@@ -61,11 +61,11 @@ const upcomingTasks: Task[] = [
 ];
 
 const progressData = [
-  { subject: '國語', progress: 65, color: '#4F46E5' },
-  { subject: '數學', progress: 78, color: '#0EA5E9' },
-  { subject: '英語', progress: 42, color: '#F97316' },
-  { subject: '自然', progress: 85, color: '#10B981' },
-  { subject: '社會', progress: 51, color: '#8B5CF6' }
+  { subject: '國語', progress: 38, color: '#4F46E5' },
+  { subject: '數學', progress: 55, color: '#0EA5E9' },
+  { subject: '英語', progress: 47, color: '#F97316' },
+  { subject: '自然', progress: 62, color: '#10B981' },
+  { subject: '社會', progress: 41, color: '#8B5CF6' }
 ];
 
 const StudentDashboard: React.FC = () => {
