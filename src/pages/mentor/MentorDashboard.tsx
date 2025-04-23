@@ -2,6 +2,8 @@ import React from 'react';
 import PageLayout from '../../components/layout/PageLayout';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Book, User, CheckCircle, Clock, Calendar, TrendingUp } from 'lucide-react';
+// StatsBlock 导入路径已更正
+import { StatsBlock } from '../../components/blocks/StatsBlock';
 
 // Mock data
 const students = [
@@ -72,64 +74,19 @@ const upcomingTasks = [
 const MentorDashboard: React.FC = () => {
   const navigate = useNavigate();
 
+  const statsData = {
+    studentCount: students.length,
+    completedTasks: students.reduce((sum, student) => sum + student.completedTasks, 0),
+    pendingTasks: students.reduce((sum, student) => sum + (student.totalTasks - student.completedTasks), 0),
+    weeklyPlans: 5
+  };
+
   return (
     <PageLayout title="指導老師儀表板">
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-6">
           <section>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-indigo-500">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-lg">
-                    <User className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">學生總數</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{students.length}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-green-500">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-green-100 dark:bg-green-900/30 p-3 rounded-lg">
-                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">已完成任務</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                      {students.reduce((sum, student) => sum + student.completedTasks, 0)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-orange-500">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-orange-100 dark:bg-orange-900/30 p-3 rounded-lg">
-                    <Clock className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">待完成任務</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                      {students.reduce((sum, student) => sum + (student.totalTasks - student.completedTasks), 0)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-purple-500">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-purple-100 dark:bg-purple-900/30 p-3 rounded-lg">
-                    <Calendar className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">本週計畫</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">5</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <StatsBlock data={statsData} />
           </section>
           
           <section>
