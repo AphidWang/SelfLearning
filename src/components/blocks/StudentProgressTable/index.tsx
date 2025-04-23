@@ -7,7 +7,9 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
   students,
   onViewDetails 
 }) => {
-  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
+  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(
+    new Set(students.map(student => student.id))
+  );
 
   const toggleExpand = (studentId: string) => {
     const newExpanded = new Set(expandedStudents);
