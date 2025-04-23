@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Clock, BookOpen } from 'lucide-react';
-import { StudentProgressTableProps } from './types';
+import { StudentProgressTableProps, Student, WeeklyPlan } from './types';
 import { card, layout, subjects, taskStyles } from '../../../styles/tokens';
 
 export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({ 
   students,
   onViewDetails 
 }) => {
-  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(
-    new Set(students.map(student => student.id))
-  );
+  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
 
   const toggleExpand = (studentId: string) => {
     const newExpanded = new Set(expandedStudents);
@@ -34,16 +32,16 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string, progress: number) => {
     switch (status) {
       case 'completed':
         return '已完成';
       case 'in_progress':
         return '進行中';
       case 'waiting_feedback':
-        return '待回饋';
+        return <span className={taskStyles.status.waiting_feedback}>待回饋</span>;
       default:
-        return '待進行';
+        return '未開始';
     }
   };
 
@@ -78,9 +76,9 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
   };
 
   const getDueDateStyle = (endDate: Date, status: string) => {
-    // 如果任務已完成或待回饋，使用預設的藍色
+    // 如果任務已完成或待回饋，使用預設樣式（不上色）
     if (status === 'completed' || status === 'waiting_feedback') {
-      return taskStyles.dueDate.upcoming; // 藍色
+      return 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400';
     }
 
     const today = new Date();
@@ -91,13 +89,34 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
     const diffTime = targetDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
+    // 只有過期的才標示紅色，其他都用預設樣式
     if (diffDays < 0) {
       return taskStyles.dueDate.overdue;  // 紅色
-    } else if (diffDays === 0) {
-      return taskStyles.dueDate.today;    // 橙色
     } else {
-      return taskStyles.dueDate.upcoming; // 藍色
+      return 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400';  // 預設樣式
     }
+  };
+
+  const getOverdueTasks = (student: Student) => {
+    let overdueCount = 0;
+    student.weeklyPlans?.forEach((plan: WeeklyPlan) => {
+      plan.tasks.forEach(task => {
+        if (task.status !== 'completed' && task.status !== 'waiting_feedback') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const targetDate = new Date(task.endDate);
+          targetDate.setHours(0, 0, 0, 0);
+          
+          const diffTime = targetDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays < 0) {
+            overdueCount++;
+          }
+        }
+      });
+    });
+    return overdueCount;
   };
 
   return (
@@ -113,7 +132,7 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                 任務完成率
               </th>
               <th scope="col" className="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                最近活動
+                關注項目
               </th>
               <th scope="col" className="w-2/12 px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 待回饋
@@ -160,10 +179,16 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {student.lastActive}
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap text-left">
+                    {getOverdueTasks(student) > 0 ? (
+                      <span className={taskStyles.dueDate.overdue}>
+                        {getOverdueTasks(student)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        正常
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {student.pendingFeedback > 0 && (
@@ -217,17 +242,17 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                                         <span className={taskStyles.status.waiting_feedback}>
                                           待回饋
                                         </span>
-                                      ) : task.progress === 100 && task.status === 'completed' ? (
+                                      ) : task.status === 'completed' ? (
                                         <span className={taskStyles.status.completed}>
                                           已完成
                                         </span>
-                                      ) : task.progress > 0 ? (
+                                      ) : task.status === 'in_progress' ? (
                                         <span className={taskStyles.status.in_progress}>
-                                          進行中 {task.progress}%
+                                          進行中
                                         </span>
                                       ) : (
                                         <span className={taskStyles.status.pending}>
-                                          待完成
+                                          未開始
                                         </span>
                                       )}
                                     </div>
