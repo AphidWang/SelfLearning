@@ -7,7 +7,7 @@ const statsConfig = [
   {
     key: 'studentCount',
     icon: User,
-    label: '學生數',
+    label: '學生總數',
     color: 'indigo'
   },
   {

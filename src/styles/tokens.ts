@@ -27,14 +27,39 @@ export const colors = {
 
 export const card = {
   base: 'bg-white dark:bg-gray-800 rounded-lg shadow',
-  border: 'border-l-4',
+  border: 'border-l-4'
 };
 
 export const text = {
   label: 'text-sm font-medium text-gray-500 dark:text-gray-400',
   value: 'text-2xl font-semibold text-gray-900 dark:text-white',
+  title: 'text-xl font-semibold text-gray-800 dark:text-white',
+  body: 'text-sm text-gray-500 dark:text-gray-400',
+  link: 'text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium',
+  name: 'font-medium text-gray-900 dark:text-white',
+  description: 'text-sm text-gray-600 dark:text-gray-300',
+  meta: 'text-xs text-gray-500 dark:text-gray-400',
+  activity: 'text-sm font-medium text-gray-900 dark:text-white'
 };
 
 export const iconContainer = {
   base: 'flex-shrink-0 p-3 rounded-lg',
+};
+
+export const layout = {
+  section: {
+    header: 'flex justify-between items-center mb-4',
+    content: 'space-y-4'
+  },
+  divider: 'border-b border-gray-200 dark:border-gray-700 last:border-0 pb-4 last:pb-0',
+  row: 'flex justify-between items-start',
+  icon: {
+    wrapper: 'mr-4 flex-shrink-0',
+    circle: 'h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center',
+    base: 'text-indigo-600 dark:text-indigo-400'
+  },
+  activity: {
+    container: 'flex',
+    content: 'space-y-1'
+  }
 }; 
