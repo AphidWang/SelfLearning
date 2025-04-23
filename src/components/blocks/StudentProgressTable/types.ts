@@ -1,28 +1,28 @@
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  startDate: Date;
+  endDate: Date;
+  status: string;
+  progress: number;
+}
+
+export interface WeeklyPlan {
+  subject: string;
+  curriculum: string;
+  tasks: Task[];
+}
+
 export interface Student {
   id: string;
   name: string;
-  progress: number;
+  avatar: string;
   completedTasks: number;
   totalTasks: number;
   lastActive: string;
-  avatar: string;
-  subjects: Array<{
-    name: string;
-    progress: number;
-  }>;
   pendingFeedback: number;
-  weeklyPlans?: Array<{
-    subject: string;
-    curriculum: string;
-    tasks: Array<{
-      id: string;
-      title: string;
-      description: string;
-      dueDate: string;
-      status: string;
-      progress: number;
-    }>;
-  }>;
+  weeklyPlans?: WeeklyPlan[];
 }
 
 export interface StudentProgressTableProps {
