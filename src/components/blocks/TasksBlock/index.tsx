@@ -2,7 +2,7 @@ import React from 'react';
 import { TasksBlockProps } from './types';
 import { card, text } from '../../../styles/tokens';
 
-export const TasksBlock: React.FC<TasksBlockProps> = ({ tasks, onViewAll }) => {
+export const TasksBlock: React.FC<TasksBlockProps> = ({ tasks }) => {
   const getDueDateStyle = (dueDate: string) => {
     switch (dueDate) {
       case '今天':
@@ -16,9 +16,6 @@ export const TasksBlock: React.FC<TasksBlockProps> = ({ tasks, onViewAll }) => {
 
   return (
     <div className={`${card.base} p-4`}>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className={text.title}>您的待辦事項</h2>
-      </div>
       <div className="space-y-4">
         {tasks.map((task) => (
           <div key={task.id} className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -42,15 +39,6 @@ export const TasksBlock: React.FC<TasksBlockProps> = ({ tasks, onViewAll }) => {
             </div>
           </div>
         ))}
-        
-        {onViewAll && (
-          <button 
-            onClick={onViewAll}
-            className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:text-indigo-300 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 focus:outline-none"
-          >
-            查看全部任務
-          </button>
-        )}
       </div>
     </div>
   );

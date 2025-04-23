@@ -1,13 +1,12 @@
 import React from 'react';
 import PageLayout from '../../components/layout/PageLayout';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Book, User, CheckCircle, Clock, Calendar, TrendingUp } from 'lucide-react';
-// StatsBlock 导入路径已更正
 import { StatsBlock } from '../../components/blocks/StatsBlock';
 import { StudentProgressTable } from '../../components/blocks/StudentProgressTable';
 import { AttentionBlock } from '../../components/blocks/AttentionBlock';
 import { TasksBlock } from '../../components/blocks/TasksBlock';
 import { RecentActivitiesBlock } from '../../components/blocks/RecentActivitiesBlock';
+import { card, text, layout } from '../../styles/tokens';
 
 // Mock data
 const students = [
@@ -105,33 +104,47 @@ const MentorDashboard: React.FC = () => {
 
   return (
     <PageLayout title="指導老師儀表板">
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 space-y-6">
-          <section>
+      <div className={layout.grid.main}>
+        <div className={layout.grid.sidebar}>
+          <section className={layout.section.wrapper}>
             <StatsBlock data={statsData} />
           </section>
-          <section>
-            <StudentProgressTable 
-              students={students}
-              onViewDetails={(studentId) => navigate(`/mentor/students/${studentId}`)}
-            />
+          <section className={layout.section.wrapper}>
+            <div className={layout.section.header}>
+              <h2 className={text.title}>學生進度總覽</h2>
+            </div>
+            <div className={`${layout.card.base} overflow-hidden`}>
+              <StudentProgressTable 
+                students={students}
+                onViewDetails={(studentId) => navigate(`/mentor/students/${studentId}`)}
+              />
+            </div>
           </section>
         </div>
-        <div className="space-y-6">
+        <div className={layout.section.wrapper}>
           <section>
+            <div className={layout.section.header}>
+              <h2 className={text.title}>需要關注</h2>
+            </div>
             <AttentionBlock items={attentionItems} />
           </section>
           <section>
-            <TasksBlock 
-              tasks={upcomingTasks}
-              onViewAll={() => navigate('/mentor/tasks')}
-            />
+            <div className={layout.section.header}>
+              <h2 className={text.title}>您的待辦事項</h2>
+              <button onClick={() => navigate('/mentor/tasks')} className={text.link}>
+                查看全部
+              </button>
+            </div>
+            <TasksBlock tasks={upcomingTasks} />
           </section>
           <section>
-            <RecentActivitiesBlock 
-              activities={recentActivities}
-              onViewAll={() => navigate('/mentor/activities')}
-            />
+            <div className={layout.section.header}>
+              <h2 className={text.title}>學生最近活動</h2>
+              <button onClick={() => navigate('/mentor/activities')} className={text.link}>
+                查看全部
+              </button>
+            </div>
+            <RecentActivitiesBlock activities={recentActivities} />
           </section>
         </div>
       </div>

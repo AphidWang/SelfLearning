@@ -33,12 +33,12 @@ export const card = {
 export const text = {
   label: 'text-sm font-medium text-gray-500 dark:text-gray-400',
   value: 'text-2xl font-semibold text-gray-900 dark:text-white',
-  title: 'text-xl font-semibold text-gray-800 dark:text-white',
+  title: 'text-xl font-semibold text-gray-900 dark:text-white',
   body: 'text-sm text-gray-500 dark:text-gray-400',
   link: 'text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium',
   name: 'font-medium text-gray-900 dark:text-white',
   description: 'text-sm text-gray-600 dark:text-gray-300',
-  meta: 'text-xs text-gray-500 dark:text-gray-400',
+  meta: 'text-sm text-gray-500 dark:text-gray-400',
   activity: 'text-sm font-medium text-gray-900 dark:text-white'
 };
 
@@ -48,8 +48,9 @@ export const iconContainer = {
 
 export const layout = {
   section: {
-    header: 'flex justify-between items-center mb-4',
-    content: 'space-y-4'
+    header: 'flex items-center justify-between mb-4',
+    content: 'space-y-6',
+    wrapper: 'space-y-6'
   },
   divider: 'border-b border-gray-200 dark:border-gray-700 last:border-0 pb-4 last:pb-0',
   row: 'flex justify-between items-start',
@@ -61,5 +62,15 @@ export const layout = {
   activity: {
     container: 'flex',
     content: 'space-y-1'
+  },
+  grid: {
+    main: 'grid grid-cols-1 xl:grid-cols-3 gap-6',
+    sidebar: 'xl:col-span-2 space-y-6'
+  },
+  card: {
+    base: 'bg-white dark:bg-gray-800 rounded-lg shadow',
+    padding: 'p-4',
+    interactive: 'hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer',
+    border: 'border border-gray-200 dark:border-gray-700'
   }
 }; 

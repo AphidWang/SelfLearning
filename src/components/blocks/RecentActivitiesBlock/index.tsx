@@ -4,22 +4,10 @@ import { RecentActivitiesBlockProps } from './types';
 import { card, text, layout } from '../../../styles/tokens';
 
 export const RecentActivitiesBlock: React.FC<RecentActivitiesBlockProps> = ({ 
-  activities,
-  onViewAll 
+  activities
 }) => {
   return (
     <div className={`${card.base} p-4`}>
-      <div className={layout.section.header}>
-        <h2 className={text.title}>學生最近活動</h2>
-        {onViewAll && (
-          <button 
-            onClick={onViewAll}
-            className={text.link}
-          >
-            查看全部
-          </button>
-        )}
-      </div>
       <div className={layout.section.content}>
         {activities.map((activity) => (
           <div key={activity.id} className={layout.activity.container}>
