@@ -127,8 +127,8 @@ export const mockStudents = [
       id: '3',
       name: '林大文',
       progress: 91,
-      completedTasks: 20,
-      totalTasks: 22,
+      completedTasks: 0,
+      totalTasks: 0,
       lastActive: '3 小時前',
       avatar: 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=150',
       subjects: [

@@ -7,7 +7,17 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
   students,
   onViewDetails 
 }) => {
-  const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (studentId: string) => {
+    const newExpanded = new Set(expandedStudents);
+    if (newExpanded.has(studentId)) {
+      newExpanded.delete(studentId);
+    } else {
+      newExpanded.add(studentId);
+    }
+    setExpandedStudents(newExpanded);
+  };
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -110,10 +120,10 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <button 
-                        onClick={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
+                        onClick={() => toggleExpand(student.id)}
                         className="mr-3 flex items-center"
                       >
-                        {expandedStudent === student.id ? (
+                        {expandedStudents.has(student.id) ? (
                           <ChevronUp className="h-4 w-4 text-gray-500" />
                         ) : (
                           <ChevronDown className="h-4 w-4 text-gray-500" />
@@ -129,10 +139,18 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
-                      {student.completedTasks}/{student.totalTasks}
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {Math.round((student.completedTasks / student.totalTasks) * 100)}%
+                      {student.totalTasks > 0 ? (
+                        <>
+                          {student.completedTasks}/{student.totalTasks}
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {Math.round((student.completedTasks / student.totalTasks) * 100)}%
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          尚無任務
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -152,7 +170,7 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                     )}
                   </td>
                 </tr>
-                {expandedStudent === student.id && (
+                {expandedStudents.has(student.id) && (
                   <tr>
                     <td colSpan={6} className="px-6 py-4">
                       {(student.weeklyPlans?.length ?? 0) > 0 ? (
