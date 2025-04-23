@@ -127,14 +127,17 @@ export const taskStyles = {
   title: 'text-sm font-medium text-gray-900 dark:text-white',
   description: 'text-sm text-gray-600 dark:text-gray-300 break-words',
   dueDate: {
-    overdue: 'inline-flex items-center text-xs text-red-600 dark:text-red-400',
-    today: 'inline-flex items-center text-xs text-orange-600 dark:text-orange-400',
-    upcoming: 'inline-flex items-center text-xs text-blue-600 dark:text-blue-400'
+    overdue: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-200',
+    today: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    upcoming: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
   },
   status: {
     completed: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
     'in_progress': 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-    waiting_feedback: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    waiting_feedback: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
     pending: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+  },
+  badge: {
+    feedback: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
   }
 }; 

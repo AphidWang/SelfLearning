@@ -1,6 +1,8 @@
 const today = new Date();
 const yesterday = new Date(today);
 yesterday.setDate(today.getDate() - 1);
+const twoDaysAgo = new Date(today);
+twoDaysAgo.setDate(today.getDate() - 2);
 const tomorrow = new Date(today);
 tomorrow.setDate(today.getDate() + 1);
 const dayAfterTomorrow = new Date(today);
@@ -40,10 +42,10 @@ export const mockStudents = [
               id: 't2',
               title: '課文朗讀練習',
               description: '練習課文朗讀並錄音',
-              startDate: yesterday,
-              endDate: today,
-              status: 'completed',
-              progress: 100
+              startDate: twoDaysAgo,
+              endDate: twoDaysAgo,
+              status: 'in_progress',
+              progress: 50
             },
             {
               id: 't3',

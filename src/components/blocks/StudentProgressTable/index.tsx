@@ -77,7 +77,12 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
     return new Intl.DateTimeFormat('zh-TW', { month: 'numeric', day: 'numeric' }).format(date);
   };
 
-  const getDueDateStyle = (endDate: Date) => {
+  const getDueDateStyle = (endDate: Date, status: string) => {
+    // 如果任務已完成或待回饋，使用預設的藍色
+    if (status === 'completed' || status === 'waiting_feedback') {
+      return taskStyles.dueDate.upcoming; // 藍色
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(endDate);
@@ -161,13 +166,9 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {student.pendingFeedback > 0 ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                    {student.pendingFeedback > 0 && (
+                      <span className={taskStyles.badge.feedback}>
                         {student.pendingFeedback}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                        無
                       </span>
                     )}
                   </td>
@@ -205,7 +206,7 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                                     </div>
 
                                     <div className="col-span-2 text-center">
-                                      <span className={getDueDateStyle(task.endDate)}>
+                                      <span className={getDueDateStyle(task.endDate, task.status)}>
                                         <Clock size={14} className="mr-1" />
                                         {formatDate(task.endDate)}
                                       </span>
