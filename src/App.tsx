@@ -30,9 +30,7 @@ function App() {
           
           {/* Mentor Routes */}
           <Route path="/mentor" element={<MentorDashboard />} />
-          <Route path="/mentor/students" element={<MentorStudentOverview />} />
           <Route path="/mentor/tasks" element={<MentorTaskManager />} />
-          <Route path="/mentor/progress" element={<MentorProgressTracker />} />
           <Route path="/mentor/subject/:subjectId" element={<SubjectPage isMentor={true} />} />
           
           {/* Default and Not Found Routes */}

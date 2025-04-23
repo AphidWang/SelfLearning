@@ -26,9 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     ],
     mentor: [
       { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
-      { name: '學生總覽', path: '/mentor/students', icon: <Users size={20} /> },
       { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
-      { name: '進度追蹤', path: '/mentor/progress', icon: <LineChart size={20} /> },
     ]
   };
 
