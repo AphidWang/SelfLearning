@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, User, KeyRound, Mail } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { CONTACT_EMAIL } from '../config/contact';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -68,14 +69,14 @@ const Login: React.FC = () => {
           </div>
           <div className="space-y-2">
             <button 
-              onClick={() => window.location.href = 'mailto:u26480@gmail.com'} 
+              onClick={() => window.location.href = `mailto:${CONTACT_EMAIL}`} 
               className="inline-flex items-center px-6 py-3 text-base font-medium rounded-full shadow-lg text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors"
             >
               <Mail className="h-5 w-5 mr-2" />
               加入我們成為早期使用者
             </button>
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              歡迎來信了解更多：u26480@gmail.com
+              歡迎來信了解更多：{CONTACT_EMAIL}
             </div>
           </div>
         </div>

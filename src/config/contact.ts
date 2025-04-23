@@ -1,0 +1,1 @@
+export const CONTACT_EMAIL = 'chiawentsai.0807@gmail.com'; 
