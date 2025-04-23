@@ -7,97 +7,18 @@ import { AttentionBlock } from '../../components/blocks/AttentionBlock';
 import { TasksBlock } from '../../components/blocks/TasksBlock';
 import { RecentActivitiesBlock } from '../../components/blocks/RecentActivitiesBlock';
 import { text, layout } from '../../styles/tokens';
+import { mockStudents } from '../../mocks/students';
 
-// Mock data
-const students = [
-  {
-    id: '1',
-    name: '王小明',
-    progress: 78,
-    completedTasks: 14,
-    totalTasks: 18,
-    lastActive: '今天',
-    avatar: 'https://images.pexels.com/photos/1462630/pexels-photo-1462630.jpeg?auto=compress&cs=tinysrgb&w=150',
-    subjects: [
-      { name: '國語', progress: 85 },
-      { name: '數學', progress: 72 },
-      { name: '英語', progress: 68 },
-      { name: '自然', progress: 90 },
-    ],
-    pendingFeedback: 2,
-    weeklyPlans: [
-      {
-        subject: '國語',
-        curriculum: '第六課 - 生活中的科學',
-        tasks: [
-          {
-            id: 't1',
-            title: '寫一篇遊記',
-            description: '選擇一個最近去過的地方，寫一篇遊記',
-            dueDate: '週五',
-            status: 'in_progress',
-            progress: 30
-          },
-          {
-            id: 't2',
-            title: '課文朗讀練習',
-            description: '練習課文朗讀並錄音',
-            dueDate: '週三',
-            status: 'completed',
-            progress: 100
-          }
-        ]
-      },
-      {
-        subject: '自然',
-        curriculum: '物質的三態變化',
-        tasks: [
-          {
-            id: 't3',
-            title: '水三態的科學實驗',
-            description: '完成水三態實驗報告',
-            dueDate: '週三',
-            status: 'completed',
-            progress: 100
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: '2',
-    name: '陳小美',
-    progress: 62,
-    completedTasks: 9,
-    totalTasks: 15,
-    lastActive: '昨天',
-    avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150',
-    subjects: [
-      { name: '國語', progress: 65 },
-      { name: '數學', progress: 55 },
-      { name: '英語', progress: 72 },
-      { name: '自然', progress: 60 },
-    ],
-    pendingFeedback: 1,
-    weeklyPlans: [] // 沒有本週任務的學生
-  },
-  {
-    id: '3',
-    name: '林大文',
-    progress: 91,
-    completedTasks: 20,
-    totalTasks: 22,
-    lastActive: '3 小時前',
-    avatar: 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=150',
-    subjects: [
-      { name: '國語', progress: 92 },
-      { name: '數學', progress: 88 },
-      { name: '英語', progress: 95 },
-      { name: '自然', progress: 89 },
-    ],
-    pendingFeedback: 0
-  }
-];
+// 動態生成日期
+const today = new Date();
+const yesterday = new Date(today);
+yesterday.setDate(today.getDate() - 1);
+const tomorrow = new Date(today);
+tomorrow.setDate(today.getDate() + 1);
+const dayAfterTomorrow = new Date(today);
+dayAfterTomorrow.setDate(today.getDate() + 2);
+
+
 
 const recentActivities = [
   { id: '1', student: '王小明', activity: '完成了任務', detail: '水三態的科學實驗', time: '1 小時前' },
@@ -135,9 +56,9 @@ const MentorDashboard: React.FC = () => {
   const navigate = useNavigate();
 
   const statsData = {
-    studentCount: students.length,
-    completedTasks: students.reduce((sum, student) => sum + student.completedTasks, 0),
-    pendingTasks: students.reduce((sum, student) => sum + (student.totalTasks - student.completedTasks), 0),
+    studentCount: mockStudents.length,
+    completedTasks: mockStudents.reduce((sum, student) => sum + student.completedTasks, 0),
+    pendingTasks: mockStudents.reduce((sum, student) => sum + (student.totalTasks - student.completedTasks), 0),
     weeklyPlans: 5
   };
 
@@ -154,7 +75,7 @@ const MentorDashboard: React.FC = () => {
             </div>
             <div className={`${layout.card.base} overflow-hidden`}>
               <StudentProgressTable 
-                students={students}
+                students={mockStudents}
                 onViewDetails={(studentId) => navigate(`/mentor/students/${studentId}`)}
               />
             </div>

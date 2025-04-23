@@ -73,4 +73,68 @@ export const layout = {
     interactive: 'hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer',
     border: 'border border-gray-200 dark:border-gray-700'
   }
+};
+
+type SubjectStyle = {
+  bg: string;
+  text: string;
+  accent: string;
+};
+
+type SubjectColors = {
+  [key: string]: SubjectStyle;
+};
+
+export const subjects = {
+  colors: {
+    '國語': {
+      bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+      text: 'text-indigo-800 dark:text-indigo-300',
+      accent: '#4F46E5'
+    },
+    '數學': {
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-800 dark:text-blue-300',
+      accent: '#0EA5E9'
+    },
+    '英語': {
+      bg: 'bg-orange-100 dark:bg-orange-900/30',
+      text: 'text-orange-800 dark:text-orange-300',
+      accent: '#F97316'
+    },
+    '自然': {
+      bg: 'bg-green-100 dark:bg-green-900/30',
+      text: 'text-green-800 dark:text-green-300',
+      accent: '#10B981'
+    },
+    '社會': {
+      bg: 'bg-purple-100 dark:bg-purple-900/30',
+      text: 'text-purple-800 dark:text-purple-300',
+      accent: '#8B5CF6'
+    }
+  } as SubjectColors,
+  getSubjectStyle: (subjectName: string) => {
+    const defaultStyle = {
+      bg: 'bg-gray-100 dark:bg-gray-900/30',
+      text: 'text-gray-800 dark:text-gray-300',
+      accent: '#6B7280'
+    };
+    return subjects.colors[subjectName] || defaultStyle;
+  }
+};
+
+export const taskStyles = {
+  title: 'text-sm font-medium text-gray-900 dark:text-white',
+  description: 'text-sm text-gray-600 dark:text-gray-300 break-words',
+  dueDate: {
+    overdue: 'inline-flex items-center text-xs text-red-600 dark:text-red-400',
+    today: 'inline-flex items-center text-xs text-orange-600 dark:text-orange-400',
+    upcoming: 'inline-flex items-center text-xs text-blue-600 dark:text-blue-400'
+  },
+  status: {
+    completed: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    'in_progress': 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    waiting_feedback: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    pending: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+  }
 }; 

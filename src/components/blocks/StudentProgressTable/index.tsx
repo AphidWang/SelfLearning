@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Clock, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, BookOpen } from 'lucide-react';
 import { StudentProgressTableProps } from './types';
-import { card, layout } from '../../../styles/tokens';
+import { card, layout, subjects, taskStyles } from '../../../styles/tokens';
 
 export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({ 
   students,
@@ -15,6 +15,8 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
       case 'in_progress':
         return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+      case 'waiting_feedback':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
       default:
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
     }
@@ -25,9 +27,59 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
       case 'completed':
         return '已完成';
       case 'in_progress':
-        return `進行中`;
+        return '進行中';
+      case 'waiting_feedback':
+        return '待回饋';
       default:
         return '待進行';
+    }
+  };
+
+  const formatDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    // 計算日期差
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // 優先判斷今天、明天、昨天
+    if (diffDays === 0) return '今天';
+    if (diffDays === 1) return '明天';
+    if (diffDays === -1) return '昨天';
+    
+    // 判斷是否在本週內
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    if (targetDate >= weekStart && targetDate <= weekEnd) {
+      const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+      return weekdays[targetDate.getDay()];
+    }
+    
+    // 其他日期顯示月日
+    return new Intl.DateTimeFormat('zh-TW', { month: 'numeric', day: 'numeric' }).format(date);
+  };
+
+  const getDueDateStyle = (endDate: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(endDate);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return taskStyles.dueDate.overdue;  // 紅色
+    } else if (diffDays === 0) {
+      return taskStyles.dueDate.today;    // 橙色
+    } else {
+      return taskStyles.dueDate.upcoming; // 藍色
     }
   };
 
@@ -37,23 +89,17 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th scope="col" className="w-3/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 學生
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                總進度
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th scope="col" className="w-5/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 任務完成率
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th scope="col" className="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 最近活動
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th scope="col" className="w-2/12 px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 待回饋
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                操作
               </th>
             </tr>
           </thead>
@@ -82,19 +128,6 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 w-24">
-                        <div 
-                          className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full" 
-                          style={{ width: `${student.progress}%` }}
-                        ></div>
-                      </div>
-                      <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                        {student.progress}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
                       {student.completedTasks}/{student.totalTasks}
                     </div>
@@ -102,10 +135,12 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                       {Math.round((student.completedTasks / student.totalTasks) * 100)}%
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {student.lastActive}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {student.lastActive}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
                     {student.pendingFeedback > 0 ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
                         {student.pendingFeedback}
@@ -116,14 +151,6 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button 
-                      onClick={() => onViewDetails?.(student.id)}
-                      className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
-                    >
-                      詳情
-                    </button>
-                  </td>
                 </tr>
                 {expandedStudent === student.id && (
                   <tr>
@@ -133,41 +160,55 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                           {student.weeklyPlans?.map((plan, planIndex) => (
                             <div key={planIndex} className="space-y-3">
                               <div className="flex items-center space-x-2">
-                                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {plan.subject}
-                                </span>
-                                <span className="text-gray-500 dark:text-gray-400">·</span>
-                                <span className="text-sm text-gray-500 dark:text-gray-400">
+                                <h3 className="text-base font-medium text-gray-900 dark:text-white">
                                   {plan.curriculum}
+                                </h3>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${subjects.getSubjectStyle(plan.subject).bg} ${subjects.getSubjectStyle(plan.subject).text}`}>
+                                  <BookOpen size={14} className="mr-1" />
+                                  {plan.subject}
                                 </span>
                               </div>
                               
                               <div className="space-y-2">
                                 {plan.tasks.map((task) => (
-                                  <div key={task.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-                                    <div className="flex-1">
-                                      <div className="flex items-center space-x-4">
-                                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                                          {task.title}
-                                        </h3>
-                                        <span className="inline-flex items-center text-xs text-gray-500 dark:text-gray-400">
-                                          <Clock size={14} className="mr-1" />
-                                          {task.dueDate}
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                  <div key={task.id} className="grid grid-cols-12 items-center bg-gray-50 dark:bg-gray-700/50 px-6 py-3 rounded-lg">
+                                    <div className="col-span-3">
+                                      <h3 className={taskStyles.title}>
+                                        {task.title}
+                                      </h3>
+                                    </div>
+                                    
+                                    <div className="col-span-5">
+                                      <p className={taskStyles.description}>
                                         {task.description}
                                       </p>
                                     </div>
-                                    <div className="flex items-center space-x-3">
-                                      {task.progress > 0 && task.progress < 100 && (
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                          {task.progress}%
+
+                                    <div className="col-span-2 text-center">
+                                      <span className={getDueDateStyle(task.endDate)}>
+                                        <Clock size={14} className="mr-1" />
+                                        {formatDate(task.endDate)}
+                                      </span>
+                                    </div>
+
+                                    <div className="col-span-2 text-right">
+                                      {task.status === 'waiting_feedback' ? (
+                                        <span className={taskStyles.status.waiting_feedback}>
+                                          待回饋
+                                        </span>
+                                      ) : task.progress === 100 && task.status === 'completed' ? (
+                                        <span className={taskStyles.status.completed}>
+                                          已完成
+                                        </span>
+                                      ) : task.progress > 0 ? (
+                                        <span className={taskStyles.status.in_progress}>
+                                          進行中 {task.progress}%
+                                        </span>
+                                      ) : (
+                                        <span className={taskStyles.status.pending}>
+                                          待完成
                                         </span>
                                       )}
-                                      <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusStyle(task.status)}`}>
-                                        {getStatusText(task.status)}
-                                      </span>
                                     </div>
                                   </div>
                                 ))}
