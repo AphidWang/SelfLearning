@@ -11,6 +11,18 @@ export interface Student {
     progress: number;
   }>;
   pendingFeedback: number;
+  weeklyPlans?: Array<{
+    subject: string;
+    curriculum: string;
+    tasks: Array<{
+      id: string;
+      title: string;
+      description: string;
+      dueDate: string;
+      status: string;
+      progress: number;
+    }>;
+  }>;
 }
 
 export interface StudentProgressTableProps {

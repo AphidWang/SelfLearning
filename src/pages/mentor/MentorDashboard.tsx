@@ -6,7 +6,7 @@ import { StudentProgressTable } from '../../components/blocks/StudentProgressTab
 import { AttentionBlock } from '../../components/blocks/AttentionBlock';
 import { TasksBlock } from '../../components/blocks/TasksBlock';
 import { RecentActivitiesBlock } from '../../components/blocks/RecentActivitiesBlock';
-import { card, text, layout } from '../../styles/tokens';
+import { text, layout } from '../../styles/tokens';
 
 // Mock data
 const students = [
@@ -24,7 +24,45 @@ const students = [
       { name: '英語', progress: 68 },
       { name: '自然', progress: 90 },
     ],
-    pendingFeedback: 2
+    pendingFeedback: 2,
+    weeklyPlans: [
+      {
+        subject: '國語',
+        curriculum: '第六課 - 生活中的科學',
+        tasks: [
+          {
+            id: 't1',
+            title: '寫一篇遊記',
+            description: '選擇一個最近去過的地方，寫一篇遊記',
+            dueDate: '週五',
+            status: 'in_progress',
+            progress: 30
+          },
+          {
+            id: 't2',
+            title: '課文朗讀練習',
+            description: '練習課文朗讀並錄音',
+            dueDate: '週三',
+            status: 'completed',
+            progress: 100
+          }
+        ]
+      },
+      {
+        subject: '自然',
+        curriculum: '物質的三態變化',
+        tasks: [
+          {
+            id: 't3',
+            title: '水三態的科學實驗',
+            description: '完成水三態實驗報告',
+            dueDate: '週三',
+            status: 'completed',
+            progress: 100
+          }
+        ]
+      }
+    ]
   },
   {
     id: '2',
@@ -40,7 +78,8 @@ const students = [
       { name: '英語', progress: 72 },
       { name: '自然', progress: 60 },
     ],
-    pendingFeedback: 1
+    pendingFeedback: 1,
+    weeklyPlans: [] // 沒有本週任務的學生
   },
   {
     id: '3',
