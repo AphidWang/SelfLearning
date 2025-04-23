@@ -66,13 +66,18 @@ const Login: React.FC = () => {
               </span>
             </div>
           </div>
-          <button 
-            onClick={() => window.location.href = 'mailto:u26480@gmail.com'} 
-            className="inline-flex items-center px-6 py-3 text-base font-medium rounded-full shadow-lg text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors"
-          >
-            <Mail className="h-5 w-5 mr-2" />
-            加入我們成為早期使用者
-          </button>
+          <div className="space-y-2">
+            <button 
+              onClick={() => window.location.href = 'mailto:u26480@gmail.com'} 
+              className="inline-flex items-center px-6 py-3 text-base font-medium rounded-full shadow-lg text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors"
+            >
+              <Mail className="h-5 w-5 mr-2" />
+              加入我們成為早期使用者
+            </button>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              歡迎來信了解更多：u26480@gmail.com
+            </div>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
