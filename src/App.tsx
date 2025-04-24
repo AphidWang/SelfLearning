@@ -12,6 +12,7 @@ import MentorTaskManager from './pages/mentor/MentorTaskManager';
 import MentorProgressTracker from './pages/mentor/MentorProgressTracker.tsx';
 import SubjectPage from './pages/shared/SubjectPage';
 import NotFound from './pages/NotFound';
+import MentorCurriculum from './pages/mentor/MentorCurriculum';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
           <Route path="/mentor" element={<MentorDashboard />} />
           <Route path="/mentor/tasks" element={<MentorTaskManager />} />
           <Route path="/mentor/subject/:subjectId" element={<SubjectPage isMentor={true} />} />
+          <Route path="/mentor/curriculum" element={<MentorCurriculum />} />
           
           {/* Default and Not Found Routes */}
           <Route path="/" element={<Navigate to="/login" replace />} />

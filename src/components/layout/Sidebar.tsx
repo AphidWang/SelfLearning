@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, ListTodo, Users, BookMarked, 
-  Menu, X, LogOut 
+  Menu, X, LogOut, Map 
 } from 'lucide-react';
 import { useUser, UserRole } from '../../contexts/UserContext';
 
@@ -27,6 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     mentor: [
       { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
       { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
+      { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
     ]
   };
 
