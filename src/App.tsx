@@ -13,34 +13,39 @@ import MentorProgressTracker from './pages/mentor/MentorProgressTracker.tsx';
 import SubjectPage from './pages/shared/SubjectPage';
 import NotFound from './pages/NotFound';
 import MentorCurriculum from './pages/mentor/MentorCurriculum';
+import TaskPlanner from './pages/mentor/TaskPlanner';
+import { CurriculumProvider } from './context/CurriculumContext';
 
 function App() {
   return (
-    <UserProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          {/* Student Routes */}
-          <Route path="/student" element={<StudentDashboard />} />
-          <Route path="/student/schedule" element={<StudentSchedule />} />
-          <Route path="/student/tasks" element={<StudentTasks />} />
-          <Route path="/student/journal" element={<StudentJournal />} />
-          <Route path="/student/goals" element={<StudentGoals />} />
-          <Route path="/student/subject/:subjectId" element={<SubjectPage />} />
-          
-          {/* Mentor Routes */}
-          <Route path="/mentor" element={<MentorDashboard />} />
-          <Route path="/mentor/tasks" element={<MentorTaskManager />} />
-          <Route path="/mentor/subject/:subjectId" element={<SubjectPage isMentor={true} />} />
-          <Route path="/mentor/curriculum" element={<MentorCurriculum />} />
-          
-          {/* Default and Not Found Routes */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
-    </UserProvider>
+    <CurriculumProvider>
+      <UserProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            {/* Student Routes */}
+            <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/student/schedule" element={<StudentSchedule />} />
+            <Route path="/student/tasks" element={<StudentTasks />} />
+            <Route path="/student/journal" element={<StudentJournal />} />
+            <Route path="/student/goals" element={<StudentGoals />} />
+            <Route path="/student/subject/:subjectId" element={<SubjectPage />} />
+            
+            {/* Mentor Routes */}
+            <Route path="/mentor" element={<MentorDashboard />} />
+            <Route path="/mentor/tasks" element={<MentorTaskManager />} />
+            <Route path="/mentor/task-planner" element={<TaskPlanner />} />
+            <Route path="/mentor/subject/:subjectId" element={<SubjectPage isMentor={true} />} />
+            <Route path="/mentor/curriculum" element={<MentorCurriculum />} />
+            
+            {/* Default and Not Found Routes */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
+      </UserProvider>
+    </CurriculumProvider>
   );
 }
 
