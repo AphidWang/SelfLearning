@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Xarrow, { Xwrapper } from 'react-xarrows';
 import { DndContext, DragEndEvent, useDraggable, DragStartEvent, DragMoveEvent } from '@dnd-kit/core';
@@ -28,10 +28,14 @@ interface NodeProps {
   onNodeComplete?: (nodeId: string) => void;
   onAddBranch?: (nodeId: string, position: { x: number; y: number }) => void;
   onEditNode?: (nodeId: string, updates: Partial<LearningNode>) => void;
+  onNodesChange?: (nodes: LearningNode[]) => void;
   showRewardAnimation?: boolean;
   isStudent?: boolean;
   isEditable?: boolean;
   isDragging?: boolean;
+  dragStartPosition?: { x: number; y: number } | null;
+  nodes?: LearningNode[];
+  allowDragOut?: boolean;
 }
 
 const Node: React.FC<NodeProps> = React.memo(({ 
@@ -39,21 +43,25 @@ const Node: React.FC<NodeProps> = React.memo(({
   onNodeComplete,
   onAddBranch,
   onEditNode,
+  onNodesChange,
+  nodes,
   showRewardAnimation,
   isStudent,
   isEditable,
-  isDragging
+  isDragging,
+  dragStartPosition,
+  allowDragOut
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const nodeRef = useRef<HTMLElement | null>(null);
+  const { attributes, listeners, setNodeRef } = useDraggable({
     id: node.id,
     disabled: !isEditable || isStudent
   });
 
-  const style = transform ? {
-    transform: CSS.Transform.toString(transform),
-    zIndex: 50
+  const style = dragStartPosition ? {
+    transform: `translate3d(${dragStartPosition.x}px, ${dragStartPosition.y}px, 0)`,
   } : undefined;
 
   const statusColors = {
@@ -103,6 +111,40 @@ const Node: React.FC<NodeProps> = React.memo(({
     onEditNode?.(node.id, updates);
     setIsEditing(false);
   };
+
+  useEffect(() => {
+    if (!allowDragOut) return;
+
+    const element = nodeRef.current;
+    if (!element) return;
+
+    const handleNativeDragStart = (e: DragEvent) => {
+      e.stopPropagation();
+      if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', node.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }
+    };
+
+    const handleNativeDragEnd = (e: DragEvent) => {
+      if (dragStartPosition && nodes) {
+        const updatedNodes = nodes.map(n => 
+          n.id === node.id 
+            ? { ...n, position: dragStartPosition }
+            : n
+        );
+        onNodesChange?.(updatedNodes);
+      }
+    };
+
+    element.addEventListener('dragstart', handleNativeDragStart);
+    element.addEventListener('dragend', handleNativeDragEnd);
+    
+    return () => {
+      element.removeEventListener('dragstart', handleNativeDragStart);
+      element.removeEventListener('dragend', handleNativeDragEnd);
+    };
+  }, [node.id, allowDragOut, dragStartPosition, nodes]);
 
   if (isEditing && isEditable) {
     return (
@@ -201,8 +243,13 @@ const Node: React.FC<NodeProps> = React.memo(({
 
   return (
     <motion.div
-      ref={setNodeRef}
       id={node.id}
+      ref={(el) => {
+        nodeRef.current = el;
+        setNodeRef(el);
+      }}
+      {...attributes}
+      {...listeners}
       style={{
         position: 'absolute',
         left: node.position.x,
@@ -211,14 +258,13 @@ const Node: React.FC<NodeProps> = React.memo(({
         cursor: isEditable && !isStudent ? 'grab' : 'default',
         ...style
       }}
+      draggable={allowDragOut}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ scale: 1.05 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       className="relative"
-      {...attributes}
-      {...listeners}
     >
       {/* Level Ring */}
       <div className={`
@@ -375,7 +421,8 @@ const Node: React.FC<NodeProps> = React.memo(({
     prev.isDragging === next.isDragging &&
     prev.showRewardAnimation === next.showRewardAnimation &&
     prev.isEditable === next.isEditable &&
-    prev.isStudent === next.isStudent
+    prev.isStudent === next.isStudent &&
+    prev.dragStartPosition === next.dragStartPosition
   );
 });
 
@@ -384,13 +431,15 @@ interface LearningMapProps {
   onNodesChange: (nodes: LearningNode[]) => void;
   isStudent?: boolean;
   isEditable?: boolean;
+  allowDragOut?: boolean;
 }
 
 const LearningMap: React.FC<LearningMapProps> = ({ 
   nodes = [], 
   onNodesChange, 
   isStudent,
-  isEditable = !isStudent 
+  isEditable = !isStudent,
+  allowDragOut = false
 }) => {
   const [showRewardAnimation, setShowRewardAnimation] = useState(false);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
@@ -463,30 +512,6 @@ const LearningMap: React.FC<LearningMapProps> = ({
     if (!active || !draggingNodeId || !dragStartPosition) return;
 
     const nodeId = active.id as string;
-    requestAnimationFrame(() => {
-      const updatedNodes = nodes.map(node => 
-        node.id === nodeId 
-          ? {
-              ...node,
-              position: {
-                x: dragStartPosition.x + delta.x,
-                y: dragStartPosition.y + delta.y
-              }
-            }
-          : node
-      );
-      onNodesChange(updatedNodes);
-    });
-  }, [nodes, draggingNodeId, dragStartPosition, onNodesChange]);
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, delta } = event;
-    if (!active || !dragStartPosition) return;
-
-    const nodeId = active.id as string;
-    setDraggingNodeId(null);
-    setDragStartPosition(null);
-    
     const updatedNodes = nodes.map(node => 
       node.id === nodeId 
         ? {
@@ -498,12 +523,35 @@ const LearningMap: React.FC<LearningMapProps> = ({
           }
         : node
     );
-    
+    onNodesChange(updatedNodes);
+  }, [nodes, draggingNodeId, dragStartPosition, onNodesChange]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+    if (!active || !dragStartPosition) return;
+
+    const nodeId = active.id as string;
+    setDraggingNodeId(null);
+    setDragStartPosition(null);
+
+    // 更新節點位置
+    const updatedNodes = nodes.map(node => 
+      node.id === nodeId 
+        ? {
+            ...node,
+            position: {
+              x: dragStartPosition.x + delta.x,
+              y: dragStartPosition.y + delta.y
+            }
+          }
+        : node
+    );
     onNodesChange(updatedNodes);
   };
 
+  // 生成連線
   const arrows = useMemo(() => 
-    nodes.map(node => 
+    nodes.flatMap(node => 
       node.connections.map(targetId => (
         <Xarrow
           key={`${node.id}-${targetId}`}
@@ -512,32 +560,18 @@ const LearningMap: React.FC<LearningMapProps> = ({
           path="smooth"
           startAnchor="right"
           endAnchor="left"
-          showHead={false}
+          showHead={true}
           strokeWidth={2}
           color={node.status === 'completed' ? '#22c55e' : '#6366f1'}
-          dashness={node.status === 'locked'}
+          dashness={node.status === 'locked' ? true : false}
+          curveness={0.3}
         />
       ))
     ), [nodes]
   );
 
-  const nodeElements = useMemo(() => 
-    nodes.map(node => (
-      <Node
-        key={node.id}
-        node={node}
-        isDragging={node.id === draggingNodeId}
-        onNodeComplete={handleNodeComplete}
-        onAddBranch={isEditable ? handleAddBranch : undefined}
-        onEditNode={handleEditNode}
-        showRewardAnimation={showRewardAnimation}
-        isStudent={isStudent}
-        isEditable={isEditable}
-      />
-    )), [nodes, draggingNodeId, showRewardAnimation, isStudent, isEditable]);
-
   return (
-    <div className="relative w-full overflow-hidden bg-gradient-to-br from-gray-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-900/30 rounded-xl shadow-inner">
+    <div className="relative w-full bg-gradient-to-br from-gray-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-900/30 rounded-xl shadow-inner">
       <div className="absolute top-4 left-4 z-10 flex items-center space-x-2 text-gray-600 dark:text-gray-300">
         <Compass className="w-5 h-5" />
         <span className="text-sm font-medium">學習地圖</span>
@@ -547,7 +581,8 @@ const LearningMap: React.FC<LearningMapProps> = ({
         className="min-h-[600px] relative p-8" 
         style={{ 
           minWidth: '1200px',
-          touchAction: 'none'
+          touchAction: 'none',
+          overflow: allowDragOut ? 'visible' : 'hidden'
         }}
       >
         <Xwrapper>
@@ -556,9 +591,23 @@ const LearningMap: React.FC<LearningMapProps> = ({
             onDragStart={handleDragStart}
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
-            modifiers={[]}
           >
-            {nodeElements}
+            {nodes.map(node => (
+              <Node
+                key={node.id}
+                node={node}
+                nodes={nodes}
+                onNodeComplete={handleNodeComplete}
+                onAddBranch={handleAddBranch}
+                onEditNode={handleEditNode}
+                showRewardAnimation={showRewardAnimation}
+                isStudent={isStudent}
+                isEditable={isEditable}
+                isDragging={node.id === draggingNodeId}
+                dragStartPosition={dragStartPosition}
+                allowDragOut={allowDragOut}
+              />
+            ))}
           </DndContext>
         </Xwrapper>
       </div>
