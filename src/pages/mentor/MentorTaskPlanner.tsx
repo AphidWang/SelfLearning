@@ -6,29 +6,25 @@ import { usePlanner } from '../../context/PlannerContext';
 import { useCurriculum } from '../../context/CurriculumContext';
 import { PlannerProvider } from '../../context/PlannerContext';
 import { CurriculumProvider } from '../../context/CurriculumContext';
+import { WeekPlan } from '../../types/planner';
 
 const TaskPlannerContent: React.FC = () => {
-  const { weeks, setWeeks, assignments } = usePlanner();
+  const { weeks, assignments } = usePlanner();
   const { nodes, setNodes, updateNodeStatus } = useCurriculum();
 
   // 當 assignments 改變時，更新節點狀態
   useEffect(() => {
     assignments.forEach(assignment => {
-      const status = assignment.status === 'completed' ? 'completed' : 'unlocked';
-      updateNodeStatus(assignment.nodeId, status);
+      if (assignment.status === 'accepted') {
+        // 找到對應的任務和節點
+        const week = weeks.find(w => w.id === assignment.weekId);
+        const task = week?.tasks.find(t => t.id === assignment.taskId);
+        if (task?.courseId) {
+          updateNodeStatus(task.courseId, 'completed');
+        }
+      }
     });
-  }, [assignments, updateNodeStatus]);
-
-  // 初始化週數
-  React.useEffect(() => {
-    if (weeks.length === 0) {
-      const initialWeeks = Array.from({ length: 8 }, (_, i) => ({
-        id: i + 1,
-        nodeIds: []
-      }));
-      setWeeks(initialWeeks);
-    }
-  }, [weeks.length, setWeeks]);
+  }, [assignments, weeks, updateNodeStatus]);
 
   return (
     <PageLayout title="任務規劃">
@@ -39,7 +35,15 @@ const TaskPlannerContent: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               週任務規劃
             </h2>
-            <WeeklyTaskColumns />
+            <WeeklyTaskColumns 
+              weeks={weeks}
+              onAssignTask={(taskId, weekId) => {
+                // 由 PlannerContext 處理
+              }}
+              onRemoveTask={(taskId, weekId) => {
+                // 由 PlannerContext 處理
+              }}
+            />
           </div>
         </div>
 
@@ -62,7 +66,7 @@ const TaskPlannerContent: React.FC = () => {
   );
 };
 
-const TaskPlanner: React.FC = () => {
+const MentorTaskPlanner: React.FC = () => {
   return (
     <PlannerProvider>
       <CurriculumProvider>
@@ -72,4 +76,4 @@ const TaskPlanner: React.FC = () => {
   );
 };
 
-export default TaskPlanner; 
+export default MentorTaskPlanner; 

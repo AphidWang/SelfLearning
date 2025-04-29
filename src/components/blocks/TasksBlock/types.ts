@@ -1,9 +1,4 @@
-export interface Task {
-  id: string;
-  title: string;
-  dueDate: string;
-  students: string[];
-}
+import { Task } from '../../../types/task';
 
 export interface TasksBlockProps {
   tasks: Task[];

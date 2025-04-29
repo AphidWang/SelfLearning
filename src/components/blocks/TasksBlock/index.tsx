@@ -1,19 +1,10 @@
 import React from 'react';
 import { TasksBlockProps } from './types';
-import { card, text } from '../../../styles/tokens';
+import { card, text, taskStyles } from '../../../styles/tokens';
+import { getDueDateStyle } from '../../../utils/dateUtils';
+import { formatDate } from '../../../utils/dateUtils';
 
 export const TasksBlock: React.FC<TasksBlockProps> = ({ tasks }) => {
-  const getDueDateStyle = (dueDate: string) => {
-    switch (dueDate) {
-      case '今天':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-      case '明天':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
-      default:
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-    }
-  };
-
   return (
     <div className={`${card.base} p-4`}>
       <div className="space-y-4">
@@ -23,8 +14,8 @@ export const TasksBlock: React.FC<TasksBlockProps> = ({ tasks }) => {
               <h3 className="font-medium text-gray-900 dark:text-white">
                 {task.title}
               </h3>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${getDueDateStyle(task.dueDate)}`}>
-                {task.dueDate}
+              <span className={getDueDateStyle(task.endDate, task.status)}>
+                {formatDate(task.endDate)}
               </span>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">

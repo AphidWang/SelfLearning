@@ -1,27 +1,17 @@
 import React, { useState } from 'react';
 import { CheckCircle, Circle, ChevronDown, ChevronRight, AlertCircle, Clock } from 'lucide-react';
-
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate: Date;
-  completed: boolean;
-  subject: string;
-  priority: 'high' | 'medium' | 'low';
-  assignedBy?: string;
-}
+import { Task, TaskStatus, TaskPriority } from '../../types/task';
 
 interface TaskListProps {
   tasks: Task[];
-  onTaskToggle: (taskId: string) => void;
+  onStatusChange?: (taskId: string, status: TaskStatus) => void;
   onTaskSelect?: (task: Task) => void;
   groupBy?: 'subject' | 'dueDate' | 'priority' | 'none';
 }
 
 const TaskList: React.FC<TaskListProps> = ({
   tasks,
-  onTaskToggle,
+  onStatusChange,
   onTaskSelect,
   groupBy = 'none'
 }) => {
@@ -46,12 +36,14 @@ const TaskList: React.FC<TaskListProps> = ({
       if (groupBy === 'subject') {
         groupKey = task.subject;
       } else if (groupBy === 'priority') {
-        groupKey = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
+        groupKey = task.priority ? 
+          task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 
+          'Normal';
       } else if (groupBy === 'dueDate') {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        const taskDate = new Date(task.dueDate);
+        const taskDate = new Date(task.endDate);
         taskDate.setHours(0, 0, 0, 0);
         
         const diffTime = taskDate.getTime() - today.getTime();
@@ -95,7 +87,22 @@ const TaskList: React.FC<TaskListProps> = ({
     }
   };
 
-  const formatDueDate = (date: Date) => {
+  const getStatusIcon = (status: TaskStatus) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle size={20} className="text-green-500" />;
+      case 'in_progress':
+        return <Circle size={20} className="text-blue-500 fill-blue-100" />;
+      case 'waiting_feedback':
+        return <Circle size={20} className="text-orange-500 fill-orange-100" />;
+      case 'overdue':
+        return <AlertCircle size={20} className="text-red-500" />;
+      default:
+        return <Circle size={20} className="text-gray-400" />;
+    }
+  };
+
+  const formatDueDate = (date: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -112,7 +119,7 @@ const TaskList: React.FC<TaskListProps> = ({
     } else if (diffDays === 1) {
       return '明天';
     } else {
-      return new Intl.DateTimeFormat('zh-TW', { month: 'short', day: 'numeric' }).format(date);
+      return new Intl.DateTimeFormat('zh-TW', { month: 'short', day: 'numeric' }).format(taskDate);
     }
   };
 
@@ -152,31 +159,31 @@ const TaskList: React.FC<TaskListProps> = ({
                         className="mt-0.5 mr-3 focus:outline-none"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onTaskToggle(task.id);
+                          onStatusChange?.(task.id, 
+                            task.status === 'completed' ? 'pending' : 'completed'
+                          );
                         }}
                       >
-                        {task.completed ? (
-                          <CheckCircle size={20} className="text-green-500" />
-                        ) : (
-                          <Circle size={20} className="text-gray-400" />
-                        )}
+                        {getStatusIcon(task.status)}
                       </button>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className={`font-medium ${task.completed ? 'text-gray-500 dark:text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>
+                          <p className={`font-medium ${
+                            task.status === 'completed' 
+                              ? 'text-gray-500 dark:text-gray-400 line-through' 
+                              : 'text-gray-900 dark:text-white'
+                          }`}>
                             {task.title}
                           </p>
                           <div className="flex items-center ml-2">
-                            {getPriorityIcon(task.priority)}
+                            {task.priority && getPriorityIcon(task.priority)}
                             <span className={`ml-1 text-xs ${
-                              task.priority === 'high' 
+                              task.status === 'overdue' 
                                 ? 'text-red-500' 
-                                : task.priority === 'medium' 
-                                  ? 'text-orange-500' 
-                                  : 'text-blue-500'
+                                : 'text-gray-500'
                             }`}>
-                              {formatDueDate(task.dueDate)}
+                              {formatDueDate(task.endDate)}
                             </span>
                           </div>
                         </div>
@@ -194,6 +201,11 @@ const TaskList: React.FC<TaskListProps> = ({
                           {task.assignedBy && (
                             <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                               由 {task.assignedBy} 指派
+                            </span>
+                          )}
+                          {task.progress > 0 && (
+                            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                              進度: {task.progress}%
                             </span>
                           )}
                         </div>

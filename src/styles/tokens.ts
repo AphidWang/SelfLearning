@@ -72,7 +72,12 @@ export const layout = {
     padding: 'p-4',
     interactive: 'hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer',
     border: 'border border-gray-200 dark:border-gray-700'
-  }
+  },
+  table: 'min-w-full divide-y divide-gray-200 dark:divide-gray-700',
+  tableHeader: 'bg-gray-50 dark:bg-gray-800/50',
+  tableHeaderCell: 'px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider',
+  tableRow: 'hover:bg-gray-50 dark:hover:bg-gray-800/50',
+  tableCell: 'px-6 py-4 whitespace-nowrap'
 };
 
 type SubjectStyle = {
@@ -134,7 +139,8 @@ export const taskStyles = {
     completed: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400',
     'in_progress': 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400',
     waiting_feedback: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-    pending: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400'
+    pending: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400',
+    overdue: 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
   },
   badge: {
     feedback: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'

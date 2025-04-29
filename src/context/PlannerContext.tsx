@@ -1,56 +1,45 @@
 import React, { createContext, useContext, useState } from 'react';
-import { Student, TaskStatus } from '../types/task';
+import { Task, TaskStatus } from '../types/task';
+import { WeekPlan, TaskAssignment } from '../types/planner';
 import { useCurriculum } from './CurriculumContext';
 
-interface Week {
-  id: number;
-  nodeIds: string[];  // 改用 nodeIds 而不是重複存儲任務數據
-}
-
-interface Assignment {
-  nodeId: string;     // 改用 nodeId
-  studentId: string;
-  weekId: number;
-  status: 'pending' | 'completed' | 'overdue';
-  assignedAt: string;
-  completedAt?: string;
-}
-
 interface PlannerContextType {
-  weeks: Week[];
-  students: Student[];
-  assignments: Assignment[];
-  setWeeks: React.Dispatch<React.SetStateAction<Week[]>>;
-  // 任務管理
-  assignNodeToWeek: (nodeId: string, weekId: number) => void;
-  removeNodeFromWeek: (nodeId: string, weekId: number) => void;
-  isNodeAssignable: (nodeId: string, weekId: number) => boolean;
+  weeks: WeekPlan[];
+  tasks: Task[];
+  assignments: TaskAssignment[];
+  
+  // 週任務管理
+  assignTaskToWeek: (taskId: string, weekId: number) => void;
+  removeTaskFromWeek: (taskId: string, weekId: number) => void;
+  updateTaskStatus: (taskId: string, status: TaskStatus) => void;
+  
   // 任務分配
-  assignNodesToStudents: (params: {
+  assignTasksToStudents: (params: {
     weekId: number;
-    nodeIds: string[];
+    taskIds: string[];
     studentIds: string[];
-  }) => Promise<void>;
-  getStudentNodes: (studentId: string) => string[];
-  getWeekNodes: (weekId: number) => string[];
+  }) => void;
 }
 
 const PlannerContext = createContext<PlannerContextType | undefined>(undefined);
 
 export const PlannerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [weeks, setWeeks] = useState<Week[]>([]);
-  const [students] = useState<Student[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const { nodes } = useCurriculum();  // 使用 CurriculumContext 的數據
+  const [weeks, setWeeks] = useState<WeekPlan[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [assignments, setAssignments] = useState<TaskAssignment[]>([]);
+  const { nodes } = useCurriculum();
 
-  // 任務管理功能
-  const assignNodeToWeek = (nodeId: string, weekId: number) => {
+  // 週任務管理功能
+  const assignTaskToWeek = (taskId: string, weekId: number) => {
     setWeeks(prevWeeks => 
       prevWeeks.map(week => {
         if (week.id === weekId) {
+          const task = tasks.find(t => t.id === taskId);
+          if (!task) return week;
+          
           return {
             ...week,
-            nodeIds: [...week.nodeIds, nodeId]
+            tasks: [...week.tasks, { ...task, weekId }]
           };
         }
         return week;
@@ -58,13 +47,13 @@ export const PlannerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
-  const removeNodeFromWeek = (nodeId: string, weekId: number) => {
+  const removeTaskFromWeek = (taskId: string, weekId: number) => {
     setWeeks(prevWeeks =>
       prevWeeks.map(week => {
         if (week.id === weekId) {
           return {
             ...week,
-            nodeIds: week.nodeIds.filter(id => id !== nodeId)
+            tasks: week.tasks.filter(task => task.id !== taskId)
           };
         }
         return week;
@@ -72,63 +61,86 @@ export const PlannerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
-  const isNodeAssignable = (nodeId: string, weekId: number) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node?.requirements?.length) return true;
+  const updateTaskStatus = (taskId: string, status: TaskStatus) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === taskId
+          ? { ...task, status }
+          : task
+      )
+    );
 
-    return node.requirements.every(reqId => {
-      const reqNode = nodes.find(n => n.id === reqId);
-      const reqWeek = weeks.find(w => w.nodeIds.includes(reqId));
-      return reqWeek && reqWeek.id < weekId;
-    });
+    // 同時更新週任務中的狀態
+    setWeeks(prevWeeks =>
+      prevWeeks.map(week => ({
+        ...week,
+        tasks: week.tasks.map(task =>
+          task.id === taskId
+            ? { ...task, status }
+            : task
+        )
+      }))
+    );
   };
 
   // 任務分配功能
-  const assignNodesToStudents = async ({
+  const assignTasksToStudents = async ({
     weekId,
-    nodeIds,
+    taskIds,
     studentIds
   }: {
     weekId: number;
-    nodeIds: string[];
+    taskIds: string[];
     studentIds: string[];
   }) => {
-    const newAssignments: Assignment[] = studentIds.flatMap(studentId =>
-      nodeIds.map(nodeId => ({
-        nodeId,
+    const newAssignments: TaskAssignment[] = studentIds.flatMap(studentId =>
+      taskIds.map(taskId => ({
+        id: `${taskId}-${studentId}-${weekId}`, // 生成唯一 ID
+        taskId,
         studentId,
         weekId,
         status: 'pending',
-        assignedAt: new Date().toISOString()
+        assignedAt: new Date().toISOString(),
+        assignedBy: 'current-teacher-id', // TODO: 從 auth context 獲取
       }))
     );
 
     setAssignments(prev => [...prev, ...newAssignments]);
+
+    // 更新任務狀態為進行中
+    taskIds.forEach(taskId => {
+      updateTaskStatus(taskId, 'in_progress');
+    });
   };
 
-  const getStudentNodes = (studentId: string) => {
-    return assignments
-      .filter(a => a.studentId === studentId)
-      .map(a => a.nodeId);
-  };
+  // 初始化週數
+  React.useEffect(() => {
+    if (weeks.length === 0) {
+      const initialWeeks: WeekPlan[] = Array.from({ length: 8 }, (_, i) => ({
+        id: i + 1,
+        tasks: [],
+        nodeIds: [], // 保留向後兼容
+        subjectId: '', // TODO: 從課程資料獲取
+        creatorId: 'current-teacher-id', // TODO: 從 auth context 獲取
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
+      setWeeks(initialWeeks);
+    }
+  }, []);
 
-  const getWeekNodes = (weekId: number) => {
-    return weeks.find(w => w.id === weekId)?.nodeIds || [];
+  const value = {
+    weeks,
+    tasks,
+    assignments,
+    assignTaskToWeek,
+    removeTaskFromWeek,
+    updateTaskStatus,
+    assignTasksToStudents
   };
 
   return (
-    <PlannerContext.Provider value={{
-      weeks,
-      students,
-      assignments,
-      setWeeks,
-      assignNodeToWeek,
-      removeNodeFromWeek,
-      isNodeAssignable,
-      assignNodesToStudents,
-      getStudentNodes,
-      getWeekNodes
-    }}>
+    <PlannerContext.Provider value={value}>
       {children}
     </PlannerContext.Provider>
   );
@@ -136,7 +148,7 @@ export const PlannerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 export const usePlanner = () => {
   const context = useContext(PlannerContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('usePlanner must be used within a PlannerProvider');
   }
   return context;
