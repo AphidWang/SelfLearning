@@ -3,16 +3,18 @@ import { NavLink } from 'react-router-dom';
 import { 
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, ListTodo, Users, BookMarked, 
-  Menu, X, LogOut, Map, Calendar 
+  Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import { useUser, UserRole } from '../../contexts/UserContext';
 
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  isCollapsed: boolean;
+  setIsCollapsed: (isCollapsed: boolean) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) => {
   const { currentUser, logout } = useUser();
   const role = currentUser?.role as UserRole;
 
@@ -35,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const items = role ? sidebarItems[role] : [];
 
   const toggleSidebar = () => setIsOpen(!isOpen);
+  const toggleCollapse = () => setIsCollapsed(!isCollapsed);
 
   return (
     <>
@@ -56,17 +59,33 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
       {/* Sidebar */}
       <div 
-        className={`fixed inset-y-0 left-0 bg-white dark:bg-gray-900 w-64 z-30 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:relative bg-white dark:bg-gray-900 transform transition-all duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } lg:static lg:translate-x-0 lg:z-0 shadow-lg`}
+        } ${
+          isCollapsed ? 'w-16' : 'w-64'
+        } h-full z-30 shadow-lg`}
       >
+        {/* Collapse toggle button */}
+        <button
+          onClick={toggleCollapse}
+          className="hidden lg:flex absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-indigo-600 text-white items-center justify-center rounded-full shadow-lg hover:bg-indigo-700"
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
+
         <div className="flex flex-col h-full">
           {/* Logo and brand */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">學習進度追蹤</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {role === 'student' ? '學生版' : '指導老師版'}
-            </p>
+            <h1 className={`text-xl font-bold text-indigo-600 dark:text-indigo-400 truncate ${
+              isCollapsed ? 'text-center' : ''
+            }`}>
+              {isCollapsed ? '學習' : '學習進度追蹤'}
+            </h1>
+            {!isCollapsed && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {role === 'student' ? '學生版' : '指導老師版'}
+              </p>
+            )}
           </div>
 
           {/* Navigation items */}
@@ -84,9 +103,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                       }`
                     }
                     onClick={() => setIsOpen(false)}
+                    title={isCollapsed ? item.name : undefined}
                   >
-                    <span className="mr-3">{item.icon}</span>
-                    {item.name}
+                    <span className={isCollapsed ? 'mx-auto' : 'mr-3'}>{item.icon}</span>
+                    {!isCollapsed && item.name}
                   </NavLink>
                 </li>
               ))}
@@ -100,24 +120,30 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                 <img 
                   src={currentUser.avatar} 
                   alt={currentUser.name}
-                  className="w-10 h-10 rounded-full mr-3 object-cover"
+                  className={`w-10 h-10 rounded-full object-cover ${
+                    isCollapsed ? 'mx-auto' : 'mr-3'
+                  }`}
                 />
               )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                  {currentUser?.name}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {role === 'student' ? '學生' : '指導老師'}
-                </p>
-              </div>
-              <button 
-                onClick={logout}
-                className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                title="登出"
-              >
-                <LogOut size={18} />
-              </button>
+              {!isCollapsed && (
+                <>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      {currentUser?.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {role === 'student' ? '學生' : '指導老師'}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={logout}
+                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    title="登出"
+                  >
+                    <LogOut size={18} />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
