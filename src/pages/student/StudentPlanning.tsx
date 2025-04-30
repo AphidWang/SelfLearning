@@ -1,121 +1,13 @@
 import React, { useState } from 'react';
 import PageLayout from '../../components/layout/PageLayout';
-import { 
-  Target, ChevronRight, Plus, Calendar, 
-  ArrowRight, Sparkles, Brain, BookOpen,
-  Lightbulb, CheckCircle2, AlertCircle
-} from 'lucide-react';
-
-interface Goal {
-  id: string;
-  title: string;
-  description: string;
-  category: 'learning' | 'personal' | 'project';
-  status: 'active' | 'completed' | 'paused';
-  dueDate?: Date;
-  progress: number;
-  actionItems: ActionItem[];
-  source: 'student' | 'mentor';
-  createdAt: Date;
-}
-
-interface ActionItem {
-  id: string;
-  description: string;
-  estimatedTime?: string;
-  status: 'todo' | 'in-progress' | 'done';
-  addedToSchedule: boolean;
-  dueDate?: Date;
-  priority: 'high' | 'medium' | 'low';
-}
-
-const mockGoals: Goal[] = [
-  {
-    id: '1',
-    title: '完成科學探索專案',
-    description: '透過觀察、實驗和記錄，探索自然現象並培養科學思維',
-    category: 'learning',
-    status: 'active',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-    progress: 35,
-    source: 'mentor',
-    createdAt: new Date(),
-    actionItems: [
-      {
-        id: '1-1',
-        description: '閱讀科學家傳記，了解科學研究方法',
-        estimatedTime: '2小時',
-        status: 'done',
-        addedToSchedule: true,
-        priority: 'high'
-      },
-      {
-        id: '1-2',
-        description: '進行水的三態實驗並記錄觀察',
-        estimatedTime: '1.5小時',
-        status: 'in-progress',
-        addedToSchedule: true,
-        priority: 'high'
-      },
-      {
-        id: '1-3',
-        description: '整理實驗數據並製作圖表',
-        status: 'todo',
-        addedToSchedule: false,
-        priority: 'medium'
-      }
-    ]
-  },
-  {
-    id: '2',
-    title: '環島旅行學習計畫',
-    description: '結合地理、歷史和文化的實地探索之旅',
-    category: 'project',
-    status: 'active',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 60)),
-    progress: 20,
-    source: 'student',
-    createdAt: new Date(),
-    actionItems: [
-      {
-        id: '2-1',
-        description: '規劃路線並研究各地特色',
-        estimatedTime: '3小時',
-        status: 'done',
-        addedToSchedule: true,
-        priority: 'high'
-      },
-      {
-        id: '2-2',
-        description: '準備旅行日誌模板',
-        status: 'todo',
-        addedToSchedule: false,
-        priority: 'medium'
-      }
-    ]
-  }
-];
-
-const goalTemplates = [
-  {
-    icon: <Brain className="h-5 w-5 text-purple-500" />,
-    title: '學習目標',
-    description: '設定特定科目或技能的學習目標',
-    category: 'learning'
-  },
-  {
-    icon: <Target className="h-5 w-5 text-blue-500" />,
-    title: '個人成長',
-    description: '培養習慣、發展興趣或自我提升',
-    category: 'personal'
-  },
-  {
-    icon: <Sparkles className="h-5 w-5 text-green-500" />,
-    title: '專案計畫',
-    description: '規劃並執行一個完整的學習專案',
-    category: 'project'
-  }
-];
+import { Target, ChevronRight, Plus, Calendar, ArrowRight, Sparkles, BookOpen, Lightbulb, CheckCircle2, AlertCircle } from 'lucide-react';
+import { GoalCard } from '../../components/goals/GoalCard';
+import { AIAssistant } from '../../components/goals/AIAssistant';
+import { ActionItem } from '../../components/goals/ActionItem';
+import { goalTemplates } from '../../mocks/goalTemplates';
+import { mockGoals } from '../../mocks/goals';
+import type { Goal } from '../../types/goal';
+import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
 
 const StudentPlanning: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>(mockGoals);
@@ -322,54 +214,11 @@ const StudentPlanning: React.FC = () => {
 
                   <div className="space-y-3">
                     {selectedGoal.actionItems.map(item => (
-                      <div
+                      <ActionItem
                         key={item.id}
-                        className="flex items-start p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition"
-                      >
-                        <div className="flex-shrink-0 mr-3">
-                          {item.status === 'done' ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : item.status === 'in-progress' ? (
-                            <AlertCircle className="h-5 w-5 text-orange-500" />
-                          ) : (
-                            <div className="h-5 w-5 border-2 border-gray-300 dark:border-gray-600 rounded-full" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-medium ${
-                            item.status === 'done'
-                              ? 'text-gray-500 dark:text-gray-400 line-through'
-                              : 'text-gray-900 dark:text-white'
-                          }`}>
-                            {item.description}
-                          </p>
-                          <div className="mt-1 flex items-center space-x-3 text-sm">
-                            {item.estimatedTime && (
-                              <span className="text-gray-500 dark:text-gray-400">
-                                預計 {item.estimatedTime}
-                              </span>
-                            )}
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              item.priority === 'high'
-                                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                : item.priority === 'medium'
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                            }`}>
-                              {item.priority === 'high' ? '優先' : item.priority === 'medium' ? '一般' : '次要'}
-                            </span>
-                          </div>
-                        </div>
-                        {!item.addedToSchedule && (
-                          <button
-                            onClick={() => handleAddToSchedule(selectedGoal.id, item.id)}
-                            className="ml-4 inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50"
-                          >
-                            <Calendar className="h-3 w-3 mr-1" />
-                            加入課表
-                          </button>
-                        )}
-                      </div>
+                        item={item}
+                        onAddToSchedule={() => handleAddToSchedule(selectedGoal.id, item.id)}
+                      />
                     ))}
                   </div>
                 </div>
