@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, ListTodo, Users, BookMarked, 
-  Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight 
+  Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight, Target 
 } from 'lucide-react';
 import { useUser, UserRole } from '../../contexts/UserContext';
 
@@ -23,6 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       { name: '儀表板', path: '/student', icon: <BookOpen size={20} /> },
       { name: '課表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
       { name: '任務', path: '/student/tasks', icon: <CheckSquare size={20} /> },
+      { name: '學習規劃', path: '/student/planning', icon: <Target size={20} /> },
       { name: '學習日誌', path: '/student/journal', icon: <BookMarked size={20} /> },
       { name: '目標與進度', path: '/student/goals', icon: <LineChart size={20} /> },
     ],

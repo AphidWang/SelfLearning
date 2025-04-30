@@ -15,6 +15,7 @@ import NotFound from './pages/NotFound';
 import MentorCurriculum from './pages/mentor/MentorCurriculum';
 import MentorTaskPlanner from './pages/mentor/MentorTaskPlanner.tsx';
 import { CurriculumProvider } from './context/CurriculumContext';
+import StudentPlanning from './pages/student/StudentPlanning';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/student/schedule" element={<StudentSchedule />} />
             <Route path="/student/tasks" element={<StudentTasks />} />
+            <Route path="/student/planning" element={<StudentPlanning />} />
             <Route path="/student/journal" element={<StudentJournal />} />
             <Route path="/student/goals" element={<StudentGoals />} />
             <Route path="/student/subject/:subjectId" element={<SubjectPage />} />
