@@ -1,13 +1,12 @@
 {
   "name": "self-learning-platform",
   "private": true,
+  "scripts": {
+    "build": "cd apps/server && yarn build && cd ../client && yarn build",
+    "start": "cd apps/server && yarn start"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "scripts": {
-    "dev": "concurrently \"cd apps/client && yarn dev\" \"cd apps/server && yarn dev\"",
-    "build": "yarn workspaces run build",
-    "start": "cd apps/server && yarn start"
-  }
+  ]
 }
