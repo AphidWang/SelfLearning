@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRouter from './routes/auth';
+import path from 'path';
 
 dotenv.config();
 
@@ -30,7 +31,13 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRouter);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.use(express.static(path.join(__dirname, '../../client/dist')));
+
+// 確保所有路由都返回 index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 }); 
