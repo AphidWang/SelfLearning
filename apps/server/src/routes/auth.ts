@@ -6,15 +6,29 @@ const router = express.Router();
 
 router.post('/login', (req, res) => {
   const { email, password }: LoginCredentials = req.body;
-  // TODO: 實作真正的登入邏輯
-  const user = {
-    id: '1',
-    name: 'Test User',
-    role: 'student' as const
-  };
   
-  const token = generateToken(user);
-  res.json({ user, token });
+  // Demo 帳號處理
+  if (email.includes('demo')) {
+    const user: User = email.includes('student')
+      ? {
+          id: '1',
+          name: 'Alex Student',
+          role: 'student',
+          avatar: 'https://images.pexels.com/photos/1462630/pexels-photo-1462630.jpeg?auto=compress&cs=tinysrgb&w=150'
+        }
+      : {
+          id: '2',
+          name: 'Sam Mentor',
+          role: 'mentor',
+          avatar: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=150'
+        };
+    
+    const token = generateToken(user);
+    return res.json({ user, token });
+  }
+
+  // TODO: 實作真正的登入邏輯
+  res.status(401).json({ message: '無效的帳號或密碼' });
 });
 
 export default router; 
