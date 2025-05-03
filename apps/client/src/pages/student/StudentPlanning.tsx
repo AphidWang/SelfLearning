@@ -270,7 +270,7 @@ const StudentPlanning: React.FC = () => {
                 選擇目標類型
               </h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 {goalTemplates.map((template, index) => (
                   <button
                     key={index}
