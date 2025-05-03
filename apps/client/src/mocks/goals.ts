@@ -1,5 +1,6 @@
 import { Goal } from '../types/goal';
-import { GOAL_STATUSES, GOAL_SOURCES } from '../constants/goals';
+import { GOAL_STATUSES } from '../constants/goals';
+import { SUBJECTS } from '../constants/subjects';
 
 export const mockGoals: Goal[] = [
   {
@@ -7,10 +8,11 @@ export const mockGoals: Goal[] = [
     title: '完成科學探索專案',
     description: '透過觀察、實驗和記錄，探索自然現象並培養科學思維',
     category: 'learning',
+    templateType: '學習目標',
     status: GOAL_STATUSES.ACTIVE,
     dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
     progress: 35,
-    source: GOAL_SOURCES.MENTOR,
+    subject: SUBJECTS.SCIENCE,
     createdAt: new Date(),
     actionItems: [
       {
@@ -43,10 +45,11 @@ export const mockGoals: Goal[] = [
     title: '環島旅行學習計畫',
     description: '結合地理、歷史和文化的實地探索之旅',
     category: 'project',
+    templateType: '專案計畫',
     status: 'active',
     dueDate: new Date(new Date().setDate(new Date().getDate() + 60)),
     progress: 20,
-    source: 'student',
+    subject: SUBJECTS.SOCIAL,
     createdAt: new Date(),
     actionItems: [
       {

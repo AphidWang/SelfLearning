@@ -93,28 +93,44 @@ type SubjectColors = {
 export const subjects = {
   colors: {
     '國語': {
-      bg: 'bg-indigo-100 dark:bg-indigo-900/30',
-      text: 'text-indigo-800 dark:text-indigo-300',
-      accent: '#4F46E5'
-    },
-    '數學': {
       bg: 'bg-blue-100 dark:bg-blue-900/30',
       text: 'text-blue-800 dark:text-blue-300',
-      accent: '#0EA5E9'
+      accent: '#3B82F6'
     },
     '英語': {
+      bg: 'bg-cyan-100 dark:bg-cyan-900/30',
+      text: 'text-cyan-800 dark:text-cyan-300',
+      accent: '#06B6D4'  // 青色，仍保留國際清新感但與藍色有明顯區別
+    
+    },
+    '數學': {
       bg: 'bg-orange-100 dark:bg-orange-900/30',
       text: 'text-orange-800 dark:text-orange-300',
       accent: '#F97316'
     },
     '自然': {
-      bg: 'bg-green-100 dark:bg-green-900/30',
-      text: 'text-green-800 dark:text-green-300',
+      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      text: 'text-emerald-800 dark:text-emerald-300',
       accent: '#10B981'
     },
     '社會': {
-      bg: 'bg-purple-100 dark:bg-purple-900/30',
-      text: 'text-purple-800 dark:text-purple-300',
+      bg: 'bg-amber-100 dark:bg-amber-900/30',
+      text: 'text-amber-800 dark:text-amber-300',
+      accent: '#F59E0B'
+    },
+    '藝術': {
+      bg: 'bg-fuchsia-100 dark:bg-fuchsia-900/30',
+      text: 'text-fuchsia-800 dark:text-fuchsia-300',
+      accent: '#D946EF'
+    },
+    '體育': {
+      bg: 'bg-rose-100 dark:bg-rose-900/30',
+      text: 'text-rose-800 dark:text-rose-300',
+      accent: '#E11D48'
+    },
+    '自訂': {
+      bg: 'bg-violet-100 dark:bg-violet-900/30',
+      text: 'text-violet-800 dark:text-violet-300',
       accent: '#8B5CF6'
     }
   } as SubjectColors,

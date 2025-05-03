@@ -1,15 +1,18 @@
-export type Goal = {
+import { SubjectType } from '../constants/subjects';
+
+export interface Goal {
   id: string;
   title: string;
   description: string;
-  category: 'learning' | 'personal' | 'project';
-  status: 'active' | 'completed' | 'archived';
+  category: string;
+  templateType: string;
+  status: string;
   dueDate: Date;
   progress: number;
-  source: 'mentor' | 'student';
+  subject: SubjectType;
   createdAt: Date;
   actionItems: ActionItem[];
-};
+}
 
 export type ActionItem = {
   id: string;
