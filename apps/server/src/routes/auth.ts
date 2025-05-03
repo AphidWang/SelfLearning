@@ -31,4 +31,9 @@ router.post('/login', (req, res) => {
   res.status(401).json({ message: '無效的帳號或密碼' });
 });
 
+router.post('/logout', (req, res) => {
+  // 在這裡可以添加 token 黑名單等邏輯
+  res.json({ message: '登出成功' });
+});
+
 export default router; 

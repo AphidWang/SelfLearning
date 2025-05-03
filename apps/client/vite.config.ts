@@ -7,4 +7,11 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    port: 5173,
+    host: true,
+    hmr: {
+      overlay: false  // 禁用錯誤覆蓋層
+    }
+  }
 });

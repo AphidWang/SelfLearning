@@ -11,12 +11,18 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/auth', authRouter);
-
 // 測試路由
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// 添加一些日誌
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
+app.use('/api/auth', authRouter);
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

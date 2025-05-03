@@ -9,8 +9,13 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    await api.post('/api/auth/logout');
-    localStorage.removeItem('token');
+    try {
+      // 先通知後端（可以將 token 加入黑名單）
+      await api.post('/api/auth/logout');
+    } finally {
+      // 無論 API 是否成功都清除本地存儲
+      localStorage.removeItem('token');
+    }
   },
 
   async getCurrentUser(): Promise<User | null> {
@@ -21,4 +26,6 @@ export const authService = {
       return null;
     }
   }
-}; 
+};
+
+export type { User }; 

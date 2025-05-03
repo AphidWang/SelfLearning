@@ -16,7 +16,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) => {
   const { currentUser, logout } = useUser();
-  const role = currentUser?.role;
+  const role = currentUser?.role as 'student' | 'mentor' | undefined;
 
   const sidebarItems = {
     student: [
