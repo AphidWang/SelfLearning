@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bell, Sun, Moon } from 'lucide-react';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../context/UserContext';
 
 interface HeaderProps {
   title: string;

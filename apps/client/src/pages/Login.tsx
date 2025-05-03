@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, User, KeyRound, Mail } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../context/UserContext';
 import { CONTACT_EMAIL } from '../config/contact';
 
 const Login: React.FC = () => {
@@ -40,7 +40,7 @@ const Login: React.FC = () => {
   const handleDemoLogin = async (role: 'student' | 'mentor') => {
     setIsLoading(true);
     try {
-      await login(role === 'student' ? 'student@example.com' : 'mentor@example.com', 'password');
+      await login(`demo-${role}@example.com`, 'demo-password');
     } catch (err) {
       setError('Demo login failed. Please try again.');
     } finally {

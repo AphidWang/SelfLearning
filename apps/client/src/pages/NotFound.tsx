@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Home, BookOpen } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../context/UserContext';
 
 const NotFound: React.FC = () => {
   const { currentUser } = useUser();

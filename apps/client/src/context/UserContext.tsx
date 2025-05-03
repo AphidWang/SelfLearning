@@ -1,20 +1,14 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
-
-export type UserRole = 'student' | 'mentor';
-
-interface User {
-  id: string;
-  name: string;
-  role: UserRole;
-  avatar?: string;
-}
+import { authService, User } from '../services/auth';
 
 interface UserContextType {
   currentUser: User | null;
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -33,33 +27,33 @@ interface UserProviderProps {
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock login function - would connect to authentication service in production
   const login = async (email: string, password: string): Promise<boolean> => {
-    // For demo purposes, implement simple login logic
-    if (email && password) {
-      if (email.includes('student')) {
-        setCurrentUser({
-          id: '1',
-          name: 'Alex Student',
-          role: 'student',
-          avatar: 'https://images.pexels.com/photos/1462630/pexels-photo-1462630.jpeg?auto=compress&cs=tinysrgb&w=150'
-        });
-      } else {
-        setCurrentUser({
-          id: '2',
-          name: 'Sam Mentor',
-          role: 'mentor',
-          avatar: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=150'
-        });
-      }
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { user, token } = await authService.login({ email, password });
+      localStorage.setItem('token', token);
+      setCurrentUser(user);
       return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '登入失敗');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    return false;
   };
 
-  const logout = () => {
-    setCurrentUser(null);
+  const logout = async () => {
+    try {
+      await authService.logout();
+      setCurrentUser(null);
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
   };
 
   const value = {
@@ -67,8 +61,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setCurrentUser,
     isAuthenticated: !!currentUser,
     login,
-    logout
+    logout,
+    isLoading,
+    error
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };
+
+export type { User as UserRole };

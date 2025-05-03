@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { UserProvider } from './contexts/UserContext';
+import { UserProvider } from './context/UserContext.tsx';
 import Login from './pages/Login';
 import StudentDashboard from './pages/student/StudentDashboard';
 import MentorDashboard from './pages/mentor/MentorDashboard';

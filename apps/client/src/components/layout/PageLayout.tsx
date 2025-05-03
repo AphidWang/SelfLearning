@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../context/UserContext';
 
 interface PageLayoutProps {
   children: React.ReactNode;

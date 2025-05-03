@@ -5,7 +5,7 @@ import {
   LineChart, ListTodo, Users, BookMarked, 
   Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight, Target 
 } from 'lucide-react';
-import { useUser, UserRole } from '../../contexts/UserContext';
+import { useUser, UserRole } from '../../context/UserContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) => {
   const { currentUser, logout } = useUser();
-  const role = currentUser?.role as UserRole;
+  const role = currentUser?.role;
 
   const sidebarItems = {
     student: [
