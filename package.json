@@ -6,15 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "npm run dev -w apps/client",
-    "dev:server": "npm run dev -w apps/server",
-    "build": "npm run build:server && npm run build:client",
-    "build:client": "cd apps/client && npm run build",
-    "build:server": "cd apps/server && npm run build",
-    "start": "cd apps/server && npm start"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+    "dev": "concurrently \"cd apps/client && yarn dev\" \"cd apps/server && yarn dev\"",
+    "build": "yarn workspaces run build",
+    "start": "cd apps/server && yarn start"
   }
 }
