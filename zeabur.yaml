@@ -1,20 +1,6 @@
-apps:
-  - name: client
-    path: apps/client
-    build:
-      command: yarn build
-    start:
-      command: yarn preview
-    env:
-      - name: VITE_API_URL
-        value: https://selflearning.zeabur.app
-
-  - name: server
-    path: apps/server
-    build:
-      command: yarn build
-    start:
-      command: yarn start
-    env:
-      - name: CORS_ORIGIN
-        value: https://selflearning.zeabur.app
+app:
+  name: selflearning
+  build:
+    command: yarn build
+  start:
+    command: yarn start
