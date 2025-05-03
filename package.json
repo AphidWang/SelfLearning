@@ -2,6 +2,7 @@
   "name": "self-learning-platform",
   "private": true,
   "scripts": {
+    "install": "cd apps/server && yarn install && cd ../client && yarn install",
     "build": "cd apps/server && yarn build && cd ../client && yarn build",
     "start": "cd apps/server && yarn start"
   },
