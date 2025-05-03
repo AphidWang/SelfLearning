@@ -8,7 +8,13 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// CORS 設置必須在其他 middleware 之前
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true
+}));
+
+// Body parser middleware
 app.use(express.json());
 
 // 測試路由
@@ -24,6 +30,7 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRouter);
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 }); 
