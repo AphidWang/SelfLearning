@@ -6,10 +6,11 @@ import { AIAssistant } from '../../components/goals/AIAssistant';
 import { ActionItem } from '../../components/goals/ActionItem';
 import { goalTemplates } from '../../constants/goalTemplates';
 import { mockGoals } from '../../mocks/goals';
-import type { Goal } from '../../types/goal';
+import type { Goal, Step, Task } from '../../types/goal';
 import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
 import { SUBJECTS, type SubjectType } from '../../constants/subjects';
 import { subjects } from '../../styles/tokens';
+import { StepItem } from '../../components/goals/StepItem';
 
 const StudentPlanning: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>(mockGoals);
@@ -25,21 +26,94 @@ const StudentPlanning: React.FC = () => {
   const [savedGoalIds, setSavedGoalIds] = useState<Set<string>>(new Set());
   const [showSubjectSelect, setShowSubjectSelect] = useState(false);
   const [showTypeSelect, setShowTypeSelect] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
 
   useEffect(() => {
     setSavedGoalIds(new Set(goals.map(goal => goal.id)));
   }, []);
 
-  const handleAddToSchedule = (goalId: string, actionItemId: string) => {
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('.dropdown-option')) {
+        return;
+      }
+      if (!target.closest('.subject-select') && !target.closest('.type-select')) {
+        setShowSubjectSelect(false);
+        setShowTypeSelect(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleTypeSelectClick = () => {
+    setShowTypeSelect(!showTypeSelect);
+    setShowSubjectSelect(false);
+  };
+
+  const handleSubjectSelectClick = () => {
+    setShowSubjectSelect(!showSubjectSelect);
+    setShowTypeSelect(false);
+  };
+
+  const handleAddToSchedule = (goalId: string, stepId: string, taskId: string) => {
     setGoals(goals.map(goal => {
       if (goal.id === goalId) {
         return {
           ...goal,
-          actionItems: goal.actionItems.map(item => 
-            item.id === actionItemId 
-              ? { ...item, addedToSchedule: true }
-              : item
-          )
+          steps: goal.steps.map(step => {
+            if (step.id === stepId) {
+              return {
+                ...step,
+                tasks: step.tasks.map(task => 
+                  task.id === taskId 
+                    ? { ...task, addedToSchedule: true }
+                    : task
+                )
+              };
+            }
+            return step;
+          })
+        };
+      }
+      return goal;
+    }));
+  };
+
+  const toggleStep = (stepId: string) => {
+    setExpandedSteps(prev =>
+      prev.includes(stepId)
+        ? prev.filter(id => id !== stepId)
+        : [...prev, stepId]
+    );
+  };
+
+  const getCompletionRate = (goal: Goal) => {
+    if (!goal?.steps) return 0;
+    const totalTasks = goal.steps.reduce((acc, step) => acc + (step.tasks?.length || 0), 0);
+    const completedTasks = goal.steps.reduce(
+      (acc, step) => acc + (step.tasks?.filter(task => task.status === 'done').length || 0),
+      0
+    );
+    return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+  };
+
+  const updateTask = (goalId: string, stepId: string, task: Task) => {
+    setGoals(goals.map(goal => {
+      if (goal.id === goalId) {
+        return {
+          ...goal,
+          steps: goal.steps.map(step => {
+            if (step.id === stepId) {
+              return {
+                ...step,
+                tasks: step.tasks.map(t => t.id === task.id ? task : t)
+              };
+            }
+            return step;
+          })
         };
       }
       return goal;
@@ -103,10 +177,10 @@ const StudentPlanning: React.FC = () => {
                         </h3>
                       </div>
                     </div>
-                    <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      subjects.getSubjectStyle(goal.subject).bg
-                    } ${subjects.getSubjectStyle(goal.subject).text}`}>
-                      {goal.subject}
+                    <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
+                      subjects.getSubjectStyle(goal.subject || '').bg
+                    } ${subjects.getSubjectStyle(goal.subject || '').text}`}>
+                      {goal.subject || '未分類'}
                     </span>
                   </div>
 
@@ -114,13 +188,13 @@ const StudentPlanning: React.FC = () => {
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-gray-500 dark:text-gray-400">進度</span>
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {goal.progress}%
+                        {getCompletionRate(goal)}%
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-indigo-600 h-2 rounded-full"
-                        style={{ width: `${goal.progress}%` }}
+                        style={{ width: `${getCompletionRate(goal)}%` }}
                       />
                     </div>
                   </div>
@@ -131,7 +205,7 @@ const StudentPlanning: React.FC = () => {
                       {new Intl.DateTimeFormat('zh-TW', {
                         month: 'long',
                         day: 'numeric'
-                      }).format(goal.dueDate)}
+                      }).format(new Date(goal.dueDate))}
                     </div>
                   )}
                 </button>
@@ -227,12 +301,12 @@ const StudentPlanning: React.FC = () => {
                         <div className="flex gap-2">
                           <div className="relative inline-block">
                             <button
-                              onClick={() => setShowTypeSelect(!showTypeSelect)}
-                              className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md text-sm font-medium ${
-                                editedGoal?.templateType === '學習目標' ? 'bg-purple-100 text-purple-800' :
-                                editedGoal?.templateType === '個人成長' ? 'bg-blue-100 text-blue-800' :
-                                editedGoal?.templateType === '專案計畫' ? 'bg-green-100 text-green-800' :
-                                'bg-orange-100 text-orange-800'
+                              onClick={handleTypeSelectClick}
+                              className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md text-sm font-medium type-select ${
+                                editedGoal?.templateType === '學習目標' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                editedGoal?.templateType === '個人成長' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                editedGoal?.templateType === '專案計畫' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
                               }`}
                             >
                               {editedGoal?.templateType === '學習目標' ? <Brain className="h-4 w-4" /> :
@@ -248,13 +322,19 @@ const StudentPlanning: React.FC = () => {
                                 {goalTemplates.map((template) => (
                                   <button
                                     key={template.title}
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       if (editedGoal) {
                                         setEditedGoal({...editedGoal, templateType: template.title});
                                         setShowTypeSelect(false);
                                       }
                                     }}
-                                    className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className={`flex items-center gap-2 w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 dropdown-option ${
+                                      template.title === '學習目標' ? 'text-purple-600 dark:text-purple-400' :
+                                      template.title === '個人成長' ? 'text-blue-600 dark:text-blue-400' :
+                                      template.title === '專案計畫' ? 'text-green-600 dark:text-green-400' :
+                                      'text-orange-600 dark:text-orange-400'
+                                    }`}
                                   >
                                     {template.icon}
                                     {template.title}
@@ -266,12 +346,12 @@ const StudentPlanning: React.FC = () => {
 
                           <div className="relative inline-block">
                             <button
-                              onClick={() => setShowSubjectSelect(!showSubjectSelect)}
-                              className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md text-sm font-medium ${
+                              onClick={handleSubjectSelectClick}
+                              className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md text-sm font-medium subject-select ${
                                 subjects.getSubjectStyle(editedGoal?.subject || '').bg
                               } ${subjects.getSubjectStyle(editedGoal?.subject || '').text}`}
                             >
-                              {editedGoal?.subject}
+                              {editedGoal?.subject || '未分類'}
                               <ChevronDown className="h-4 w-4" />
                             </button>
                             
@@ -280,15 +360,16 @@ const StudentPlanning: React.FC = () => {
                                 {Object.values(SUBJECTS).map((subject) => (
                                   <button
                                     key={subject}
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       if (editedGoal) {
                                         setEditedGoal({...editedGoal, subject});
                                         setShowSubjectSelect(false);
                                       }
                                     }}
-                                    className={`w-full text-left px-4 py-2 text-sm ${
-                                      subjects.getSubjectStyle(subject).bg
-                                    } ${subjects.getSubjectStyle(subject).text} hover:bg-opacity-80`}
+                                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 dropdown-option ${
+                                      subjects.getSubjectStyle(subject).text
+                                    }`}
                                   >
                                     {subject}
                                   </button>
@@ -303,7 +384,7 @@ const StudentPlanning: React.FC = () => {
                               setHasAttemptedSave(true);
                               if (editedGoal && selectedGoal && 
                                   editedGoal.title.trim() !== '' && 
-                                  editedGoal.description.trim() !== '') {
+                                  editedGoal.description?.trim() !== '') {
                                 setIsEditing(false);
                                 setGoals(goals.map(g => g.id === selectedGoal.id ? editedGoal : g));
                                 setSelectedGoal(editedGoal);
@@ -349,9 +430,9 @@ const StudentPlanning: React.FC = () => {
                             {selectedGoal.templateType}
                           </span>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium ${
-                            subjects.getSubjectStyle(selectedGoal.subject).bg
-                          } ${subjects.getSubjectStyle(selectedGoal.subject).text}`}>
-                            {selectedGoal.subject}
+                            subjects.getSubjectStyle(selectedGoal.subject || '').bg
+                          } ${subjects.getSubjectStyle(selectedGoal.subject || '').text}`}>
+                            {selectedGoal.subject || '未分類'}
                           </span>
                         </div>
                       </>
@@ -382,44 +463,52 @@ const StudentPlanning: React.FC = () => {
                   <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">總進度</p>
                     <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                      {selectedGoal.progress}%
+                      {getCompletionRate(selectedGoal)}%
                     </p>
                   </div>
                   <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">已完成項目</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {selectedGoal.actionItems.filter(item => item.status === 'done').length}
+                      {selectedGoal.steps.reduce((acc, step) => 
+                        acc + step.tasks.filter(task => task.status === 'done').length, 0
+                      )}
                     </p>
                   </div>
                   <div className="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">待辦項目</p>
                     <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                      {selectedGoal.actionItems.filter(item => item.status === 'todo').length}
+                      {selectedGoal.steps.reduce((acc, step) => 
+                        acc + step.tasks.filter(task => task.status === 'todo').length, 0
+                      )}
                     </p>
                   </div>
                 </div>
 
-                {/* Action Items */}
+                {/* Steps List */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      行動計畫
+                      學習步驟
                     </h3>
                     <button
-                      onClick={() => setShowActionItemModal(true)}
+                      onClick={() => {/* 添加步驟的邏輯 */}}
                       className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50"
                     >
                       <Plus className="h-4 w-4 mr-1" />
-                      新增行動項目
+                      新增步驟
                     </button>
                   </div>
 
                   <div className="space-y-3">
-                    {selectedGoal.actionItems.map(item => (
-                      <ActionItem
-                        key={item.id}
-                        item={item}
-                        onAddToSchedule={() => handleAddToSchedule(selectedGoal.id, item.id)}
+                    {selectedGoal.steps.map(step => (
+                      <StepItem
+                        key={step.id}
+                        step={step}
+                        isExpanded={expandedSteps.includes(step.id)}
+                        onToggle={() => toggleStep(step.id)}
+                        onTaskStatusChange={(task) => updateTask(selectedGoal.id, step.id, task)}
+                        onTaskEdit={(task) => updateTask(selectedGoal.id, step.id, task)}
+                        onAddTask={() => {/* 添加任務的邏輯 */}}
                       />
                     ))}
                   </div>
@@ -481,14 +570,12 @@ const StudentPlanning: React.FC = () => {
                         id: crypto.randomUUID(),
                         title: '',
                         description: '',
-                        category: template.category,
                         templateType: template.title,
-                        status: 'active',
-                        dueDate: new Date(),
-                        progress: 0,
                         subject: SUBJECTS.CUSTOM,
-                        createdAt: new Date(),
-                        actionItems: []
+                        dueDate: new Date().toISOString(),
+                        progress: 0,
+                        steps: [],
+                        status: 'active'
                       };
                       
                       setShowTemplateModal(false);

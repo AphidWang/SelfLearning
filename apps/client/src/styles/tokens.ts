@@ -100,8 +100,7 @@ export const subjects = {
     '英語': {
       bg: 'bg-cyan-100 dark:bg-cyan-900/30',
       text: 'text-cyan-800 dark:text-cyan-300',
-      accent: '#06B6D4'  // 青色，仍保留國際清新感但與藍色有明顯區別
-    
+      accent: '#06B6D4'
     },
     '數學': {
       bg: 'bg-orange-100 dark:bg-orange-900/30',
@@ -136,8 +135,8 @@ export const subjects = {
   } as SubjectColors,
   getSubjectStyle: (subjectName: string) => {
     const defaultStyle = {
-      bg: 'bg-gray-100 dark:bg-gray-900/30',
-      text: 'text-gray-800 dark:text-gray-300',
+      bg: 'bg-gray-100 dark:bg-gray-800',
+      text: 'text-gray-600 dark:text-gray-400',
       accent: '#6B7280'
     };
     return subjects.colors[subjectName] || defaultStyle;
