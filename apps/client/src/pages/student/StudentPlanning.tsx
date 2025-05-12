@@ -11,6 +11,7 @@ import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
 import { SUBJECTS, type SubjectType } from '../../constants/subjects';
 import { subjects } from '../../styles/tokens';
 import { StepItem } from '../../components/goals/StepItem';
+import { useNavigate } from 'react-router-dom';
 
 const StudentPlanning: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>(mockGoals);
@@ -27,6 +28,7 @@ const StudentPlanning: React.FC = () => {
   const [showSubjectSelect, setShowSubjectSelect] = useState(false);
   const [showTypeSelect, setShowTypeSelect] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setSavedGoalIds(new Set(goals.map(goal => goal.id)));
@@ -448,6 +450,12 @@ const StudentPlanning: React.FC = () => {
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       >
                         <Pencil className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => navigate(`/student/planning/goal/${selectedGoal.id}`)}
+                        className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                      >
+                        <Brain className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => setShowDeleteModal(true)}
