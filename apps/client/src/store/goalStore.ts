@@ -6,180 +6,257 @@ import { SUBJECTS } from '../constants/subjects';
 const initialGoals: Goal[] = [
   {
     id: '1',
-    title: '科學探究：水的三態變化實驗',
-    description: '透過系統性的實驗和觀察，深入理解水的三態變化原理，並培養科學探究能力',
-    category: 'learning',
-    templateType: '學習目標',
-    status: GOAL_STATUSES.ACTIVE,
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString(),
-    progress: 35,
-    subject: SUBJECTS.SCIENCE,
+    title: '提升國語閱讀能力',
+    description: '培養閱讀興趣，提升理解能力',
+    status: 'in-progress',
     steps: [
       {
-        id: 's1',
-        title: '準備階段',
+        id: '1-1',
+        title: '基礎閱讀',
         tasks: [
           {
-            id: 't1',
-            title: '閱讀相關教材，了解水的三態變化原理',
+            id: '1-1-1',
+            title: '每天閱讀 15 分鐘課外讀物',
             status: 'done',
-            priority: 'high',
-            role: 'explore',
-            estimatedTime: '1小時'
+            completedAt: new Date('2024-03-15').toISOString(),
           },
           {
-            id: 't2',
-            title: '準備實驗器材：燒杯、溫度計、冰塊、熱水等',
+            id: '1-1-2',
+            title: '完成 5 本繪本閱讀',
             status: 'done',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '30分鐘'
+            completedAt: new Date('2024-03-20').toISOString(),
           },
           {
-            id: 't3',
-            title: '設計實驗記錄表格',
-            status: 'done',
-            priority: 'medium',
-            role: 'work',
-            estimatedTime: '20分鐘'
-          }
-        ]
-      },
-      {
-        id: 's2',
-        title: '實驗階段',
-        tasks: [
-          {
-            id: 't4',
-            title: '進行固態到液態的變化實驗',
+            id: '1-1-3',
+            title: '練習朗讀課文',
             status: 'in_progress',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '1小時'
           },
-          {
-            id: 't5',
-            title: '進行液態到氣態的變化實驗',
-            status: 'todo',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '1小時'
-          },
-          {
-            id: 't6',
-            title: '記錄實驗數據和觀察結果',
-            status: 'todo',
-            priority: 'medium',
-            role: 'work',
-            estimatedTime: '30分鐘'
-          }
-        ]
+        ],
       },
       {
-        id: 's3',
-        title: '分析與總結',
+        id: '1-2',
+        title: '理解能力',
         tasks: [
           {
-            id: 't7',
-            title: '整理實驗數據，製作圖表',
-            status: 'todo',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '1小時'
+            id: '1-2-1',
+            title: '完成閱讀理解練習',
+            status: 'in_progress',
           },
           {
-            id: 't8',
-            title: '撰寫實驗報告，總結發現',
+            id: '1-2-2',
+            title: '寫讀書心得',
             status: 'todo',
-            priority: 'high',
-            role: 'present',
-            estimatedTime: '2小時'
           },
-          {
-            id: 't9',
-            title: '準備實驗成果展示',
-            status: 'todo',
-            priority: 'medium',
-            role: 'present',
-            estimatedTime: '1小時'
-          }
-        ]
-      }
-    ]
+        ],
+      },
+    ],
   },
   {
     id: '2',
-    title: '文學創作：我的成長故事',
-    description: '透過撰寫個人成長故事，培養文學創作能力，並反思自己的成長歷程',
-    category: 'learning',
-    templateType: '學習目標',
+    title: '數學基礎運算',
+    description: '熟練加減乘除運算',
     status: 'active',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 21)).toISOString(),
-    progress: 20,
-    subject: SUBJECTS.CHINESE,
     steps: [
       {
-        id: 's1',
-        title: '構思與規劃',
+        id: '2-1',
+        title: '加法練習',
         tasks: [
           {
-            id: 't1',
-            title: '閱讀優秀的成長故事範例',
+            id: '2-1-1',
+            title: '完成 20 題加法練習',
             status: 'done',
-            priority: 'high',
-            role: 'explore',
-            estimatedTime: '2小時'
+            completedAt: new Date('2024-03-10').toISOString(),
           },
           {
-            id: 't2',
-            title: '列出個人成長的重要時刻',
+            id: '2-1-2',
+            title: '練習心算加法',
             status: 'done',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '1小時'
+            completedAt: new Date('2024-03-12').toISOString(),
           },
-          {
-            id: 't3',
-            title: '確定故事主題和結構',
-            status: 'in_progress',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '1小時'
-          }
-        ]
+        ],
       },
       {
-        id: 's2',
-        title: '寫作階段',
+        id: '2-2',
+        title: '減法練習',
         tasks: [
           {
-            id: 't4',
-            title: '撰寫故事大綱',
-            status: 'todo',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '2小時'
+            id: '2-2-1',
+            title: '完成 20 題減法練習',
+            status: 'in_progress',
           },
           {
-            id: 't5',
-            title: '完成初稿',
+            id: '2-2-2',
+            title: '練習心算減法',
             status: 'todo',
-            priority: 'high',
-            role: 'work',
-            estimatedTime: '4小時'
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '3',
+    title: '英語單字學習',
+    description: '認識基礎英語單字',
+    status: 'active',
+    steps: [
+      {
+        id: '3-1',
+        title: '動物單字',
+        tasks: [
+          {
+            id: '3-1-1',
+            title: '學習 10 個動物單字',
+            status: 'done',
+            completedAt: new Date('2024-03-18').toISOString(),
           },
           {
-            id: 't6',
-            title: '加入細節描寫和情感表達',
+            id: '3-1-2',
+            title: '練習動物單字發音',
+            status: 'in_progress',
+          },
+        ],
+      },
+      {
+        id: '3-2',
+        title: '顏色單字',
+        tasks: [
+          {
+            id: '3-2-1',
+            title: '學習 8 個顏色單字',
+            status: 'in_progress',
+          },
+          {
+            id: '3-2-2',
+            title: '練習顏色單字發音',
             status: 'todo',
-            priority: 'medium',
-            role: 'work',
-            estimatedTime: '3小時'
-          }
-        ]
-      }
-    ]
-  }
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '4',
+    title: '自然科學探索',
+    description: '認識生活中的科學現象',
+    status: 'active',
+    steps: [
+      {
+        id: '4-1',
+        title: '植物觀察',
+        tasks: [
+          {
+            id: '4-1-1',
+            title: '種植綠豆並觀察生長',
+            status: 'done',
+            completedAt: new Date('2024-03-05').toISOString(),
+          },
+          {
+            id: '4-1-2',
+            title: '記錄植物生長日記',
+            status: 'in_progress',
+          },
+        ],
+      },
+      {
+        id: '4-2',
+        title: '天氣觀察',
+        tasks: [
+          {
+            id: '4-2-1',
+            title: '記錄一週天氣變化',
+            status: 'in_progress',
+          },
+          {
+            id: '4-2-2',
+            title: '認識不同天氣現象',
+            status: 'todo',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '5',
+    title: '藝術創作',
+    description: '培養藝術興趣與創造力',
+    status: 'active',
+    steps: [
+      {
+        id: '5-1',
+        title: '繪畫基礎',
+        tasks: [
+          {
+            id: '5-1-1',
+            title: '練習基本線條',
+            status: 'done',
+            completedAt: new Date('2024-03-15').toISOString(),
+          },
+          {
+            id: '5-1-2',
+            title: '完成一幅風景畫',
+            status: 'in_progress',
+          },
+        ],
+      },
+      {
+        id: '5-2',
+        title: '手工創作',
+        tasks: [
+          {
+            id: '5-2-1',
+            title: '製作紙藝作品',
+            status: 'in_progress',
+          },
+          {
+            id: '5-2-2',
+            title: '完成黏土創作',
+            status: 'todo',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '6',
+    title: '體育活動',
+    description: '培養運動習慣',
+    status: 'active',
+    steps: [
+      {
+        id: '6-1',
+        title: '基礎體能',
+        tasks: [
+          {
+            id: '6-1-1',
+            title: '每天跳繩 100 下',
+            status: 'done',
+            completedAt: new Date('2024-03-20').toISOString(),
+          },
+          {
+            id: '6-1-2',
+            title: '練習跑步 10 分鐘',
+            status: 'in_progress',
+          },
+        ],
+      },
+      {
+        id: '6-2',
+        title: '球類運動',
+        tasks: [
+          {
+            id: '6-2-1',
+            title: '練習投籃',
+            status: 'in_progress',
+          },
+          {
+            id: '6-2-2',
+            title: '學習傳球技巧',
+            status: 'todo',
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 interface GoalStore {
