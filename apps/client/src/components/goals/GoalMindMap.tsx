@@ -9,6 +9,31 @@ interface GoalMindMapProps {
   onBack?: () => void;
 }
 
+// 在 GoalMindMap 組件前添加顏色計算函數
+const getStepColors = (index: number, totalSteps: number) => {
+  // 使用漸層效果，從淺到深，但降低整體深度
+  const colorLevels = [
+    { bg: 'from-purple-50 to-purple-100', border: 'border-purple-100', icon: 'text-purple-400', text: 'text-purple-600' },
+    { bg: 'from-purple-50 to-purple-100', border: 'border-purple-200', icon: 'text-purple-500', text: 'text-purple-700' },
+    { bg: 'from-purple-50 to-purple-200', border: 'border-purple-300', icon: 'text-purple-600', text: 'text-purple-800' },
+    { bg: 'from-purple-50 to-purple-200', border: 'border-purple-400', icon: 'text-purple-700', text: 'text-purple-900' },
+    { bg: 'from-purple-50 to-purple-300', border: 'border-purple-500', icon: 'text-purple-800', text: 'text-purple-900' },
+    { bg: 'from-purple-50 to-purple-300', border: 'border-purple-600', icon: 'text-purple-900', text: 'text-purple-900' },
+    { bg: 'from-purple-50 to-purple-400', border: 'border-purple-700', icon: 'text-purple-900', text: 'text-purple-900' },
+  ];
+
+  // 限制最大步驟數為7
+  const stepIndex = Math.min(index, 6);
+  const colors = colorLevels[stepIndex];
+
+  return {
+    gradient: colors.bg,
+    border: colors.border,
+    icon: colors.icon,
+    text: colors.text,
+  };
+};
+
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const { goals } = useGoalStore();
   const goal = goals.find((g) => g.id === goalId);
@@ -402,34 +427,18 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                         ? 'border-4 border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)]'
                         : 'border-4'
                     } bg-gradient-to-br ${
-                      stepIndex === 0
-                        ? 'from-rose-100 to-pink-100 border-rose-200'
-                        : stepIndex === 1
-                        ? 'from-orange-100 to-amber-100 border-orange-200'
-                        : stepIndex === 2
-                        ? 'from-yellow-100 to-lime-100 border-yellow-200'
-                        : 'from-emerald-100 to-teal-100 border-emerald-200'
+                      getStepColors(stepIndex, goal.steps.length).gradient
+                    } border-${
+                      getStepColors(stepIndex, goal.steps.length).border
                     } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:shadow-xl transition-all duration-200`}
                     whileHover={{ scale: 1.1 }}
                   >
                     <div className="text-center">
                       <ListTodo className={`w-8 h-8 mx-auto mb-1 ${
-                        stepIndex === 0
-                          ? 'text-rose-500'
-                          : stepIndex === 1
-                          ? 'text-orange-500'
-                          : stepIndex === 2
-                          ? 'text-yellow-500'
-                          : 'text-emerald-500'
+                        getStepColors(stepIndex, goal.steps.length).icon
                       }`} />
                       <h3 className={`text-sm font-bold ${
-                        stepIndex === 0
-                          ? 'text-rose-700'
-                          : stepIndex === 1
-                          ? 'text-orange-700'
-                          : stepIndex === 2
-                          ? 'text-yellow-700'
-                          : 'text-emerald-700'
+                        getStepColors(stepIndex, goal.steps.length).text
                       }`}>{step.title}</h3>
                     </div>
                   </motion.button>
@@ -466,7 +475,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
                             : task.status === 'in_progress'
                             ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
-                            : 'bg-gradient-to-br from-sky-50 to-blue-50 border-sky-200'
+                            : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200'
                         }`}>
                           <div className="flex justify-between items-start">
                             <motion.button
@@ -475,7 +484,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                                   ? 'border-green-500 bg-green-100'
                                   : task.status === 'in_progress'
                                   ? 'border-orange-500 bg-orange-100'
-                                  : 'border-sky-300 bg-white'
+                                  : 'border-pink-300 bg-white'
                               }`}
                             >
                               {task.status === 'done' && (
@@ -490,7 +499,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                                 ? 'bg-green-200 text-green-800'
                                 : task.status === 'in_progress'
                                 ? 'bg-orange-200 text-orange-800'
-                                : 'bg-sky-200 text-sky-800'
+                                : 'bg-pink-200 text-pink-800'
                             }`}>
                               {task.status === 'done'
                                 ? '已完成'
