@@ -46,7 +46,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [stepOffsets, setStepOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [taskOffsets, setTaskOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
-  const [dragStartOffsets, setDragStartOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
+  const [dragStartPositions, setDragStartPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [isDraggingStep, setIsDraggingStep] = useState<string | null>(null);
   const [goalPosition, setGoalPosition] = useState<{ x: number; y: number }>({ x: 200, y: 0 });
 
@@ -93,6 +93,24 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       }, 500);
     }
   }, [initialLoad, calculateOptimalView]);
+
+  // 初始化 offsets
+  useEffect(() => {
+    if (goal) {
+      const initialStepOffsets: { [key: string]: { x: number; y: number } } = {};
+      const initialTaskOffsets: { [key: string]: { x: number; y: number } } = {};
+
+      goal.steps.forEach((step, stepIndex) => {
+        initialStepOffsets[step.id] = { x: 0, y: 0 };
+        step.tasks.forEach((task) => {
+          initialTaskOffsets[task.id] = { x: 0, y: 0 };
+        });
+      });
+
+      setStepOffsets(initialStepOffsets);
+      setTaskOffsets(initialTaskOffsets);
+    }
+  }, [goal]);
 
   // ✅ 刪除 resize 時自動 reset zoom/position 的邏輯
 // ❌ 不要再做這個
@@ -257,22 +275,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
     baseY += ((120 + 20) * goal.steps[stepIndex].tasks.length) / 2;
 
-    const offset = stepOffsets[goal.steps[stepIndex].id] || { x: 0, y: 0 };  // 使用者拖曳的偏移
-    
-    console.log(`Step ${stepIndex} 位置計算:`, {
-      stepId: goal.steps[stepIndex].id,
-      baseX,
-      baseY,
-      offset,
-      final: {
-        x: baseX + offset.x,
-        y: baseY + offset.y
-      }
-    });
-
     return {
-      x: baseX + offset.x,  // 基礎位置 + 偏移
-      y: baseY + offset.y
+      x: baseX,
+      y: baseY
     };
   };
 
@@ -285,23 +290,30 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const currentStepPreviousHeight = (cardHeight + cardSpacing) * taskIndex;
     const baseY = stepPos.y - (cardHeight * totalTasks + cardSpacing * (totalTasks - 1)) / 2 + currentStepPreviousHeight;
 
-    const taskId = goal.steps[stepIndex].tasks[taskIndex].id;
-    const offset = taskOffsets[taskId] || { x: 0, y: 0 };
-
     return {
-      x: stepPos.x + taskX + offset.x,
-      y: baseY + offset.y
+      x: stepPos.x + taskX,
+      y: baseY
     };
   };
 
   // 計算曲線控制點
   const getCurvePoints = (start: { x: number; y: number }, end: { x: number; y: number }) => {
-    const controlX = start.x + (end.x - start.x) * 0.5;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const controlDistance = distance * 0.5;
+
     return {
       start,
       end,
-      control1: { x: controlX, y: start.y },
-      control2: { x: controlX, y: end.y },
+      control1: { 
+        x: start.x + controlDistance,
+        y: start.y
+      },
+      control2: { 
+        x: end.x - controlDistance,
+        y: end.y
+      },
     };
   };
 
@@ -348,15 +360,23 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         }}
       >
         <svg
-          width="10000"
-          height="10000"
+          width="20000"
+          height="20000"
           className="absolute top-0 left-0 pointer-events-none"
+          style={{
+            width: '200%',
+            height: '200%',
+            transform: 'translate(-5000px, -5000px)',
+            minWidth: '20000px',
+            minHeight: '20000px'
+          }}
         >
           {goal.steps.map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex);
+            const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
             const curvePoints = getCurvePoints(
-              { x: centerGoalPos.x + 96, y: centerGoalPos.y },
-              { x: stepPos.x - 64, y: stepPos.y }
+              { x: centerGoalPos.x + 96 + 5000, y: centerGoalPos.y + 5000 },
+              { x: stepPos.x - 64 + stepOffset.x + 5000, y: stepPos.y + stepOffset.y + 5000 }
             );
 
             return (
@@ -375,15 +395,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
           {goal.steps.map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex);
+            const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
             return step.tasks.map((task, taskIndex) => {
               const taskPos = getTaskPosition(
                 stepIndex,
                 taskIndex,
                 step.tasks.length
               );
+              const taskOffset = taskOffsets[task.id] || { x: 0, y: 0 };
               const taskCurvePoints = getCurvePoints(
-                { x: stepPos.x + 64, y: stepPos.y },
-                { x: taskPos.x, y: taskPos.y + 60 }
+                { x: stepPos.x + 64 + stepOffset.x + 5000, y: stepPos.y + stepOffset.y + 5000 },
+                { x: taskPos.x + taskOffset.x + 5000, y: taskPos.y + 60 + taskOffset.y + 5000 }
               );
 
               return (
@@ -447,23 +469,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   <motion.button
                     drag
                     dragMomentum={false}
-                    onDragStart={() => {
+                    onDragStart={(event, info) => {
                       setIsDraggingStep(step.id);
                     }}
                     onDrag={(event, info) => {
-                      const newX = (info.point.x - 64) / zoom;
-                      const newY = (info.point.y - 64) / zoom;
+                      const dx = info.delta.x / zoom;
+                      const dy = info.delta.y / zoom;
 
-                      setStepOffsets(prev => ({
-                        ...prev,
-                        [step.id]: {
-                          x: newX - stepPos.x + 64,
-                          y: newY - stepPos.y + 64,
-                        }
-                      }));
+                      setStepOffsets(prev => {
+                        const currentOffset = prev[step.id] || { x: 0, y: 0 };
+                        return {
+                          ...prev,
+                          [step.id]: {
+                            x: currentOffset.x + dx,
+                            y: currentOffset.y + dy
+                          }
+                        };
+                      });
                     }}
                     onDragEnd={() => {
                       setIsDraggingStep(null);
+                      console.log('Step drag end offsets:', stepOffsets);
                     }}
                     onClick={() => setSelectedStepId(isSelected ? null : step.id)}
                     className={`step-node w-32 h-32 rounded-full ${
@@ -523,16 +549,22 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             // 不需要保存初始位置
                           }}
                           onDrag={(event, info) => {
-                            const newX = info.point.x / zoom;
-                            const newY = info.point.y / zoom;
+                            const dx = info.delta.x / zoom;
+                            const dy = info.delta.y / zoom;
 
-                            setTaskOffsets(prev => ({
-                              ...prev,
-                              [task.id]: {
-                                x: newX - taskPos.x,
-                                y: newY - taskPos.y,
-                              }
-                            }));
+                            setTaskOffsets(prev => {
+                              const currentOffset = prev[task.id] || { x: 0, y: 0 };
+                              return {
+                                ...prev,
+                                [task.id]: {
+                                  x: currentOffset.x + dx,
+                                  y: currentOffset.y + dy
+                                }
+                              };
+                            });
+                          }}
+                          onDragEnd={() => {
+                            console.log('Task drag end offsets:', taskOffsets);
                           }}
                           className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
                             task.status === 'done'
