@@ -1,6 +1,7 @@
 import { SubjectType } from '../constants/subjects';
+import { GOAL_STATUSES } from '../constants/goals';
 
-export type GoalStatus = 'active' | 'completed' | 'paused';
+export type GoalStatus = typeof GOAL_STATUSES[keyof typeof GOAL_STATUSES];
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type TaskRole = 'explore' | 'work' | 'present';

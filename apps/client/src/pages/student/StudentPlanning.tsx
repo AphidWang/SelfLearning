@@ -5,7 +5,7 @@ import { GoalCard } from '../../components/goals/GoalCard';
 import { AIAssistant } from '../../components/goals/AIAssistant';
 import { ActionItem } from '../../components/goals/ActionItem';
 import { goalTemplates } from '../../constants/goalTemplates';
-import { mockGoals } from '../../mocks/goals';
+import { useGoalStore } from '../../store/goalStore';
 import type { Goal, Step, Task } from '../../types/goal';
 import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
 import { SUBJECTS, type SubjectType } from '../../constants/subjects';
@@ -14,7 +14,7 @@ import { StepItem } from '../../components/goals/StepItem';
 import { useNavigate } from 'react-router-dom';
 
 const StudentPlanning: React.FC = () => {
-  const [goals, setGoals] = useState<Goal[]>(mockGoals);
+  const { goals, updateGoal, updateTask: storeUpdateTask } = useGoalStore();
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [showNewGoalModal, setShowNewGoalModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -32,7 +32,7 @@ const StudentPlanning: React.FC = () => {
 
   useEffect(() => {
     setSavedGoalIds(new Set(goals.map(goal => goal.id)));
-  }, []);
+  }, [goals]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -61,27 +61,16 @@ const StudentPlanning: React.FC = () => {
   };
 
   const handleAddToSchedule = (goalId: string, stepId: string, taskId: string) => {
-    setGoals(goals.map(goal => {
-      if (goal.id === goalId) {
-        return {
-          ...goal,
-          steps: goal.steps.map(step => {
-            if (step.id === stepId) {
-              return {
-                ...step,
-                tasks: step.tasks.map(task => 
-                  task.id === taskId 
-                    ? { ...task, addedToSchedule: true }
-                    : task
-                )
-              };
-            }
-            return step;
-          })
-        };
-      }
-      return goal;
-    }));
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+
+    const step = goal.steps.find(s => s.id === stepId);
+    if (!step) return;
+
+    const task = step.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    storeUpdateTask(goalId, stepId, { ...task, notes: '已加入排程' });
   };
 
   const toggleStep = (stepId: string) => {
@@ -102,24 +91,66 @@ const StudentPlanning: React.FC = () => {
     return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   };
 
-  const updateTask = (goalId: string, stepId: string, task: Task) => {
-    setGoals(goals.map(goal => {
-      if (goal.id === goalId) {
-        return {
-          ...goal,
-          steps: goal.steps.map(step => {
-            if (step.id === stepId) {
-              return {
-                ...step,
-                tasks: step.tasks.map(t => t.id === task.id ? task : t)
-              };
-            }
-            return step;
-          })
-        };
+  const handleTaskStatusChange = (goalId: string, stepId: string, task: Task) => {
+    storeUpdateTask(goalId, stepId, task);
+  };
+
+  const handleTaskEdit = (goalId: string, stepId: string, task: Task) => {
+    storeUpdateTask(goalId, stepId, task);
+  };
+
+  const handleDeleteGoal = (goalId: string) => {
+    const goalToDelete = goals.find(g => g.id === goalId);
+    if (goalToDelete) {
+      updateGoal({ ...goalToDelete, status: GOAL_STATUSES.ARCHIVED });
+    }
+  };
+
+  const handleAddNewGoal = (newGoal: Goal) => {
+    updateGoal(newGoal);
+  };
+
+  const handleSaveGoal = (goal: Goal) => {
+    updateGoal(goal);
+  };
+
+  const handleUpdateGoal = (goal: Goal) => {
+    updateGoal(goal);
+  };
+
+  const handleGoalSelect = (goal: Goal) => {
+    if (isEditing && editedGoal) {
+      if (!savedGoalIds.has(editedGoal.id)) {
+        handleDeleteGoal(editedGoal.id);
       }
-      return goal;
-    }));
+      setIsEditing(false);
+      setHasAttemptedSave(false);
+    }
+    setSelectedGoal(goal);
+    setEditedGoal(goal);
+  };
+
+  const handleGoalSave = (goal: Goal) => {
+    if (goal.title?.trim() !== '' && 
+        goal.description?.trim() !== '') {
+      setIsEditing(false);
+      handleUpdateGoal(goal);
+      setSelectedGoal(goal);
+      setHasAttemptedSave(false);
+    }
+  };
+
+  const handleGoalDelete = (goal: Goal) => {
+    if (deleteConfirmText === 'delete') {
+      handleDeleteGoal(goal.id);
+      setSelectedGoal(null);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleGoalFilter = (filteredGoals: Goal[]) => {
+    // 這裡不需要更新 store，因為我們只是過濾顯示
+    return filteredGoals;
   };
 
   return (
@@ -146,7 +177,7 @@ const StudentPlanning: React.FC = () => {
                   onClick={() => {
                     if (isEditing && editedGoal) {
                       if (!savedGoalIds.has(editedGoal.id)) {
-                        setGoals(goals.filter(g => g.id !== editedGoal.id));
+                        handleDeleteGoal(editedGoal.id);
                       }
                       setIsEditing(false);
                       setHasAttemptedSave(false);
@@ -388,7 +419,7 @@ const StudentPlanning: React.FC = () => {
                                   editedGoal.title.trim() !== '' && 
                                   editedGoal.description?.trim() !== '') {
                                 setIsEditing(false);
-                                setGoals(goals.map(g => g.id === selectedGoal.id ? editedGoal : g));
+                                updateGoal(editedGoal);
                                 setSelectedGoal(editedGoal);
                                 setHasAttemptedSave(false);
                                 setSavedGoalIds(prev => new Set(prev).add(editedGoal.id));
@@ -514,8 +545,8 @@ const StudentPlanning: React.FC = () => {
                         step={step}
                         isExpanded={expandedSteps.includes(step.id)}
                         onToggle={() => toggleStep(step.id)}
-                        onTaskStatusChange={(task) => updateTask(selectedGoal.id, step.id, task)}
-                        onTaskEdit={(task) => updateTask(selectedGoal.id, step.id, task)}
+                        onTaskStatusChange={(task) => handleTaskStatusChange(selectedGoal.id, step.id, task)}
+                        onTaskEdit={(task) => handleTaskEdit(selectedGoal.id, step.id, task)}
                         onAddTask={() => {/* 添加任務的邏輯 */}}
                       />
                     ))}
@@ -587,7 +618,7 @@ const StudentPlanning: React.FC = () => {
                       };
                       
                       setShowTemplateModal(false);
-                      setGoals([...goals, newGoal]);
+                      updateGoal(newGoal);
                       setSelectedGoal(newGoal);
                       setEditedGoal(newGoal);
                       setIsEditing(true);
@@ -650,7 +681,7 @@ const StudentPlanning: React.FC = () => {
               <button
                 onClick={() => {
                   if (deleteConfirmText === 'delete' && selectedGoal) {
-                    setGoals(goals.filter(g => g.id !== selectedGoal.id));
+                    handleDeleteGoal(selectedGoal.id);
                     setSelectedGoal(null);
                     setShowDeleteModal(false);
                     setDeleteConfirmText('');

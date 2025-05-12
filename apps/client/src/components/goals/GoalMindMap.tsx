@@ -1,86 +1,8 @@
-import React, { useCallback, useMemo } from 'react';
-import ReactFlow, {
-  Background,
-  Controls,
-  Edge,
-  Node,
-  NodeTypes,
-  useNodesState,
-  useEdgesState,
-  Connection,
-  addEdge,
-  Panel,
-  Handle,
-  Position,
-} from 'reactflow';
-import { motion } from 'framer-motion';
-import { Brain, Plus, ArrowLeft } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
-import 'reactflow/dist/style.css';
-
-interface NodeData {
-  label: string;
-  description?: string;
-}
-
-// 定义节点类型
-const nodeTypes: NodeTypes = {
-  goal: ({ data }: { data: NodeData }) => (
-    <motion.div
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      className="p-4 rounded-lg bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-200 dark:border-purple-800 shadow-lg"
-    >
-      <Handle type="source" position={Position.Bottom} />
-      <h3 className="text-lg font-bold text-purple-800 dark:text-purple-300">{data.label}</h3>
-      <p className="text-sm text-purple-600 dark:text-purple-400">{data.description}</p>
-    </motion.div>
-  ),
-  step: ({ data }: { data: NodeData }) => (
-    <motion.div
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-800 shadow-md"
-    >
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
-      <h4 className="font-semibold text-blue-800 dark:text-blue-300">{data.label}</h4>
-      <p className="text-sm text-blue-600 dark:text-blue-400">{data.description}</p>
-    </motion.div>
-  ),
-  task: ({ data }: { data: NodeData }) => (
-    <motion.div
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 border-2 border-green-200 dark:border-green-800 shadow-sm"
-    >
-      <Handle type="target" position={Position.Top} />
-      <p className="text-sm font-medium text-green-800 dark:text-green-300">{data.label}</p>
-      <p className="text-xs text-green-600 dark:text-green-400">{data.description}</p>
-    </motion.div>
-  ),
-};
-
-// 计算节点位置
-const calculateNodePositions = (
-  nodes: Node[],
-  centerX: number,
-  centerY: number,
-  radius: number
-) => {
-  const angleStep = (2 * Math.PI) / nodes.length;
-  return nodes.map((node, index) => {
-    const angle = index * angleStep;
-    return {
-      ...node,
-      position: {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle),
-      },
-    };
-  });
-};
 
 interface GoalMindMapProps {
   goalId: string;
@@ -90,135 +12,227 @@ interface GoalMindMapProps {
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const { goals } = useGoalStore();
   const goal = goals.find((g) => g.id === goalId);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // 创建节点和边
-  const initialNodes = useMemo(() => {
-    if (!goal) return [];
-
-    const nodes: Node[] = [
-      {
-        id: goal.id,
-        type: 'goal',
-        data: {
-          label: goal.title,
-          description: goal.description,
-        },
-        position: { x: 0, y: 0 },
-      },
-    ];
-
-    // 添加步骤节点
-    goal.steps.forEach((step, index) => {
-      nodes.push({
-        id: step.id,
-        type: 'step',
-        data: {
-          label: step.title,
-          description: step.description,
-        },
-        position: { x: 0, y: 0 },
-      });
-
-      // 添加任务节点
-      step.tasks.forEach((task) => {
-        nodes.push({
-          id: task.id,
-          type: 'task',
-          data: {
-            label: task.title,
-            description: task.description,
-          },
-          position: { x: 0, y: 0 },
-        });
-      });
+  const handleZoom = useCallback((delta: number) => {
+    setZoom((prevZoom) => {
+      const newZoom = prevZoom + delta;
+      return Math.min(Math.max(0.5, newZoom), 2);
     });
+  }, []);
 
-    // 计算节点位置
-    const centerX = 400;
-    const centerY = 300;
-    const radius = 200;
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      handleZoom(delta);
+    }
+  }, [handleZoom]);
 
-    return calculateNodePositions(nodes, centerX, centerY, radius);
-  }, [goal]);
+  // 阻止觸控板的默認縮放行為
+  const preventDefault = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+    }
+  }, []);
 
-  const initialEdges = useMemo(() => {
-    if (!goal) return [];
-
-    const edges: Edge[] = [];
-
-    // 目标到步骤的边
-    goal.steps.forEach((step) => {
-      edges.push({
-        id: `${goal.id}-${step.id}`,
-        source: goal.id,
-        target: step.id,
-        type: 'smoothstep',
-        animated: true,
-      });
-
-      // 步骤到任务的边
-      step.tasks.forEach((task) => {
-        edges.push({
-          id: `${step.id}-${task.id}`,
-          source: step.id,
-          target: task.id,
-          type: 'smoothstep',
-          animated: true,
-        });
-      });
-    });
-
-    return edges;
-  }, [goal]);
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds: Edge[]) => addEdge(params, eds)),
-    [setEdges]
-  );
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('touchstart', preventDefault, { passive: false });
+      container.addEventListener('touchmove', preventDefault, { passive: false });
+      return () => {
+        container.removeEventListener('touchstart', preventDefault);
+        container.removeEventListener('touchmove', preventDefault);
+      };
+    }
+  }, [preventDefault]);
 
   if (!goal) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">找不到目标</p>
+        <p className="text-gray-500">找不到目標</p>
       </div>
     );
   }
 
+  const getStepPosition = (index: number, total: number) => {
+    const radius = 300;
+    const angle = (index * 2 * Math.PI) / total - Math.PI / 2;
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    };
+  };
+
+  const getTaskPosition = (stepIndex: number, taskIndex: number, totalTasks: number) => {
+    const stepPos = getStepPosition(stepIndex, goal.steps.length);
+    const taskRadius = 200;
+    const angle = (taskIndex * 2 * Math.PI) / totalTasks - Math.PI / 2;
+    return {
+      x: stepPos.x + Math.cos(angle) * taskRadius,
+      y: stepPos.y + Math.sin(angle) * taskRadius,
+    };
+  };
+
   return (
-    <div className="w-full h-full">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        nodeTypes={nodeTypes}
-        fitView
+    <div 
+      ref={containerRef}
+      className="w-full h-full relative bg-gray-50 overflow-hidden"
+      onWheel={handleWheel}
+    >
+      <div className="absolute top-4 left-4 z-10 flex items-center space-x-4">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onBack}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          返回
+        </motion.button>
+        <h1 className="text-xl font-bold text-gray-900">{goal.title}</h1>
+      </div>
+
+      <div className="absolute top-4 right-4 z-10">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          新增任務
+        </motion.button>
+      </div>
+
+      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
+        <button
+          onClick={() => handleZoom(0.1)}
+          className="p-2 rounded-lg bg-white shadow-md hover:bg-gray-50"
+        >
+          <ZoomIn className="w-5 h-5 text-gray-600" />
+        </button>
+        <button
+          onClick={() => handleZoom(-0.1)}
+          className="p-2 rounded-lg bg-white shadow-md hover:bg-gray-50"
+        >
+          <ZoomOut className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
+
+      <div 
+        className="relative w-full h-full"
+        style={{
+          transform: `scale(${zoom})`,
+          transformOrigin: 'center center',
+          transition: 'transform 0.2s ease-out'
+        }}
       >
-        <Background />
-        <Controls />
-        <Panel position="top-left">
-          <div className="flex gap-2">
-            <button
-              onClick={onBack}
-              className="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-md hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-            </button>
-            <button
-              onClick={() => {
-                // TODO: 实现添加新节点的功能
-              }}
-              className="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-md hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <Plus className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-            </button>
+        {/* 中心目標 */}
+        <motion.div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+        >
+          <div className="w-48 h-48 rounded-full bg-indigo-100 border-4 border-indigo-200 flex items-center justify-center p-6 shadow-lg">
+            <div className="text-center">
+              <Target className="w-12 h-12 text-indigo-500 mx-auto mb-2" />
+              <h2 className="text-lg font-bold text-indigo-700">{goal.title}</h2>
+            </div>
           </div>
-        </Panel>
-      </ReactFlow>
+        </motion.div>
+
+        {/* 步驟和任務 */}
+        <AnimatePresence>
+          {goal.steps.map((step, stepIndex) => {
+            const stepPos = getStepPosition(stepIndex, goal.steps.length);
+            const isSelected = selectedStepId === step.id;
+
+            return (
+              <React.Fragment key={step.id}>
+                {/* 步驟節點 */}
+                <motion.div
+                  className="absolute left-1/2 top-1/2"
+                  initial={{ scale: 0, x: '-50%', y: '-50%' }}
+                  animate={{
+                    scale: 1,
+                    x: `calc(${stepPos.x}px - 50%)`,
+                    y: `calc(${stepPos.y}px - 50%)`,
+                  }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                >
+                  <motion.button
+                    onClick={() => setSelectedStepId(isSelected ? null : step.id)}
+                    className={`w-32 h-32 rounded-full ${
+                      isSelected
+                        ? 'bg-blue-200 border-blue-300'
+                        : 'bg-blue-100 border-blue-200'
+                    } border-4 flex items-center justify-center p-4 shadow-lg transition-colors duration-200`}
+                    whileHover={{ scale: 1.1 }}
+                  >
+                    <div className="text-center">
+                      <ListTodo className="w-8 h-8 text-blue-500 mx-auto mb-1" />
+                      <h3 className="text-sm font-bold text-blue-700">
+                        {step.title}
+                      </h3>
+                    </div>
+                  </motion.button>
+                </motion.div>
+
+                {/* 任務卡片 */}
+                <AnimatePresence>
+                  {isSelected &&
+                    step.tasks.map((task, taskIndex) => {
+                      const taskPos = getTaskPosition(
+                        stepIndex,
+                        taskIndex,
+                        step.tasks.length
+                      );
+
+                      return (
+                        <motion.div
+                          key={task.id}
+                          className="absolute left-1/2 top-1/2"
+                          initial={{ scale: 0, x: '-50%', y: '-50%' }}
+                          animate={{
+                            scale: 1,
+                            x: `calc(${taskPos.x}px - 50%)`,
+                            y: `calc(${taskPos.y}px - 50%)`,
+                          }}
+                          exit={{ scale: 0 }}
+                          transition={{
+                            type: 'spring',
+                            stiffness: 260,
+                            damping: 20,
+                          }}
+                        >
+                          <div className="w-64 p-4 rounded-2xl shadow-lg border-2 bg-emerald-50 border-emerald-200">
+                            <div className="flex justify-between items-start">
+                              <motion.button
+                                whileTap={{ scale: 0.9 }}
+                                className="w-6 h-6 rounded-full border-2 flex items-center justify-center border-emerald-300 bg-white"
+                              />
+                              <div className="flex items-center px-2 py-1 rounded-full text-sm bg-emerald-100 text-emerald-700">
+                                <span className="text-xs font-medium">進行中</span>
+                              </div>
+                            </div>
+                            <h3 className="mt-3 text-lg font-semibold text-emerald-900">
+                              {task.title}
+                            </h3>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                </AnimatePresence>
+              </React.Fragment>
+            );
+          })}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }; 
