@@ -42,7 +42,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [stepOffsets, setStepOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
+  const [taskOffsets, setTaskOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
+  const [dragStartOffsets, setDragStartOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
+  const [isDraggingStep, setIsDraggingStep] = useState<string | null>(null);
+  const [goalPosition, setGoalPosition] = useState<{ x: number; y: number }>({ x: 200, y: 0 });
 
   // 計算最佳視圖位置和縮放值
   const calculateOptimalView = useCallback(() => {
@@ -58,27 +64,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     // 計算最右側任務的 X 位置
     const rightmostX = 400 + 300 + 200 + 256; // baseX + stepX + taskX + taskWidth
 
-
-    // 讓大目標圓心對齊 container 垂直正中央
-    const cardHeight = 120;
-    const cardSpacing = 20;
-    let totalHeight = 0;
-    goal.steps.forEach((step) => {
-      const stepHeight = Math.max(1, step.tasks.length) * (cardHeight + cardSpacing);
-      totalHeight += stepHeight;
-    });
-    const centerGoalY = totalHeight / 2;
-
     // 計算最佳縮放值
     const optimalZoomX = (containerWidth * 0.75) / rightmostX; // 75% 的容器寬度
-    const optimalZoomY = (containerHeight * 0.8) / totalHeight; // 80% 的容器高度
+    const optimalZoomY = (containerHeight * 0.8) / maxStepHeight; // 80% 的容器高度
     const optimalZoom = Math.min(optimalZoomX, optimalZoomY, 1); // 不超過 1
 
-    const optimalY = (containerHeight * 0.5) - centerGoalY;
-    // 水平同前
-    const optimalX = (containerWidth * 0.15) - 200;
+    // 計算初始位置，讓畫布置中
+    const totalWidth = rightmostX;
+    const totalHeight = maxStepHeight;
+    const optimalX = (containerWidth - totalWidth * optimalZoom) / 2;
+    const optimalY = (containerHeight - totalHeight * optimalZoom) / 2;
 
-    
     return {
       zoom: optimalZoom,
       position: { x: optimalX, y: optimalY }
@@ -98,19 +94,50 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
   }, [initialLoad, calculateOptimalView]);
 
+  // ✅ 刪除 resize 時自動 reset zoom/position 的邏輯
+// ❌ 不要再做這個
+/*
   // 添加視窗大小改變時的重新計算
   useEffect(() => {
     const handleResize = () => {
       const optimalView = calculateOptimalView();
       if (optimalView) {
-        setZoom(optimalView.zoom);
+        const oldZoom = zoom;
+        const newZoom = optimalView.zoom;
+        const zoomFactor = newZoom / oldZoom;
+
+        // 調整 offset 以適應新的 zoom
+        setStepOffsets(prev => {
+          const newOffsets = { ...prev };
+          Object.keys(newOffsets).forEach(key => {
+            newOffsets[key] = {
+              x: newOffsets[key].x * zoomFactor,
+              y: newOffsets[key].y * zoomFactor
+            };
+          });
+          return newOffsets;
+        });
+
+        setTaskOffsets(prev => {
+          const newOffsets = { ...prev };
+          Object.keys(newOffsets).forEach(key => {
+            newOffsets[key] = {
+              x: newOffsets[key].x * zoomFactor,
+              y: newOffsets[key].y * zoomFactor
+            };
+          });
+          return newOffsets;
+        });
+
+        setZoom(newZoom);
         setPosition(optimalView.position);
       }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [calculateOptimalView]);
+  }, [calculateOptimalView, zoom]);
+  */
 
   const handleZoom = useCallback((delta: number) => {
     setZoom((prevZoom) => {
@@ -156,6 +183,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 拖行相關的處理函數
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // 如果點擊的是步驟或任務，不觸發畫布拖曳
+    if ((e.target as HTMLElement).closest('.step-node, .task-card')) {
+      return;
+    }
+
     if (e.button === 0) { // 左鍵點擊
       setIsDragging(true);
       const startX = e.clientX - position.x;
@@ -206,57 +238,59 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     );
   }
 
-  const getStepPosition = (stepIndex: number, total: number) => {
-    const baseX = 400; // 起始 X 位置
-    const baseY = 0; // 中心 Y 位置
-    const stepX = 300; // X 軸間距
-
-    // 計算當前步驟之前所有任務的總高度
-    let previousHeight = 0;
-    for (let i = 0; i < stepIndex; i++) {
-      previousHeight += (120 + 20) * goal.steps[i].tasks.length;
-    }
-
-    // 計算當前步驟的任務總高度
-    const currentStepHeight = (120 + 20) * goal.steps[stepIndex].tasks.length;
-
-    // 計算當前步驟之前所有步驟的總高度
-    const totalPreviousHeight = previousHeight;
-
-    // 計算當前步驟的垂直位置，使其位於其任務範圍的中間
-    const stepY = baseY + totalPreviousHeight + (currentStepHeight / 2);
-
-    return {
-      x: baseX + stepX,
-      y: stepY,
-    };
-  };
-
-  // 計算中心目標的位置
   const getCenterGoalPosition = () => {
-    // 計算所有步驟的任務總高度
     const totalTasksHeight = goal.steps.reduce((height, step) => {
       return height + (120 + 20) * step.tasks.length;
     }, 0);
 
     return {
       x: 200,
-      y: (totalTasksHeight / 2), // 將中心目標放在所有任務的中間位置
+      y: (totalTasksHeight / 2),
+    };
+  };
+
+  const getStepPosition = (stepIndex: number) => {
+    const baseX = 400 + 300;  // 基礎位置
+    let baseY = 0;
+    for (let i = 0; i < stepIndex; i++) {
+      baseY += (120 + 20) * goal.steps[i].tasks.length;
+    }
+    baseY += ((120 + 20) * goal.steps[stepIndex].tasks.length) / 2;
+
+    const offset = stepOffsets[goal.steps[stepIndex].id] || { x: 0, y: 0 };  // 使用者拖曳的偏移
+    
+    console.log(`Step ${stepIndex} 位置計算:`, {
+      stepId: goal.steps[stepIndex].id,
+      baseX,
+      baseY,
+      offset,
+      final: {
+        x: baseX + offset.x,
+        y: baseY + offset.y
+      }
+    });
+
+    return {
+      x: baseX + offset.x,  // 基礎位置 + 偏移
+      y: baseY + offset.y
     };
   };
 
   const getTaskPosition = (stepIndex: number, taskIndex: number, totalTasks: number) => {
-    const stepPos = getStepPosition(stepIndex, goal.steps.length);
-    const taskX = 200; // 任務相對於步驟的 X 偏移
-    const cardHeight = 120; // 卡片高度
-    const cardSpacing = 20; // 卡片間距
+    const stepPos = getStepPosition(stepIndex);
+    const taskX = 200;
+    const cardHeight = 120;
+    const cardSpacing = 20;
 
-    // 計算當前步驟中之前任務的高度
     const currentStepPreviousHeight = (cardHeight + cardSpacing) * taskIndex;
+    const baseY = stepPos.y - (cardHeight * totalTasks + cardSpacing * (totalTasks - 1)) / 2 + currentStepPreviousHeight;
+
+    const taskId = goal.steps[stepIndex].tasks[taskIndex].id;
+    const offset = taskOffsets[taskId] || { x: 0, y: 0 };
 
     return {
-      x: stepPos.x + taskX,
-      y: stepPos.y - (cardHeight * totalTasks + cardSpacing * (totalTasks - 1)) / 2 + currentStepPreviousHeight,
+      x: stepPos.x + taskX + offset.x,
+      y: baseY + offset.y
     };
   };
 
@@ -305,30 +339,24 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </motion.button>
       </div>
 
-      <div 
-        className="relative w-full h-full"
+      <div
+        ref={canvasRef}
+        className="absolute top-0 left-0"
         style={{
           transform: `scale(${zoom}) translate(${position.x}px, ${position.y}px)`,
-          transformOrigin: 'center center',
-          transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+          transformOrigin: '0 0'
         }}
       >
-        {/* 所有連接線的容器 */}
         <svg
-          className="absolute top-0 left-0 w-full h-full pointer-events-none"
-          style={{ 
-            zIndex: 0,
-            width: '100%',
-            height: '100%',
-            overflow: 'visible'
-          }}
+          width="10000"
+          height="10000"
+          className="absolute top-0 left-0 pointer-events-none"
         >
-          {/* 中心目標到步驟的連接線 */}
           {goal.steps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex, goal.steps.length);
+            const stepPos = getStepPosition(stepIndex);
             const curvePoints = getCurvePoints(
-              { x: centerGoalPos.x + 96, y: centerGoalPos.y }, // 從中心目標圓圈右側開始
-              { x: stepPos.x - 64, y: stepPos.y } // 連接到步驟圓圈左側
+              { x: centerGoalPos.x + 96, y: centerGoalPos.y },
+              { x: stepPos.x - 64, y: stepPos.y }
             );
 
             return (
@@ -338,17 +366,15 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     C ${curvePoints.control1.x} ${curvePoints.control1.y},
                       ${curvePoints.control2.x} ${curvePoints.control2.y},
                       ${curvePoints.end.x} ${curvePoints.end.y}`}
-                stroke="#818cf8"  // indigo-400，更活潑的紫色
+                stroke="#818cf8"
                 strokeWidth="3"
-                className="transition-all duration-300"
                 fill="none"
               />
             );
           })}
 
-          {/* 步驟到任務的連接線 */}
           {goal.steps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex, goal.steps.length);
+            const stepPos = getStepPosition(stepIndex);
             return step.tasks.map((task, taskIndex) => {
               const taskPos = getTaskPosition(
                 stepIndex,
@@ -356,8 +382,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 step.tasks.length
               );
               const taskCurvePoints = getCurvePoints(
-                { x: stepPos.x + 64, y: stepPos.y }, // 從步驟圓圈右側開始
-                { x: taskPos.x, y: taskPos.y + 60 } // 連接到任務卡片左側中間
+                { x: stepPos.x + 64, y: stepPos.y },
+                { x: taskPos.x, y: taskPos.y + 60 }
               );
 
               return (
@@ -368,13 +394,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                         ${taskCurvePoints.control2.x} ${taskCurvePoints.control2.y},
                         ${taskCurvePoints.end.x} ${taskCurvePoints.end.y}`}
                   stroke={task.status === 'done' 
-                    ? '#34d399'  // green-400
+                    ? '#34d399'
                     : task.status === 'in_progress'
-                    ? '#f97316'  // orange-500
-                    : '#0ea5e9'  // sky-500
+                    ? '#f97316'
+                    : '#0ea5e9'
                   }
                   strokeWidth="2.5"
-                  className="transition-all duration-300"
                   fill="none"
                 />
               );
@@ -382,16 +407,16 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           })}
         </svg>
 
-        {/* 中心目標 */}
         <motion.div
           className="absolute"
-          initial={{ scale: 0, x: centerGoalPos.x - 96, y: centerGoalPos.y - 96 }}
-          animate={{ 
-            scale: 1,
-            x: centerGoalPos.x - 96,
-            y: centerGoalPos.y - 96,
+          style={{
+            left: centerGoalPos.x - 96,
+            top: centerGoalPos.y - 96,
+            transform: 'none'
           }}
-          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
         >
           <div className="w-48 h-48 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 border-4 border-purple-200 flex items-center justify-center p-6 shadow-lg">
             <div className="text-center">
@@ -401,28 +426,47 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           </div>
         </motion.div>
 
-        {/* 步驟和任務 */}
         <AnimatePresence>
           {goal.steps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex, goal.steps.length);
+            const stepPos = getStepPosition(stepIndex);
             const isSelected = selectedStepId === step.id;
 
             return (
               <React.Fragment key={step.id}>
-                {/* 步驟節點 */}
                 <motion.div
                   className="absolute"
-                  initial={{ scale: 0, x: stepPos.x - 64, y: stepPos.y - 64 }}
-                  animate={{
-                    scale: 1,
-                    x: stepPos.x - 64,
-                    y: stepPos.y - 64,
+                  style={{
+                    left: stepPos.x - 64,
+                    top: stepPos.y - 64,
+                    transform: 'none'
                   }}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
                   transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                 >
                   <motion.button
+                    drag
+                    dragMomentum={false}
+                    onDragStart={() => {
+                      setIsDraggingStep(step.id);
+                    }}
+                    onDrag={(event, info) => {
+                      const newX = (info.point.x - 64) / zoom;
+                      const newY = (info.point.y - 64) / zoom;
+
+                      setStepOffsets(prev => ({
+                        ...prev,
+                        [step.id]: {
+                          x: newX - stepPos.x + 64,
+                          y: newY - stepPos.y + 64,
+                        }
+                      }));
+                    }}
+                    onDragEnd={() => {
+                      setIsDraggingStep(null);
+                    }}
                     onClick={() => setSelectedStepId(isSelected ? null : step.id)}
-                    className={`w-32 h-32 rounded-full ${
+                    className={`step-node w-32 h-32 rounded-full ${
                       isSelected
                         ? 'border-4 border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)]'
                         : 'border-4'
@@ -430,8 +474,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       getStepColors(stepIndex, goal.steps.length).gradient
                     } border-${
                       getStepColors(stepIndex, goal.steps.length).border
-                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:shadow-xl transition-all duration-200`}
+                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:shadow-xl transition-all duration-200 cursor-move`}
                     whileHover={{ scale: 1.1 }}
+                    whileDrag={{ scale: 1.05, zIndex: 50 }}
                   >
                     <div className="text-center">
                       <ListTodo className={`w-8 h-8 mx-auto mb-1 ${
@@ -444,7 +489,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   </motion.button>
                 </motion.div>
 
-                {/* 任務卡片 */}
                 <AnimatePresence>
                   {step.tasks.map((task, taskIndex) => {
                     const taskPos = getTaskPosition(
@@ -457,12 +501,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       <motion.div
                         key={task.id}
                         className="absolute"
-                        initial={{ scale: 0, x: taskPos.x, y: taskPos.y }}
-                        animate={{
-                          scale: 1,
-                          x: taskPos.x,
-                          y: taskPos.y,
+                        style={{
+                          left: taskPos.x,
+                          top: taskPos.y,
+                          transform: 'none'
                         }}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
                         exit={{ scale: 0 }}
                         transition={{
                           type: 'spring',
@@ -470,13 +515,33 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           damping: 20,
                         }}
                       >
-                        <div className={`w-64 p-4 rounded-2xl shadow-lg border-2 ${
-                          task.status === 'done'
-                            ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
-                            : task.status === 'in_progress'
-                            ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
-                            : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200'
-                        }`}>
+                        <motion.div
+                          drag
+                          dragMomentum={false}
+                          whileDrag={{ scale: 1.02, zIndex: 40 }}
+                          onDragStart={() => {
+                            // 不需要保存初始位置
+                          }}
+                          onDrag={(event, info) => {
+                            const newX = info.point.x / zoom;
+                            const newY = info.point.y / zoom;
+
+                            setTaskOffsets(prev => ({
+                              ...prev,
+                              [task.id]: {
+                                x: newX - taskPos.x,
+                                y: newY - taskPos.y,
+                              }
+                            }));
+                          }}
+                          className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
+                            task.status === 'done'
+                              ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
+                              : task.status === 'in_progress'
+                              ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
+                              : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200'
+                          }`}
+                        >
                           <div className="flex justify-between items-start">
                             <motion.button
                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
@@ -514,7 +579,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               完成於 {new Date(task.completedAt).toLocaleDateString()}
                             </p>
                           )}
-                        </div>
+                        </motion.div>
                       </motion.div>
                     );
                   })}
@@ -525,7 +590,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </AnimatePresence>
       </div>
 
-      {/* footbar 置底按鈕列 - Figma style */}
       <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-2xl shadow-xl bg-white/80 backdrop-blur border border-gray-200" style={{minWidth:'fit-content'}}>
         <button
           onClick={() => {
