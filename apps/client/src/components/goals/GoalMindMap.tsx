@@ -168,7 +168,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 初始化 offsets
   useEffect(() => {
-    if (goal) {
+    if (goal && initialLoad) {
       const initialStepOffsets: { [key: string]: { x: number; y: number } } = {};
       const initialTaskOffsets: { [key: string]: { x: number; y: number } } = {};
 
@@ -478,9 +478,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     };
     updateGoal(updatedGoal);
 
-    // 重置所有 offset
-    setStepOffsets({});
-    setTaskOffsets({});
 
     // 計算新 step 的位置
     const newStepIndex = goal.steps.length; // 新的 step 會是最後一個
@@ -740,12 +737,14 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                 >
                   <motion.button
-                    drag
+                    drag={editingStepId !== step.id}
                     dragMomentum={false}
                     onDragStart={(event, info) => {
+                      if (editingStepId === step.id) return;
                       setIsDraggingStep(step.id);
                     }}
                     onDrag={(event, info) => {
+                      if (editingStepId === step.id) return;
                       const dx = info.delta.x;
                       const dy = info.delta.y;
 
@@ -761,6 +760,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       });
                     }}
                     onDragEnd={() => {
+                      if (editingStepId === step.id) return;
                       setIsDraggingStep(null);
                     }}
                     onClick={() => setSelectedStepId(isSelected ? null : step.id)}
@@ -776,8 +776,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       getStepColors(stepIndex, goal.steps.length).gradient
                     } border-${
                       getStepColors(stepIndex, goal.steps.length).border
-                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:shadow-xl transition-all duration-200 cursor-move`}
-                    whileHover={{ scale: 1.1 }}
+                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:shadow-xl transition-all duration-200 ${editingStepId === step.id ? 'cursor-text' : 'cursor-move'}`}
+                    whileHover={{ scale: editingStepId === step.id ? 1 : 1.1 }}
                     whileDrag={{ scale: 1.05, zIndex: 50 }}
                   >
                     <div className="text-center">
