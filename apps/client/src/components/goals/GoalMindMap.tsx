@@ -58,22 +58,52 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
 
-    // 計算每個 step 的高度，取最大值
-    const maxStepHeight = Math.max(...goal.steps.map(step => (120 + 20) * step.tasks.length), 0);
+    // 計算所有 step 的總高度
+    const totalStepHeight = goal.steps.reduce((total, step) => {
+      return total + (120 + 40) * step.tasks.length;
+    }, 0);
 
-    // 計算最右側任務的 X 位置
-    const rightmostX = 400 + 300 + 200 + 256; // baseX + stepX + taskX + taskWidth
+    // 計算整個畫布的寬度（從最左到最右）
+    const centerGoalX = 0;  // 中心目標的 x 位置
+    const rightmostTaskX = 400 + 300 + 200 + 256 + 100; // baseX + stepX + taskX + taskWidth
+    const leftmostX = centerGoalX;  // 中心目標左邊的空間
+    const totalWidth = rightmostTaskX - leftmostX;  // 整個畫布的實際寬度
 
     // 計算最佳縮放值
-    const optimalZoomX = (containerWidth * 0.75) / rightmostX; // 75% 的容器寬度
-    const optimalZoomY = (containerHeight * 0.8) / maxStepHeight; // 80% 的容器高度
-    const optimalZoom = Math.min(optimalZoomX, optimalZoomY, 1); // 不超過 1
+    const optimalZoomX = (containerWidth * 0.8) / totalWidth;
+    const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
+    const optimalZoom = Math.min(optimalZoomX, optimalZoomY, 1.5);
 
-    // 計算初始位置，讓畫布置中
-    const totalWidth = rightmostX;
-    const totalHeight = maxStepHeight;
-    const optimalX = (containerWidth - totalWidth * optimalZoom) / 2;
-    const optimalY = (containerHeight - totalHeight * optimalZoom) / 2;
+    // 計算目標應該在的位置（螢幕寬度的 35%）
+    const targetScreenX = containerWidth * 0.30;
+    
+    // 計算需要的 translate 值，確保目標出現在 35% 的位置
+    const optimalX = (targetScreenX - centerGoalX * optimalZoom) / optimalZoom;
+    const optimalY = (containerHeight - totalStepHeight * optimalZoom) / 2 / optimalZoom;
+
+    console.log('Layout calculation:', {
+      container: {
+        width: containerWidth,
+        height: containerHeight
+      },
+      canvas: {
+        centerGoalX,
+        rightmostTaskX,
+        leftmostX,
+        totalWidth,
+        totalStepHeight
+      },
+      zoom: {
+        optimalZoomX,
+        optimalZoomY,
+        finalZoom: optimalZoom
+      },
+      position: {
+        x: optimalX,
+        y: optimalY
+      },
+      finalTransform: `scale(${optimalZoom}) translate(${optimalX}px, ${optimalY}px)`
+    });
 
     return {
       zoom: optimalZoom,
@@ -158,43 +188,73 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   */
 
   const handleZoom = useCallback((delta: number) => {
-    setZoom((prevZoom) => {
-      const newZoom = prevZoom + delta;
-      return Math.min(Math.max(0.4, newZoom), 2);
-    });
-  }, []);
+    // 獲取容器的位置和大小資訊
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // 計算容器中心點
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    // 計算新的縮放值
+    const newZoom = Math.min(Math.max(0.4, zoom + delta), 2);
+
+    // 計算中心點在畫布邏輯座標系中的位置
+    const logicX = centerX / zoom - position.x;
+    const logicY = centerY / zoom - position.y;
+
+    // 計算新的位置，確保中心點在縮放前後指向畫布中的同一個點
+    const newPosition = {
+      x: centerX / newZoom - logicX,
+      y: centerY / newZoom - logicY
+    };
+
+    // 更新狀態
+    setZoom(newZoom);
+    setPosition(newPosition);
+  }, [zoom, position]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    // 只處理 Ctrl/Cmd + 滾輪的縮放事件
     if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
+      // 阻止事件冒泡和默認行為（避免瀏覽器縮放）
       e.stopPropagation();
+      e.preventDefault();
       
-      // 獲取滑鼠在容器中的相對位置
+      // 獲取容器的位置和大小資訊
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       
+      // 計算滑鼠相對於容器左上角的位置
+      // 這是在螢幕座標系統中的位置（考慮了滾動）
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
       
-      // 計算滑鼠相對於當前視圖中心的位置
-      const viewCenterX = rect.width / 2;
-      const viewCenterY = rect.height / 2;
-      
-      // 計算滑鼠相對於視圖中心的偏移
-      const offsetX = mouseX - viewCenterX;
-      const offsetY = mouseY - viewCenterY;
-      
-      // 計算縮放比例
+      // 計算新的縮放值
+      // deltaY > 0 表示滾輪向下滾動，我們將其解釋為縮小
       const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      // 限制縮放範圍在 0.4 到 2 之間
       const newZoom = Math.min(Math.max(0.4, zoom + delta), 2);
+      // 計算縮放比例（新/舊）
       const zoomFactor = newZoom / zoom;
       
-      // 更新位置，使滑鼠指向的點保持不變
-      setPosition({
-        x: position.x - (offsetX * (zoomFactor - 1)),
-        y: position.y - (offsetY * (zoomFactor - 1))
-      });
+      // 計算滑鼠在畫布邏輯座標系中的位置
+      // 1. 先將螢幕座標除以當前縮放比例得到縮放前的座標
+      // 2. 再減去當前位移得到邏輯座標
+      const logicX = mouseX / zoom - position.x;
+      const logicY = mouseY / zoom - position.y;
       
+      // 計算新的位置，確保滑鼠指向的內容保持不變
+      // 1. 將滑鼠螢幕座標除以新的縮放比例
+      // 2. 減去邏輯座標得到新的位移
+      // 這樣可以保證滑鼠位置在縮放前後指向畫布中的同一個點
+      const newPosition = {
+        x: mouseX / newZoom - logicX,
+        y: mouseY / newZoom - logicY
+      };
+
+      // 更新狀態，觸發重新渲染
+      setPosition(newPosition);
       setZoom(newZoom);
     }
   }, [zoom, position]);
@@ -236,14 +296,26 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
   }, []);
 
+  // 設定 wheel 事件為 non-passive
   React.useEffect(() => {
     const container = containerRef.current;
     if (container) {
+      // 觸控相關
       container.addEventListener('touchstart', preventDefault, { passive: false });
       container.addEventListener('touchmove', preventDefault, { passive: false });
+      
+      // wheel 事件
+      const handleWheelPassive = (e: WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+        }
+      };
+      container.addEventListener('wheel', handleWheelPassive, { passive: false });
+
       return () => {
         container.removeEventListener('touchstart', preventDefault);
         container.removeEventListener('touchmove', preventDefault);
+        container.removeEventListener('wheel', handleWheelPassive);
       };
     }
   }, [preventDefault]);
@@ -270,10 +342,15 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const getStepPosition = (stepIndex: number) => {
     const baseX = 400 + 300;  // 基礎位置
     let baseY = 0;
+    
+    // 計算前面所有 step 的總高度
     for (let i = 0; i < stepIndex; i++) {
-      baseY += (120 + 20) * goal.steps[i].tasks.length;
+      baseY += (120 + 40) * goal.steps[i].tasks.length;  // 改為 40px 間距
     }
-    baseY += ((120 + 20) * goal.steps[stepIndex].tasks.length) / 2;
+    
+    // 計算當前 step 的起始位置
+    const currentStepHeight = (120 + 40) * goal.steps[stepIndex].tasks.length;  // 改為 40px 間距
+    baseY += currentStepHeight / 2;
 
     return {
       x: baseX,
@@ -285,10 +362,16 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const stepPos = getStepPosition(stepIndex);
     const taskX = 200;
     const cardHeight = 120;
-    const cardSpacing = 20;
+    const cardSpacing = 40;
 
-    const currentStepPreviousHeight = (cardHeight + cardSpacing) * taskIndex;
-    const baseY = stepPos.y - (cardHeight * totalTasks + cardSpacing * (totalTasks - 1)) / 2 + currentStepPreviousHeight;
+    // 計算當前任務之前的所有卡片高度和間距
+    const currentStepPreviousHeight = (cardHeight * taskIndex) + (cardSpacing * taskIndex);
+    
+    // 計算整個 step 的總高度（所有卡片高度 + 間距）
+    const totalHeight = (cardHeight * totalTasks) + (cardSpacing * (totalTasks - 1));
+    
+    // 從 step 中心點開始計算位置
+    const baseY = stepPos.y - (totalHeight / 2) + currentStepPreviousHeight;
 
     return {
       x: stepPos.x + taskX,
@@ -340,16 +423,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         <h1 className="text-xl font-bold text-gray-900">{goal.title}</h1>
       </div>
 
-      <div className="absolute top-4 right-4 z-20">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          新增任務
-        </motion.button>
-      </div>
 
       <div
         ref={canvasRef}
@@ -473,8 +546,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       setIsDraggingStep(step.id);
                     }}
                     onDrag={(event, info) => {
-                      const dx = info.delta.x / zoom;
-                      const dy = info.delta.y / zoom;
+                      const dx = info.delta.x;
+                      const dy = info.delta.y;
 
                       setStepOffsets(prev => {
                         const currentOffset = prev[step.id] || { x: 0, y: 0 };
@@ -549,8 +622,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             // 不需要保存初始位置
                           }}
                           onDrag={(event, info) => {
-                            const dx = info.delta.x / zoom;
-                            const dy = info.delta.y / zoom;
+                            const dx = info.delta.x;
+                            const dy = info.delta.y;
 
                             setTaskOffsets(prev => {
                               const currentOffset = prev[task.id] || { x: 0, y: 0 };
@@ -606,11 +679,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             </div>
                           </div>
                           <h3 className="mt-3 text-lg font-semibold text-gray-900">{task.title}</h3>
-                          {task.completedAt && (
-                            <p className="mt-2 text-xs text-gray-500">
-                              完成於 {new Date(task.completedAt).toLocaleDateString()}
-                            </p>
-                          )}
+                          <div className="h-[20px] mt-2">
+                            {task.completedAt && (
+                              <p className="text-xs text-gray-500">
+                                完成於 {new Date(task.completedAt).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
                         </motion.div>
                       </motion.div>
                     );
