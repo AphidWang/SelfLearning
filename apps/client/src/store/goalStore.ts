@@ -98,6 +98,12 @@ const initialGoals: Goal[] = [
             title: '用圖片表示分數',
             status: 'in_progress',
           },
+          {
+            id: '2-1-3',
+            title: '分享生活中的分數應用',
+            status: 'done',
+            completedAt: new Date('2024-03-12').toISOString(),
+          }
         ],
       },
       {
@@ -107,13 +113,14 @@ const initialGoals: Goal[] = [
           {
             id: '2-2-1',
             title: '比較不同分數的大小',
-            status: 'in_progress',
+            status: 'done',
+            completedAt: new Date('2024-03-15').toISOString(),
           },
           {
             id: '2-2-2',
             title: '用圖形解釋比較結果',
-            status: 'todo',
-          },
+            status: 'in_progress',
+          }
         ],
       },
       {
@@ -122,14 +129,24 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '2-3-1',
-            title: '用圖形解釋分數加減',
-            status: 'todo',
+            title: '學習分數加法',
+            status: 'in_progress',
           },
           {
             id: '2-3-2',
-            title: '解決分數應用題',
+            title: '學習分數減法',
             status: 'todo',
           },
+          {
+            id: '2-3-3',
+            title: '學習分數乘法',
+            status: 'in_progress',
+          },
+          {
+            id: '2-3-4',
+            title: '學習分數除法',
+            status: 'todo',
+          }
         ],
       },
       {
@@ -145,7 +162,7 @@ const initialGoals: Goal[] = [
             id: '2-4-2',
             title: '用分數解決生活問題',
             status: 'todo',
-          },
+          }
         ],
       },
     ],
