@@ -303,8 +303,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 拖行相關的處理函數
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // 如果點擊的是步驟或任務，不觸發畫布拖曳
-    if ((e.target as HTMLElement).closest('.step-node, .task-card')) {
+    // 如果點擊的是目標節點或步驟或任務，不觸發畫布拖曳
+    if ((e.target as HTMLElement).closest('.goal-node, .step-node, .task-card')) {
       return;
     }
 
@@ -653,7 +653,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </svg>
 
         <motion.div
-          className="absolute"
+          className="absolute goal-node"
           style={{
             left: centerGoalPos.x - 96,
             top: centerGoalPos.y - 96,
@@ -667,22 +667,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           drag
           dragMomentum={false}
           dragElastic={0}
+          onDragStart={(e) => {
+            e.stopPropagation();
+            console.log('Goal drag start');
+          }}
+          onDrag={(e) => {
+            e.stopPropagation();
+          }}
+          onDragEnd={(e) => {
+            e.stopPropagation();
+            console.log('Goal drag end');
+            console.log('Final position:', {
+              x: goalX.get(),
+              y: goalY.get()
+            });
+          }}
           whileDrag={{ 
             scale: 1.05,
             zIndex: 50 
           }}
           whileHover={{ 
             scale: 1.02 
-          }}
-          onDragStart={() => {
-            console.log('Goal drag start');
-          }}
-          onDragEnd={() => {
-            console.log('Goal drag end');
-            console.log('Final position:', {
-              x: goalX.get(),
-              y: goalY.get()
-            });
           }}
         >
           <div 
