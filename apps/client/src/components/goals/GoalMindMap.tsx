@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, MotionValue, useMotionValueEvent } from 'framer-motion';
 import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
 import { Goal, Step, Task, createStep } from '../../types/goal';
@@ -55,6 +55,23 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [dragStartPositions, setDragStartPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [isDraggingStep, setIsDraggingStep] = useState<string | null>(null);
   const [goalPosition, setGoalPosition] = useState<{ x: number; y: number }>({ x: 200, y: 0 });
+  const [goalOffset, setGoalOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // 追蹤目標節點位置
+  const goalX = useMotionValue(0);
+  const goalY = useMotionValue(0);
+
+  // 追蹤步驟節點位置
+  const stepPositions = useRef(new Map<string, { x: number, y: number }>());
+
+  // 監聽位置變化
+  useMotionValueEvent(goalX, "change", (latest) => {
+    setGoalOffset(prev => ({ ...prev, x: latest }));
+  });
+
+  useMotionValueEvent(goalY, "change", (latest) => {
+    setGoalOffset(prev => ({ ...prev, y: latest }));
+  });
 
   // 計算最佳視圖位置和縮放值
   const calculateOptimalView = useCallback(() => {
@@ -451,8 +468,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     if (!goal) return;
 
     const newStep = createStep({
-      title: '新步驟',
-      createdAt: new Date().toISOString(),
+      title: '新步驟'
     });
 
     // 更新 goal store
@@ -585,7 +601,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             const stepPos = getStepPosition(stepIndex, goal.steps);
             const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
             const curvePoints = getCurvePoints(
-              { x: centerGoalPos.x + 96 + 5000, y: centerGoalPos.y + 5000 },
+              { x: centerGoalPos.x + 96 + goalOffset.x + 5000, y: centerGoalPos.y + goalOffset.y + 5000 },
               { x: stepPos.x - 64 + stepOffset.x + 5000, y: stepPos.y + stepOffset.y + 5000 }
             );
 
@@ -644,11 +660,33 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           style={{
             left: centerGoalPos.x - 96,
             top: centerGoalPos.y - 96,
-            transform: 'none'
+            transform: 'none',
+            x: goalX,
+            y: goalY
           }}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          drag
+          dragMomentum={false}
+          dragElastic={0}
+          whileDrag={{ 
+            scale: 1.05,
+            zIndex: 50 
+          }}
+          whileHover={{ 
+            scale: 1.02 
+          }}
+          onDragStart={() => {
+            console.log('Goal drag start');
+          }}
+          onDragEnd={() => {
+            console.log('Goal drag end');
+            console.log('Final position:', {
+              x: goalX.get(),
+              y: goalY.get()
+            });
+          }}
         >
           <div 
             className="group relative w-48 h-48 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 border-4 border-purple-200 flex items-center justify-center p-6 shadow-lg cursor-pointer transition-all duration-200 hover:scale-105 hover:border-purple-400 hover:shadow-[0_0_0_4px_rgba(99,102,241,0.2)]"
@@ -659,17 +697,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
               <h2 className="text-lg font-bold text-purple-700">{goal.title}</h2>
             </div>
 
-            {/* 新增 Step 按鈕 */}
-            <motion.button
-              initial={false}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAddStep();
-              }}
-              className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center shadow-lg hover:bg-purple-600 transition-all duration-200 opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-75"
-            >
-              <Plus className="w-5 h-5 text-white" />
-            </motion.button>
           </div>
         </motion.div>
 
