@@ -17,6 +17,7 @@ import MentorTaskPlanner from './pages/mentor/MentorTaskPlanner.tsx';
 import { CurriculumProvider } from './context/CurriculumContext';
 import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
+import LottiePreview from './pages/preview/LottiePreview';
 
 function App() {
   return (
@@ -25,6 +26,9 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            
+            {/* Preview Routes */}
+            <Route path="/preview/lottie" element={<LottiePreview />} />
             
             {/* Student Routes */}
             <Route path="/student" element={<StudentDashboard />} />

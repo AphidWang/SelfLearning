@@ -16,6 +16,7 @@
     "caniuse-lite": "^1.0.30001717",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.8.0",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-day-picker": "^9.6.7",

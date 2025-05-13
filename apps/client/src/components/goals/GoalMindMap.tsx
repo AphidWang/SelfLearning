@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
+import Lottie from 'lottie-react';
+import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
 
 interface GoalMindMapProps {
   goalId: string;
@@ -44,6 +46,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [stepOffsets, setStepOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [taskOffsets, setTaskOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [dragStartPositions, setDragStartPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
@@ -113,14 +116,20 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   useEffect(() => {
     if (initialLoad) {
-      setTimeout(() => {
+      // 確保元素都已經渲染完成
+      const timer = setTimeout(() => {
         const optimalView = calculateOptimalView();
         if (optimalView) {
           setZoom(optimalView.zoom);
           setPosition(optimalView.position);
         }
         setInitialLoad(false);
+        // 等待位置調整完成後再隱藏 loading
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
       }, 500);
+      return () => clearTimeout(timer);
     }
   }, [initialLoad, calculateOptimalView]);
 
@@ -410,6 +419,29 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       onMouseDown={handleMouseDown}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
     >
+      {/* Loading 遮罩 */}
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 z-50 bg-white flex flex-col items-center justify-center"
+          >
+            <div className="w-48 h-48 relative">
+              <Lottie
+                animationData={loadingAnimation}
+                loop={true}
+                className="w-full h-full"
+              />
+            </div>
+            <div className="mt-4 text-lg text-purple-600 font-medium">
+              正在載入心智圖...
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="absolute top-4 left-4 z-10 flex items-center space-x-4">
         <motion.button
           whileHover={{ scale: 1.05 }}
