@@ -774,14 +774,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       setEditingStepTitle(step.title);
                     }}
                     className={`step-node w-32 h-32 rounded-full ${
-                      isSelected
-                        ? 'border-4 border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)]'
-                        : 'border-4'
+                      'border-4'
                     } bg-gradient-to-br ${
                       getStepColors(stepIndex, goal.steps.length).gradient
                     } border-${
                       getStepColors(stepIndex, goal.steps.length).border
-                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:shadow-xl transition-all duration-200 ${editingStepId === step.id ? 'cursor-text' : 'cursor-move'}`}
+                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)] transition-all duration-200 ${editingStepId === step.id ? 'cursor-text' : 'cursor-move'}`}
                     whileHover={{ scale: editingStepId === step.id ? 1 : 1.1 }}
                     whileDrag={{ scale: 1.05, zIndex: 50 }}
                   >
