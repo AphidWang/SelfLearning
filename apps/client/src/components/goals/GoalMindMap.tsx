@@ -697,6 +697,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
               <h2 className="text-lg font-bold text-purple-700">{goal.title}</h2>
             </div>
 
+            {/* 新增步驟按鈕 */}
+            <div 
+              className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              style={{
+                right: '0px',
+                top: '75%',
+                transform: 'translate(50%, -50%)',
+              }}
+            >
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddStep();
+                }}
+                className="w-9 h-9 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Plus className="w-5 h-5 text-white" />
+              </motion.button>
+            </div>
           </div>
         </motion.div>
 
