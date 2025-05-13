@@ -75,14 +75,26 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     // 計算最佳縮放值
     const optimalZoomX = (containerWidth * 0.8) / totalWidth;
     const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
-    const optimalZoom = Math.min(optimalZoomX, optimalZoomY, 1.5);
+    const optimalZoom = Math.min(Math.max(0.8, Math.min(optimalZoomX, optimalZoomY)), 1.5);
 
     // 計算目標應該在的位置（螢幕寬度的 35%）
-    const targetScreenX = containerWidth * 0.30;
+    const targetScreenX = containerWidth * 0.2;
     
     // 計算需要的 translate 值，確保目標出現在 35% 的位置
     const optimalX = (targetScreenX - centerGoalX * optimalZoom) / optimalZoom;
-    const optimalY = (containerHeight - totalStepHeight * optimalZoom) / 2 / optimalZoom;
+
+    // 計算 Y 軸位置
+    let optimalY;
+    const scaledTotalHeight = totalStepHeight * optimalZoom;
+    
+    if (scaledTotalHeight > containerHeight) {
+      // 如果縮放後的高度超過容器高度，將位置設定為顯示第一個 task
+      // 考慮 goal 圖示的高度（96px）和一些上方間距（50px）
+      optimalY = 50 / optimalZoom;
+    } else {
+      // 如果高度足夠，置中顯示
+      optimalY = (containerHeight - totalStepHeight * optimalZoom) / 2 / optimalZoom;
+    }
 
     console.log('Layout calculation:', {
       container: {
@@ -94,7 +106,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         rightmostTaskX,
         leftmostX,
         totalWidth,
-        totalStepHeight
+        totalStepHeight,
+        scaledTotalHeight
       },
       zoom: {
         optimalZoomX,
@@ -750,6 +763,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         >
           <ZoomIn className="w-5 h-5 text-gray-600" />
         </button>
+        <div className="w-16 text-center font-mono text-sm text-gray-600">
+          {Math.round(zoom * 100)}%
+        </div>
         <button
           onClick={() => handleZoom(-0.1)}
           className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
