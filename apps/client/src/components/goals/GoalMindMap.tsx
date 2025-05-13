@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
-import { Goal, Step, Task } from '../../types/goal';
+import { Goal, Step, Task, createStep } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
 
@@ -37,9 +37,12 @@ const getStepColors = (index: number, totalSteps: number) => {
 };
 
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
-  const { goals } = useGoalStore();
+  const { goals, updateGoal } = useGoalStore();
   const goal = goals.find((g) => g.id === goalId);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [isGoalSelected, setIsGoalSelected] = useState(false);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [editingStepTitle, setEditingStepTitle] = useState('');
   const [zoom, setZoom] = useState(0.8);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -361,17 +364,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     };
   };
 
-  const getStepPosition = (stepIndex: number) => {
+  const getStepPosition = (stepIndex: number, steps: Step[]) => {
     const baseX = 400 + 300;  // 基礎位置
     let baseY = 0;
     
     // 計算前面所有 step 的總高度
     for (let i = 0; i < stepIndex; i++) {
-      baseY += (120 + 40) * goal.steps[i].tasks.length;  // 改為 40px 間距
+      baseY += (120 + 40) * Math.max(1, steps[i].tasks.length);  // 確保最少有一個 task 的高度
     }
     
     // 計算當前 step 的起始位置
-    const currentStepHeight = (120 + 40) * goal.steps[stepIndex].tasks.length;  // 改為 40px 間距
+    const currentStepHeight = (120 + 40) * Math.max(1, steps[stepIndex].tasks.length);  // 確保最少有一個 task 的高度
     baseY += currentStepHeight / 2;
 
     return {
@@ -381,7 +384,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   };
 
   const getTaskPosition = (stepIndex: number, taskIndex: number, totalTasks: number) => {
-    const stepPos = getStepPosition(stepIndex);
+    const stepPos = getStepPosition(stepIndex, goal.steps);
     const taskX = 200;
     const cardHeight = 120;
     const cardSpacing = 40;
@@ -423,6 +426,95 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   };
 
   const centerGoalPos = getCenterGoalPosition();
+
+  // 新增 step 後重新計算位置並置中到新 step
+  const focusOnStep = useCallback((stepId: string) => {
+    const stepIndex = goal?.steps.findIndex(s => s.id === stepId) ?? -1;
+    if (stepIndex === -1) return;
+
+    const stepPos = getStepPosition(stepIndex, goal.steps);
+    const container = containerRef.current;
+    if (!container) return;
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    // 計算新的位置，使 step 位於畫面中心
+    const newX = (containerWidth / 2 / zoom) - stepPos.x;
+    const newY = (containerHeight / 2 / zoom) - stepPos.y;
+
+    setPosition({ x: newX, y: newY });
+  }, [zoom, getStepPosition]);
+
+  // 處理新增 step
+  const handleAddStep = useCallback(() => {
+    if (!goal) return;
+
+    const newStep = createStep({
+      title: '新步驟',
+      createdAt: new Date().toISOString(),
+    });
+
+    // 更新 goal store
+    const updatedGoal = {
+      ...goal,
+      steps: [...goal.steps, newStep]
+    };
+    updateGoal(updatedGoal);
+
+    // 重置所有 offset
+    setStepOffsets({});
+    setTaskOffsets({});
+
+    // 計算新 step 的位置
+    const newStepIndex = goal.steps.length; // 新的 step 會是最後一個
+    const stepPos = getStepPosition(newStepIndex, updatedGoal.steps);
+    const container = containerRef.current;
+    if (container) {
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+
+      // 計算所有 step 的總高度（包含新增的 step）
+      const totalStepHeight = goal.steps.reduce((total, step) => {
+        return total + (120 + 40) * step.tasks.length;
+      }, 0) + (120 + 40); // 加上新 step 的預設高度
+
+      // 計算最佳縮放值
+      const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
+      const optimalZoom = Math.min(Math.max(0.8, optimalZoomY), 1.5);
+
+      // 計算新的位置，使新的 step 出現在畫面中心偏下
+      const newX = (containerWidth / 2 / optimalZoom) - stepPos.x;
+      const newY = (containerHeight * 0.7 / optimalZoom) - stepPos.y; // 讓新 step 出現在畫面偏下方
+
+      // 更新縮放和位置
+      setZoom(optimalZoom);
+      setPosition({ x: newX, y: newY });
+    }
+
+    // 設置編輯狀態
+    setEditingStepId(newStep.id);
+    setEditingStepTitle('新步驟');
+    setIsGoalSelected(false);
+  }, [goal, updateGoal]);
+
+  // 處理 step 標題更新
+  const handleStepTitleUpdate = useCallback((stepId: string, newTitle: string) => {
+    if (!goal) return;
+
+    const updatedSteps = goal.steps.map(step => 
+      step.id === stepId ? { ...step, title: newTitle } : step
+    );
+
+    const updatedGoal = {
+      ...goal,
+      steps: updatedSteps
+    };
+    updateGoal(updatedGoal);
+
+    setEditingStepId(null);
+    setEditingStepTitle('');
+  }, [goal, updateGoal]);
 
   return (
     <div 
@@ -490,7 +582,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           }}
         >
           {goal.steps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex);
+            const stepPos = getStepPosition(stepIndex, goal.steps);
             const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
             const curvePoints = getCurvePoints(
               { x: centerGoalPos.x + 96 + 5000, y: centerGoalPos.y + 5000 },
@@ -512,7 +604,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           })}
 
           {goal.steps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex);
+            const stepPos = getStepPosition(stepIndex, goal.steps);
             const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
             return step.tasks.map((task, taskIndex) => {
               const taskPos = getTaskPosition(
@@ -558,17 +650,32 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 20 }}
         >
-          <div className="w-48 h-48 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 border-4 border-purple-200 flex items-center justify-center p-6 shadow-lg">
+          <div 
+            className="group relative w-48 h-48 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 border-4 border-purple-200 flex items-center justify-center p-6 shadow-lg cursor-pointer transition-all duration-200 hover:scale-105 hover:border-purple-400 hover:shadow-[0_0_0_4px_rgba(99,102,241,0.2)]"
+            onClick={() => setIsGoalSelected(!isGoalSelected)}
+          >
             <div className="text-center">
               <Target className="w-12 h-12 text-purple-500 mx-auto mb-2" />
               <h2 className="text-lg font-bold text-purple-700">{goal.title}</h2>
             </div>
+
+            {/* 新增 Step 按鈕 */}
+            <motion.button
+              initial={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddStep();
+              }}
+              className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center shadow-lg hover:bg-purple-600 transition-all duration-200 opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-75"
+            >
+              <Plus className="w-5 h-5 text-white" />
+            </motion.button>
           </div>
         </motion.div>
 
         <AnimatePresence>
           {goal.steps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex);
+            const stepPos = getStepPosition(stepIndex, goal.steps);
             const isSelected = selectedStepId === step.id;
 
             return (
@@ -607,9 +714,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     }}
                     onDragEnd={() => {
                       setIsDraggingStep(null);
-                      console.log('Step drag end offsets:', stepOffsets);
                     }}
                     onClick={() => setSelectedStepId(isSelected ? null : step.id)}
+                    onDoubleClick={() => {
+                      setEditingStepId(step.id);
+                      setEditingStepTitle(step.title);
+                    }}
                     className={`step-node w-32 h-32 rounded-full ${
                       isSelected
                         ? 'border-4 border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)]'
@@ -623,12 +733,34 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     whileDrag={{ scale: 1.05, zIndex: 50 }}
                   >
                     <div className="text-center">
-                      <ListTodo className={`w-8 h-8 mx-auto mb-1 ${
-                        getStepColors(stepIndex, goal.steps.length).icon
-                      }`} />
-                      <h3 className={`text-sm font-bold ${
-                        getStepColors(stepIndex, goal.steps.length).text
-                      }`}>{step.title}</h3>
+                      {editingStepId === step.id ? (
+                        <input
+                          type="text"
+                          value={editingStepTitle}
+                          onChange={(e) => setEditingStepTitle(e.target.value)}
+                          onBlur={() => handleStepTitleUpdate(step.id, editingStepTitle)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleStepTitleUpdate(step.id, editingStepTitle);
+                            } else if (e.key === 'Escape') {
+                              setEditingStepId(null);
+                              setEditingStepTitle('');
+                            }
+                          }}
+                          className="w-full text-center bg-transparent border-b border-purple-300 focus:outline-none focus:border-purple-500 px-1"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <>
+                          <ListTodo className={`w-8 h-8 mx-auto mb-1 ${
+                            getStepColors(stepIndex, goal.steps.length).icon
+                          }`} />
+                          <h3 className={`text-sm font-bold ${
+                            getStepColors(stepIndex, goal.steps.length).text
+                          }`}>{step.title}</h3>
+                        </>
+                      )}
                     </div>
                   </motion.button>
                 </motion.div>
