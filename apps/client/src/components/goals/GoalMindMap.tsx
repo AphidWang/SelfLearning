@@ -55,6 +55,49 @@ const useElementStack = (initialValue = 1) => {
   return { bringToFront, getIndex };
 };
 
+// 計算所有可見元素的邊界
+const calculateContentBounds = (
+  canvasRef: React.RefObject<HTMLDivElement>,
+  goal: Goal | undefined,
+  zoom: number,
+  position: { x: number; y: number }
+) => {
+  if (!canvasRef.current || !goal) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  // 獲取所有需要計算的元素
+  const elements = canvasRef.current.querySelectorAll('.goal-node, .step-node, .task-card');
+  
+  elements.forEach(element => {
+    const rect = element.getBoundingClientRect();
+    const scale = zoom; // 當前縮放值
+    
+    // 計算實際位置（考慮縮放和位移）
+    const actualLeft = (rect.left - position.x * scale) / scale;
+    const actualTop = (rect.top - position.y * scale) / scale;
+    const actualRight = actualLeft + rect.width / scale;
+    const actualBottom = actualTop + rect.height / scale;
+
+    minX = Math.min(minX, actualLeft);
+    minY = Math.min(minY, actualTop);
+    maxX = Math.max(maxX, actualRight);
+    maxY = Math.max(maxY, actualBottom);
+  });
+
+  // 添加邊距
+  const padding = 50;
+  return {
+    x: Math.max(0, minX - padding),
+    y: Math.max(0, minY - padding),
+    width: maxX - minX + (padding * 2),
+    height: maxY - minY + (padding * 2)
+  };
+};
+
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const { goals, updateGoal } = useGoalStore();
   const goal = goals.find((g) => g.id === goalId);
@@ -678,118 +721,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     URL.revokeObjectURL(url);
   }, [goal]);
 
-  // 匯出成 PNG
-  const exportToPNG = useCallback(async () => {
-    if (!goal || !canvasRef.current) return;
-
-    try {
-      // 等待一小段時間確保元素都渲染完成
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const canvas = await html2canvas(canvasRef.current, {
-        scale: 2, // 提高解析度
-        useCORS: true, // 允許跨域圖片
-        allowTaint: true, // 允許污染
-        backgroundColor: '#f9fafb', // 設定背景色
-        logging: true, // 開啟日誌以便偵錯
-        width: canvasRef.current.scrollWidth,
-        height: canvasRef.current.scrollHeight,
-        windowWidth: canvasRef.current.scrollWidth,
-        windowHeight: canvasRef.current.scrollHeight,
-        onclone: (document, element) => {
-          // 確保所有元素都是可見的
-          element.style.transform = 'none';
-          element.style.opacity = '1';
-          element.style.display = 'block';
-        }
-      });
-
-      // 確保 canvas 有內容
-      if (canvas.width === 0 || canvas.height === 0) {
-        throw new Error('Canvas dimensions are invalid');
-      }
-
-      const url = canvas.toDataURL('image/png', 1.0);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${goal.title}-心智圖.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('匯出 PNG 失敗:', error);
-      alert('匯出 PNG 失敗，請稍後再試');
-    }
-  }, [goal]);
-
-  // 匯出成 PDF
-  const exportToPDF = useCallback(async () => {
-    if (!goal || !canvasRef.current) return;
-
-    try {
-      // 等待一小段時間確保元素都渲染完成
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const canvas = await html2canvas(canvasRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#f9fafb',
-        logging: true,
-        width: canvasRef.current.scrollWidth,
-        height: canvasRef.current.scrollHeight,
-        windowWidth: canvasRef.current.scrollWidth,
-        windowHeight: canvasRef.current.scrollHeight,
-        onclone: (document, element) => {
-          element.style.transform = 'none';
-          element.style.opacity = '1';
-          element.style.display = 'block';
-        }
-      });
-
-      // 確保 canvas 有內容
-      if (canvas.width === 0 || canvas.height === 0) {
-        throw new Error('Canvas dimensions are invalid');
-      }
-
-      const imgData = canvas.toDataURL('image/png', 1.0);
-      
-      // 根據內容比例決定 PDF 方向
-      const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
-      
-      // 計算 PDF 大小以適應內容
-      const pdfWidth = orientation === 'landscape' ? 297 : 210;  // A4 尺寸（mm）
-      const pdfHeight = orientation === 'landscape' ? 210 : 297;
-      
-      // 計算縮放比例
-      const aspectRatio = canvas.width / canvas.height;
-      const imgWidth = pdfWidth;
-      const imgHeight = pdfWidth / aspectRatio;
-
-      const pdf = new jsPDF({
-        orientation,
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      // 如果圖片高度超過頁面，調整縮放
-      if (imgHeight > pdfHeight) {
-        const scale = pdfHeight / imgHeight;
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth * scale, pdfHeight);
-      } else {
-        // 置中顯示
-        const yOffset = (pdfHeight - imgHeight) / 2;
-        pdf.addImage(imgData, 'PNG', 0, yOffset, imgWidth, imgHeight);
-      }
-
-      pdf.save(`${goal.title}-心智圖.pdf`);
-    } catch (error) {
-      console.error('匯出 PDF 失敗:', error);
-      alert('匯出 PDF 失敗，請稍後再試');
-    }
-  }, [goal]);
-
   return (
     <div 
       ref={containerRef}
@@ -862,18 +793,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 onSelect={exportToJSON}
               >
                 匯出成 JSON
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                className="flex items-center px-2 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-md cursor-pointer outline-none"
-                onSelect={exportToPNG}
-              >
-                匯出成圖片 (PNG)
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                className="flex items-center px-2 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-md cursor-pointer outline-none"
-                onSelect={exportToPDF}
-              >
-                匯出成 PDF
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
