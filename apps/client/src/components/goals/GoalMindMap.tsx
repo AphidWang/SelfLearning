@@ -36,6 +36,22 @@ const getStepColors = (index: number, totalSteps: number) => {
   };
 };
 
+const useElementStack = (initialValue = 1) => {
+  const [stackIndexes, setStackIndexes] = useState<{ [key: string]: number }>({});
+  
+  const bringToFront = useCallback((id: string) => {
+    const currentMax = Object.values(stackIndexes).reduce((max, z) => Math.max(max, z), initialValue);
+    setStackIndexes(prev => ({
+      ...prev,
+      [id]: currentMax + 1
+    }));
+  }, [stackIndexes, initialValue]);
+
+  const getIndex = useCallback((id: string) => stackIndexes[id] || initialValue, [stackIndexes, initialValue]);
+
+  return { bringToFront, getIndex };
+};
+
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const { goals, updateGoal } = useGoalStore();
   const goal = goals.find((g) => g.id === goalId);
@@ -56,6 +72,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [isDraggingStep, setIsDraggingStep] = useState<string | null>(null);
   const [goalPosition, setGoalPosition] = useState<{ x: number; y: number }>({ x: 200, y: 0 });
   const [goalOffset, setGoalOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [taskZIndexes, setTaskZIndexes] = useState<{ [key: string]: number }>({});
+  const baseZIndex = 1;
 
   // 追蹤目標節點位置
   const goalX = useMotionValue(0);
@@ -529,6 +547,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     setEditingStepTitle('');
   }, [goal, updateGoal]);
 
+  const { bringToFront, getIndex } = useElementStack(1);
+
   return (
     <div 
       ref={containerRef}
@@ -659,7 +679,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             top: centerGoalPos.y - 96,
             transform: 'none',
             x: goalX,
-            y: goalY
+            y: goalY,
+            zIndex: getIndex('goal')
           }}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -669,14 +690,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           dragElastic={0}
           onDragStart={(e) => {
             e.stopPropagation();
-            console.log('Goal drag start');
+            bringToFront('goal');
           }}
           onDrag={(e) => {
             e.stopPropagation();
           }}
           onDragEnd={(e) => {
             e.stopPropagation();
-            console.log('Goal drag end');
             console.log('Final position:', {
               x: goalX.get(),
               y: goalY.get()
@@ -746,7 +766,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     dragMomentum={false}
                     onDragStart={(event, info) => {
                       if (editingStepId === step.id) return;
+                      event.stopPropagation();
                       setIsDraggingStep(step.id);
+                      bringToFront(step.id);
                     }}
                     onDrag={(event, info) => {
                       if (editingStepId === step.id) return;
@@ -767,6 +789,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     onDragEnd={() => {
                       if (editingStepId === step.id) return;
                       setIsDraggingStep(null);
+                    }}
+                    style={{
+                      position: 'relative',
+                      zIndex: getIndex(step.id)
                     }}
                     onClick={() => setSelectedStepId(isSelected ? null : step.id)}
                     onDoubleClick={() => {
@@ -845,11 +871,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                         <motion.div
                           drag
                           dragMomentum={false}
-                          whileDrag={{ scale: 1.02, zIndex: 40 }}
-                          onDragStart={() => {
-                            // 不需要保存初始位置
+                          whileDrag={{ scale: 1.02 }}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            bringToFront(task.id);
                           }}
                           onDrag={(event, info) => {
+                            event.stopPropagation();
                             const dx = info.delta.x;
                             const dy = info.delta.y;
 
@@ -864,8 +892,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               };
                             });
                           }}
-                          onDragEnd={() => {
-                            console.log('Task drag end offsets:', taskOffsets);
+                          style={{
+                            position: 'relative',
+                            zIndex: getIndex(task.id)
                           }}
                           className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
                             task.status === 'done'
