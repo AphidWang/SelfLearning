@@ -30,8 +30,11 @@ const StudentPlanning: React.FC = () => {
   const [showSubjectSelect, setShowSubjectSelect] = useState(false);
   const [showTypeSelect, setShowTypeSelect] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
-  const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant } = useAssistant();
+  const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant } = useAssistant({
+    position: { x: -120, y: 0 }
+  });
   const detailsRef = useRef<HTMLDivElement>(null);
+  const assistantContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -132,6 +135,7 @@ const StudentPlanning: React.FC = () => {
     }
     setSelectedGoal(goal);
     setEditedGoal(goal);
+    setAssistantPosition({ x: -120, y: 0 });
   };
 
   const handleGoalSave = (goal: Goal) => {
@@ -159,7 +163,24 @@ const StudentPlanning: React.FC = () => {
 
   return (
     <PageLayout title="學習計畫">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
+        {/* 浮動助理容器 - 移到最外層 */}
+        <div 
+          ref={assistantContainerRef}
+          className="fixed bottom-20 right-6 w-[400px] h-[400px]"
+          style={{ pointerEvents: 'none' }}
+        >
+          <FloatingAssistant
+            enabled={showAssistant}
+            onToggle={toggleAssistant}
+            hideCloseButton
+            dragConstraints={assistantContainerRef}
+            initialPosition={assistantPosition}
+            onPositionChange={setAssistantPosition}
+            className="pointer-events-auto"
+          />
+        </div>
+
         {/* Left Column - Goals List */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -507,23 +528,6 @@ const StudentPlanning: React.FC = () => {
                     </div>
                   )}
                 </div>
-
-                {/* 浮動助理 */}
-                {selectedGoal && (
-                  <div 
-                    ref={detailsRef}
-                    className="absolute top-20 right-6"
-                  >
-                    <FloatingAssistant
-                      enabled={showAssistant}
-                      onToggle={toggleAssistant}
-                      hideCloseButton
-                      dragConstraints={detailsRef}
-                      initialPosition={assistantPosition}
-                      onPositionChange={setAssistantPosition}
-                    />
-                  </div>
-                )}
 
                 <div className="grid grid-cols-3 gap-4 mb-6">
                   <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">

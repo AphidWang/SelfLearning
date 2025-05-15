@@ -161,7 +161,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     // 計算最佳縮放值
     const optimalZoomX = (containerWidth * 0.8) / totalWidth;
     const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
-    const optimalZoom = Math.min(Math.max(0.8, Math.min(optimalZoomX, optimalZoomY)), 1.5);
+    const optimalZoom = Math.min(Math.max(1, Math.min(optimalZoomX, optimalZoomY)), 1.5);
 
     // 計算目標應該在的位置（螢幕寬度的 35%）
     const targetScreenX = containerWidth * 0.2;
