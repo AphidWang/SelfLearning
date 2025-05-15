@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, MotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock, Download, Share2 } from 'lucide-react';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock, Download, Share2, Brain, Network, Sparkles } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
 import { Goal, Step, Task, createStep, createTask } from '../../types/goal';
 import Lottie from 'lottie-react';
@@ -8,6 +8,8 @@ import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { FloatingAssistant } from '../assistant/FloatingAssistant';
+import { useAssistant } from '../../hooks/useAssistant';
 
 interface GoalMindMapProps {
   goalId: string;
@@ -367,8 +369,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 拖行相關的處理函數
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // 如果點擊的是目標節點或步驟或任務，不觸發畫布拖曳
-    if ((e.target as HTMLElement).closest('.goal-node, .step-node, .task-card')) {
+    // 如果點擊的是助理或其相關元素，不觸發畫布拖曳
+    if ((e.target as HTMLElement).closest('.floating-assistant, .goal-node, .step-node, .task-card')) {
       return;
     }
 
@@ -425,6 +427,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       };
     }
   }, [preventDefault]);
+
+  const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant } = useAssistant({
+    position: { x: 0, y: -200 } // 設定初始位置在按鈕上方
+  });
+  const assistantContainerRef = useRef<HTMLDivElement>(null);
 
   if (!goal) {
     return (
@@ -558,7 +565,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
       // 計算最佳縮放值
       const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
-      const optimalZoom = Math.min(Math.max(0.8, optimalZoomY), 1.5);
+      const optimalZoom = Math.min(Math.max(1, optimalZoomY), 1.5);
 
       // 計算新的位置，使新的 step 出現在畫面中心偏下
       const newX = (containerWidth / 2 / optimalZoom) - stepPos.x;
@@ -1202,6 +1209,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </AnimatePresence>
       </div>
 
+      {/* 底部工具列 */}
       <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-2xl shadow-xl bg-white/80 backdrop-blur border border-gray-200" style={{minWidth:'fit-content'}}>
         <button
           onClick={() => {
@@ -1233,6 +1241,31 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         >
           <ZoomOut className="w-5 h-5 text-gray-600" />
         </button>
+        <div className="w-px h-6 bg-gray-200" />
+        <div className="relative">
+          <button
+            onClick={toggleAssistant}
+            className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
+              showAssistant ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'hover:bg-gray-100 text-gray-600'
+            }`}
+            title={showAssistant ? '隱藏助理' : '顯示助理'}
+          >
+            <Sparkles className="w-5 h-5" />
+          </button>
+
+          {/* 浮動助理 */}
+          <div className="fixed bottom-6 right-6 z-50">
+            <FloatingAssistant
+              enabled={showAssistant}
+              onToggle={toggleAssistant}
+              dragConstraints={containerRef}
+              initialPosition={{ x: 0, y: -120 }}
+              onPositionChange={setAssistantPosition}
+              hideCloseButton
+              className="floating-assistant"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
