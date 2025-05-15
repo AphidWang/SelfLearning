@@ -38,13 +38,23 @@ export const TaskItem: React.FC<TaskItemProps> = ({ task, onStatusChange, onEdit
 
   return (
     <div className="flex items-center p-2 hover:bg-gray-50 rounded-md">
-      <button onClick={onStatusChange} className="mr-3 flex-shrink-0">
+      <div 
+        onClick={onStatusChange} 
+        className="mr-3 flex-shrink-0 cursor-pointer"
+        role="button"
+        tabIndex={0}
+        onKeyPress={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            onStatusChange();
+          }
+        }}
+      >
         {task.status === 'done' ? (
           <CheckCircle2 className="h-5 w-5 text-success-500" />
         ) : (
           <Circle className="h-5 w-5 text-gray-300" />
         )}
-      </button>
+      </div>
 
       <div className="flex-1 min-w-0">
         <p className={`text-sm ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
@@ -72,9 +82,19 @@ export const TaskItem: React.FC<TaskItemProps> = ({ task, onStatusChange, onEdit
         </div>
       </div>
 
-      <button onClick={onEdit} className="ml-2 p-1 text-gray-400 hover:text-gray-600">
+      <div 
+        onClick={onEdit} 
+        className="ml-2 p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+        role="button"
+        tabIndex={0}
+        onKeyPress={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            onEdit();
+          }
+        }}
+      >
         <Edit2 className="h-4 w-4" />
-      </button>
+      </div>
     </div>
   );
 }; 

@@ -1,10 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, MotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock } from 'lucide-react';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock, Download, Share2 } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
-import { Goal, Step, Task, createStep } from '../../types/goal';
+import { Goal, Step, Task, createStep, createTask } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface GoalMindMapProps {
   goalId: string;
@@ -549,6 +552,244 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   const { bringToFront, getIndex } = useElementStack(1);
 
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskTitle, setEditingTaskTitle] = useState('');
+
+  // 處理新增 task
+  const handleAddTask = useCallback((stepId: string) => {
+    if (!goal) return;
+
+    const stepIndex = goal.steps.findIndex(s => s.id === stepId);
+    if (stepIndex === -1) return;
+
+    const newTask = createTask({
+      title: '新任務',
+      status: 'todo'
+    });
+
+    // 更新 goal store
+    const updatedSteps = goal.steps.map(step => 
+      step.id === stepId 
+        ? { ...step, tasks: [...step.tasks, newTask] }
+        : step
+    );
+
+    const updatedGoal = {
+      ...goal,
+      steps: updatedSteps
+    };
+    updateGoal(updatedGoal);
+
+    // 計算新 task 的位置
+    const taskPos = getTaskPosition(
+      stepIndex,
+      goal.steps[stepIndex].tasks.length, // 新的 task 會是最後一個
+      goal.steps[stepIndex].tasks.length + 1
+    );
+
+    const container = containerRef.current;
+    if (container) {
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+
+      // 計算新的位置，使新的 task 出現在畫面中心偏右
+      const newX = (containerWidth / 2 / zoom) - taskPos.x;
+      const newY = (containerHeight / 2 / zoom) - taskPos.y;
+
+      // 更新位置
+      setPosition({ x: newX, y: newY });
+    }
+
+    // 設置編輯狀態
+    setEditingTaskId(newTask.id);
+    setEditingTaskTitle('新任務');
+  }, [goal, updateGoal, zoom]);
+
+  // 處理 task 標題更新
+  const handleTaskTitleUpdate = useCallback((taskId: string, newTitle: string) => {
+    if (!goal) return;
+
+    const updatedSteps = goal.steps.map(step => ({
+      ...step,
+      tasks: step.tasks.map(task =>
+        task.id === taskId ? { ...task, title: newTitle } : task
+      )
+    }));
+
+    const updatedGoal = {
+      ...goal,
+      steps: updatedSteps
+    };
+    updateGoal(updatedGoal);
+
+    setEditingTaskId(null);
+    setEditingTaskTitle('');
+  }, [goal, updateGoal]);
+
+  // 匯出成 Markdown
+  const exportToMarkdown = useCallback(() => {
+    if (!goal) return;
+
+    let markdown = `# ${goal.title}\n\n`;
+
+    goal.steps.forEach((step, stepIndex) => {
+      markdown += `## ${stepIndex + 1}. ${step.title}\n\n`;
+      
+      step.tasks.forEach((task, taskIndex) => {
+        const status = task.status === 'done' 
+          ? '✅' 
+          : task.status === 'in_progress' 
+          ? '🔄' 
+          : '⭕';
+        
+        markdown += `${status} ${task.title}\n`;
+        if (task.completedAt) {
+          markdown += `   - 完成於: ${new Date(task.completedAt).toLocaleDateString()}\n`;
+        }
+      });
+      markdown += '\n';
+    });
+
+    // 創建並下載文件
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${goal.title}-規劃.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [goal]);
+
+  // 匯出成 JSON
+  const exportToJSON = useCallback(() => {
+    if (!goal) return;
+
+    const json = JSON.stringify(goal, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${goal.title}-規劃.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [goal]);
+
+  // 匯出成 PNG
+  const exportToPNG = useCallback(async () => {
+    if (!goal || !canvasRef.current) return;
+
+    try {
+      // 等待一小段時間確保元素都渲染完成
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(canvasRef.current, {
+        scale: 2, // 提高解析度
+        useCORS: true, // 允許跨域圖片
+        allowTaint: true, // 允許污染
+        backgroundColor: '#f9fafb', // 設定背景色
+        logging: true, // 開啟日誌以便偵錯
+        width: canvasRef.current.scrollWidth,
+        height: canvasRef.current.scrollHeight,
+        windowWidth: canvasRef.current.scrollWidth,
+        windowHeight: canvasRef.current.scrollHeight,
+        onclone: (document, element) => {
+          // 確保所有元素都是可見的
+          element.style.transform = 'none';
+          element.style.opacity = '1';
+          element.style.display = 'block';
+        }
+      });
+
+      // 確保 canvas 有內容
+      if (canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Canvas dimensions are invalid');
+      }
+
+      const url = canvas.toDataURL('image/png', 1.0);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${goal.title}-心智圖.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('匯出 PNG 失敗:', error);
+      alert('匯出 PNG 失敗，請稍後再試');
+    }
+  }, [goal]);
+
+  // 匯出成 PDF
+  const exportToPDF = useCallback(async () => {
+    if (!goal || !canvasRef.current) return;
+
+    try {
+      // 等待一小段時間確保元素都渲染完成
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(canvasRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#f9fafb',
+        logging: true,
+        width: canvasRef.current.scrollWidth,
+        height: canvasRef.current.scrollHeight,
+        windowWidth: canvasRef.current.scrollWidth,
+        windowHeight: canvasRef.current.scrollHeight,
+        onclone: (document, element) => {
+          element.style.transform = 'none';
+          element.style.opacity = '1';
+          element.style.display = 'block';
+        }
+      });
+
+      // 確保 canvas 有內容
+      if (canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Canvas dimensions are invalid');
+      }
+
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      
+      // 根據內容比例決定 PDF 方向
+      const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+      
+      // 計算 PDF 大小以適應內容
+      const pdfWidth = orientation === 'landscape' ? 297 : 210;  // A4 尺寸（mm）
+      const pdfHeight = orientation === 'landscape' ? 210 : 297;
+      
+      // 計算縮放比例
+      const aspectRatio = canvas.width / canvas.height;
+      const imgWidth = pdfWidth;
+      const imgHeight = pdfWidth / aspectRatio;
+
+      const pdf = new jsPDF({
+        orientation,
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // 如果圖片高度超過頁面，調整縮放
+      if (imgHeight > pdfHeight) {
+        const scale = pdfHeight / imgHeight;
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth * scale, pdfHeight);
+      } else {
+        // 置中顯示
+        const yOffset = (pdfHeight - imgHeight) / 2;
+        pdf.addImage(imgData, 'PNG', 0, yOffset, imgWidth, imgHeight);
+      }
+
+      pdf.save(`${goal.title}-心智圖.pdf`);
+    } catch (error) {
+      console.error('匯出 PDF 失敗:', error);
+      alert('匯出 PDF 失敗，請稍後再試');
+    }
+  }, [goal]);
+
   return (
     <div 
       ref={containerRef}
@@ -591,8 +832,53 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           返回
         </motion.button>
         <h1 className="text-xl font-bold text-gray-900">{goal.title}</h1>
-      </div>
 
+        {/* 匯出選單 */}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              匯出
+            </motion.button>
+          </DropdownMenu.Trigger>
+
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              className="min-w-[180px] bg-white rounded-lg p-1 shadow-lg border border-gray-200"
+              sideOffset={5}
+            >
+              <DropdownMenu.Item
+                className="flex items-center px-2 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-md cursor-pointer outline-none"
+                onSelect={exportToMarkdown}
+              >
+                匯出成 Markdown
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className="flex items-center px-2 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-md cursor-pointer outline-none"
+                onSelect={exportToJSON}
+              >
+                匯出成 JSON
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className="flex items-center px-2 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-md cursor-pointer outline-none"
+                onSelect={exportToPNG}
+              >
+                匯出成圖片 (PNG)
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className="flex items-center px-2 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-md cursor-pointer outline-none"
+                onSelect={exportToPDF}
+              >
+                匯出成 PDF
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </div>
 
       <div
         ref={canvasRef}
@@ -799,7 +1085,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       setEditingStepId(step.id);
                       setEditingStepTitle(step.title);
                     }}
-                    className={`step-node w-32 h-32 rounded-full ${
+                    className={`step-node group w-32 h-32 rounded-full ${
                       'border-4'
                     } bg-gradient-to-br ${
                       getStepColors(stepIndex, goal.steps.length).gradient
@@ -838,6 +1124,29 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           }`}>{step.title}</h3>
                         </>
                       )}
+                    </div>
+
+                    {/* 新增任務按鈕 */}
+                    <div 
+                      className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      style={{
+                        right: '-10px',
+                        bottom: '0px',
+                        transform: 'translate(50%, 50%)',
+                        zIndex: getIndex(step.id) + 1
+                      }}
+                    >
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddTask(step.id);
+                        }}
+                        className="w-8 h-8 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4 text-white" />
+                      </motion.div>
                     </div>
                   </motion.button>
                 </motion.div>
@@ -905,7 +1214,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           }`}
                         >
                           <div className="flex justify-between items-start">
-                            <motion.button
+                            <div
                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
                                 task.status === 'done'
                                   ? 'border-green-500 bg-green-100'
@@ -920,7 +1229,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               {task.status === 'in_progress' && (
                                 <Clock className="w-4 h-4 text-orange-500" />
                               )}
-                            </motion.button>
+                            </div>
                             <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                               task.status === 'done'
                                 ? 'bg-green-200 text-green-800'
@@ -935,7 +1244,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                                 : '未開始'}
                             </div>
                           </div>
-                          <h3 className="mt-3 text-lg font-semibold text-gray-900">{task.title}</h3>
+                          {editingTaskId === task.id ? (
+                            <input
+                              type="text"
+                              value={editingTaskTitle}
+                              onChange={(e) => setEditingTaskTitle(e.target.value)}
+                              onBlur={() => handleTaskTitleUpdate(task.id, editingTaskTitle)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleTaskTitleUpdate(task.id, editingTaskTitle);
+                                } else if (e.key === 'Escape') {
+                                  setEditingTaskId(null);
+                                  setEditingTaskTitle('');
+                                }
+                              }}
+                              className="mt-3 w-full bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 px-1 text-lg font-semibold text-gray-900"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <h3 className="mt-3 text-lg font-semibold text-gray-900">{task.title}</h3>
+                          )}
                           <div className="h-[20px] mt-2">
                             {task.completedAt && (
                               <p className="text-xs text-gray-500">
