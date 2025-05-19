@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRouter from './routes/auth';
+import chatRouter from './routes/chat';
 import path from 'path';
 
 dotenv.config();
@@ -32,6 +33,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/chat', chatRouter);
 
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 
