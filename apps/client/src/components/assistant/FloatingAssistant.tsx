@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import Lottie from 'lottie-react';
 import slothAnimation from '../../assets/lottie/sloth.json';
@@ -12,6 +12,7 @@ interface FloatingAssistantProps {
   dragConstraints?: React.RefObject<HTMLElement>;
   initialPosition?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
+  onDragEnd?: (position: { x: number; y: number }) => void;
   hideCloseButton?: boolean;
   className?: string;
 }
@@ -22,6 +23,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   dragConstraints,
   initialPosition = { x: 0, y: 0 },
   onPositionChange,
+  onDragEnd,
   hideCloseButton = false,
   className = ''
 }) => {
@@ -30,9 +32,24 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const [options, setOptions] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   
+  // 使用 ref 來追蹤上一次的位置
+  const lastPositionRef = useRef(initialPosition);
+  
   // 使用 Framer Motion 的 useMotionValue 來追蹤位置
   const x = useMotionValue(initialPosition.x);
   const y = useMotionValue(initialPosition.y);
+
+  // 當 initialPosition 改變時更新位置
+  useEffect(() => {
+    if (
+      initialPosition.x !== lastPositionRef.current.x ||
+      initialPosition.y !== lastPositionRef.current.y
+    ) {
+      x.set(initialPosition.x);
+      y.set(initialPosition.y);
+      lastPositionRef.current = initialPosition;
+    }
+  }, [initialPosition.x, initialPosition.y]);
 
   useEffect(() => {
     if (enabled) {
@@ -92,7 +109,12 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
               onPositionChange({ x: info.point.x, y: info.point.y });
             }
           }}
-          onDragEnd={() => setIsDragging(false)}
+          onDragEnd={(event, info) => {
+            setIsDragging(false);
+            if (onDragEnd) {
+              onDragEnd({ x: info.point.x, y: info.point.y });
+            }
+          }}
           className={`${className}`}
         >
           {/* 主容器 */}

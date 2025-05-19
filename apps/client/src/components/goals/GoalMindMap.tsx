@@ -428,10 +428,81 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
   }, [preventDefault]);
 
-  const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant } = useAssistant({
-    position: { x: 0, y: -200 } // 設定初始位置在按鈕上方
+  const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant: originalToggleAssistant } = useAssistant({
+    position: { x: 0, y: -200 }
   });
-  const assistantContainerRef = useRef<HTMLDivElement>(null);
+
+  // 預設位置
+  const defaultAssistantPosition = { x: 0, y: -200 };
+
+  // 包裝 toggleAssistant，在切換時重置位置
+  const handleToggleAssistant = () => {
+    originalToggleAssistant();
+    // 如果是要開啟小幫手，重置到預設位置
+    if (!showAssistant) {
+      setAssistantPosition(defaultAssistantPosition);
+    }
+  };
+
+  // 處理小幫手拖曳結束
+  const handleAssistantDragEnd = (position: { x: number; y: number }) => {
+    console.log('Assistant dropped at screen position:', position);
+  };
+
+  // 飛到指定元素旁邊
+  const flyToElement = (elementId: string) => {
+    if (!showAssistant) return;
+
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    // 取得元素和助手容器在視窗中的位置
+    const rect = element.getBoundingClientRect();
+    const assistantContainer = document.querySelector('.floating-assistant')?.parentElement;
+    const containerRect = assistantContainer?.getBoundingClientRect();
+
+    if (!containerRect) return;
+
+    // 小助手的大小（包含對話框）
+    const ASSISTANT_WIDTH = 360;  // 最大寬度
+    const ASSISTANT_HEIGHT = 300; // 預估高度
+
+    // 計算相對於容器的位置
+    let x = rect.right - containerRect.left + 20; // 預設在右側
+    let y = rect.top - containerRect.top;
+
+    // 檢查右側空間
+    if (x + ASSISTANT_WIDTH > window.innerWidth - containerRect.left) {
+      // 如果右側空間不夠，改放在左側
+      x = rect.left - containerRect.left - ASSISTANT_WIDTH - 20;
+    }
+
+    // 檢查垂直空間
+    if (y + ASSISTANT_HEIGHT > window.innerHeight - containerRect.top) {
+      // 如果下方空間不夠，往上移動
+      y = Math.max(0, window.innerHeight - containerRect.top - ASSISTANT_HEIGHT);
+    }
+
+    console.log('Flying to element:', {
+      elementRect: rect,
+      containerRect,
+      windowSize: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      assistantSize: {
+        width: ASSISTANT_WIDTH,
+        height: ASSISTANT_HEIGHT
+      },
+      finalPosition: { x, y }
+    });
+
+    // 設定小幫手新位置（相對於容器）
+    setAssistantPosition({
+      x,
+      y
+    });
+  };
 
   if (!goal) {
     return (
@@ -885,6 +956,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </svg>
 
         <motion.div
+          id={`goal-${goal.id}`}
           className="absolute goal-node"
           style={{
             left: centerGoalPos.x - 96,
@@ -921,10 +993,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           whileHover={{ 
             scale: 1.02 
           }}
+          onClick={() => {
+            flyToElement(`goal-${goal.id}`);
+            setIsGoalSelected(!isGoalSelected);
+          }}
         >
           <div 
             className="group relative w-48 h-48 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 border-4 border-purple-200 flex items-center justify-center p-6 shadow-lg cursor-pointer transition-all duration-200 hover:scale-105 hover:border-purple-400 hover:shadow-[0_0_0_4px_rgba(99,102,241,0.2)]"
-            onClick={() => setIsGoalSelected(!isGoalSelected)}
           >
             <div className="text-center">
               <Target className="w-12 h-12 text-purple-500 mx-auto mb-2" />
@@ -974,6 +1049,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                 >
                   <motion.button
+                    id={`step-${step.id}`}
                     drag={editingStepId !== step.id}
                     dragMomentum={false}
                     onDragStart={(event, info) => {
@@ -1006,7 +1082,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       position: 'relative',
                       zIndex: getIndex(step.id)
                     }}
-                    onClick={() => setSelectedStepId(isSelected ? null : step.id)}
+                    onClick={() => {
+                      flyToElement(`step-${step.id}`);
+                      setSelectedStepId(isSelected ? null : step.id);
+                    }}
                     onDoubleClick={() => {
                       setEditingStepId(step.id);
                       setEditingStepTitle(step.title);
@@ -1088,6 +1167,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     return (
                       <motion.div
                         key={task.id}
+                        id={`task-${task.id}`}
                         className="absolute"
                         style={{
                           left: taskPos.x,
@@ -1131,13 +1211,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             position: 'relative',
                             zIndex: getIndex(task.id)
                           }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            flyToElement(`task-${task.id}`);
+                          }}
                           className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
                             task.status === 'done'
                               ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
                               : task.status === 'in_progress'
                               ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
                               : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200'
-                          }`}
+                          } hover:shadow-xl transition-all duration-200`}
                         >
                           <div className="flex justify-between items-start">
                             <div
@@ -1244,7 +1328,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         <div className="w-px h-6 bg-gray-200" />
         <div className="relative">
           <button
-            onClick={toggleAssistant}
+            onClick={handleToggleAssistant}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
               showAssistant ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'hover:bg-gray-100 text-gray-600'
             }`}
@@ -1257,12 +1341,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           <div className="fixed bottom-6 right-6 z-50">
             <FloatingAssistant
               enabled={showAssistant}
-              onToggle={toggleAssistant}
+              onToggle={handleToggleAssistant}
               dragConstraints={containerRef}
-              initialPosition={{ x: 0, y: -120 }}
+              initialPosition={assistantPosition}
               onPositionChange={setAssistantPosition}
+              onDragEnd={handleAssistantDragEnd}
               hideCloseButton
-              className="floating-assistant"
+              className="floating-assistant pointer-events-auto"
             />
           </div>
         </div>
