@@ -994,7 +994,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             scale: 1.02 
           }}
           onClick={() => {
-            flyToElement(`goal-${goal.id}`);
             setIsGoalSelected(!isGoalSelected);
           }}
         >
@@ -1083,7 +1082,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       zIndex: getIndex(step.id)
                     }}
                     onClick={() => {
-                      flyToElement(`step-${step.id}`);
                       setSelectedStepId(isSelected ? null : step.id);
                     }}
                     onDoubleClick={() => {
@@ -1213,7 +1211,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            flyToElement(`task-${task.id}`);
                           }}
                           className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
                             task.status === 'done'
