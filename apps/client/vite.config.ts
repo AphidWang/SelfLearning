@@ -12,6 +12,12 @@ export default defineConfig({
     host: true,
     hmr: {
       overlay: false  // 禁用錯誤覆蓋層
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     }
   }
 });
