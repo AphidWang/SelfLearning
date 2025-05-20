@@ -373,7 +373,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[800px] min-w-[600px] pointer-events-auto cursor-default ${
+                      className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto cursor-default ${
                         mode === 'chat' ? 'bottom-[calc(100%+13rem)]' : 'bottom-full mb-3'
                       }`}
                       style={{ 
@@ -381,31 +381,27 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                         transformOrigin: 'bottom right'
                       }}
                     >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-4">
                         {choices.map((choice, index) => (
-                          <div
+                          <motion.button
                             key={index}
-                            className="w-full p-6 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => choice.action()}
+                            className="w-full p-4 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-4"
                           >
-                            <div className="flex flex-col items-center text-center">
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => choice.action()}
-                                className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-4 cursor-pointer"
-                              >
-                                {choice.icon}
-                              </motion.button>
-                              <div className="select-text">
-                                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                                  {choice.text}
-                                </h3>
-                                <p className="text-base text-gray-600 dark:text-gray-400 cursor-text">
-                                  {choice.description}
-                                </p>
-                              </div>
+                            <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
+                              {choice.icon}
                             </div>
-                          </div>
+                            <div className="flex-1">
+                              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                                {choice.text}
+                              </h3>
+                              <p className="text-base text-gray-600 dark:text-gray-400">
+                                {choice.description}
+                              </p>
+                            </div>
+                          </motion.button>
                         ))}
                       </div>
 
