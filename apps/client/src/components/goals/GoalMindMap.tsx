@@ -428,19 +428,24 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
   }, [preventDefault]);
 
-  const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant: originalToggleAssistant } = useAssistant({
-    position: { x: 0, y: -200 }
-  });
+  // 計算右下角位置
+  const calculateBottomRightPosition = () => {
+    return {
+      x: -150,  // 與 FloatingAssistant 的 initialPosition 一致
+      y: -150   // 與 FloatingAssistant 的 initialPosition 一致
+    };
+  };
 
-  // 預設位置
-  const defaultAssistantPosition = { x: 0, y: -200 };
+  const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant: originalToggleAssistant } = useAssistant({
+    position: calculateBottomRightPosition()
+  });
 
   // 包裝 toggleAssistant，在切換時重置位置
   const handleToggleAssistant = () => {
     originalToggleAssistant();
     // 如果是要開啟小幫手，重置到預設位置
     if (!showAssistant) {
-      setAssistantPosition(defaultAssistantPosition);
+      setAssistantPosition(calculateBottomRightPosition());
     }
   };
 
@@ -1290,6 +1295,20 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </AnimatePresence>
       </div>
 
+      {/* 浮動助理 */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <FloatingAssistant
+          enabled={showAssistant}
+          onToggle={handleToggleAssistant}
+          dragConstraints={containerRef}
+          initialPosition={calculateBottomRightPosition()}
+          onPositionChange={setAssistantPosition}
+          onDragEnd={handleAssistantDragEnd}
+          hideCloseButton
+          className="floating-assistant pointer-events-auto"
+        />
+      </div>
+
       {/* 底部工具列 */}
       <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-2xl shadow-xl bg-white/80 backdrop-blur border border-gray-200" style={{minWidth:'fit-content'}}>
         <button
@@ -1333,20 +1352,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           >
             <Sparkles className="w-5 h-5" />
           </button>
-
-          {/* 浮動助理 */}
-          <div className="fixed bottom-6 right-6 z-50">
-            <FloatingAssistant
-              enabled={showAssistant}
-              onToggle={handleToggleAssistant}
-              dragConstraints={containerRef}
-              initialPosition={assistantPosition}
-              onPositionChange={setAssistantPosition}
-              onDragEnd={handleAssistantDragEnd}
-              hideCloseButton
-              className="floating-assistant pointer-events-auto"
-            />
-          </div>
         </div>
       </div>
     </div>
