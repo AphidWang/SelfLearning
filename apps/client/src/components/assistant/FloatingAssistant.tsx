@@ -74,13 +74,13 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         },
         { 
           text: "我想學新東西", 
-          icon: <Brain className="h-12 w-12 text-indigo-600" />,
+          icon: <Brain className="h-12 w-12 text-emerald-600" />,
           description: "一起探索有趣的新知識！",
           action: () => handleNewTopicQuestion() 
         },
         { 
           text: "我想玩遊戲", 
-          icon: <Gamepad className="h-12 w-12 text-indigo-600" />,
+          icon: <Gamepad className="h-12 w-12 text-orange-600" />,
           description: "來玩個益智遊戲吧！",
           action: () => handleGameQuestion() 
         }
@@ -204,6 +204,19 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     }
   };
 
+  const getGradientColor = (index: number, isEnd = false) => {
+    const colors = [
+      ['#4F46E5', '#7C3AED'], // indigo to purple
+      ['#059669', '#10B981'], // emerald to green
+      ['#DC2626', '#F97316'], // red to orange
+      ['#2563EB', '#3B82F6'], // blue
+      ['#7C3AED', '#8B5CF6'], // purple
+      ['#EA580C', '#F97316'], // orange
+    ];
+    const colorIndex = index % colors.length;
+    return colors[colorIndex][isEnd ? 1 : 0];
+  };
+
   return (
     <AnimatePresence>
       {enabled && (
@@ -262,13 +275,13 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       },
                       { 
                         text: "我想學新東西", 
-                        icon: <Brain className="h-12 w-12 text-indigo-600" />,
+                        icon: <Brain className="h-12 w-12 text-emerald-600" />,
                         description: "一起探索有趣的新知識！",
                         action: () => handleNewTopicQuestion() 
                       },
                       { 
                         text: "我想玩遊戲", 
-                        icon: <Gamepad className="h-12 w-12 text-indigo-600" />,
+                        icon: <Gamepad className="h-12 w-12 text-orange-600" />,
                         description: "來玩個益智遊戲吧！",
                         action: () => handleGameQuestion() 
                       }
@@ -471,18 +484,18 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                           <motion.button
                             key={index}
                             whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => choice.action()}
-                            className="w-full p-4 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-4"
+                            className="w-full p-4 bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-4"
                           >
                             <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
                               {choice.icon}
                             </div>
-                            <div className="flex-1">
-                              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                            <div className="flex-1 text-left">
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                                 {choice.text}
                               </h3>
-                              <p className="text-base text-gray-600 dark:text-gray-400">
+                              <p className="text-gray-600 dark:text-gray-400 text-sm">
                                 {choice.description}
                               </p>
                             </div>
