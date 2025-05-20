@@ -308,7 +308,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
-                    className="absolute bottom-0 right-full mr-3 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text"
+                    className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text min-h-[8rem]"
                     style={{ 
                       pointerEvents: isDragging ? 'none' : 'auto',
                       transformOrigin: 'bottom right'
@@ -367,58 +367,13 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     </div>
                   </motion.div>
 
-                  {/* 選項泡泡 */}
-                  {choices.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto cursor-default ${
-                        mode === 'chat' ? 'bottom-[calc(100%+13rem)]' : 'bottom-full mb-3'
-                      }`}
-                      style={{ 
-                        pointerEvents: isDragging ? 'none' : 'auto',
-                        transformOrigin: 'bottom right'
-                      }}
-                    >
-                      <div className="space-y-4">
-                        {choices.map((choice, index) => (
-                          <motion.button
-                            key={index}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => choice.action()}
-                            className="w-full p-4 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-4"
-                          >
-                            <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
-                              {choice.icon}
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                                {choice.text}
-                              </h3>
-                              <p className="text-base text-gray-600 dark:text-gray-400">
-                                {choice.description}
-                              </p>
-                            </div>
-                          </motion.button>
-                        ))}
-                      </div>
-
-                      {/* 尾巴 */}
-                      <div className="absolute bottom-0 right-6 transform translate-y-full">
-                        <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
-                      </div>
-                    </motion.div>
-                  )}
-
                   {/* 輸入泡泡 */}
                   {mode === 'chat' && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto"
+                      className="absolute bottom-[calc(100%+10rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto"
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',
                         transformOrigin: 'bottom right'
@@ -488,6 +443,51 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                             )}
                           </motion.button>
                         </div>
+                      </div>
+
+                      {/* 尾巴 */}
+                      <div className="absolute bottom-0 right-6 transform translate-y-full">
+                        <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* 選項泡泡 */}
+                  {choices.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto cursor-default ${
+                        mode === 'chat' ? 'bottom-[calc(100%+20rem)]' : 'bottom-[calc(100%+10rem)]'
+                      }`}
+                      style={{ 
+                        pointerEvents: isDragging ? 'none' : 'auto',
+                        transformOrigin: 'bottom right'
+                      }}
+                    >
+                      <div className="space-y-4">
+                        {choices.map((choice, index) => (
+                          <motion.button
+                            key={index}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => choice.action()}
+                            className="w-full p-4 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-4"
+                          >
+                            <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
+                              {choice.icon}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                                {choice.text}
+                              </h3>
+                              <p className="text-base text-gray-600 dark:text-gray-400">
+                                {choice.description}
+                              </p>
+                            </div>
+                          </motion.button>
+                        ))}
                       </div>
 
                       {/* 尾巴 */}
