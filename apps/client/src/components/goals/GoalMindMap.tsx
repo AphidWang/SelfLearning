@@ -1223,7 +1223,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               : task.status === 'in_progress'
                               ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
                               : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200'
-                          } hover:shadow-xl transition-all duration-200`}
+                          }`}
                         >
                           <div className="flex justify-between items-start">
                             <div
