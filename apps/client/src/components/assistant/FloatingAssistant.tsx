@@ -329,7 +329,9 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                   >
                     {/* 訊息 */}
                     <div>
-                      <p className="text-lg text-gray-800 dark:text-gray-200">{message}</p>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 font-sans leading-relaxed">
+                        {message}
+                      </p>
                     </div>
 
                     {/* 思考中動畫 */}
