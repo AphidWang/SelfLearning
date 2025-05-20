@@ -308,14 +308,126 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
-                    className="absolute bottom-full right-0 mb-3 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text"
+                    className="absolute bottom-0 right-full mr-3 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text"
                     style={{ 
                       pointerEvents: isDragging ? 'none' : 'auto',
                       transformOrigin: 'bottom right'
                     }}
                   >
-                    {/* 聊天模式 */}
-                    {mode === 'chat' ? (
+                    {/* 訊息 */}
+                    <div>
+                      <p className="text-lg text-gray-800 dark:text-gray-200">{message}</p>
+                    </div>
+
+                    {/* 思考中動畫 */}
+                    {mode === 'thinking' && (
+                      <div className="flex justify-center items-center space-x-3 py-4">
+                        <motion.div
+                          animate={{
+                            scale: [1, 0.8, 1],
+                            opacity: [1, 0.5, 1],
+                          }}
+                          transition={{
+                            duration: 0.8,
+                            repeat: Infinity,
+                            delay: 0,
+                          }}
+                          className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                        />
+                        <motion.div
+                          animate={{
+                            scale: [1, 0.8, 1],
+                            opacity: [1, 0.5, 1],
+                          }}
+                          transition={{
+                            duration: 0.8,
+                            repeat: Infinity,
+                            delay: 0.2,
+                          }}
+                          className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                        />
+                        <motion.div
+                          animate={{
+                            scale: [1, 0.8, 1],
+                            opacity: [1, 0.5, 1],
+                          }}
+                          transition={{
+                            duration: 0.8,
+                            repeat: Infinity,
+                            delay: 0.4,
+                          }}
+                          className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                        />
+                      </div>
+                    )}
+
+                    {/* 尾巴 */}
+                    <div className="absolute bottom-0 right-0 transform translate-x-full">
+                      <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
+                    </div>
+                  </motion.div>
+
+                  {/* 選項泡泡 */}
+                  {choices.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[800px] min-w-[600px] pointer-events-auto cursor-default ${
+                        mode === 'chat' ? 'bottom-[calc(100%+13rem)]' : 'bottom-full mb-3'
+                      }`}
+                      style={{ 
+                        pointerEvents: isDragging ? 'none' : 'auto',
+                        transformOrigin: 'bottom right'
+                      }}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        {choices.map((choice, index) => (
+                          <div
+                            key={index}
+                            className="w-full p-6 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+                          >
+                            <div className="flex flex-col items-center text-center">
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => choice.action()}
+                                className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-4 cursor-pointer"
+                              >
+                                {choice.icon}
+                              </motion.button>
+                              <div className="select-text">
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                                  {choice.text}
+                                </h3>
+                                <p className="text-base text-gray-600 dark:text-gray-400 cursor-text">
+                                  {choice.description}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 尾巴 */}
+                      <div className="absolute bottom-0 right-6 transform translate-y-full">
+                        <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* 輸入泡泡 */}
+                  {mode === 'chat' && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto"
+                      style={{ 
+                        pointerEvents: isDragging ? 'none' : 'auto',
+                        transformOrigin: 'bottom right'
+                      }}
+                    >
                       <div className="flex flex-col">
                         {/* 最新一輪對話 */}
                         {chatHistory.length > 0 && (
@@ -380,102 +492,6 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                             )}
                           </motion.button>
                         </div>
-                      </div>
-                    ) : (
-                      <>
-                        {/* 訊息 */}
-                        <div>
-                          <p className="text-lg text-gray-800 dark:text-gray-200">{message}</p>
-                        </div>
-
-                        {/* 思考中動畫 */}
-                        {mode === 'thinking' && (
-                          <div className="flex justify-center items-center space-x-3 py-4">
-                            <motion.div
-                              animate={{
-                                scale: [1, 0.8, 1],
-                                opacity: [1, 0.5, 1],
-                              }}
-                              transition={{
-                                duration: 0.8,
-                                repeat: Infinity,
-                                delay: 0,
-                              }}
-                              className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                            />
-                            <motion.div
-                              animate={{
-                                scale: [1, 0.8, 1],
-                                opacity: [1, 0.5, 1],
-                              }}
-                              transition={{
-                                duration: 0.8,
-                                repeat: Infinity,
-                                delay: 0.2,
-                              }}
-                              className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                            />
-                            <motion.div
-                              animate={{
-                                scale: [1, 0.8, 1],
-                                opacity: [1, 0.5, 1],
-                              }}
-                              transition={{
-                                duration: 0.8,
-                                repeat: Infinity,
-                                delay: 0.4,
-                              }}
-                              className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                            />
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {/* 尾巴 */}
-                    <div className="absolute bottom-0 right-6 transform translate-y-full">
-                      <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
-                    </div>
-                  </motion.div>
-
-                  {/* 選項泡泡 */}
-                  {choices.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute bottom-full right-0 mb-32 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[800px] min-w-[600px] pointer-events-auto cursor-default"
-                      style={{ 
-                        pointerEvents: isDragging ? 'none' : 'auto',
-                        transformOrigin: 'bottom right'
-                      }}
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        {choices.map((choice, index) => (
-                          <div
-                            key={index}
-                            className="w-full p-6 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
-                          >
-                            <div className="flex flex-col items-center text-center">
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => choice.action()}
-                                className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-4 cursor-pointer"
-                              >
-                                {choice.icon}
-                              </motion.button>
-                              <div className="select-text">
-                                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                                  {choice.text}
-                                </h3>
-                                <p className="text-base text-gray-600 dark:text-gray-400 cursor-text">
-                                  {choice.description}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
                       </div>
 
                       {/* 尾巴 */}
