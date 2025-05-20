@@ -375,6 +375,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
 
     if (e.button === 0) { // 左鍵點擊
+      // 防止文字選取
+      document.body.style.userSelect = 'none';
+      document.body.style.webkitUserSelect = 'none';
+      
       setIsDragging(true);
       const startX = e.clientX - position.x;
       const startY = e.clientY - position.y;
@@ -388,6 +392,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
       const handleMouseUp = () => {
         setIsDragging(false);
+        // 恢復文字選取
+        document.body.style.userSelect = '';
+        document.body.style.webkitUserSelect = '';
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
       };

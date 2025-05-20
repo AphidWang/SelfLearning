@@ -229,6 +229,8 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             zIndex: isDragging ? 50 : 40
           }}
           className={`${className}`}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           <motion.div 
             style={{ 
@@ -236,11 +238,17 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
               zIndex: isDragging ? 50 : 40
             }}
             className="relative w-24 h-24"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             {/* 助理圖示 */}
             <button
-              onPointerDown={(e) => dragControls.start(e)}
-              onClick={() => {
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                dragControls.start(e);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
                 if (!isDragging) {
                   if (mode === 'idle') {
                     setMode('asking');
