@@ -208,6 +208,22 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     <AnimatePresence>
       {enabled && (
         <motion.div
+          drag
+          dragControls={dragControls}
+          dragConstraints={dragConstraints}
+          dragMomentum={false}
+          dragElastic={0}
+          initial={initialPosition}
+          dragListener={false}
+          onDragStart={() => {
+            setIsDragging(true);
+          }}
+          onDragEnd={(event, info) => {
+            setIsDragging(false);
+            if (onDragEnd) {
+              onDragEnd({ x: info.point.x, y: info.point.y });
+            }
+          }}
           style={{ 
             position: 'absolute',
             zIndex: isDragging ? 50 : 40
@@ -215,24 +231,9 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
           className={`${className}`}
         >
           <motion.div 
-            drag
-            dragControls={dragControls}
-            dragConstraints={dragConstraints}
-            dragMomentum={false}
-            dragElastic={0}
-            initial={initialPosition}
             style={{ 
               position: 'absolute',
               zIndex: isDragging ? 50 : 40
-            }}
-            onDragStart={() => {
-              setIsDragging(true);
-            }}
-            onDragEnd={(event, info) => {
-              setIsDragging(false);
-              if (onDragEnd) {
-                onDragEnd({ x: info.point.x, y: info.point.y });
-              }
             }}
             className="relative w-24 h-24"
           >
@@ -293,170 +294,189 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             {/* 聊天泡泡 */}
             <AnimatePresence>
               {mode !== 'idle' && mode !== 'menu' && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute bottom-full right-0 mb-3 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[600px] min-w-[400px] pointer-events-auto select-text cursor-text"
-                  style={{ 
-                    pointerEvents: isDragging ? 'none' : 'auto',
-                    transformOrigin: 'bottom right'
-                  }}
-                >
-                  {/* 聊天模式 */}
-                  {mode === 'chat' ? (
-                    <div className="flex flex-col">
-                      {/* 最新一輪對話 */}
-                      {chatHistory.length > 0 && (
-                        <div className="mb-6 space-y-4">
-                          {chatHistory.slice(-2).map((item, index) => (
-                            <div
-                              key={index}
-                              className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                            >
+                <>
+                  {/* AI 回覆泡泡 */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="absolute bottom-full right-0 mb-3 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text"
+                    style={{ 
+                      pointerEvents: isDragging ? 'none' : 'auto',
+                      transformOrigin: 'bottom right'
+                    }}
+                  >
+                    {/* 聊天模式 */}
+                    {mode === 'chat' ? (
+                      <div className="flex flex-col">
+                        {/* 最新一輪對話 */}
+                        {chatHistory.length > 0 && (
+                          <div className="mb-6 space-y-4">
+                            {chatHistory.slice(-2).map((item, index) => (
                               <div
-                                className={`max-w-[85%] rounded-lg p-4 ${
-                                  item.role === 'user'
-                                    ? 'bg-indigo-500 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                }`}
+                                key={index}
+                                className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}
                               >
-                                {item.message}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* 提示文字 */}
-                      <div className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                        和我分享你的想法吧
-                      </div>
-
-                      {/* 輸入區域 */}
-                      <div className="flex items-center space-x-3">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={handleVoiceInput}
-                          className={`p-3 rounded-full ${
-                            isRecording 
-                              ? 'bg-red-500 text-white animate-pulse' 
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                          }`}
-                        >
-                          <Mic className="h-5 w-5" />
-                        </motion.button>
-                        <textarea
-                          value={inputText}
-                          onChange={(e) => setInputText(e.target.value)}
-                          onKeyPress={handleKeyPress}
-                          placeholder="輸入訊息..."
-                          className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                          rows={2}
-                        />
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={handleSendMessage}
-                          disabled={isLoading || !inputText.trim()}
-                          className="p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {isLoading ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            <Send className="h-5 w-5" />
-                          )}
-                        </motion.button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {/* 訊息 */}
-                      <div className="mb-6">
-                        <p className="text-lg text-gray-800 dark:text-gray-200">{message}</p>
-                      </div>
-
-                      {/* 選項按鈕 */}
-                      {choices.length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                          {choices.map((choice, index) => (
-                            <div
-                              key={index}
-                              className="w-full p-6 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
-                            >
-                              <div className="flex flex-col items-center text-center">
-                                <motion.button
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => choice.action()}
-                                  className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-4 cursor-pointer"
+                                <div
+                                  className={`max-w-[85%] rounded-lg p-4 ${
+                                    item.role === 'user'
+                                      ? 'bg-indigo-500 text-white'
+                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                  }`}
                                 >
-                                  {choice.icon}
-                                </motion.button>
-                                <div className="select-text cursor-text">
-                                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                                    {choice.text}
-                                  </h3>
-                                  <p className="text-base text-gray-600 dark:text-gray-400">
-                                    {choice.description}
-                                  </p>
+                                  {item.message}
                                 </div>
                               </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 提示文字 */}
+                        <div className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                          和我分享你的想法吧
+                        </div>
+
+                        {/* 輸入區域 */}
+                        <div className="flex items-center space-x-3">
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleVoiceInput}
+                            className={`p-3 rounded-full ${
+                              isRecording 
+                                ? 'bg-red-500 text-white animate-pulse' 
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
+                            <Mic className="h-5 w-5" />
+                          </motion.button>
+                          <textarea
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            placeholder="輸入訊息..."
+                            className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            rows={2}
+                          />
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleSendMessage}
+                            disabled={isLoading || !inputText.trim()}
+                            className="p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {isLoading ? (
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <Send className="h-5 w-5" />
+                            )}
+                          </motion.button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* 訊息 */}
+                        <div>
+                          <p className="text-lg text-gray-800 dark:text-gray-200">{message}</p>
+                        </div>
+
+                        {/* 思考中動畫 */}
+                        {mode === 'thinking' && (
+                          <div className="flex justify-center items-center space-x-3 py-4">
+                            <motion.div
+                              animate={{
+                                scale: [1, 0.8, 1],
+                                opacity: [1, 0.5, 1],
+                              }}
+                              transition={{
+                                duration: 0.8,
+                                repeat: Infinity,
+                                delay: 0,
+                              }}
+                              className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                            />
+                            <motion.div
+                              animate={{
+                                scale: [1, 0.8, 1],
+                                opacity: [1, 0.5, 1],
+                              }}
+                              transition={{
+                                duration: 0.8,
+                                repeat: Infinity,
+                                delay: 0.2,
+                              }}
+                              className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                            />
+                            <motion.div
+                              animate={{
+                                scale: [1, 0.8, 1],
+                                opacity: [1, 0.5, 1],
+                              }}
+                              transition={{
+                                duration: 0.8,
+                                repeat: Infinity,
+                                delay: 0.4,
+                              }}
+                              className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* 尾巴 */}
+                    <div className="absolute bottom-0 right-6 transform translate-y-full">
+                      <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
+                    </div>
+                  </motion.div>
+
+                  {/* 選項泡泡 */}
+                  {choices.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="absolute bottom-full right-0 mb-32 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[800px] min-w-[600px] pointer-events-auto cursor-default"
+                      style={{ 
+                        pointerEvents: isDragging ? 'none' : 'auto',
+                        transformOrigin: 'bottom right'
+                      }}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        {choices.map((choice, index) => (
+                          <div
+                            key={index}
+                            className="w-full p-6 text-left bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+                          >
+                            <div className="flex flex-col items-center text-center">
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => choice.action()}
+                                className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-4 cursor-pointer"
+                              >
+                                {choice.icon}
+                              </motion.button>
+                              <div className="select-text">
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                                  {choice.text}
+                                </h3>
+                                <p className="text-base text-gray-600 dark:text-gray-400 cursor-text">
+                                  {choice.description}
+                                </p>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        ))}
+                      </div>
 
-                      {/* 思考中動畫 */}
-                      {mode === 'thinking' && (
-                        <div className="flex justify-center items-center space-x-3 py-4">
-                          <motion.div
-                            animate={{
-                              scale: [1, 0.8, 1],
-                              opacity: [1, 0.5, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              delay: 0,
-                            }}
-                            className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                          />
-                          <motion.div
-                            animate={{
-                              scale: [1, 0.8, 1],
-                              opacity: [1, 0.5, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              delay: 0.2,
-                            }}
-                            className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                          />
-                          <motion.div
-                            animate={{
-                              scale: [1, 0.8, 1],
-                              opacity: [1, 0.5, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              delay: 0.4,
-                            }}
-                            className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                          />
-                        </div>
-                      )}
-                    </>
+                      {/* 尾巴 */}
+                      <div className="absolute bottom-0 right-6 transform translate-y-full">
+                        <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
+                      </div>
+                    </motion.div>
                   )}
-
-                  {/* 尾巴 */}
-                  <div className="absolute bottom-0 right-6 transform translate-y-full">
-                    <div className="w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45" />
-                  </div>
-                </motion.div>
+                </>
               )}
 
               {/* 選單 */}
