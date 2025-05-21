@@ -49,5 +49,105 @@
     ],
     "submitLabel": "建立",
     "cancelLabel": "取消"
+  },
+  "suggest_topics": {
+    "type": "suggest_topics",
+    "title": "建議主題",
+    "description": "選擇建議的主題",
+    "fields": [
+      {
+        "name": "suggestions",
+        "label": "建議主題",
+        "type": "multiselect",
+        "required": true
+      }
+    ],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "suggest_steps": {
+    "type": "suggest_steps",
+    "title": "建議步驟",
+    "description": "選擇建議的步驟",
+    "fields": [
+      {
+        "name": "suggestions",
+        "label": "建議步驟",
+        "type": "multiselect",
+        "required": true
+      }
+    ],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "suggest_tasks": {
+    "type": "suggest_tasks",
+    "title": "建議任務",
+    "description": "選擇建議的任務",
+    "fields": [
+      {
+        "name": "suggestions",
+        "label": "建議任務",
+        "type": "multiselect",
+        "required": true
+      }
+    ],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "use_template_steps": {
+    "type": "use_template_steps",
+    "title": "使用模板步驟",
+    "description": "使用預設的觀察/行動/紀錄/分享步驟",
+    "fields": [],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "summarize_progress": {
+    "type": "summarize_progress",
+    "title": "進度摘要",
+    "description": "查看目前進度",
+    "fields": [],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "mark_as_bookmark": {
+    "type": "mark_as_bookmark",
+    "title": "收藏主題",
+    "description": "將主題加入收藏",
+    "fields": [],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "complete_topic": {
+    "type": "complete_topic",
+    "title": "完成主題",
+    "description": "標記主題為已完成",
+    "fields": [],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "explore_more": {
+    "type": "explore_more",
+    "title": "延伸探索",
+    "description": "根據當前任務延伸更多探索",
+    "fields": [],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "ask_for_input": {
+    "type": "ask_for_input",
+    "title": "輸入想法",
+    "description": "請輸入你的想法",
+    "fields": [
+      {
+        "name": "prompt",
+        "label": "想法",
+        "type": "text",
+        "required": true
+      }
+    ],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
   }
 }

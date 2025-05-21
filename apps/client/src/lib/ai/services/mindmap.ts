@@ -93,7 +93,14 @@ export class MindMapService {
           form: formConfig as ActionForm
         };
       } catch (error) {
-        lastError = error as Error;
+        const err = error as Error & { response?: { data?: any; status?: number } };
+        lastError = err;
+        console.error('❌ Error details:', {
+          message: err.message,
+          stack: err.stack,
+          response: err.response?.data,
+          status: err.response?.status
+        });
         retries++;
         
         if (retries < this.maxRetries) {

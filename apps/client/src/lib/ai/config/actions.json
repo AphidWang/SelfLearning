@@ -96,7 +96,7 @@
       }
     },
     "suggest_tasks": {
-      "description": "顯示任務建議（含分類）",
+      "description": "顯示任務建議",
       "params": {
         "suggestions": {
           "type": "array",
@@ -174,7 +174,6 @@
       "params": {
         "context": {
           "type": "object",
-          "required": true,
           "description": "當前任務上下文"
         }
       },

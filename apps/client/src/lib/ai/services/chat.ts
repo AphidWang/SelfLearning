@@ -3,56 +3,55 @@ import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts
 import { LLMChain } from 'langchain/chains';
 import { BaseLLM } from '@langchain/core/language_models/llms';
 import { ChatMessage, ChatResponse } from '../types';
-import { chatConfig, DEFAULT_SYSTEM_PROMPT } from '../config/index';
+import { chatConfig } from '../config/index';
 import { ConversationMemory } from './memory';
 import { LLMResult } from '@langchain/core/outputs';
 import { BaseLLMCallOptions } from '@langchain/core/language_models/llms';
 import { api } from '../../../services/api';
 import actions from '../config/actions.json';
 
+const DEFAULT_SYSTEM_PROMPT = `你是一位智慧助理`;
+
 // 將 actions 轉換為易讀的格式
-const actionsDescription = Object.entries(actions.actions as Record<string, {
-  description: string;
-  params: Record<string, {
-    type: string;
-    description: string;
-    required?: boolean;
-  }>;
-  returns: { type: string };
-}>)
+//console.log('🔍 Actions:', actions);
+const actionsDescription = Object.entries(actions.actions)
   .map(([name, action]) => {
     const params = Object.entries(action.params)
-      .map(([paramName, param]) => `  "${paramName}": {
-    "type": "${param.type}",
-    "description": "${param.description}"${param.required ? ',\n    "required": true' : ''}
-  }`)
-      .join(',\n');
-    return `"${name}": {
-  "description": "${action.description}",
-  "parameters": {
-${params}
-  },
-  "returns": {
-    "type": "${action.returns.type}"
-  }
-}`;
+      .map(([paramName, param]) => `${paramName}${(param as any).required ? ' (required)' : ''}: ${param.description} (${param.type})`)
+      .join('\n    ');
+    const returns = `${action.returns.type}${(action.returns as any).properties ? ` with properties: ${JSON.stringify((action.returns as any).properties)}` : ''}`;
+    return `${name}:
+  Description: ${action.description}
+  Parameters:
+    ${params}
+  Returns: ${returns}`;
   })
-  .join(',\n');
+  .join('\n\n');
 
 const SYSTEM_PROMPT_WITH_ACTIONS = `${DEFAULT_SYSTEM_PROMPT}
+===
+你可以根據使用者輸入「建議一個最適合的動作」，並提供建議的參數。
+
+請注意：
+1. 你不能直接執行動作，只能「建議應該做什麼動作」。
+2. 系統會根據你的建議內容，請使用者確認是否執行，真正的執行會由系統完成。
+3. 請在回應中加入鼓勵與引導語句，但不能說「我已經為你建立了...」、「我已經完成...」，這樣會誤導使用者。
+
+可用的動作列表：
 
 Available actions:
-{
 ${actionsDescription}
-}
 
 Please respond with a JSON object in the following format:
 {
   "tool": "action_name",
   "params": {
     "param_name": "param_value"
-  }
-}`;
+  },
+  "message": "Your response message to the user"
+}`.replace(/{/g, '{{').replace(/}/g, '}}');
+
+//console.log('📝 SYSTEM_PROMPT_WITH_ACTIONS: ', SYSTEM_PROMPT_WITH_ACTIONS);
 
 class CustomLLM extends BaseLLM {
   constructor() {
@@ -125,13 +124,14 @@ export class ChatService {
     const prompt = ChatPromptTemplate.fromMessages([
       ['system', SYSTEM_PROMPT_WITH_ACTIONS],
       new MessagesPlaceholder('history'),
-      ['human', '{input}'],
+      ['human', '{input}']
     ]);
 
     // 建立對話鏈
     this.chain = new LLMChain({
       llm: new CustomLLM(),
       prompt,
+      verbose: true
     });
   }
 
