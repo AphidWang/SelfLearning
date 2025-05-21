@@ -25,15 +25,26 @@ class CustomLLM extends BaseLLM {
   ): Promise<LLMResult> {
     const generations = await Promise.all(
       prompts.map(async (prompt) => {
-        const response = await api.post('/api/chat/completions', {
+        const token = localStorage.getItem('token');
+        const payload = {
           messages: [
-            { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
-            { role: 'user', content: prompt }
+            { type: 'system', content: DEFAULT_SYSTEM_PROMPT },
+            { type: 'user', content: prompt }
           ],
           model: chatConfig.modelName,
           temperature: 0.7,
+        };
+        console.log('📤 Request payload:', payload);
+        
+        const response = await api.post('/api/chat/completions', payload, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          withCredentials: true
         });
 
+        console.log('📥 Response:', response.data);
         const data = response.data;
         return {
           text: data.choices[0].message.content,
@@ -98,6 +109,8 @@ export class ChatService {
         summary: summary || '',
       });
 
+      console.log('🤖 AI Response:', response.text);
+
       // 添加助手回應到記憶
       this.memory.addMessage('assistant', response.text);
 
@@ -105,7 +118,7 @@ export class ChatService {
         message: response.text,
       };
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('❌ Chat error:', error);
       return {
         message: '',
         error: error instanceof Error ? error.message : '未知錯誤',

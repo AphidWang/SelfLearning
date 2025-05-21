@@ -195,7 +195,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
           description: suggestion.description,
           action: () => {
             setActionForm({
-              type: suggestion.action,
+              type: suggestion.action as "create_topic" | "create_step" | "create_task" | "use_template_steps" | "mark_as_bookmark" | "complete_topic",
               title: suggestion.text,
               description: suggestion.description,
               fields: [],

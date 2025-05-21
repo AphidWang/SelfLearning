@@ -6,6 +6,8 @@ const router = Router();
 router.post('/completions', async (req: Request, res: Response) => {
   try {
     const body = req.body;
+    console.log('📥 Received request body:', body);
+    console.log('🔑 Auth header:', req.headers.authorization);
     
     // 轉換 LangChain 格式到 xAI 格式
     const messages = body.messages || [];
@@ -19,6 +21,8 @@ router.post('/completions', async (req: Request, res: Response) => {
       stream: false
     };
     
+    console.log('📤 Sending to xAI:', xaiBody);
+    
     const response = await fetch(`${process.env.XAI_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -30,16 +34,17 @@ router.post('/completions', async (req: Request, res: Response) => {
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('xAI API error:', error);
+      console.error('❌ xAI API error:', error);
       return res.status(response.status).json({
         error: error.message || 'API request failed'
       });
     }
 
     const data = await response.json();
+    console.log('📥 xAI response:', data);
     
     // 轉換 xAI 回應到 LangChain 格式
-    return res.json({
+    const result = {
       id: data.id,
       object: 'chat.completion',
       created: Date.now(),
@@ -52,9 +57,12 @@ router.post('/completions', async (req: Request, res: Response) => {
         },
         finish_reason: choice.finish_reason
       }))
-    });
+    };
+    
+    console.log('📤 Sending response:', result);
+    return res.json(result);
   } catch (error) {
-    console.error('Chat API error:', error);
+    console.error('❌ Chat API error:', error);
     return res.status(500).json({
       error: 'Failed to process request'
     });
