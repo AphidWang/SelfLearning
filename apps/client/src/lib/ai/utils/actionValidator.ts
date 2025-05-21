@@ -2,7 +2,11 @@ import actions from '../config/actions.json';
 
 interface ActionConfig {
   description: string;
-  params: Record<string, any>;
+  params: Record<string, {
+    type: string;
+    description: string;
+    required?: boolean;
+  }>;
   returns: {
     type: string;
     properties?: Record<string, any>;
@@ -37,7 +41,7 @@ export class ActionValidator {
 
     // 驗證必要參數
     for (const [paramName, paramConfig] of Object.entries(actionConfig.params)) {
-      if (paramConfig.required && !params[paramName]) {
+      if ((paramConfig.required ?? false) && !params[paramName]) {
         console.error(`Missing required parameter: ${paramName}`);
         return false;
       }
