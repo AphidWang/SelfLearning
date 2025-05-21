@@ -1,11 +1,6 @@
 import { useGoalStore } from '../../../store/goalStore';
 import type { Tool } from './types';
-import yaml from 'js-yaml';
-import fs from 'fs';
-import path from 'path';
 import { ActionValidator } from '../utils/actionValidator';
-
-const forms = yaml.load(fs.readFileSync(path.join(process.cwd(), 'src/lib/ai/config/forms.yaml'), 'utf8')) as Record<string, any>;
 
 const actionValidator = new ActionValidator();
 
@@ -13,7 +8,6 @@ const actionValidator = new ActionValidator();
 export const summarizeProgressTool: Tool<void, { progress: number; summary: string }> = {
   name: 'summarize_progress',
   description: '顯示目前進度',
-  form: forms.summarize_progress,
   handler: async () => {
     const goalStore = useGoalStore.getState();
     const selectedGoalId = goalStore.selectedGoalId;
@@ -39,7 +33,6 @@ export const summarizeProgressTool: Tool<void, { progress: number; summary: stri
 export const askForInputTool: Tool<void, { prompt: string }> = {
   name: 'ask_for_input',
   description: '引導孩子說出任務想法',
-  form: forms.ask_for_input,
   handler: async () => {
     return { prompt: '請告訴我你的想法...' };
   }

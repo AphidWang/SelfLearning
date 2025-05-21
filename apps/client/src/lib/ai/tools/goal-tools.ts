@@ -1,17 +1,11 @@
 import { useGoalStore } from '../../../store/goalStore';
 import type { Tool } from './types';
 import type { Goal, Step, Task, GoalStatus } from '../../../types/goal';
-import yaml from 'js-yaml';
-import fs from 'fs';
-import path from 'path';
-
-const forms = yaml.load(fs.readFileSync(path.join(process.cwd(), 'src/lib/ai/config/forms.yaml'), 'utf8')) as Record<string, any>;
 
 // 建立主題
 export const createTopicTool: Tool<{ topic: string }, Goal> = {
   name: 'create_topic',
   description: '建立新的學習主題',
-  form: forms.create_topic,
   handler: async (params) => {
     const goalStore = useGoalStore.getState();
     const newGoal: Goal = {
@@ -30,7 +24,6 @@ export const createTopicTool: Tool<{ topic: string }, Goal> = {
 export const createStepTool: Tool<{ step_name: string }, Step> = {
   name: 'create_step',
   description: '建立新的學習步驟',
-  form: forms.create_step,
   handler: async (params) => {
     const goalStore = useGoalStore.getState();
     const selectedGoalId = goalStore.selectedGoalId;
@@ -50,7 +43,6 @@ export const createStepTool: Tool<{ step_name: string }, Step> = {
 export const createTaskTool: Tool<{ task_name: string; step_tag: string }, Task> = {
   name: 'create_task',
   description: '建立新的學習任務',
-  form: forms.create_task,
   handler: async (params) => {
     const goalStore = useGoalStore.getState();
     const selectedGoalId = goalStore.selectedGoalId;
@@ -70,7 +62,6 @@ export const createTaskTool: Tool<{ task_name: string; step_tag: string }, Task>
 export const useTemplateStepsTool: Tool<void, string[]> = {
   name: 'use_template_steps',
   description: '建立觀察/行動/紀錄/分享',
-  form: forms.use_template_steps,
   handler: async () => {
     const goalStore = useGoalStore.getState();
     const selectedGoalId = goalStore.selectedGoalId;
@@ -95,7 +86,6 @@ export const useTemplateStepsTool: Tool<void, string[]> = {
 export const completeTopicTool: Tool<void, boolean> = {
   name: 'complete_topic',
   description: '結束主題',
-  form: forms.complete_topic,
   handler: async () => {
     const goalStore = useGoalStore.getState();
     const selectedGoalId = goalStore.selectedGoalId;
@@ -116,7 +106,6 @@ export const completeTopicTool: Tool<void, boolean> = {
 export const markAsBookmarkTool: Tool<void, boolean> = {
   name: 'mark_as_bookmark',
   description: '收藏主題',
-  form: forms.mark_as_bookmark,
   handler: async () => {
     const goalStore = useGoalStore.getState();
     const selectedGoalId = goalStore.selectedGoalId;
