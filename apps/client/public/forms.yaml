@@ -1,0 +1,39 @@
+create_topic:
+  type: create_topic
+  title: 建立新主題
+  description: 請輸入主題名稱
+  fields:
+    - name: topic
+      label: 主題名稱
+      type: text
+      required: true
+  submitLabel: 建立
+  cancelLabel: 取消
+
+create_step:
+  type: create_step
+  title: 建立新步驟
+  description: 請輸入步驟名稱
+  fields:
+    - name: step_name
+      label: 步驟名稱
+      type: text
+      required: true
+  submitLabel: 建立
+  cancelLabel: 取消
+
+create_task:
+  type: create_task
+  title: 建立新任務
+  description: 請輸入任務資訊
+  fields:
+    - name: task_name
+      label: 任務名稱
+      type: text
+      required: true
+    - name: step_tag
+      label: 所屬步驟
+      type: select
+      required: true
+  submitLabel: 建立
+  cancelLabel: 取消 

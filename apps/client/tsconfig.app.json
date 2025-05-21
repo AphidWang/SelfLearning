@@ -16,9 +16,13 @@
 
     /* Linting */
     "strict": true,
+    "noImplicitAny": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* React 18 */
+    "types": ["react", "react-dom"]
   },
   "include": ["src"]
 }
