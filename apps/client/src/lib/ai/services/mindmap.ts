@@ -5,9 +5,7 @@ import { ActionValidator } from '../utils/actionValidator';
 import type { LLMResponse, ActionForm } from '../types/llm';
 import { tools } from '../tools';
 import type { Tool } from '../tools/types';
-import yaml from 'js-yaml';
-import fs from 'fs';
-import path from 'path';
+import forms from '../config/forms.json';
 
 export interface MindMapAction {
   type: string;
@@ -21,7 +19,7 @@ interface FormConfig {
   fields: Array<{
     name: string;
     label: string;
-    type: 'text' | 'select' | 'multiselect';
+    type: string;
     required: boolean;
     options?: Array<{ label: string; value: string }>;
   }>;
@@ -42,9 +40,7 @@ export class MindMapService {
 
   constructor() {
     this.chatService = new ChatService();
-    const configPath = path.join(process.cwd(), 'src/lib/ai/config/forms.yaml');
-    const fileContents = fs.readFileSync(configPath, 'utf8');
-    this.formConfigs = yaml.load(fileContents) as FormsConfig;
+    this.formConfigs = forms;
   }
 
   async processLLMResponse(response: string): Promise<LLMResponse> {
@@ -73,7 +69,7 @@ export class MindMapService {
         const response = await this.chatService.sendMessage(input);
         const parsedResponse = await this.processLLMResponse(response.message);
         
-        // 從 forms.yaml 獲取表單定義
+        // 從 forms.json 獲取表單定義
         const formConfig = this.formConfigs[parsedResponse.tool];
         if (!formConfig) {
           throw new Error(`Unknown form type: ${parsedResponse.tool}`);
@@ -126,11 +122,6 @@ export class MindMapService {
     const result = await tool.handler(params);
     console.log('✅ Action result:', result);
     
-    if (!this.validator.validateReturn(toolName, result)) {
-      console.error('❌ Invalid action return value');
-      throw new Error('Invalid action return value');
-    }
-
     return result;
   }
 } 

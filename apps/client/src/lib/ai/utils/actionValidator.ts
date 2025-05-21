@@ -1,6 +1,4 @@
-import yaml from 'js-yaml';
-import fs from 'fs';
-import path from 'path';
+import actions from '../config/actions.json';
 
 interface ActionConfig {
   description: string;
@@ -23,9 +21,7 @@ export class ActionValidator {
   private config: ActionsConfig;
 
   constructor() {
-    const configPath = path.join(process.cwd(), 'src/lib/ai/config/actions.yaml');
-    const fileContents = fs.readFileSync(configPath, 'utf8');
-    this.config = yaml.load(fileContents) as ActionsConfig;
+    this.config = actions as ActionsConfig;
   }
 
   getActionConfig(action: string): ActionConfig | undefined {
