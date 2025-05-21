@@ -12,6 +12,7 @@ import {
   Brain,
   Gamepad
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { ChatService } from '../../lib/ai/services/chat';
 import { MindMapService } from '../../lib/ai/services/mindmap';
 import { ChatResponse } from '../../lib/ai/types';
@@ -21,7 +22,7 @@ export type AssistantMode = 'idle' | 'asking' | 'thinking' | 'voice' | 'chat' | 
 
 interface Choice {
   text: string;
-  icon: React.ReactNode;
+  icon: React.ReactElement;
   description: string;
   action: () => void;
 }
@@ -436,8 +437,8 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             </motion.button>
 
             {/* 聊天泡泡 */}
-            <AnimatePresence>
-              {mode !== 'idle' && mode !== 'menu' && (
+            <AnimatePresence mode="wait">
+              {mode !== 'idle' && mode !== 'menu' ? (
                 <>
                   {/* AI 回覆泡泡 */}
                   <motion.div
@@ -635,10 +636,10 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     </motion.div>
                   )}
                 </>
-              )}
+              ) : null}
 
               {/* 選單 */}
-              {mode === 'menu' && (
+              {mode === 'menu' ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -660,7 +661,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     設定
                   </button>
                 </motion.div>
-              )}
+              ) : null}
             </AnimatePresence>
           </motion.div>
           {renderForm()}
