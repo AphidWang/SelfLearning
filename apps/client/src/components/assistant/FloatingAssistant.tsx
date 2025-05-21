@@ -1,14 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence, useMotionValue, useDragControls } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import Lottie from 'lottie-react';
 import slothAnimation from '../../assets/lottie/sloth.json';
 import { 
-  X, 
   Mic, 
-  Volume2, 
   Send, 
   Loader2, 
-  MessageSquare,
   History,
   Settings,
   BookOpen,
@@ -40,12 +37,9 @@ interface FloatingAssistantProps {
 
 export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   enabled = true,
-  onToggle,
   dragConstraints,
   initialPosition = { x: 0, y: 0 },
-  onPositionChange,
   onDragEnd,
-  hideCloseButton = false,
   className = ''
 }) => {
   const [mode, setMode] = useState<AssistantMode>('idle');
@@ -57,7 +51,6 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const chatService = React.useMemo(() => new ChatService(), []);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
   
   useEffect(() => {
@@ -204,19 +197,6 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     }
   };
 
-  const getGradientColor = (index: number, isEnd = false) => {
-    const colors = [
-      ['#4F46E5', '#7C3AED'], // indigo to purple
-      ['#059669', '#10B981'], // emerald to green
-      ['#DC2626', '#F97316'], // red to orange
-      ['#2563EB', '#3B82F6'], // blue
-      ['#7C3AED', '#8B5CF6'], // purple
-      ['#EA580C', '#F97316'], // orange
-    ];
-    const colorIndex = index % colors.length;
-    return colors[colorIndex][isEnd ? 1 : 0];
-  };
-
   return (
     <AnimatePresence>
       {enabled && (
@@ -231,7 +211,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
           onDragStart={() => {
             setIsDragging(true);
           }}
-          onDragEnd={(event, info) => {
+          onDragEnd={(_, info) => {
             setIsDragging(false);
             if (onDragEnd) {
               onDragEnd({ x: info.point.x, y: info.point.y });
