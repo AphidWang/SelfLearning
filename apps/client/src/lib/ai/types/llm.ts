@@ -15,13 +15,40 @@ export interface ActionForm {
   type: string;
   title: string;
   description: string;
-  fields: {
-    name: string;
-    label: string;
-    type: 'text' | 'select' | 'multiselect';
-    options?: { label: string; value: string }[];
-    required: boolean;
-  }[];
-  submitLabel: string;
-  cancelLabel: string;
-} 
+  options: Array<{
+    paramSource: string;
+    param?: any;
+    paramType?: ParamType;
+    action?: {
+      type: string;
+      params: Record<string, any>;
+    };
+  }>;
+}
+
+export interface Task {
+  task_name: string;
+  step_tag: string;
+}
+
+export interface ActionDefinition {
+  type: string;
+  description: string;
+  params: {
+    [key: string]: {
+      type: string;
+      required: boolean;
+      description: string;
+      items?: {
+        type: string;
+        properties?: {
+          [key: string]: {
+            type: string;
+          };
+        };
+      };
+    };
+  };
+}
+
+export type ParamType = 'string' | 'string[]' | 'task[]' 

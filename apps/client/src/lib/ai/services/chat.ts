@@ -19,12 +19,10 @@ const actionsDescription = Object.entries(actions.actions)
     const params = Object.entries(action.params)
       .map(([paramName, param]) => `${paramName}${(param as any).required ? ' (required)' : ''}: ${param.description} (${param.type})`)
       .join('\n    ');
-    const returns = `${action.returns.type}${(action.returns as any).properties ? ` with properties: ${JSON.stringify((action.returns as any).properties)}` : ''}`;
     return `${name}:
   Description: ${action.description}
   Parameters:
-    ${params}
-  Returns: ${returns}`;
+    ${params}`;
   })
   .join('\n\n');
 

@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Don't use pnpm in this project, use yarn for toolchain install
+
+This is monorepo project.
