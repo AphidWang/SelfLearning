@@ -321,7 +321,8 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   // 修改點擊事件
   const handleAssistantClick = () => {
     if (!isDragging) {
-      if (mode === 'idle') {
+      if (mode === 'idle' && !uiState.message && !uiState.showChoices && !uiState.showInput) {
+        // 如果目前沒有顯示任何泡泡，就顯示初始選項
         setMode('idle');
         updateUIState(prev => ({
           message: '嗨！今天想要做什麼呢？',
@@ -351,11 +352,13 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
           ]
         }), 'handleAssistantClick-show');
       } else {
+        // 如果有任何泡泡顯示，就全部隱藏
         setMode('idle');
         updateUIState(prev => ({
           message: '',
           showChoices: false,
           showInput: false,
+          inputText: '',
           choices: []
         }), 'handleAssistantClick-hide');
       }
