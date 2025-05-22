@@ -465,58 +465,81 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 飛到指定元素旁邊
   const flyToElement = (elementId: string) => {
-    if (!showAssistant) return;
-
     const element = document.getElementById(elementId);
     if (!element) return;
 
-    // 取得元素和助手容器在視窗中的位置
-    const rect = element.getBoundingClientRect();
-    const assistantContainer = document.querySelector('.floating-assistant')?.parentElement;
-    const containerRect = assistantContainer?.getBoundingClientRect();
+    // 取得容器資訊
+    const container = containerRef.current;
+    if (!container) return;
 
-    if (!containerRect) return;
+    const elementRect = element.getBoundingClientRect();
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-    // 小助手的大小（包含對話框）
-    const ASSISTANT_WIDTH = 360;  // 最大寬度
-    const ASSISTANT_HEIGHT = 300; // 預估高度
+    // 計算需要的位移
+    // 1. 計算元素中心點
+    const elementCenterX = elementRect.left + elementRect.width / 2;
+    const elementCenterY = elementRect.top + elementRect.height / 2;
 
-    // 計算相對於容器的位置
-    let x = rect.right - containerRect.left + 20; // 預設在右側
-    let y = rect.top - containerRect.top;
+    // 2. 計算容器中心點
+    const containerCenterX = containerWidth / 2;
+    const containerCenterY = containerHeight / 2;
 
-    // 檢查右側空間
-    if (x + ASSISTANT_WIDTH > window.innerWidth - containerRect.left) {
-      // 如果右側空間不夠，改放在左側
-      x = rect.left - containerRect.left - ASSISTANT_WIDTH - 20;
-    }
+    // 3. 計算需要的位移（從元素到容器中心）
+    const dx = containerCenterX - elementCenterX;
+    const dy = containerCenterY - elementCenterY;
 
-    // 檢查垂直空間
-    if (y + ASSISTANT_HEIGHT > window.innerHeight - containerRect.top) {
-      // 如果下方空間不夠，往上移動
-      y = Math.max(0, window.innerHeight - containerRect.top - ASSISTANT_HEIGHT);
-    }
+    // 4. 更新位置（考慮縮放）
+    const newPosition = {
+      x: position.x + dx / zoom,
+      y: position.y + dy / zoom
+    };
 
-    // 設定小幫手新位置（相對於容器）
-    setAssistantPosition({
-      x,
-      y
+    console.log('🎯 計算後的位置', { 
+      current: {
+        x: position.x,
+        y: position.y
+      },
+      element: {
+        centerX: elementCenterX,
+        centerY: elementCenterY
+      },
+      container: {
+        centerX: containerCenterX,
+        centerY: containerCenterY
+      },
+      delta: {
+        dx,
+        dy
+      },
+      new: newPosition,
+      zoom
     });
+
+    // 更新畫布位置
+    setPosition(newPosition);
+
+    // 等待畫布移動動畫完成後清除 focus
+    setTimeout(() => {
+      mindMapService.clearFocusElement();
+    }, 500);
   };
 
-  // 監聽 goalStore 的變化
   useEffect(() => {
     const unsubscribe = useGoalStore.subscribe((state) => {
       const currentGoal = state.goals.find(g => g.id === goalId);
       if (currentGoal?.focusElement) {
-        flyToElement(`${currentGoal.focusElement.type}-${currentGoal.focusElement.id}`);
-        // 清除 focus 標記
-        mindMapService.clearFocusElement();
+        const elementId = `${currentGoal.focusElement.type}-${currentGoal.focusElement.id}`;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            flyToElement(elementId);
+          });
+        });
       }
     });
 
     return () => unsubscribe();
-  }, [goalId, mindMapService]);
+  }, [goalId, mindMapService, position, zoom]);
 
   if (!goal) {
     return (
@@ -1231,7 +1254,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     return (
                       <motion.div
                         key={`task-${step.id}-${task.id}`}
-                        id={`task-${task.id}`}
                         className="absolute"
                         style={{
                           left: taskPos.x,
@@ -1248,6 +1270,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                         }}
                       >
                         <motion.div
+                          id={`task-${task.id}`}
                           drag
                           dragMomentum={false}
                           whileDrag={{ scale: 1.02 }}
