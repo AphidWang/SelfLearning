@@ -10,6 +10,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { FloatingAssistant } from '../assistant/FloatingAssistant';
 import { useAssistant } from '../../hooks/useAssistant';
+import { MindMapService } from '../../services/mindmap';
 
 interface GoalMindMapProps {
   goalId: string;
@@ -101,8 +102,9 @@ const calculateContentBounds = (
 };
 
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
-  const { goals, updateGoal } = useGoalStore();
+  const { goals } = useGoalStore();
   const goal = goals.find((g) => g.id === goalId);
+  const mindMapService = React.useMemo(() => new MindMapService(goalId), [goalId]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [isGoalSelected, setIsGoalSelected] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
@@ -625,17 +627,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       title: '新步驟'
     });
 
-    // 更新 goal store
-    const updatedGoal = {
-      ...goal,
-      steps: [...goal.steps, newStep]
-    };
-    updateGoal(updatedGoal);
-
+    mindMapService.addStep(goalId, newStep);
 
     // 計算新 step 的位置
     const newStepIndex = goal.steps.length; // 新的 step 會是最後一個
-    const stepPos = getStepPosition(newStepIndex, updatedGoal.steps);
+    const stepPos = getStepPosition(newStepIndex, [...goal.steps, newStep]);
     const container = containerRef.current;
     if (container) {
       const containerWidth = container.clientWidth;
@@ -663,25 +659,16 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     setEditingStepId(newStep.id);
     setEditingStepTitle('新步驟');
     setIsGoalSelected(false);
-  }, [goal, updateGoal]);
+  }, [goal, goalId, mindMapService]);
 
   // 處理 step 標題更新
   const handleStepTitleUpdate = useCallback((stepId: string, newTitle: string) => {
     if (!goal) return;
 
-    const updatedSteps = goal.steps.map(step => 
-      step.id === stepId ? { ...step, title: newTitle } : step
-    );
-
-    const updatedGoal = {
-      ...goal,
-      steps: updatedSteps
-    };
-    updateGoal(updatedGoal);
-
+    mindMapService.updateStep(goalId, stepId, { title: newTitle });
     setEditingStepId(null);
     setEditingStepTitle('');
-  }, [goal, updateGoal]);
+  }, [goal, goalId, mindMapService]);
 
   const { bringToFront, getIndex } = useElementStack(1);
 
@@ -700,18 +687,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       status: 'todo'
     });
 
-    // 更新 goal store
-    const updatedSteps = goal.steps.map(step => 
-      step.id === stepId 
-        ? { ...step, tasks: [...step.tasks, newTask] }
-        : step
-    );
-
-    const updatedGoal = {
-      ...goal,
-      steps: updatedSteps
-    };
-    updateGoal(updatedGoal);
+    mindMapService.addTask(goalId, stepId, newTask);
 
     // 計算新 task 的位置
     const taskPos = getTaskPosition(
@@ -736,28 +712,19 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     // 設置編輯狀態
     setEditingTaskId(newTask.id);
     setEditingTaskTitle('新任務');
-  }, [goal, updateGoal, zoom]);
+  }, [goal, goalId, mindMapService, zoom]);
 
   // 處理 task 標題更新
   const handleTaskTitleUpdate = useCallback((taskId: string, newTitle: string) => {
     if (!goal) return;
 
-    const updatedSteps = goal.steps.map(step => ({
-      ...step,
-      tasks: step.tasks.map(task =>
-        task.id === taskId ? { ...task, title: newTitle } : task
-      )
-    }));
+    const step = goal.steps.find(s => s.tasks.some(t => t.id === taskId));
+    if (!step) return;
 
-    const updatedGoal = {
-      ...goal,
-      steps: updatedSteps
-    };
-    updateGoal(updatedGoal);
-
+    mindMapService.updateTask(goalId, step.id, taskId, { title: newTitle });
     setEditingTaskId(null);
     setEditingTaskTitle('');
-  }, [goal, updateGoal]);
+  }, [goal, goalId, mindMapService]);
 
   // 匯出成 Markdown
   const exportToMarkdown = useCallback(() => {
