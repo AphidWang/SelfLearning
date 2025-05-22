@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ChatService } from '../../lib/ai/services/chat';
-import { MindMapService } from '../../lib/ai/services/mindmap';
+import { MindMapService } from '../../services/mindmap/service';
 import { ChatResponse } from '../../lib/ai/types';
 import type { LLMResponse, ActionForm } from '../../lib/ai/types/llm';
 

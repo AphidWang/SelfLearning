@@ -1,0 +1,26 @@
+
+    "summarize_progress": {
+      "description": "顯示目前進度",
+      "params": {}
+    },
+    "mark_as_bookmark": {
+      "description": "收藏主題",
+      "params": {}
+    },
+    "complete_topic": {
+      "description": "結束主題",
+      "params": {}
+    },
+    "explore_more": {
+      "description": "依現有任務狀況延伸探索",
+      "params": {
+        "context": {
+          "type": "object",
+          "description": "當前任務上下文"
+        }
+      }
+    },
+    "ask_for_input": {
+      "description": "引導孩子說出任務想法",
+      "params": {}
+    },
