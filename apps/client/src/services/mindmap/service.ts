@@ -354,9 +354,10 @@ export class MindMapService {
     const topic = this.getTopic();
     if (!topic) return;
 
+    // 只更新 focusElement，保留其他所有屬性
     this.goalStore.updateGoal({
       ...topic,
-      ...updates
+      focusElement: updates.focusElement
     });
   }
 
@@ -364,7 +365,7 @@ export class MindMapService {
     const topic = this.getTopic();
     if (!topic) return;
     
-    this.updateTopic({
+    this.goalStore.updateGoal({
       ...topic,
       focusElement: undefined
     });
