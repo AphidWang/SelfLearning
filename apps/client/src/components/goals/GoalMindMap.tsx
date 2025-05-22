@@ -163,10 +163,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
     const optimalZoom = Math.min(Math.max(1, Math.min(optimalZoomX, optimalZoomY)), 1.5);
 
-    // 計算目標應該在的位置（螢幕寬度的 35%）
-    const targetScreenX = containerWidth * 0.2;
+    // 計算目標應該在的位置（螢幕的左邊）
+    const targetScreenX = containerWidth * 0.1;
     
-    // 計算需要的 translate 值，確保目標出現在 35% 的位置
+    // 計算需要的 translate 值
     const optimalX = (targetScreenX - centerGoalX * optimalZoom) / optimalZoom;
 
     // 計算 Y 軸位置

@@ -50,7 +50,6 @@ export interface MindMapAction {
 
 export class MindMapService {
   private chatService: ChatService;
-  private goalStore = useGoalStore.getState();
   private validator = new ActionValidator();
   private maxRetries = 3;  // 一般錯誤的重試次數
   private formConfigs: Record<string, ActionFormConfig>;
@@ -119,7 +118,7 @@ export class MindMapService {
     });
 
     // 初始化 context
-    const initialContext = selector(this.goalStore);
+    const initialContext = selector(useGoalStore.getState());
     this.contextCache = initialContext 
       ? JSON.stringify(initialContext, null, 2)
       : 'Topic not found';
@@ -347,28 +346,14 @@ export class MindMapService {
 
   // 主題相關的 API
   private getTopic(): Goal | undefined {
-    return this.goalStore.goals.find(g => g.id === this.currentTopicId);
-  }
-
-  private updateTopic(updates: Partial<Goal>) {
-    const topic = this.getTopic();
-    if (!topic) return;
-
-    // 只更新 focusElement，保留其他所有屬性
-    this.goalStore.updateGoal({
-      ...topic,
-      focusElement: updates.focusElement
-    });
+    return useGoalStore.getState().goals.find(g => g.id === this.currentTopicId);
   }
 
   clearFocusElement() {
     const topic = this.getTopic();
     if (!topic) return;
     
-    this.goalStore.updateGoal({
-      ...topic,
-      focusElement: undefined
-    });
+    useGoalStore.getState().setFocusElement(topic.id, undefined);
   }
 
   addStep(step: Step) {
@@ -379,7 +364,7 @@ export class MindMapService {
     }
 
     // 直接使用 goalStore 返回的步驟
-    const newStep = this.goalStore.addStep(this.currentTopicId, step);
+    const newStep = useGoalStore.getState().addStep(this.currentTopicId, step);
     console.log('✅ 步驟已新增到 store', { newStep });
     return newStep;
   }
@@ -387,13 +372,12 @@ export class MindMapService {
   updateStep(stepId: string, updates: Step) {
     if (!this.currentTopicId) return null;
 
-    return this.goalStore.updateStep(this.currentTopicId, updates);
+    return useGoalStore.getState().updateStep(this.currentTopicId, updates);
   }
 
   addTask(stepId: string, task: Task) {
     if (!this.currentTopicId) return null;
-
-    return this.goalStore.addTask(this.currentTopicId, stepId, task);
+    return useGoalStore.getState().addTask(this.currentTopicId, stepId, task);
   }
 
   updateTask(stepId: string, taskId: string, updates: Task) {
@@ -404,48 +388,71 @@ export class MindMapService {
       return null;
     }
 
-    const result = this.goalStore.updateTask(this.currentTopicId, stepId, updates);
+    const result = useGoalStore.getState().updateTask(this.currentTopicId, stepId, updates);
     console.log('🔄 更新結果', { result });
     return result;
   }
 
   async handleAction(actionType: string, params: any): Promise<void> {
+    console.log('👆 使用者觸發行為', { 
+      actionType, 
+      params,
+      currentTopicId: this.currentTopicId 
+    });
+
     const topic = this.getTopic();
-    if (!topic) return;
+    if (!topic) {
+      console.log('❌ 處理失敗：找不到當前主題');
+      return;
+    }
 
     try {
       switch (actionType) {
         case 'createTopic':
-          // 新增主題，params 是 string
+          console.log('📝 準備新增主題', { title: params });
           const newStep: Partial<Step> = {
             title: params,
             tasks: []
           };
           const createdStep = this.addStep(newStep as Step);
+          console.log('✅ 主題新增結果', { createdStep });
           if (createdStep) {
-            this.updateTopic({
-              focusElement: { type: 'step', id: createdStep.id }
+            console.log('🎯 設定焦點到新主題', { 
+              type: 'step',
+              id: createdStep.id 
+            });
+            useGoalStore.getState().setFocusElement(topic.id, {
+              type: 'step',
+              id: createdStep.id
             });
           }
           break;
 
         case 'createStep':
-          // 新增步驟，params 是 string
+          console.log('📝 準備新增步驟', { title: params });
           const step: Partial<Step> = {
             title: params,
             tasks: []
           };
           const addedStep = this.addStep(step as Step);
+          console.log('✅ 步驟新增結果', { addedStep });
           if (addedStep) {
-            this.updateTopic({
-              focusElement: { type: 'step', id: addedStep.id }
+            console.log('🎯 設定焦點到新步驟', {
+              type: 'step',
+              id: addedStep.id
+            });
+            useGoalStore.getState().setFocusElement(topic.id, {
+              type: 'step',
+              id: addedStep.id
             });
           }
           break;
 
         case 'createTask':
           try {
+            console.log('📝 準備新增任務', { params });
             if (!params.step_id) {
+              console.log('❌ 新增失敗：缺少步驟 ID');
               throw new LLMRetryError('哎呀！我需要知道要把任務加到哪個步驟。讓我想想看...');
             }
             
@@ -457,32 +464,41 @@ export class MindMapService {
             // 確認步驟存在
             const currentTopic = this.getTopic();
             if (!currentTopic) {
+              console.log('❌ 新增失敗：找不到當前主題');
               throw new LLMRetryError('找不到目前的主題，讓我檢查一下...');
             }
 
             if (currentTopic.steps.length === 0) {
+              console.log('❌ 新增失敗：沒有任何步驟');
               throw new LLMRetryError('需要先建立步驟。建議使用 use_template_steps 建立預設步驟結構。');
             }
 
             const targetStep = currentTopic.steps.find(s => s.id === params.step_id);
             if (!targetStep) {
+              console.log('❌ 新增失敗：找不到目標步驟', { stepId: params.step_id });
               throw new LLMRetryError('咦？這個步驟好像不見了。讓我檢查一下...');
             }
 
             const addedTask = this.addTask(params.step_id, task as Task);
+            console.log('✅ 任務新增結果', { addedTask });
             if (addedTask) {
-              this.updateTopic({
-                focusElement: { type: 'task', id: addedTask.id }
+              console.log('🎯 設定焦點到新任務', {
+                type: 'task',
+                id: addedTask.id
+              });
+              useGoalStore.getState().setFocusElement(topic.id, {
+                type: 'task',
+                id: addedTask.id
               });
             }
           } catch (error) {
-            console.error('建立任務失敗:', error);
+            console.error('❌ 建立任務時發生錯誤:', error);
             throw error;
           }
           break;
 
         case 'createTopics':
-          // 批量新增主題，params 是 string[]
+          console.log('📝 準備批量新增主題', { topics: params });
           let lastCreatedStepId: string | null = null;
           params.forEach((title: string) => {
             const step: Partial<Step> = {
@@ -490,19 +506,25 @@ export class MindMapService {
               tasks: []
             };
             const createdStep = this.addStep(step as Step);
+            console.log('✅ 主題新增結果', { title, createdStep });
             if (createdStep) {
               lastCreatedStepId = createdStep.id;
             }
           });
           if (lastCreatedStepId) {
-            this.updateTopic({
-              focusElement: { type: 'step', id: lastCreatedStepId }
+            console.log('🎯 設定焦點到最後新增的主題', {
+              type: 'step',
+              id: lastCreatedStepId
+            });
+            useGoalStore.getState().setFocusElement(topic.id, {
+              type: 'step',
+              id: lastCreatedStepId
             });
           }
           break;
 
         case 'createSteps':
-          // 批量新增步驟，params 是 string[]
+          console.log('📝 準備批量新增步驟', { steps: params });
           let lastAddedStepId: string | null = null;
           params.forEach((title: string) => {
             const step: Partial<Step> = {
@@ -510,19 +532,25 @@ export class MindMapService {
               tasks: []
             };
             const addedStep = this.addStep(step as Step);
+            console.log('✅ 步驟新增結果', { title, addedStep });
             if (addedStep) {
               lastAddedStepId = addedStep.id;
             }
           });
           if (lastAddedStepId) {
-            this.updateTopic({
-              focusElement: { type: 'step', id: lastAddedStepId }
+            console.log('🎯 設定焦點到最後新增的步驟', {
+              type: 'step',
+              id: lastAddedStepId
+            });
+            useGoalStore.getState().setFocusElement(topic.id, {
+              type: 'step',
+              id: lastAddedStepId
             });
           }
           break;
 
         case 'createTasks':
-          // 批量新增任務，params 是 { task_name: string, step_tag: string }[]
+          console.log('📝 準備批量新增任務', { tasks: params });
           let lastAddedTaskId: string | null = null;
           params.forEach((taskParam: { task_name: string, step_tag: string }) => {
             const newTask: Partial<Task> = {
@@ -530,19 +558,29 @@ export class MindMapService {
               status: 'todo'
             };
             const addedTask = this.addTask(taskParam.step_tag, newTask as Task);
+            console.log('✅ 任務新增結果', { 
+              title: taskParam.task_name, 
+              stepId: taskParam.step_tag,
+              addedTask 
+            });
             if (addedTask) {
               lastAddedTaskId = addedTask.id;
             }
           });
           if (lastAddedTaskId) {
-            this.updateTopic({
-              focusElement: { type: 'task', id: lastAddedTaskId }
+            console.log('🎯 設定焦點到最後新增的任務', {
+              type: 'task',
+              id: lastAddedTaskId
+            });
+            useGoalStore.getState().setFocusElement(topic.id, {
+              type: 'task',
+              id: lastAddedTaskId
             });
           }
           break;
 
         case 'use_template_steps':
-          // 使用模板步驟
+          console.log('📝 準備使用模板步驟');
           let lastTemplateStepId: string | null = null;
           const templateSteps: Partial<Step>[] = [
             {
@@ -568,19 +606,29 @@ export class MindMapService {
           ];
           templateSteps.forEach(step => {
             const addedStep = this.addStep(step as Step);
+            console.log('✅ 模板步驟新增結果', { 
+              title: step.title,
+              order: step.order,
+              addedStep 
+            });
             if (addedStep) {
               lastTemplateStepId = addedStep.id;
             }
           });
           if (lastTemplateStepId) {
-            this.updateTopic({
-              focusElement: { type: 'step', id: lastTemplateStepId }
+            console.log('🎯 設定焦點到最後新增的模板步驟', {
+              type: 'step',
+              id: lastTemplateStepId
+            });
+            useGoalStore.getState().setFocusElement(topic.id, {
+              type: 'step',
+              id: lastTemplateStepId
             });
           }
           break;
       }
     } catch (error) {
-      console.error('處理動作時發生錯誤:', error);
+      console.error('❌ 處理使用者行為時發生錯誤:', error);
       throw error;
     }
   }
