@@ -1,7 +1,15 @@
 import { ChatService } from './chat';
 import { useGoalStore } from '../../../store/goalStore';
 import { ActionValidator } from '../utils/actionValidator';
-import type { LLMResponse, ActionForm, ParamType } from '../types/llm';
+import type { 
+  LLMResponse, 
+  ActionForm,
+  ActionFormConfig,
+  ParamType,
+  ActionDefinition,
+  ActionParamDefinition,
+  ActionsConfig 
+} from '../types/llm';
 import { tools } from '../tools';
 import type { Tool } from '../tools/types';
 import forms from '../config/forms.json';
@@ -12,38 +20,12 @@ export interface MindMapAction {
   payload: any;
 }
 
-interface FormConfig {
-  type: string;
-  title: string;
-  description: string;
-  additionalOptions?: Array<{
-    text: string;
-    action: {
-      type: string;
-      params: Record<string, any>;
-    };
-  }>;
-  options?: Array<{
-    paramSource: string;
-    paramAction: string;
-    action?: {
-      type: string;
-      params: Record<string, any>;
-    };
-    isSuggestions?: boolean;
-  }>;
-}
-
-interface FormsConfig {
-  [key: string]: FormConfig;
-}
-
 export class MindMapService {
   private chatService: ChatService;
   private goalStore = useGoalStore.getState();
   private validator = new ActionValidator();
   private maxRetries = 3;
-  private formConfigs: FormsConfig;
+  private formConfigs: Record<string, ActionFormConfig>;
 
   constructor() {
     this.chatService = new ChatService();
@@ -65,12 +47,51 @@ export class MindMapService {
 
   async processLLMResponse(response: string): Promise<LLMResponse> {
     try {
-      console.log('📝 LLM Response:', response);
       const parsedResponse = JSON.parse(response) as LLMResponse;
       console.log('🔍 Parsed Response:', parsedResponse);
       
-      if (!this.validator.validateAction(parsedResponse.tool, parsedResponse.params)) {
-        throw new Error('Invalid action parameters');
+      // 檢查 action 定義
+      const actionConfig = (actions as ActionsConfig).actions[parsedResponse.tool];
+      if (!actionConfig) {
+        throw new Error(`Unknown action type: ${parsedResponse.tool}`);
+      }
+
+      // 檢查參數格式
+      for (const [paramName, paramConfig] of Object.entries(actionConfig.params)) {
+        const paramValue = parsedResponse.params[paramName];
+        const typedParamConfig = paramConfig as ActionParamDefinition;
+        
+        if (typedParamConfig.required && !paramValue) {
+          throw new Error(`Missing required parameter: ${paramName}`);
+        }
+
+        if (paramValue) {
+          if (typedParamConfig.type === 'array') {
+            if (!Array.isArray(paramValue)) {
+              throw new Error(`Parameter ${paramName} should be an array`);
+            }
+
+            if (typedParamConfig.items?.type === 'object') {
+              for (const item of paramValue) {
+                if (typeof item !== 'object') {
+                  throw new Error(`Array items in ${paramName} should be objects`);
+                }
+                // 檢查必要屬性
+                for (const [propName, propConfig] of Object.entries(typedParamConfig.items.properties || {})) {
+                  if (!(propName in item)) {
+                    throw new Error(`Missing required property ${propName} in array item of ${paramName}`);
+                  }
+                }
+              }
+            } else if (typedParamConfig.items?.type === 'string') {
+              for (const item of paramValue) {
+                if (typeof item !== 'string') {
+                  throw new Error(`Array items in ${paramName} should be strings`);
+                }
+              }
+            }
+          }
+        }
       }
 
       return parsedResponse;
@@ -87,16 +108,22 @@ export class MindMapService {
     while (retries < this.maxRetries) {
       try {
         const response = await this.chatService.sendMessage(input);
+         
         const parsedResponse = await this.processLLMResponse(response.message);
+        console.log('🔍 Parsed LLM Response:', parsedResponse);
         
         // 從 forms.json 獲取表單定義
         const formConfig = this.formConfigs[parsedResponse.tool];
+        console.log('📋 Form Config:', formConfig);
+        
+        // 從 actions.json 獲取參數定義
+        const actionConfig = actions.actions[parsedResponse.tool];
+        console.log('⚡ Action Config:', actionConfig);
+
         if (!formConfig) {
           throw new Error(`Unknown form type: ${parsedResponse.tool}`);
         }
 
-        // 從 actions.json 獲取參數定義
-        const actionConfig = actions[parsedResponse.tool];
         if (!actionConfig) {
           throw new Error(`Unknown action type: ${parsedResponse.tool}`);
         }
@@ -105,71 +132,47 @@ export class MindMapService {
         const updatedOptions = formConfig.options?.map(option => {
           if (option.paramSource) {
             const paramValue = parsedResponse.params[option.paramSource];
-            const paramConfig = actionConfig.params.find(p => p.name === option.paramSource);
-            if (!paramConfig) {
-              throw new Error(`Unknown parameter: ${option.paramSource}`);
-            }
-            const { type } = this.convertJsonSchemaToParamType(paramConfig);
+            console.log('🔍 Param Value:', paramValue);
             
             // 如果參數值是陣列，每個元素都要有自己的 action
             if (Array.isArray(paramValue)) {
-              return {
-                paramSource: option.paramSource,
-                param: paramValue.map(value => ({
-                  label: typeof value === 'string' ? value : value.task_name,
-                  action: {
-                    type: option.paramAction || formConfig.type,
-                    params: value
-                  }
-                })),
-                paramType: type
-              };
+              const mappedOptions = paramValue.map(value => ({
+                label: typeof value === 'string' ? value : value.task_name,
+                action: {
+                  type: option.paramAction,
+                  params: value
+                }
+              }));
+              return mappedOptions;
             }
             
-            return {
-              paramSource: option.paramSource,
-              param: {
-                label: typeof paramValue === 'string' ? paramValue : paramValue.task_name,
-                action: {
-                  type: option.paramAction || formConfig.type,
-                  params: {
-                    ...parsedResponse.params,
-                    [option.paramSource]: paramValue
-                  }
-                }
-              },
-              paramType: type
+            const singleOption = {
+              label: typeof paramValue === 'string' ? paramValue : paramValue.task_name,
+              action: {
+                type: option.paramAction,
+                params: paramValue
+              }
             };
+            return singleOption;
           }
           return option;
-        }) || [];
+        }).flat() || [];
+
+        console.log('📋 Final Updated Options:', updatedOptions);
 
         // 處理額外選項
-        const additionalOptions = formConfig.additionalOptions?.map(option => {
-          // 替換參數中的變數
-          const params = Object.entries(option.action.params).reduce((acc, [key, value]) => {
-            if (typeof value === 'string' && value.startsWith('${') && value.endsWith('}')) {
-              const paramName = value.slice(2, -1);
-              acc[key] = parsedResponse.params[paramName];
-            } else {
-              acc[key] = value;
-            }
-            return acc;
-          }, {} as Record<string, any>);
-
-          return {
-            paramSource: option.text,
-            param: option.text,
-            paramType: 'string',
-            action: {
-              type: option.action.type,
-              params
-            }
-          };
-        }) || [];
+        const additionalOptions = formConfig.additionalOptions?.map(option => ({
+          label: option.text,
+          action: {
+            type: option.action,
+            params: option.text
+          }
+        })) || [];
 
         return {
-          ...parsedResponse,
+          tool: parsedResponse.tool,
+          params: parsedResponse.params,
+          message: parsedResponse.message || '',
           form: {
             ...formConfig,
             options: [...updatedOptions, ...additionalOptions]

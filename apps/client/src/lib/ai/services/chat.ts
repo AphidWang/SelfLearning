@@ -10,14 +10,34 @@ import { RunnableSequence } from '@langchain/core/runnables';
 // 移除無法找到的模組導入
 // import { LLMChain } from '@langchain/core/chains';
 
-const DEFAULT_SYSTEM_PROMPT = `你是一位智慧助理`;
+const DEFAULT_SYSTEM_PROMPT = `你是一位智慧助理 
+請使用孩子可以理解的語言回答：
+- 回應請限制在 2 到 3 句話
+- 每句話不要超過 20 字
+- 保持語氣溫暖、親切、有陪伴感`;
 
 // 將 actions 轉換為易讀的格式
 //console.log('🔍 Actions:', actions);
 const actionsDescription = Object.entries(actions.actions)
   .map(([name, action]) => {
     const params = Object.entries(action.params)
-      .map(([paramName, param]) => `${paramName}${(param as any).required ? ' (required)' : ''}: ${param.description} (${param.type})`)
+      .map(([paramName, param]) => {
+        const paramInfo = param as any;
+        let typeDesc = paramInfo.type;
+        
+        if (paramInfo.type === 'array' && paramInfo.items) {
+          if (paramInfo.items.type === 'object') {
+            const properties = Object.entries(paramInfo.items.properties || {})
+              .map(([propName, prop]) => `${propName}: ${(prop as any).type}`)
+              .join(', ');
+            typeDesc = `array of objects with properties: {${properties}}`;
+          } else {
+            typeDesc = `array of ${paramInfo.items.type}`;
+          }
+        }
+        
+        return `${paramName}${paramInfo.required ? ' (required)' : ''}: ${paramInfo.description} (${typeDesc})`;
+      })
       .join('\n    ');
     return `${name}:
   Description: ${action.description}

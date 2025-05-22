@@ -10,7 +10,14 @@ import {
   Settings,
   BookOpen,
   Brain,
-  Gamepad
+  Gamepad,
+  Lightbulb,
+  ListChecks,
+  Target,
+  Bookmark,
+  CheckCircle,
+  Compass,
+  MessageSquare
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ChatService } from '../../lib/ai/services/chat';
@@ -81,33 +88,17 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const updateUIFromForm = (form: ActionForm) => {
     setUIState(prev => ({
       ...prev,
-      showChoices: form.options.length > 0,
-      showInput: !form.options.length,
+      showChoices: (form.options?.length ?? 0) > 0,
+      showInput: !(form.options?.length ?? 0),
       inputPlaceholder: form.description || '和我分享你的想法吧',
-      choices: form.options.map(option => {
-        if (Array.isArray(option.param)) {
-          return option.param.map(item => ({
-            text: item.label,
-            icon: <Brain className="h-12 w-12 text-emerald-600" />,
-            description: item.label,
-            action: () => {
-              if (item.action) {
-                onActionSubmit?.(item.action.type, item.action.params);
-              }
-            }
-          }));
+      choices: form.options?.map(option => ({
+        text: option.label,
+        icon: getActionIcon(option.action.type),
+        description: '',
+        action: () => {
+          onActionSubmit?.(option.action.type, option.action.params);
         }
-        return [{
-          text: option.param.label,
-          icon: <Brain className="h-12 w-12 text-emerald-600" />,
-          description: option.param.label,
-          action: () => {
-            if (option.param.action) {
-              onActionSubmit?.(option.param.action.type, option.param.action.params);
-            }
-          }
-        }];
-      }).flat()
+      })) || [],
     }));
   };
 
@@ -119,7 +110,9 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         ...prev,
         message: '嗨！今天想要做什麼呢？',
         showChoices: true,
-        showInput: false,
+        showInput: true,
+        inputText: '',
+        inputPlaceholder: '和我分享你的想法吧',
         choices: [
           { 
             text: "我想問功課", 
@@ -268,7 +261,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
       // 更新訊息
       setUIState(prev => ({
         ...prev,
-        message: response.tool === 'ask_for_input' ? '請輸入你的想法' : '好的，我了解了',
+        message: response.message || '好的，我了解了',
         inputText: '',
         showInput: response.tool === 'ask_for_input'
       }));
@@ -308,20 +301,17 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
 
   // 修改點擊事件
   const handleAssistantClick = () => {
-    console.log('Assistant clicked, current mode:', mode);
-    console.log('isDragging:', isDragging);
-    
     if (!isDragging) {
       if (mode === 'idle') {
-        console.log('Setting up initial state');
         setMode('idle');
         setUIState(prev => {
-          console.log('Previous UI state:', prev);
           const newState = {
             ...prev,
             message: '嗨！今天想要做什麼呢？',
             showChoices: true,
-            showInput: false,
+            showInput: true,
+            inputText: '',
+            inputPlaceholder: '和我分享你的想法吧',
             choices: [
               { 
                 text: "我想問功課", 
@@ -343,14 +333,11 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
               }
             ]
           };
-          console.log('New UI state:', newState);
           return newState;
         });
       } else {
-        console.log('Resetting state');
         setMode('idle');
         setUIState(prev => {
-          console.log('Previous UI state:', prev);
           const newState = {
             ...prev,
             message: '',
@@ -358,7 +345,6 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             showInput: false,
             choices: []
           };
-          console.log('New UI state:', newState);
           return newState;
         });
       }
@@ -367,9 +353,22 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
 
   // 在 useEffect 中也加入 log
   useEffect(() => {
-    console.log('Mode changed:', mode);
-    console.log('UI State:', uiState);
   }, [mode, uiState]);
+
+  const getActionIcon = (actionType: string) => {
+    const iconMap: Record<string, React.ReactElement> = {
+      createTopic: <Lightbulb className="h-12 w-12 text-yellow-500" />,
+      createStep: <ListChecks className="h-12 w-12 text-blue-500" />,
+      createTask: <Target className="h-12 w-12 text-red-500" />,
+      markAsBookmark: <Bookmark className="h-12 w-12 text-purple-500" />,
+      completeTopic: <CheckCircle className="h-12 w-12 text-green-500" />,
+      exploreMore: <Compass className="h-12 w-12 text-indigo-500" />,
+      askForInput: <MessageSquare className="h-12 w-12 text-teal-500" />,
+      default: <Brain className="h-12 w-12 text-emerald-600" />
+    };
+
+    return iconMap[actionType] || iconMap.default;
+  };
 
   return (
     <AnimatePresence>
@@ -447,7 +446,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text min-h-[8rem] max-h-[60vh] overflow-y-auto"
+                      className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text min-h-[8rem] max-h-[8rem] overflow-y-auto"
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',
                         transformOrigin: 'bottom right'
@@ -455,7 +454,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     >
                       {/* 訊息 */}
                       <div>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">
+                        <p className="text-lg font-bold text-gray-800 dark:text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">
                           {uiState.message}
                         </p>
                       </div>
@@ -523,7 +522,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     >
                       <div className="flex flex-col">
                         {/* 提示文字 */}
-                        <div className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="mb-3 text-base text-gray-500 dark:text-gray-400">
                           {uiState.inputPlaceholder}
                         </div>
 
@@ -579,7 +578,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
                       className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto cursor-default ${
-                        uiState.showInput ? 'bottom-[calc(100%+20rem)]' : 'bottom-[calc(100%+11rem)]'
+                        uiState.showInput ? 'bottom-[calc(100%+22rem)]' : 'bottom-[calc(100%+11rem)]'
                       }`}
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',

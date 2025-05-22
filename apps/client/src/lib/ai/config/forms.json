@@ -12,14 +12,7 @@
     "additionalOptions": [
       {
         "text": "延伸探索",
-        "action": {
-          "type": "explore_more",
-          "params": {
-            "context": {
-              "topics": "${suggestions}"
-            }
-          }
-        }
+        "action": "createTopic"
       }
     ]
   },
