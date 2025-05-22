@@ -1,153 +1,83 @@
 {
-  "create_topic": {
-    "type": "create_topic",
-    "title": "建立新主題",
-    "description": "請輸入主題名稱",
-    "fields": [
-      {
-        "name": "topic",
-        "label": "主題名稱",
-        "type": "text",
-        "required": true
-      }
-    ],
-    "submitLabel": "建立",
-    "cancelLabel": "取消"
-  },
-  "create_step": {
-    "type": "create_step",
-    "title": "建立新步驟",
-    "description": "請輸入步驟名稱",
-    "fields": [
-      {
-        "name": "step_name",
-        "label": "步驟名稱",
-        "type": "text",
-        "required": true
-      }
-    ],
-    "submitLabel": "建立",
-    "cancelLabel": "取消"
-  },
-  "create_task": {
-    "type": "create_task",
-    "title": "建立新任務",
-    "description": "請輸入任務資訊",
-    "fields": [
-      {
-        "name": "task_name",
-        "label": "任務名稱",
-        "type": "text",
-        "required": true
-      },
-      {
-        "name": "step_tag",
-        "label": "所屬步驟",
-        "type": "select",
-        "required": true
-      }
-    ],
-    "submitLabel": "建立",
-    "cancelLabel": "取消"
-  },
   "suggest_topics": {
     "type": "suggest_topics",
     "title": "建議主題",
     "description": "選擇建議的主題",
-    "fields": [
+    "options": [
       {
-        "name": "suggestions",
-        "label": "建議主題",
-        "type": "multiselect",
-        "required": true
+        "paramSource": "suggestions",
+        "paramAction": "createTopic"
       }
     ],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    "additionalOptions": [
+      {
+        "text": "延伸探索",
+        "action": {
+          "type": "explore_more",
+          "params": {
+            "context": {
+              "topics": "${suggestions}"
+            }
+          }
+        }
+      }
+    ]
   },
   "suggest_steps": {
     "type": "suggest_steps",
     "title": "建議步驟",
     "description": "選擇建議的步驟",
-    "fields": [
+    "options": [
       {
-        "name": "suggestions",
-        "label": "建議步驟",
-        "type": "multiselect",
-        "required": true
+        "paramSource": "suggestions",
+        "paramAction": "createStep"
       }
-    ],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    ]
   },
   "suggest_tasks": {
     "type": "suggest_tasks",
     "title": "建議任務",
     "description": "選擇建議的任務",
-    "fields": [
+    "options": [
       {
-        "name": "suggestions",
-        "label": "建議任務",
-        "type": "multiselect",
-        "required": true
+        "paramSource": "suggestions",
+        "paramAction": "createTask"
       }
-    ],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    ]
   },
   "use_template_steps": {
     "type": "use_template_steps",
     "title": "使用模板步驟",
     "description": "使用預設的觀察/行動/紀錄/分享步驟",
-    "fields": [],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    "options": []
   },
   "summarize_progress": {
     "type": "summarize_progress",
     "title": "進度摘要",
     "description": "查看目前進度",
-    "fields": [],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    "options": []
   },
   "mark_as_bookmark": {
     "type": "mark_as_bookmark",
     "title": "收藏主題",
     "description": "將主題加入收藏",
-    "fields": [],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    "options": []
   },
   "complete_topic": {
     "type": "complete_topic",
     "title": "完成主題",
     "description": "標記主題為已完成",
-    "fields": [],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    "options": []
   },
   "explore_more": {
     "type": "explore_more",
     "title": "延伸探索",
     "description": "根據當前任務延伸更多探索",
-    "fields": [],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    "options": []
   },
   "ask_for_input": {
     "type": "ask_for_input",
     "title": "輸入想法",
-    "description": "請輸入你的想法",
-    "fields": [
-      {
-        "name": "prompt",
-        "label": "想法",
-        "type": "text",
-        "required": true
-      }
-    ],
-    "submitLabel": "確認",
-    "cancelLabel": "取消"
+    "description": "請輸入你的想法"
   }
 }

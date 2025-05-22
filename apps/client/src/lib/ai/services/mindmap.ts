@@ -1,11 +1,11 @@
 import { ChatService } from './chat';
 import { useGoalStore } from '../../../store/goalStore';
-import type { Goal, Step, Task } from '../../../types/goal';
 import { ActionValidator } from '../utils/actionValidator';
-import type { LLMResponse, ActionForm } from '../types/llm';
+import type { LLMResponse, ActionForm, ParamType } from '../types/llm';
 import { tools } from '../tools';
 import type { Tool } from '../tools/types';
 import forms from '../config/forms.json';
+import actions from '../config/actions.json';
 
 export interface MindMapAction {
   type: string;
@@ -16,15 +16,22 @@ interface FormConfig {
   type: string;
   title: string;
   description: string;
-  fields: Array<{
-    name: string;
-    label: string;
-    type: string;
-    required: boolean;
-    options?: Array<{ label: string; value: string }>;
+  additionalOptions?: Array<{
+    text: string;
+    action: {
+      type: string;
+      params: Record<string, any>;
+    };
   }>;
-  submitLabel: string;
-  cancelLabel: string;
+  options?: Array<{
+    paramSource: string;
+    paramAction: string;
+    action?: {
+      type: string;
+      params: Record<string, any>;
+    };
+    isSuggestions?: boolean;
+  }>;
 }
 
 interface FormsConfig {
@@ -41,6 +48,19 @@ export class MindMapService {
   constructor() {
     this.chatService = new ChatService();
     this.formConfigs = forms;
+  }
+
+  private convertJsonSchemaToParamType(schema: any): { type: ParamType } {
+    if (schema.type === 'array') {
+      if (schema.items.type === 'object') {
+        // 只檢查是否為 task 型別
+        if (schema.items.properties?.task_name && schema.items.properties?.step_tag) {
+          return { type: 'task[]' };
+        }
+      }
+      return { type: 'string[]' };
+    }
+    return { type: 'string' };
   }
 
   async processLLMResponse(response: string): Promise<LLMResponse> {
@@ -75,22 +95,85 @@ export class MindMapService {
           throw new Error(`Unknown form type: ${parsedResponse.tool}`);
         }
 
-        // 如果是 create_task，需要動態添加選項
-        if (parsedResponse.tool === 'create_task') {
-          const stepField = formConfig.fields.find(f => f.name === 'step_tag');
-          if (stepField) {
-            stepField.options = this.goalStore.goals
-              .find(g => g.id === this.goalStore.selectedGoalId)
-              ?.steps.map(step => ({
-                label: step.title,
-                value: step.id
-              })) || [];
-          }
+        // 從 actions.json 獲取參數定義
+        const actionConfig = actions[parsedResponse.tool];
+        if (!actionConfig) {
+          throw new Error(`Unknown action type: ${parsedResponse.tool}`);
         }
-        
+
+        // 處理每個選項的參數轉換
+        const updatedOptions = formConfig.options?.map(option => {
+          if (option.paramSource) {
+            const paramValue = parsedResponse.params[option.paramSource];
+            const paramConfig = actionConfig.params.find(p => p.name === option.paramSource);
+            if (!paramConfig) {
+              throw new Error(`Unknown parameter: ${option.paramSource}`);
+            }
+            const { type } = this.convertJsonSchemaToParamType(paramConfig);
+            
+            // 如果參數值是陣列，每個元素都要有自己的 action
+            if (Array.isArray(paramValue)) {
+              return {
+                paramSource: option.paramSource,
+                param: paramValue.map(value => ({
+                  label: typeof value === 'string' ? value : value.task_name,
+                  action: {
+                    type: option.paramAction || formConfig.type,
+                    params: value
+                  }
+                })),
+                paramType: type
+              };
+            }
+            
+            return {
+              paramSource: option.paramSource,
+              param: {
+                label: typeof paramValue === 'string' ? paramValue : paramValue.task_name,
+                action: {
+                  type: option.paramAction || formConfig.type,
+                  params: {
+                    ...parsedResponse.params,
+                    [option.paramSource]: paramValue
+                  }
+                }
+              },
+              paramType: type
+            };
+          }
+          return option;
+        }) || [];
+
+        // 處理額外選項
+        const additionalOptions = formConfig.additionalOptions?.map(option => {
+          // 替換參數中的變數
+          const params = Object.entries(option.action.params).reduce((acc, [key, value]) => {
+            if (typeof value === 'string' && value.startsWith('${') && value.endsWith('}')) {
+              const paramName = value.slice(2, -1);
+              acc[key] = parsedResponse.params[paramName];
+            } else {
+              acc[key] = value;
+            }
+            return acc;
+          }, {} as Record<string, any>);
+
+          return {
+            paramSource: option.text,
+            param: option.text,
+            paramType: 'string',
+            action: {
+              type: option.action.type,
+              params
+            }
+          };
+        }) || [];
+
         return {
           ...parsedResponse,
-          form: formConfig as ActionForm
+          form: {
+            ...formConfig,
+            options: [...updatedOptions, ...additionalOptions]
+          } as ActionForm
         };
       } catch (error) {
         const err = error as Error & { response?: { data?: any; status?: number } };
