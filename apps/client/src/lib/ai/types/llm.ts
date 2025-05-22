@@ -32,6 +32,7 @@ export interface ActionForm {
   type: string;
   title: string;
   description: string;
+  showInput?: boolean;
   options?: Array<{
     label: string;
     action: {

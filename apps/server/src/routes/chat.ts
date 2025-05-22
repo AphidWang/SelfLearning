@@ -23,6 +23,9 @@ router.post('/completions', async (req: Request, res: Response) => {
     
     console.log('📤 Sending to xAI:', xaiBody);
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 秒 timeout
+
     const response = await fetch(`${process.env.XAI_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -30,7 +33,10 @@ router.post('/completions', async (req: Request, res: Response) => {
         'Authorization': `Bearer ${process.env.XAI_API_KEY}`,
       },
       body: JSON.stringify(xaiBody),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const error = await response.json();

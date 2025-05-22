@@ -10,7 +10,18 @@ import { RunnableSequence } from '@langchain/core/runnables';
 // 移除無法找到的模組導入
 // import { LLMChain } from '@langchain/core/chains';
 
-const DEFAULT_SYSTEM_PROMPT = `你是一位智慧助理 
+const DEFAULT_SYSTEM_PROMPT = `
+你是一位智慧助理, 
+幫助孩子選定學習主題(topic), 
+找出關鍵步驟(step) 和 設定挑戰/任務(task), 
+
+孩子的畫面上用 mindmap 展示著學習主題, 
+參考 Current Mindmap Context 你能知道孩子現在看到的是什麼, 
+根據當前的狀態和孩子的需求選出最適合的工具以及給孩子回饋
+
+如果孩子想要查詢挑戰的資訊基於 Mindmap Context 給孩子回饋, 使用 chat 工具
+如果孩子想要發表對於主題或生活的心得, 扮演一個聆聽者, 使用 chat 工具
+
 請使用孩子可以理解的語言回答：
 - 回應請限制在 2 到 3 句話
 - 每句話不要超過 20 字
@@ -75,6 +86,7 @@ export class ChatService {
   private memory: CustomSummaryMemory;
   private model: ChatOpenAI;
   private chain: RunnableSequence;
+  private mindmapContext: string = '';
 
   constructor() {
     this.model = new ChatOpenAI({
@@ -88,6 +100,7 @@ export class ChatService {
     // 建立提示模板
     const prompt = ChatPromptTemplate.fromMessages([
       ['system', SYSTEM_PROMPT_WITH_ACTIONS],
+      ['system', 'Current Mindmap Context: {mindmapContext}'],
       new MessagesPlaceholder('history'),
       ['human', '{input}']
     ]);
@@ -98,12 +111,18 @@ export class ChatService {
         const memoryVars = await this.memory.loadMemoryVariables({});
         return {
           input,
-          history: memoryVars.history
+          history: memoryVars.history,
+          mindmapContext: this.mindmapContext
         };
       },
       prompt,
       this.model,
     ]);
+  }
+
+  // 更新 mindmap 上下文
+  public updateMindmapContext(context: string) {
+    this.mindmapContext = context;
   }
 
   // 發送訊息並獲取回應
@@ -116,6 +135,7 @@ export class ChatService {
       const response = await api.post('/api/chat/completions', {
         messages: [
           { role: 'system', content: SYSTEM_PROMPT_WITH_ACTIONS },
+          { role: 'system', content: `Current Mindmap Context: ${this.mindmapContext}` },
           ...memoryVars.history.map(msg => ({
             role: msg.type === 'human' ? 'user' : 'assistant',
             content: msg.content

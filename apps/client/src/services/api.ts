@@ -5,7 +5,8 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true
+  withCredentials: true,
+  timeout: 15000 // 15 秒 timeout
 });
 
 // 添加請求攔截器

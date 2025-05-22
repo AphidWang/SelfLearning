@@ -75,6 +75,11 @@
     "ask_for_input": {
       "description": "引導孩子說出任務想法",
       "params": {}
+    },
+    
+    "chat": {
+      "description": "與孩子聊天",
+      "params": {}
     }
   }
 }

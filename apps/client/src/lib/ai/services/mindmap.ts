@@ -26,10 +26,78 @@ export class MindMapService {
   private validator = new ActionValidator();
   private maxRetries = 3;
   private formConfigs: Record<string, ActionFormConfig>;
+  private currentGoalId: string | null;
+  private contextCache: string | null = null;
+  private unsubscribe: (() => void) | null = null;
 
-  constructor() {
+  constructor(goalId: string | null = null) {
     this.chatService = new ChatService();
     this.formConfigs = forms;
+    this.currentGoalId = goalId;
+    this.setupContextSubscription();
+  }
+
+  setCurrentGoal(goalId: string | null) {
+    if (this.currentGoalId !== goalId) {
+      this.currentGoalId = goalId;
+      this.contextCache = null;
+      this.setupContextSubscription();
+    }
+  }
+
+  private setupContextSubscription() {
+    // 清除舊的訂閱
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
+
+    if (!this.currentGoalId) {
+      this.contextCache = 'No active goal';
+      return;
+    }
+
+    // 使用 selector 只訂閱需要的部分
+    const selector = (state: ReturnType<typeof useGoalStore.getState>) => {
+      const goal = state.goals.find(g => g.id === this.currentGoalId);
+      if (!goal) return null;
+
+      return {
+        goal: {
+          id: goal.id,
+          title: goal.title,
+          description: goal.description
+        },
+        topics: goal.steps.map(step => ({
+          id: step.id,
+          title: step.title,
+          tasks: step.tasks?.map(task => ({
+            id: task.id,
+            title: task.title,
+            status: task.status
+          }))
+        }))
+      };
+    };
+
+    // 訂閱變化
+    this.unsubscribe = useGoalStore.subscribe((state) => {
+      const context = selector(state);
+      if (context) {
+        this.contextCache = JSON.stringify(context, null, 2);
+      } else {
+        this.contextCache = 'Goal not found';
+      }
+    });
+
+    // 初始化 context
+    const initialContext = selector(this.goalStore);
+    this.contextCache = initialContext 
+      ? JSON.stringify(initialContext, null, 2)
+      : 'Goal not found';
+  }
+
+  private async getMindmapContext(): Promise<string> {
+    return this.contextCache || 'No active goal';
   }
 
   private convertJsonSchemaToParamType(schema: any): { type: ParamType } {
@@ -107,6 +175,10 @@ export class MindMapService {
 
     while (retries < this.maxRetries) {
       try {
+        // 更新 mindmap 上下文
+        const currentContext = await this.getMindmapContext();
+        this.chatService.updateMindmapContext(currentContext);
+
         const response = await this.chatService.sendMessage(input);
          
         const parsedResponse = await this.processLLMResponse(response.message);

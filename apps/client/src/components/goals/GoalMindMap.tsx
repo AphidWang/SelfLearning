@@ -1313,6 +1313,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           onDragEnd={handleAssistantDragEnd}
           hideCloseButton
           className="floating-assistant pointer-events-auto"
+          goalId={goalId}
         />
       </div>
 

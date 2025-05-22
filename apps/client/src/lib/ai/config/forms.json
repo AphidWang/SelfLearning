@@ -72,5 +72,12 @@
     "type": "ask_for_input",
     "title": "輸入想法",
     "description": "請輸入你的想法"
+  },
+  "chat": {
+    "type": "chat",
+    "title": "聊天",
+    "description": "與孩子聊天",
+    "showInput": true,
+    "options": []
   }
 }
