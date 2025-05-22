@@ -8,12 +8,6 @@
         "paramSource": "suggestions",
         "paramAction": "createTopic"
       }
-    ],
-    "additionalOptions": [
-      {
-        "text": "延伸探索",
-        "action": "createTopic"
-      }
     ]
   },
   "suggest_steps": {
