@@ -353,18 +353,19 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   }, [mode, uiState]);
 
   const getActionIcon = (actionType: string) => {
-    const iconMap: Record<string, React.ReactElement> = {
-      createTopic: <Lightbulb className="h-12 w-12 text-yellow-500" />,
-      createStep: <ListChecks className="h-12 w-12 text-blue-500" />,
-      createTask: <Target className="h-12 w-12 text-red-500" />,
-      markAsBookmark: <Bookmark className="h-12 w-12 text-purple-500" />,
-      completeTopic: <CheckCircle className="h-12 w-12 text-green-500" />,
-      exploreMore: <Compass className="h-12 w-12 text-indigo-500" />,
-      askForInput: <MessageSquare className="h-12 w-12 text-teal-500" />,
-      default: <Brain className="h-12 w-12 text-emerald-600" />
-    };
-
-    return iconMap[actionType] || iconMap.default;
+    const icons = [
+      <Lightbulb className="h-12 w-12 text-yellow-500" />,
+      <ListChecks className="h-12 w-12 text-blue-500" />,
+      <Target className="h-12 w-12 text-red-500" />,
+      <Bookmark className="h-12 w-12 text-purple-500" />,
+      <CheckCircle className="h-12 w-12 text-green-500" />,
+      <Compass className="h-12 w-12 text-indigo-500" />,
+      <MessageSquare className="h-12 w-12 text-teal-500" />,
+      <Brain className="h-12 w-12 text-emerald-600" />
+    ];
+    
+    const randomIndex = Math.floor(Math.random() * icons.length);
+    return icons[randomIndex];
   };
 
   return (
@@ -511,7 +512,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute bottom-[calc(100%+11rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto"
+                      className="absolute bottom-[calc(100%+11rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto cursor-default"
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',
                         transformOrigin: 'bottom right'
