@@ -467,13 +467,14 @@ interface GoalStore {
   setSelectedGoalId: (id: string | null) => void;
   addGoal: (goal: Goal) => void;
   updateGoal: (goal: Goal) => void;
-  addStep: (goalId: string, step: Step) => void;
-  updateStep: (goalId: string, step: Step) => void;
-  addTask: (goalId: string, stepId: string, task: Task) => void;
-  updateTask: (goalId: string, stepId: string, task: Task) => void;
+  addStep: (goalId: string, step: Step) => Step | null;
+  updateStep: (goalId: string, step: Step) => Step | null;
+  addTask: (goalId: string, stepId: string, task: Task) => Task | null;
+  updateTask: (goalId: string, stepId: string, task: Task) => Task | null;
+  dump: (goalId?: string) => void;
 }
 
-export const useGoalStore = create<GoalStore>((set) => ({
+export const useGoalStore = create<GoalStore>((set, get) => ({
   goals: initialGoals,
   selectedGoalId: null,
   
@@ -487,57 +488,155 @@ export const useGoalStore = create<GoalStore>((set) => ({
     goals: state.goals.map((g) => g.id === goal.id ? goal : g)
   })),
   
-  addStep: (goalId, step) => set((state) => ({
-    goals: state.goals.map((goal) =>
-      goal.id === goalId
-        ? { ...goal, steps: [...goal.steps, step] }
-        : goal
-    )
-  })),
+  addStep: (goalId, step) => {
+    let newStep: Step | null = null;
+
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      newStep = {
+        ...step,
+        id: crypto.randomUUID(),
+        tasks: step.tasks || []
+      };
+
+      return {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? { ...g, steps: [...g.steps, newStep!] }
+            : g
+        )
+      };
+    });
+
+    return newStep;
+  },
   
-  updateStep: (goalId, step) => set((state) => ({
-    goals: state.goals.map((goal) =>
-      goal.id === goalId
-        ? {
-            ...goal,
-            steps: goal.steps.map((s) => s.id === step.id ? step : s)
-          }
-        : goal
-    )
-  })),
+  updateStep: (goalId: string, step: Step) => {
+    let updatedStep: Step | null = null;
+    
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      const existingStep = goal.steps.find(s => s.id === step.id);
+      if (!existingStep) return state;
+
+      updatedStep = step;
+      const updatedGoals = state.goals.map((g) =>
+        g.id === goalId
+          ? {
+              ...g,
+              steps: g.steps.map((s) => 
+                s.id === step.id 
+                  ? updatedStep!
+                  : s
+              )
+            }
+          : g
+      );
+
+      return { goals: updatedGoals };
+    });
+
+    return updatedStep;
+  },
   
-  addTask: (goalId, stepId, task) => set((state) => ({
-    goals: state.goals.map((goal) =>
-      goal.id === goalId
-        ? {
-            ...goal,
-            steps: goal.steps.map((step) =>
-              step.id === stepId
-                ? { ...step, tasks: [...step.tasks, task] }
-                : step
-            )
-          }
-        : goal
-    )
-  })),
+  addTask: (goalId, stepId, task) => {
+    let newTask: Task | null = null;
+
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) {
+        throw new Error(`Goal ${goalId} not found`);
+      }
+      
+      const step = goal.steps.find(s => s.id === stepId);
+      if (!step) {
+        throw new Error(`Step ${stepId} not found in goal ${goalId}`);
+      }
+
+      newTask = {
+        ...task,
+        id: crypto.randomUUID()
+      };
+
+      return {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                steps: g.steps.map((s) =>
+                  s.id === stepId
+                    ? { ...s, tasks: [...s.tasks, newTask!] }
+                    : s
+                )
+              }
+            : g
+        )
+      };
+    });
+
+    return newTask;
+  },
   
-  updateTask: (goalId, stepId, task) => set((state) => ({
-    goals: state.goals.map((goal) =>
-      goal.id === goalId
-        ? {
-            ...goal,
-            steps: goal.steps.map((step) =>
-              step.id === stepId
-                ? {
-                    ...step,
-                    tasks: step.tasks.map((t) =>
-                      t.id === task.id ? task : t
-                    )
-                  }
-                : step
-            )
-          }
-        : goal
-    )
-  }))
+  updateTask: (goalId: string, stepId: string, task: Task) => {
+    let updatedTask: Task | null = null;
+    console.log('🔍 goalStore.updateTask 開始', { goalId, stepId, task });
+    
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) {
+        console.log('❌ goalStore.updateTask 失敗：找不到目標', { goalId });
+        return state;
+      }
+
+      const step = goal.steps.find(s => s.id === stepId);
+      if (!step) {
+        console.log('❌ goalStore.updateTask 失敗：找不到步驟', { stepId });
+        return state;
+      }
+
+      const existingTask = step.tasks.find(t => t.id === task.id);
+      if (!existingTask) {
+        console.log('❌ goalStore.updateTask 失敗：找不到任務', { taskId: task.id });
+        return state;
+      }
+
+      updatedTask = task;
+      console.log('✅ goalStore.updateTask 更新任務', { updatedTask });
+      
+      const updatedGoals = state.goals.map((g) =>
+        g.id === goalId
+          ? {
+              ...g,
+              steps: g.steps.map((s) =>
+                s.id === stepId
+                  ? {
+                      ...s,
+                      tasks: s.tasks.map((t) =>
+                        t.id === task.id ? updatedTask! : t
+                      )
+                    }
+                  : s
+              )
+            }
+          : g
+      );
+
+      return { goals: updatedGoals };
+    });
+
+    console.log('🔄 goalStore.updateTask 結果', { updatedTask });
+    return updatedTask;
+  },
+
+  dump: (goalId?: string) => {
+    const state = get();
+    if (goalId) {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return;
+    }
+  }
 })); 

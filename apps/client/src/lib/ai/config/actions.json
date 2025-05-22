@@ -35,15 +35,18 @@
             "type": "object",
             "properties": {
               "task_name": {
-                "type": "string"
+                "type": "string",
+                "description": "任務名稱"
               },
-              "step_tag": {
-                "type": "string"
+              "step_id": {
+                "type": "string",
+                "description": "步驟的唯一識別碼"
               }
-            }
+            },
+            "required": ["task_name", "step_id"]
           },
           "required": true,
-          "description": "建議的任務列表"
+          "description": "建議的任務列表，每個任務必須指定所屬步驟的 ID"
         }
       }
     },

@@ -1,13 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform, MotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, Move, CheckCircle2, Clock, Download, Share2, Brain, Network, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
-import { Goal, Step, Task, createStep, createTask } from '../../types/goal';
+import { Goal, Step, Task } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { FloatingAssistant } from '../assistant/FloatingAssistant';
 import { useAssistant } from '../../hooks/useAssistant';
 import { MindMapService } from '../../services/mindmap';
@@ -184,31 +182,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       optimalY = (containerHeight - totalStepHeight * optimalZoom) / 2 / optimalZoom;
     }
 
-    console.log('Layout calculation:', {
-      container: {
-        width: containerWidth,
-        height: containerHeight
-      },
-      canvas: {
-        centerGoalX,
-        rightmostTaskX,
-        leftmostX,
-        totalWidth,
-        totalStepHeight,
-        scaledTotalHeight
-      },
-      zoom: {
-        optimalZoomX,
-        optimalZoomY,
-        finalZoom: optimalZoom
-      },
-      position: {
-        x: optimalX,
-        y: optimalY
-      },
-      finalTransform: `scale(${optimalZoom}) translate(${optimalX}px, ${optimalY}px)`
-    });
-
     return {
       zoom: optimalZoom,
       position: { x: optimalX, y: optimalY }
@@ -369,6 +342,64 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
   }, [zoom, position]);
 
+  // 阻止觸控板的默認縮放行為
+  const preventDefault = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+    }
+  }, []);
+
+  // 設定 wheel 事件為 non-passive
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      // 觸控相關
+      container.addEventListener('touchstart', preventDefault, { passive: false });
+      container.addEventListener('touchmove', preventDefault, { passive: false });
+      
+      // wheel 事件
+      const handleWheelPassive = (e: WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          
+          // 獲取容器的位置和大小資訊
+          const rect = container.getBoundingClientRect();
+          if (!rect) return;
+          
+          // 計算滑鼠相對於容器左上角的位置
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+          
+          // 計算新的縮放值
+          const delta = e.deltaY > 0 ? -0.05 : 0.05;
+          const newZoom = Math.min(Math.max(0.4, zoom + delta), 2);
+          
+          // 計算滑鼠在畫布邏輯座標系中的位置
+          const logicX = mouseX / zoom - position.x;
+          const logicY = mouseY / zoom - position.y;
+          
+          // 計算新的位置
+          const newPosition = {
+            x: mouseX / newZoom - logicX,
+            y: mouseY / newZoom - logicY
+          };
+
+          // 更新狀態
+          setPosition(newPosition);
+          setZoom(newZoom);
+        }
+      };
+
+      container.addEventListener('wheel', handleWheelPassive, { passive: false });
+
+      return () => {
+        container.removeEventListener('touchstart', preventDefault);
+        container.removeEventListener('touchmove', preventDefault);
+        container.removeEventListener('wheel', handleWheelPassive);
+      };
+    }
+  }, [preventDefault, zoom, position]);
+
   // 拖行相關的處理函數
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // 如果點擊的是助理或其相關元素，不觸發畫布拖曳
@@ -405,37 +436,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       document.addEventListener('mouseup', handleMouseUp);
     }
   }, [position]);
-
-  // 阻止觸控板的默認縮放行為
-  const preventDefault = useCallback((e: TouchEvent) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-    }
-  }, []);
-
-  // 設定 wheel 事件為 non-passive
-  React.useEffect(() => {
-    const container = containerRef.current;
-    if (container) {
-      // 觸控相關
-      container.addEventListener('touchstart', preventDefault, { passive: false });
-      container.addEventListener('touchmove', preventDefault, { passive: false });
-      
-      // wheel 事件
-      const handleWheelPassive = (e: WheelEvent) => {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-        }
-      };
-      container.addEventListener('wheel', handleWheelPassive, { passive: false });
-
-      return () => {
-        container.removeEventListener('touchstart', preventDefault);
-        container.removeEventListener('touchmove', preventDefault);
-        container.removeEventListener('wheel', handleWheelPassive);
-      };
-    }
-  }, [preventDefault]);
 
   // 計算右下角位置
   const calculateBottomRightPosition = () => {
@@ -497,26 +497,26 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       y = Math.max(0, window.innerHeight - containerRect.top - ASSISTANT_HEIGHT);
     }
 
-    console.log('Flying to element:', {
-      elementRect: rect,
-      containerRect,
-      windowSize: {
-        width: window.innerWidth,
-        height: window.innerHeight
-      },
-      assistantSize: {
-        width: ASSISTANT_WIDTH,
-        height: ASSISTANT_HEIGHT
-      },
-      finalPosition: { x, y }
-    });
-
     // 設定小幫手新位置（相對於容器）
     setAssistantPosition({
       x,
       y
     });
   };
+
+  // 監聽 goalStore 的變化
+  useEffect(() => {
+    const unsubscribe = useGoalStore.subscribe((state) => {
+      const currentGoal = state.goals.find(g => g.id === goalId);
+      if (currentGoal?.focusElement) {
+        flyToElement(currentGoal.focusElement);
+        // 清除 focus 標記
+        mindMapService.clearFocusElement();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [goalId, mindMapService]);
 
   if (!goal) {
     return (
@@ -623,24 +623,37 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const handleAddStep = useCallback(() => {
     if (!goal) return;
 
-    const newStep = createStep({
-      title: '新步驟'
-    });
+    const newStep: Partial<Step> = {
+      title: '新步驟',
+      tasks: []
+    };
 
-    mindMapService.addStep(goalId, newStep);
+    console.log('📝 準備新增步驟', { newStep });
+
+    // 先新增到 store
+    const addedStep = mindMapService.addStep(newStep as Step);
+    console.log('✅ 步驟已新增到 store', { addedStep });
+    if (!addedStep) return;
+
+    // 找到新增的 step
+    const updatedGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
+    if (!updatedGoal) return;
+
+    const newAddedStep = updatedGoal.steps.find(s => s.id === addedStep.id);
+    if (!newAddedStep) return;
 
     // 計算新 step 的位置
-    const newStepIndex = goal.steps.length; // 新的 step 會是最後一個
-    const stepPos = getStepPosition(newStepIndex, [...goal.steps, newStep]);
+    const newStepIndex = updatedGoal.steps.length - 1;
+    const stepPos = getStepPosition(newStepIndex, updatedGoal.steps);
     const container = containerRef.current;
     if (container) {
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
 
       // 計算所有 step 的總高度（包含新增的 step）
-      const totalStepHeight = goal.steps.reduce((total, step) => {
+      const totalStepHeight = updatedGoal.steps.reduce((total, step) => {
         return total + (120 + 40) * step.tasks.length;
-      }, 0) + (120 + 40); // 加上新 step 的預設高度
+      }, 0);
 
       // 計算最佳縮放值
       const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
@@ -648,7 +661,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
       // 計算新的位置，使新的 step 出現在畫面中心偏下
       const newX = (containerWidth / 2 / optimalZoom) - stepPos.x;
-      const newY = (containerHeight * 0.7 / optimalZoom) - stepPos.y; // 讓新 step 出現在畫面偏下方
+      const newY = (containerHeight * 0.7 / optimalZoom) - stepPos.y;
 
       // 更新縮放和位置
       setZoom(optimalZoom);
@@ -656,19 +669,35 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
 
     // 設置編輯狀態
-    setEditingStepId(newStep.id);
-    setEditingStepTitle('新步驟');
+    console.log('✏️ 設置編輯狀態', { stepId: newAddedStep.id, title: newAddedStep.title });
+    setEditingStepId(newAddedStep.id);
+    setEditingStepTitle(newAddedStep.title);
     setIsGoalSelected(false);
-  }, [goal, goalId, mindMapService]);
+
+    // Dump store 狀態
+    useGoalStore.getState().dump(goalId);
+  }, [goal, mindMapService, goalId]);
 
   // 處理 step 標題更新
   const handleStepTitleUpdate = useCallback((stepId: string, newTitle: string) => {
-    if (!goal) return;
+    if (!newTitle.trim()) return;
 
-    mindMapService.updateStep(goalId, stepId, { title: newTitle });
+    const currentGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
+    if (!currentGoal) return;
+
+    const step = currentGoal.steps.find(s => s.id === stepId);
+    if (!step) return;
+
+    mindMapService.updateStep(stepId, { 
+      ...step,
+      title: newTitle.trim() 
+    });
+
     setEditingStepId(null);
     setEditingStepTitle('');
-  }, [goal, goalId, mindMapService]);
+
+    useGoalStore.getState().dump(goalId);
+  }, [goalId, mindMapService]);
 
   const { bringToFront, getIndex } = useElementStack(1);
 
@@ -678,22 +707,41 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   // 處理新增 task
   const handleAddTask = useCallback((stepId: string) => {
     if (!goal) return;
+    console.log('🎯 新增任務開始', { stepId });
 
     const stepIndex = goal.steps.findIndex(s => s.id === stepId);
     if (stepIndex === -1) return;
 
-    const newTask = createTask({
+    const newTask: Partial<Task> = {
       title: '新任務',
       status: 'todo'
-    });
+    };
 
-    mindMapService.addTask(goalId, stepId, newTask);
+    // 先新增到 store
+    const addedTask = mindMapService.addTask(stepId, newTask as Task);
+    console.log('✅ Store 新增結果', { addedTask });
+    if (!addedTask) return;
+
+    // 直接從 store 獲取最新狀態
+    const updatedGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
+    if (!updatedGoal) return;
+
+    const step = updatedGoal.steps.find(s => s.id === stepId);
+    if (!step) return;
+
+    const newAddedTask = step.tasks.find(t => t.id === addedTask.id);
+    console.log('📝 準備設置編輯狀態', { 
+      newTaskId: newAddedTask?.id,
+      currentEditingTaskId: editingTaskId,
+      currentEditingTaskTitle: editingTaskTitle 
+    });
+    if (!newAddedTask) return;
 
     // 計算新 task 的位置
     const taskPos = getTaskPosition(
       stepIndex,
-      goal.steps[stepIndex].tasks.length, // 新的 task 會是最後一個
-      goal.steps[stepIndex].tasks.length + 1
+      step.tasks.length - 1,
+      step.tasks.length
     );
 
     const container = containerRef.current;
@@ -701,7 +749,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
 
-      // 計算新的位置，使新的 task 出現在畫面中心偏右
+      // 計算新的位置，使新的 task 出現在畫面中心
       const newX = (containerWidth / 2 / zoom) - taskPos.x;
       const newY = (containerHeight / 2 / zoom) - taskPos.y;
 
@@ -710,21 +758,60 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
 
     // 設置編輯狀態
-    setEditingTaskId(newTask.id);
-    setEditingTaskTitle('新任務');
-  }, [goal, goalId, mindMapService, zoom]);
+    setEditingTaskId(newAddedTask.id);
+    setEditingTaskTitle(newAddedTask.title);
+    console.log('✏️ 編輯狀態已設置', { 
+      taskId: newAddedTask.id, 
+      title: newAddedTask.title 
+    });
+
+    // Dump store 狀態
+    useGoalStore.getState().dump(goalId);
+  }, [goal, mindMapService, zoom, goalId, editingTaskId, editingTaskTitle]);
 
   // 處理 task 標題更新
   const handleTaskTitleUpdate = useCallback((taskId: string, newTitle: string) => {
-    if (!goal) return;
+    console.log('💾 開始更新任務標題', { taskId, newTitle });
+    if (!newTitle.trim()) {
+      console.log('❌ 更新失敗：標題為空');
+      return;
+    }
 
-    const step = goal.steps.find(s => s.tasks.some(t => t.id === taskId));
-    if (!step) return;
+    const currentGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
+    if (!currentGoal) {
+      console.log('❌ 更新失敗：找不到目標', { goalId });
+      return;
+    }
 
-    mindMapService.updateTask(goalId, step.id, taskId, { title: newTitle });
-    setEditingTaskId(null);
-    setEditingTaskTitle('');
-  }, [goal, goalId, mindMapService]);
+    const step = currentGoal.steps.find(s => s.tasks.some(t => t.id === taskId));
+    console.log('🔍 找到的 step', { stepId: step?.id });
+    if (!step) {
+      console.log('❌ 更新失敗：找不到步驟');
+      return;
+    }
+
+    const task = step.tasks.find(t => t.id === taskId);
+    console.log('🔍 找到的 task', { task });
+    if (!task) {
+      console.log('❌ 更新失敗：找不到任務');
+      return;
+    }
+
+    const updatedTask = mindMapService.updateTask(step.id, taskId, { 
+      ...task,
+      title: newTitle.trim() 
+    });
+
+    if (updatedTask) {
+      setEditingTaskTitle(updatedTask.title);
+      setEditingTaskId(null);
+      console.log('✅ 任務更新完成', { updatedTask });
+    } else {
+      console.log('❌ 任務更新失敗');
+    }
+
+    useGoalStore.getState().dump(goalId);
+  }, [goalId, mindMapService]);
 
   // 匯出成 Markdown
   const exportToMarkdown = useCallback(() => {
@@ -782,7 +869,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     <div 
       ref={containerRef}
       className="w-full h-full relative bg-gray-50 overflow-hidden"
-      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
     >
@@ -915,7 +1001,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
               return (
                 <path
-                  key={`task-line-${task.id}`}
+                  key={`task-line-${step.id}-${task.id || taskIndex}`}
                   d={`M ${taskCurvePoints.start.x} ${taskCurvePoints.start.y} 
                       C ${taskCurvePoints.control1.x} ${taskCurvePoints.control1.y},
                         ${taskCurvePoints.control2.x} ${taskCurvePoints.control2.y},
@@ -1014,7 +1100,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             const isSelected = selectedStepId === step.id;
 
             return (
-              <React.Fragment key={step.id}>
+              <React.Fragment key={`step-group-${step.id}`}>
                 <motion.div
                   className="absolute"
                   style={{
@@ -1063,7 +1149,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     onClick={() => {
                       setSelectedStepId(isSelected ? null : step.id);
                     }}
-                    onDoubleClick={() => {
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
                       setEditingStepId(step.id);
                       setEditingStepTitle(step.title);
                     }}
@@ -1143,7 +1230,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
                     return (
                       <motion.div
-                        key={task.id}
+                        key={`task-${step.id}-${task.id}`}
                         id={`task-${task.id}`}
                         className="absolute"
                         style={{
@@ -1190,6 +1277,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTaskId(task.id);
+                            setEditingTaskTitle(task.title);
                           }}
                           className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
                             task.status === 'done'
@@ -1281,6 +1373,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           hideCloseButton
           className="floating-assistant pointer-events-auto"
           goalId={goalId}
+          onFocus={(elementId) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+              flyToElement(elementId);
+            }
+          }}
         />
       </div>
 

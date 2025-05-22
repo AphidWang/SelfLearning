@@ -17,6 +17,7 @@ export interface Goal {
   templateType?: string;
   subject?: SubjectType;
   progress?: number;
+  focusElement?: string;
 }
 
 export interface Step {
@@ -41,26 +42,3 @@ export interface Task {
   assignedTo?: string;
   notes?: string;
 }
-
-// 用於創建新實例的工廠函數
-export const createTask = (partial: Partial<Task>): Task => ({
-  id: crypto.randomUUID(),
-  title: '',
-  status: 'todo',
-  ...partial
-});
-
-export const createStep = (partial: Partial<Step>): Step => ({
-  id: crypto.randomUUID(),
-  title: '',
-  tasks: [],
-  ...partial
-});
-
-export const createGoal = (partial: Partial<Goal>): Goal => ({
-  id: crypto.randomUUID(),
-  title: '',
-  status: 'active',
-  steps: [],
-  ...partial
-}); 

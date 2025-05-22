@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ChatService } from '../../lib/ai/services/chat';
-import { MindMapService } from '../../services/mindmap/service';
+import { MindMapService } from '../../services/mindmap';
 import { ChatResponse } from '../../lib/ai/types';
 import type { LLMResponse, ActionForm } from '../../lib/ai/types/llm';
 
@@ -56,6 +56,7 @@ interface FloatingAssistantProps {
   className?: string;
   onActionSubmit?: (action: string, params: Record<string, any>) => void;
   goalId?: string | null;
+  onFocus?: (focus: string) => void;
 }
 
 export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
@@ -65,7 +66,8 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   onDragEnd,
   className = '',
   onActionSubmit,
-  goalId = null
+  goalId = null,
+  onFocus
 }) => {
   const [mode, setMode] = useState<AssistantMode>('idle');
   const [isDragging, setIsDragging] = useState(false);
@@ -114,8 +116,20 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         text: option.label,
         icon: getActionIcon(option.action.type),
         description: '',
-        action: () => {
-          onActionSubmit?.(option.action.type, option.action.params);
+        action: async () => {
+          try {
+            setMode('thinking');
+            await mindMapService.handleAction(option.action.type, option.action.params);
+            setMode('idle');
+          } catch (error) {
+            console.error('Failed to handle option click:', error);
+            const errorMessage = error instanceof Error ? error.message : '未知的錯誤';
+            updateUIState(prev => ({
+              message: `哎呀！好像遇到了一點問題... 讓我看看`
+            }), 'handleOptionClick-error');
+            setMode('idle');
+            throw error;
+          }
         }
       })) || [],
     }), 'updateUIFromForm');
