@@ -509,7 +509,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const unsubscribe = useGoalStore.subscribe((state) => {
       const currentGoal = state.goals.find(g => g.id === goalId);
       if (currentGoal?.focusElement) {
-        flyToElement(currentGoal.focusElement);
+        flyToElement(`${currentGoal.focusElement.type}-${currentGoal.focusElement.id}`);
         // 清除 focus 標記
         mindMapService.clearFocusElement();
       }

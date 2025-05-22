@@ -350,8 +350,14 @@ export class MindMapService {
     return this.goalStore.goals.find(g => g.id === this.currentTopicId);
   }
 
-  private updateTopic(topic: Goal) {
-    this.goalStore.updateGoal(topic);
+  private updateTopic(updates: Partial<Goal>) {
+    const topic = this.getTopic();
+    if (!topic) return;
+
+    this.goalStore.updateGoal({
+      ...topic,
+      ...updates
+    });
   }
 
   clearFocusElement() {
@@ -414,7 +420,12 @@ export class MindMapService {
             title: params,
             tasks: []
           };
-          this.addStep(newStep as Step);
+          const createdStep = this.addStep(newStep as Step);
+          if (createdStep) {
+            this.updateTopic({
+              focusElement: { type: 'step', id: createdStep.id }
+            });
+          }
           break;
 
         case 'createStep':
@@ -423,7 +434,12 @@ export class MindMapService {
             title: params,
             tasks: []
           };
-          this.addStep(step as Step);
+          const addedStep = this.addStep(step as Step);
+          if (addedStep) {
+            this.updateTopic({
+              focusElement: { type: 'step', id: addedStep.id }
+            });
+          }
           break;
 
         case 'createTask':
@@ -438,21 +454,26 @@ export class MindMapService {
             };
 
             // 確認步驟存在
-            const topic = this.getTopic();
-            if (!topic) {
+            const currentTopic = this.getTopic();
+            if (!currentTopic) {
               throw new LLMRetryError('找不到目前的主題，讓我檢查一下...');
             }
 
-            if (topic.steps.length === 0) {
+            if (currentTopic.steps.length === 0) {
               throw new LLMRetryError('需要先建立步驟。建議使用 use_template_steps 建立預設步驟結構。');
             }
 
-            const step = topic.steps.find(s => s.id === params.step_id);
-            if (!step) {
+            const targetStep = currentTopic.steps.find(s => s.id === params.step_id);
+            if (!targetStep) {
               throw new LLMRetryError('咦？這個步驟好像不見了。讓我檢查一下...');
             }
 
-            this.addTask(params.step_id, task as Task);
+            const addedTask = this.addTask(params.step_id, task as Task);
+            if (addedTask) {
+              this.updateTopic({
+                focusElement: { type: 'task', id: addedTask.id }
+              });
+            }
           } catch (error) {
             console.error('建立任務失敗:', error);
             throw error;
@@ -461,39 +482,67 @@ export class MindMapService {
 
         case 'createTopics':
           // 批量新增主題，params 是 string[]
+          let lastCreatedStepId: string | null = null;
           params.forEach((title: string) => {
             const step: Partial<Step> = {
               title,
               tasks: []
             };
-            this.addStep(step as Step);
+            const createdStep = this.addStep(step as Step);
+            if (createdStep) {
+              lastCreatedStepId = createdStep.id;
+            }
           });
+          if (lastCreatedStepId) {
+            this.updateTopic({
+              focusElement: { type: 'step', id: lastCreatedStepId }
+            });
+          }
           break;
 
         case 'createSteps':
           // 批量新增步驟，params 是 string[]
+          let lastAddedStepId: string | null = null;
           params.forEach((title: string) => {
             const step: Partial<Step> = {
               title,
               tasks: []
             };
-            this.addStep(step as Step);
+            const addedStep = this.addStep(step as Step);
+            if (addedStep) {
+              lastAddedStepId = addedStep.id;
+            }
           });
+          if (lastAddedStepId) {
+            this.updateTopic({
+              focusElement: { type: 'step', id: lastAddedStepId }
+            });
+          }
           break;
 
         case 'createTasks':
           // 批量新增任務，params 是 { task_name: string, step_tag: string }[]
-          params.forEach((task: { task_name: string, step_tag: string }) => {
+          let lastAddedTaskId: string | null = null;
+          params.forEach((taskParam: { task_name: string, step_tag: string }) => {
             const newTask: Partial<Task> = {
-              title: task.task_name,
+              title: taskParam.task_name,
               status: 'todo'
             };
-            this.addTask(task.step_tag, newTask as Task);
+            const addedTask = this.addTask(taskParam.step_tag, newTask as Task);
+            if (addedTask) {
+              lastAddedTaskId = addedTask.id;
+            }
           });
+          if (lastAddedTaskId) {
+            this.updateTopic({
+              focusElement: { type: 'task', id: lastAddedTaskId }
+            });
+          }
           break;
 
         case 'use_template_steps':
           // 使用模板步驟
+          let lastTemplateStepId: string | null = null;
           const templateSteps: Partial<Step>[] = [
             {
               title: '觀察',
@@ -516,7 +565,17 @@ export class MindMapService {
               order: 4
             }
           ];
-          templateSteps.forEach(step => this.addStep(step as Step));
+          templateSteps.forEach(step => {
+            const addedStep = this.addStep(step as Step);
+            if (addedStep) {
+              lastTemplateStepId = addedStep.id;
+            }
+          });
+          if (lastTemplateStepId) {
+            this.updateTopic({
+              focusElement: { type: 'step', id: lastTemplateStepId }
+            });
+          }
           break;
       }
     } catch (error) {

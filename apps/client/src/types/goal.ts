@@ -17,7 +17,7 @@ export interface Goal {
   templateType?: string;
   subject?: SubjectType;
   progress?: number;
-  focusElement?: string;
+  focusElement?: { type: 'step' | 'task', id: string };
 }
 
 export interface Step {
