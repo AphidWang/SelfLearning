@@ -1,14 +1,14 @@
-import { ChatOpenAI } from '@langchain/openai';
-import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
-import { LLMChain } from 'langchain/chains';
-import { BaseLLM } from '@langchain/core/language_models/llms';
 import { ChatMessage, ChatResponse } from '../types';
 import { chatConfig } from '../config/index';
-import { ConversationMemory } from './memory';
-import { LLMResult } from '@langchain/core/outputs';
-import { BaseLLMCallOptions } from '@langchain/core/language_models/llms';
 import { api } from '../../../services/api';
 import actions from '../config/actions.json';
+import { CustomSummaryMemory } from './memory';
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+import { BaseMessage } from '@langchain/core/messages';
+import { RunnableSequence } from '@langchain/core/runnables';
+// 移除無法找到的模組導入
+// import { LLMChain } from '@langchain/core/chains';
 
 const DEFAULT_SYSTEM_PROMPT = `你是一位智慧助理`;
 
@@ -53,72 +53,19 @@ Please respond with a JSON object in the following format:
 
 //console.log('📝 SYSTEM_PROMPT_WITH_ACTIONS: ', SYSTEM_PROMPT_WITH_ACTIONS);
 
-class CustomLLM extends BaseLLM {
-  constructor() {
-    super({
-      concurrency: 1,
-      maxConcurrency: 1,
-      maxRetries: 3,
-    });
-  }
-
-  async _generate(
-    prompts: string[],
-    options: BaseLLMCallOptions,
-    runManager?: any
-  ): Promise<LLMResult> {
-    const generations = await Promise.all(
-      prompts.map(async (prompt) => {
-        const token = localStorage.getItem('token');
-        const payload = {
-          messages: [
-            { type: 'system', content: SYSTEM_PROMPT_WITH_ACTIONS },
-            { type: 'user', content: prompt }
-          ],
-          model: chatConfig.modelName,
-          temperature: 0.7,
-        };
-        console.log('📤 Request payload:', payload);
-        
-        const response = await api.post('/api/chat/completions', payload, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          withCredentials: true
-        });
-
-        console.log('📥 Response:', response.data);
-        const data = response.data;
-        if (!data.choices || !data.choices[0]?.message?.content) {
-          throw new Error('Invalid API response format');
-        }
-        return {
-          text: data.choices[0].message.content,
-          generationInfo: {
-            finishReason: data.choices[0].finish_reason,
-          },
-        };
-      })
-    );
-
-    return {
-      generations: [generations],
-    };
-  }
-
-  _llmType(): string {
-    return 'custom';
-  }
-}
-
 export class ChatService {
-  private memory: ConversationMemory;
-  private chain: LLMChain;
+  private memory: CustomSummaryMemory;
+  private model: ChatOpenAI;
+  private chain: RunnableSequence;
 
   constructor() {
-    // 初始化記憶
-    this.memory = new ConversationMemory();
+    this.model = new ChatOpenAI({
+      maxRetries: 3,
+      temperature: 0.7,
+    });
+
+    // 初始化自定義記憶系統
+    this.memory = new CustomSummaryMemory();
 
     // 建立提示模板
     const prompt = ChatPromptTemplate.fromMessages([
@@ -128,47 +75,53 @@ export class ChatService {
     ]);
 
     // 建立對話鏈
-    this.chain = new LLMChain({
-      llm: new CustomLLM(),
+    this.chain = RunnableSequence.from([
+      async (input: string) => {
+        const memoryVars = await this.memory.loadMemoryVariables({});
+        return {
+          input,
+          history: memoryVars.history
+        };
+      },
       prompt,
-      verbose: true
-    });
+      this.model,
+    ]);
   }
 
   // 發送訊息並獲取回應
   public async sendMessage(message: string): Promise<ChatResponse> {
     try {
-      // 添加用戶訊息到記憶
-      this.memory.addMessage('user', message);
-
-      // 準備對話歷史
-      const history = this.memory.getRecentHistory().map(msg => ({
-        type: msg.role,
-        content: msg.content,
-      }));
-
-      // 獲取摘要
-      const summary = this.memory.getSummary();
-
-      // 執行對話鏈
-      const response = await this.chain.call({
-        input: message,
-        history,
-        summary: summary || '',
+      // 從記憶中獲取歷史
+      const memoryVars = await this.memory.loadMemoryVariables({});
+      
+      // 呼叫後端 API
+      const response = await api.post('/api/chat/completions', {
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT_WITH_ACTIONS },
+          ...memoryVars.history.map(msg => ({
+            role: msg.type === 'human' ? 'user' : 'assistant',
+            content: msg.content
+          })),
+          { role: 'user', content: message }
+        ].filter(msg => msg.content), // 過濾掉沒有內容的訊息
+        temperature: 0.7
       });
 
-      console.log('🤖 AI Response:', response.text);
-
-      // 添加助手回應到記憶
-      this.memory.addMessage('assistant', response.text);
+      // 保存上下文
+      await this.memory.saveContext(
+        { input: message },
+        { output: response.data.choices[0].message.content }
+      );
 
       return {
-        message: response.text,
+        message: response.data.choices[0].message.content,
+        role: 'assistant'
       };
     } catch (error) {
       console.error('❌ Chat error:', error);
       return {
         message: '',
+        role: 'assistant',
         error: error instanceof Error ? error.message : '未知錯誤',
       };
     }
