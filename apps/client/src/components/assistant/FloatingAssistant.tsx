@@ -55,6 +55,7 @@ interface FloatingAssistantProps {
   hideCloseButton?: boolean;
   className?: string;
   onActionSubmit?: (action: string, params: Record<string, any>) => void;
+  goalId?: string | null;
 }
 
 export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
@@ -63,7 +64,8 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   initialPosition = { x: 0, y: 0 },
   onDragEnd,
   className = '',
-  onActionSubmit
+  onActionSubmit,
+  goalId = null
 }) => {
   const [mode, setMode] = useState<AssistantMode>('idle');
   const [isDragging, setIsDragging] = useState(false);
@@ -71,7 +73,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const [chatHistory, setChatHistory] = useState<ChatResponse[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const chatService = React.useMemo(() => new ChatService(), []);
-  const mindMapService = React.useMemo(() => new MindMapService(), []);
+  const mindMapService = React.useMemo(() => new MindMapService(goalId), [goalId]);
   const dragControls = useDragControls();
 
   // UI 狀態
@@ -84,12 +86,29 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     inputPlaceholder: '和我分享你的想法吧'
   });
 
+  // 新增 helper 函數
+  const updateUIState = (updater: (prev: AssistantUIState) => Partial<AssistantUIState>, source: string) => {
+    setUIState(prev => {
+      const updates = updater(prev);
+      const newState = { ...prev, ...updates };
+      
+      // 如果沒有明確設定 showInput，就根據 choices 長度決定
+      if (!('showInput' in updates)) {
+        newState.showInput = !(newState.choices?.length > 0);
+      }
+      
+      console.log(`🔍 [${source}] New state:`, newState);
+      return newState;
+    });
+  };
+
   // 根據 form 配置更新 UI 狀態
-  const updateUIFromForm = (form: ActionForm) => {
-    setUIState(prev => ({
-      ...prev,
+  const updateUIFromForm = (form: ActionForm, message?: string) => {
+    console.log('🔍 Form config:', form);
+    updateUIState(prev => ({
+      message: message || prev.message,
       showChoices: (form.options?.length ?? 0) > 0,
-      showInput: !(form.options?.length ?? 0),
+      showInput: form.showInput ?? !(form.options?.length ?? 0),
       inputPlaceholder: form.description || '和我分享你的想法吧',
       choices: form.options?.map(option => ({
         text: option.label,
@@ -99,15 +118,12 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
           onActionSubmit?.(option.action.type, option.action.params);
         }
       })) || [],
-    }));
+    }), 'updateUIFromForm');
   };
 
   useEffect(() => {
     if (enabled) {
-      // 初始化助理
-      setMode('idle');
-      setUIState(prev => ({
-        ...prev,
+      updateUIState(prev => ({
         message: '嗨！今天想要做什麼呢？',
         showChoices: true,
         showInput: true,
@@ -133,15 +149,14 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             action: () => handleGameQuestion() 
           }
         ]
-      }));
+      }), 'initialSetup');
     }
   }, [enabled]);
 
   const handleHomeworkQuestion = () => {
     setMode('thinking');
     setTimeout(() => {
-      setUIState(prev => ({
-        ...prev,
+      updateUIState(prev => ({
         message: "太好了！讓我來幫你解決功課的問題。你想問哪一科的功課呢？",
         showChoices: true,
         showInput: false,
@@ -165,7 +180,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             action: () => handleSubjectSelect("語文")
           }
         ]
-      }));
+      }), 'handleHomeworkQuestion');
       setMode('idle');
     }, 1500);
   };
@@ -173,8 +188,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const handleNewTopicQuestion = () => {
     setMode('thinking');
     setTimeout(() => {
-      setUIState(prev => ({
-        ...prev,
+      updateUIState(prev => ({
         message: "太棒了！想學習什麼新知識呢？",
         showChoices: true,
         showInput: false,
@@ -192,7 +206,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             action: () => handleTopicSelect("動物世界")
           }
         ]
-      }));
+      }), 'handleNewTopicQuestion');
       setMode('idle');
     }, 1500);
   };
@@ -200,13 +214,12 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const handleGameQuestion = () => {
     setMode('thinking');
     setTimeout(() => {
-      setUIState(prev => ({
-        ...prev,
+      updateUIState(prev => ({
         message: "好啊！想玩什麼類型的遊戲呢？",
         showChoices: false,
         showInput: true,
         inputText: ''
-      }));
+      }), 'handleGameQuestion');
       setMode('idle');
     }, 1500);
   };
@@ -214,13 +227,12 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const handleSubjectSelect = (subject: string) => {
     setMode('thinking');
     setTimeout(() => {
-      setUIState(prev => ({
-        ...prev,
+      updateUIState(prev => ({
         message: `好的！讓我們來解決${subject}的問題。請告訴我你遇到了什麼困難？`,
         showChoices: false,
         showInput: true,
         inputText: ''
-      }));
+      }), 'handleSubjectSelect');
       setMode('idle');
     }, 1500);
   };
@@ -228,13 +240,12 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const handleTopicSelect = (topic: string) => {
     setMode('thinking');
     setTimeout(() => {
-      setUIState(prev => ({
-        ...prev,
+      updateUIState(prev => ({
         message: `${topic}真是個有趣的主題！你最想了解什麼呢？`,
         showChoices: false,
         showInput: true,
         inputText: ''
-      }));
+      }), 'handleTopicSelect');
       setMode('idle');
     }, 1500);
   };
@@ -245,34 +256,28 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     setIsLoading(true);
     setMode('thinking');
     try {
-      // 使用 MindMapService 處理用戶輸入
       const response = await mindMapService.handleUserInput(uiState.inputText);
       
-      // 更新聊天歷史
       setChatHistory(prev => [...prev, 
         { message: uiState.inputText, role: 'user' }
       ]);
 
-      // 如果有表單，更新 UI
+      // 更新 UI 狀態
       if (response.form) {
-        updateUIFromForm(response.form);
+        updateUIFromForm(response.form, response.message);
+      } else {
+        updateUIState(prev => ({
+          message: response.message || '你想跟我說什麼呢',
+          inputText: ''
+        }), 'handleSendMessage');
       }
-
-      // 更新訊息
-      setUIState(prev => ({
-        ...prev,
-        message: response.message || '好的，我了解了',
-        inputText: '',
-        showInput: response.tool === 'ask_for_input'
-      }));
 
       setMode('idle');
     } catch (error) {
       console.error('Failed to send message:', error);
-      setUIState(prev => ({
-        ...prev,
+      updateUIState(prev => ({
         message: '抱歉，發生了一些錯誤，請稍後再試。'
-      }));
+      }), 'handleSendMessage-error');
       setMode('idle');
     } finally {
       setIsLoading(false);
@@ -304,49 +309,41 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     if (!isDragging) {
       if (mode === 'idle') {
         setMode('idle');
-        setUIState(prev => {
-          const newState = {
-            ...prev,
-            message: '嗨！今天想要做什麼呢？',
-            showChoices: true,
-            showInput: true,
-            inputText: '',
-            inputPlaceholder: '和我分享你的想法吧',
-            choices: [
-              { 
-                text: "我想問功課", 
-                icon: <BookOpen className="h-12 w-12 text-indigo-600" />,
-                description: "讓我來幫你解決課業上的疑問吧！",
-                action: () => handleHomeworkQuestion() 
-              },
-              { 
-                text: "我想學新東西", 
-                icon: <Brain className="h-12 w-12 text-emerald-600" />,
-                description: "一起探索有趣的新知識！",
-                action: () => handleNewTopicQuestion() 
-              },
-              { 
-                text: "我想玩遊戲", 
-                icon: <Gamepad className="h-12 w-12 text-orange-600" />,
-                description: "來玩個益智遊戲吧！",
-                action: () => handleGameQuestion() 
-              }
-            ]
-          };
-          return newState;
-        });
+        updateUIState(prev => ({
+          message: '嗨！今天想要做什麼呢？',
+          showChoices: true,
+          showInput: true,
+          inputText: '',
+          inputPlaceholder: '和我分享你的想法吧',
+          choices: [
+            { 
+              text: "我想問功課", 
+              icon: <BookOpen className="h-12 w-12 text-indigo-600" />,
+              description: "讓我來幫你解決課業上的疑問吧！",
+              action: () => handleHomeworkQuestion() 
+            },
+            { 
+              text: "我想學新東西", 
+              icon: <Brain className="h-12 w-12 text-emerald-600" />,
+              description: "一起探索有趣的新知識！",
+              action: () => handleNewTopicQuestion() 
+            },
+            { 
+              text: "我想玩遊戲", 
+              icon: <Gamepad className="h-12 w-12 text-orange-600" />,
+              description: "來玩個益智遊戲吧！",
+              action: () => handleGameQuestion() 
+            }
+          ]
+        }), 'handleAssistantClick-show');
       } else {
         setMode('idle');
-        setUIState(prev => {
-          const newState = {
-            ...prev,
-            message: '',
-            showChoices: false,
-            showInput: false,
-            choices: []
-          };
-          return newState;
-        });
+        updateUIState(prev => ({
+          message: '',
+          showChoices: false,
+          showInput: false,
+          choices: []
+        }), 'handleAssistantClick-hide');
       }
     }
   };
