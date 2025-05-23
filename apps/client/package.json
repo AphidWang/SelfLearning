@@ -16,6 +16,7 @@
     "@langchain/core": "^0.3.56",
     "@langchain/openai": "^0.5.10",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-tooltip": "^1.2.7",
     "@self-learning/types": "*",
     "axios": "^1.9.0",
     "caniuse-lite": "^1.0.30001717",

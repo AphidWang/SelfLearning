@@ -3,6 +3,13 @@ import type { Goal, Step, Task } from '../types/goal';
 import { GOAL_STATUSES } from '../constants/goals';
 import { SUBJECTS } from '../constants/subjects';
 
+const STORAGE_KEY = 'self_learning_goals';
+
+// 新增一個函數來檢查是否為預設目標
+export const isDefaultGoal = (goalId: string): boolean => {
+  return initialGoals.some(g => g.id === goalId);
+};
+
 const initialGoals: Goal[] = [
   {
     id: '1',
@@ -461,6 +468,40 @@ const initialGoals: Goal[] = [
   },
 ];
 
+const getInitialGoals = (): Goal[] => {
+  if (typeof window === 'undefined') return initialGoals;
+  
+  try {
+    const storedGoals = localStorage.getItem(STORAGE_KEY);
+    if (!storedGoals) return initialGoals;
+    
+    const parsedGoals = JSON.parse(storedGoals);
+    // 把 ISO string 轉回 Date object
+    return parsedGoals.map((goal: Goal) => ({
+      ...goal,
+      steps: goal.steps.map(step => ({
+        ...step,
+        tasks: step.tasks.map(task => ({
+          ...task,
+          completedAt: task.completedAt ? new Date(task.completedAt).toISOString() : undefined
+        }))
+      }))
+    }));
+  } catch (error) {
+    console.error('Failed to load goals from localStorage:', error);
+    return initialGoals;
+  }
+};
+
+const saveGoals = (goals: Goal[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+  } catch (error) {
+    console.error('Failed to save goals to localStorage:', error);
+  }
+};
+
 interface GoalStore {
   goals: Goal[];
   selectedGoalId: string | null;
@@ -476,18 +517,26 @@ interface GoalStore {
 }
 
 export const useGoalStore = create<GoalStore>((set, get) => ({
-  goals: initialGoals,
+  goals: getInitialGoals(),
   selectedGoalId: null,
   
   setSelectedGoalId: (id) => set({ selectedGoalId: id }),
   
-  addGoal: (goal) => set((state) => ({ 
-    goals: [...state.goals, goal] 
-  })),
+  addGoal: (goal) => set((state) => {
+    const newGoal = {
+      ...goal,
+      id: goal.id || crypto.randomUUID()
+    };
+    const newState = { goals: [...state.goals, newGoal] };
+    saveGoals(newState.goals);
+    return newState;
+  }),
   
-  updateGoal: (goal) => set((state) => ({
-    goals: state.goals.map((g) => g.id === goal.id ? goal : g)
-  })),
+  updateGoal: (goal) => set((state) => {
+    const newState = { goals: state.goals.map((g) => g.id === goal.id ? goal : g) };
+    saveGoals(newState.goals);
+    return newState;
+  }),
   
   addStep: (goalId, step) => {
     let newStep: Step | null = null;
@@ -502,13 +551,15 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
         tasks: step.tasks || []
       };
 
-      return {
+      const newState = {
         goals: state.goals.map((g) =>
           g.id === goalId
             ? { ...g, steps: [...g.steps, newStep!] }
             : g
         )
       };
+      saveGoals(newState.goals);
+      return newState;
     });
 
     return newStep;
@@ -525,20 +576,22 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
       if (!existingStep) return state;
 
       updatedStep = step;
-      const updatedGoals = state.goals.map((g) =>
-        g.id === goalId
-          ? {
-              ...g,
-              steps: g.steps.map((s) => 
-                s.id === step.id 
-                  ? updatedStep!
-                  : s
-              )
-            }
-          : g
-      );
-
-      return { goals: updatedGoals };
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                steps: g.steps.map((s) => 
+                  s.id === step.id 
+                    ? updatedStep!
+                    : s
+                )
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
     });
 
     return updatedStep;
@@ -563,7 +616,7 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
         id: crypto.randomUUID()
       };
 
-      return {
+      const newState = {
         goals: state.goals.map((g) =>
           g.id === goalId
             ? {
@@ -577,6 +630,8 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
             : g
         )
       };
+      saveGoals(newState.goals);
+      return newState;
     });
 
     return newTask;
@@ -608,38 +663,44 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
       updatedTask = task;
       console.log('✅ goalStore.updateTask 更新任務', { updatedTask });
       
-      const updatedGoals = state.goals.map((g) =>
-        g.id === goalId
-          ? {
-              ...g,
-              steps: g.steps.map((s) =>
-                s.id === stepId
-                  ? {
-                      ...s,
-                      tasks: s.tasks.map((t) =>
-                        t.id === task.id ? updatedTask! : t
-                      )
-                    }
-                  : s
-              )
-            }
-          : g
-      );
-
-      return { goals: updatedGoals };
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                steps: g.steps.map((s) =>
+                  s.id === stepId
+                    ? {
+                        ...s,
+                        tasks: s.tasks.map((t) =>
+                          t.id === task.id ? updatedTask! : t
+                        )
+                      }
+                    : s
+                )
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
     });
 
     console.log('🔄 goalStore.updateTask 結果', { updatedTask });
     return updatedTask;
   },
 
-  setFocusElement: (goalId, focusElement) => set((state) => ({
-    goals: state.goals.map((g) =>
-      g.id === goalId
-        ? { ...g, focusElement }
-        : g
-    )
-  })),
+  setFocusElement: (goalId, focusElement) => set((state) => {
+    const newState = {
+      goals: state.goals.map((g) =>
+        g.id === goalId
+          ? { ...g, focusElement }
+          : g
+      )
+    };
+    saveGoals(newState.goals);
+    return newState;
+  }),
 
   dump: (goalId?: string) => {
     const state = get();

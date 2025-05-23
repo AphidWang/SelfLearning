@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles } from 'lucide-react';
-import { useGoalStore } from '../../store/goalStore';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus } from 'lucide-react';
+import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
@@ -9,6 +9,8 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { FloatingAssistant } from '../assistant/FloatingAssistant';
 import { useAssistant } from '../../hooks/useAssistant';
 import { MindMapService } from '../../services/mindmap';
+import * as Tooltip from '@radix-ui/react-tooltip';
+import { useNavigate } from 'react-router-dom';
 
 interface GoalMindMapProps {
   goalId: string;
@@ -888,6 +890,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     URL.revokeObjectURL(url);
   }, [goal]);
 
+  const navigate = useNavigate();
+
   return (
     <div 
       ref={containerRef}
@@ -928,6 +932,62 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           返回
         </motion.button>
+
+        {isDefaultGoal(goalId) && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              if (window.confirm('確定要回到預設值嗎？這會清除所有已儲存的修改。')) {
+                localStorage.removeItem('self_learning_goals');
+                window.location.reload();
+              }
+            }}
+            className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-white hover:bg-orange-50"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            回到預設值
+          </motion.button>
+        )}
+
+        <Tooltip.Provider>
+          <Tooltip.Root>
+            <Tooltip.Trigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  const newGoal: Goal = {
+                    id: '',  // store 會自動生成
+                    title: '新目標',  // 必填欄位
+                    status: 'active',
+                    steps: []
+                  };
+                  const store = useGoalStore.getState();
+                  store.addGoal(newGoal);
+                  // 取得新增的目標
+                  const addedGoal = store.goals[store.goals.length - 1];
+                  // 直接導航到新目標
+                  navigate(`/student/planning/goal/${addedGoal.id}`);
+                }}
+                className="inline-flex items-center px-4 py-2 border border-indigo-300 rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-white hover:bg-indigo-50"
+              >
+                <FilePlus className="h-4 w-4 mr-2" />
+                建立新頁面
+              </motion.button>
+            </Tooltip.Trigger>
+            <Tooltip.Portal>
+              <Tooltip.Content
+                className="bg-gray-800 text-white px-3 py-2 rounded-md text-sm shadow-lg"
+                sideOffset={5}
+              >
+                建立一個空白的學習目標
+                <Tooltip.Arrow className="fill-gray-800" />
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip.Root>
+        </Tooltip.Provider>
+
         <h1 className="text-xl font-bold text-gray-900">{goal.title}</h1>
 
         {/* 匯出選單 */}
