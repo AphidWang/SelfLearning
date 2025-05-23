@@ -386,14 +386,14 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-3 max-w-[350px] min-w-[250px] pointer-events-auto select-text cursor-text min-h-[5rem] max-h-[5rem] overflow-y-auto"
+                      className="absolute bottom-[calc(100%+1rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-2 max-w-[300px] min-w-[200px] pointer-events-auto select-text cursor-text min-h-[6rem] max-h-[6rem] overflow-y-auto flex items-center"
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',
                         transformOrigin: 'bottom right'
                       }}
                     >
                       {/* 訊息 */}
-                      <div className={`relative ${mode === 'thinking' ? 'blur-[1px]' : ''}`}>
+                      <div className={`relative w-full ${mode === 'thinking' ? 'blur-[1px]' : ''}`}>
                         <p className="text-base font-bold text-gray-800 dark:text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">
                           {uiState.message}
                         </p>
