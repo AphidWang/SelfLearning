@@ -343,7 +343,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
               position: 'absolute',
               zIndex: isDragging ? 50 : 40
             }}
-            className="relative w-16 h-16"
+            className="relative w-36 h-36"
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -357,12 +357,12 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                 e.stopPropagation();
                 handleAssistantClick();
               }}
-              className="w-full h-full rounded-full bg-white dark:bg-gray-800 shadow-lg overflow-hidden hover:shadow-xl transition-shadow relative cursor-move"
+              className="w-20 h-20 rounded-full bg-white dark:bg-gray-800 shadow-lg overflow-hidden hover:shadow-xl transition-shadow relative cursor-move translate-x-12"
             >
               <Lottie
                 animationData={slothAnimation}
                 loop={true}
-                className="w-full h-full pointer-events-none"
+                className="w-[120%] h-[120%] -translate-x-[7%] -translate-y-[5%] pointer-events-none"
               />
             </button>
 
@@ -371,9 +371,9 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setMode(mode === 'menu' ? 'idle' : 'menu')}
-              className="absolute -top-1 -right-1 bg-white dark:bg-gray-800 rounded-full p-0.5 shadow-md"
+              className="absolute -top-2 -right-2 bg-white dark:bg-gray-800 rounded-full p-1 shadow-md"
             >
-              <Settings className="h-2.5 w-2.5 text-indigo-500" />
+              <Settings className="h-4 w-4 text-indigo-500" />
             </motion.button>
 
             {/* 聊天泡泡 */}
@@ -394,7 +394,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     >
                       {/* 訊息 */}
                       <div className={`relative ${mode === 'thinking' ? 'blur-[1px]' : ''}`}>
-                        <p className="text-lg font-bold text-gray-800 dark:text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">
+                        <p className="text-base font-bold text-gray-800 dark:text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">
                           {uiState.message}
                         </p>
                       </div>
@@ -464,7 +464,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                     >
                       <div className="flex flex-col">
                         {/* 提示文字 */}
-                        <div className="mb-3 text-base text-gray-500 dark:text-gray-400">
+                        <div className="mb-3 text-sm text-gray-500 dark:text-gray-400">
                           {uiState.inputPlaceholder}
                         </div>
 
@@ -475,7 +475,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                             onChange={(e) => setUIState(prev => ({ ...prev, inputText: e.target.value }))}
                             onKeyPress={handleKeyPress}
                             placeholder="輸入訊息..."
-                            className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
                             rows={2}
                           />
                           <motion.button
@@ -528,10 +528,10 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                               {choice.icon}
                             </div>
                             <div className="flex-1 text-left min-w-[200px]">
-                              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                              <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
                                 {choice.text}
                               </h3>
-                              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                              <p className="text-gray-600 dark:text-gray-400 text-xs">
                                 {choice.description}
                               </p>
                             </div>
@@ -558,14 +558,14 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                 >
                   <button
                     onClick={() => {/* Navigate to history */}}
-                    className="w-full flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                   >
                     <History className="h-4 w-4 mr-2" />
                     查看對話紀錄
                   </button>
                   <button
                     onClick={() => {/* Open settings */}}
-                    className="w-full flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     設定
