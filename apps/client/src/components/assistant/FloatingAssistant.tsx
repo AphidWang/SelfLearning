@@ -73,7 +73,6 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatResponse[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
   const chatService = React.useMemo(() => new ChatService(), []);
   const mindMapService = React.useMemo(() => new MindMapService(goalId), [goalId]);
   const dragControls = useDragControls();
@@ -267,13 +266,21 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const handleSendMessage = useCallback(async () => {
     if (!uiState.inputText.trim() || isLoading) return;
 
+    const messageText = uiState.inputText;
     setIsLoading(true);
     setMode('thinking');
+    
+    // 立即清空輸入框
+    updateUIState(prev => ({
+      ...prev,
+      inputText: ''
+    }), 'handleSendMessage-clear');
+
     try {
-      const response = await mindMapService.handleUserInput(uiState.inputText);
+      const response = await mindMapService.handleUserInput(messageText);
       
       setChatHistory(prev => [...prev, 
-        { message: uiState.inputText, role: 'user' }
+        { message: messageText, role: 'user' }
       ]);
 
       // 更新 UI 狀態
@@ -281,8 +288,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         updateUIFromForm(response.form, response.message);
       } else {
         updateUIState(prev => ({
-          message: response.message || '你想跟我說什麼呢',
-          inputText: ''
+          message: response.message || '你想跟我說什麼呢'
         }), 'handleSendMessage');
       }
 
@@ -304,19 +310,6 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
       handleSendMessage();
     }
   }, [handleSendMessage]);
-
-  const handleVoiceInput = () => {
-    setIsRecording(!isRecording);
-    if (isRecording) {
-      setTimeout(() => {
-        setMode('idle');
-        setUIState(prev => ({
-          ...prev,
-          message: "我聽到你的問題了！讓我想想..."
-        }));
-      }, 1000);
-    }
-  };
 
   // 修改點擊事件
   const handleAssistantClick = () => {
@@ -468,7 +461,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       }}
                     >
                       {/* 訊息 */}
-                      <div>
+                      <div className={`relative ${mode === 'thinking' ? 'blur-[1px]' : ''}`}>
                         <p className="text-lg font-bold text-gray-800 dark:text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">
                           {uiState.message}
                         </p>
@@ -476,43 +469,45 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
 
                       {/* 思考中動畫 */}
                       {mode === 'thinking' && (
-                        <div className="flex justify-center items-center space-x-3 py-4">
-                          <motion.div
-                            animate={{
-                              scale: [1, 0.8, 1],
-                              opacity: [1, 0.5, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              delay: 0,
-                            }}
-                            className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                          />
-                          <motion.div
-                            animate={{
-                              scale: [1, 0.8, 1],
-                              opacity: [1, 0.5, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              delay: 0.2,
-                            }}
-                            className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                          />
-                          <motion.div
-                            animate={{
-                              scale: [1, 0.8, 1],
-                              opacity: [1, 0.5, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              delay: 0.4,
-                            }}
-                            className="w-3 h-3 bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                          />
+                        <div className="absolute inset-0 flex justify-center items-center bg-white/30 dark:bg-gray-800/30 backdrop-blur-[1px] rounded-2xl">
+                          <div className="flex justify-center items-center space-x-4">
+                            <motion.div
+                              animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [1, 0.5, 1],
+                              }}
+                              transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                delay: 0,
+                              }}
+                              className="w-4 h-4 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                            />
+                            <motion.div
+                              animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [1, 0.5, 1],
+                              }}
+                              transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                delay: 0.3,
+                              }}
+                              className="w-4 h-4 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                            />
+                            <motion.div
+                              animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [1, 0.5, 1],
+                              }}
+                              transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                delay: 0.6,
+                              }}
+                              className="w-4 h-4 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                            />
+                          </div>
                         </div>
                       )}
 
@@ -543,18 +538,6 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
 
                         {/* 輸入區域 */}
                         <div className="flex items-center space-x-3">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleVoiceInput}
-                            className={`p-3 rounded-full ${
-                              isRecording 
-                                ? 'bg-red-500 text-white animate-pulse' 
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                            }`}
-                          >
-                            <Mic className="h-5 w-5" />
-                          </motion.button>
                           <textarea
                             value={uiState.inputText}
                             onChange={(e) => setUIState(prev => ({ ...prev, inputText: e.target.value }))}
