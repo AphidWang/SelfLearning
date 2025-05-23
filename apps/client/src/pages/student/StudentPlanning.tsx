@@ -109,7 +109,9 @@ const StudentPlanning: React.FC = () => {
   const handleDeleteGoal = (goalId: string) => {
     const goalToDelete = goals.find(g => g.id === goalId);
     if (goalToDelete) {
-      updateGoal({ ...goalToDelete, status: GOAL_STATUSES.ARCHIVED });
+      const updatedGoal = { ...goalToDelete, status: GOAL_STATUSES.ARCHIVED };
+      console.log('Deleting goal:', { goalId, updatedGoal });
+      updateGoal(updatedGoal);
     }
   };
 
@@ -196,7 +198,7 @@ const StudentPlanning: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              {goals.map(goal => (
+              {goals.filter(goal => goal.status !== GOAL_STATUSES.ARCHIVED).map(goal => (
                 <button
                   key={goal.id}
                   onClick={() => {
@@ -690,15 +692,8 @@ const StudentPlanning: React.FC = () => {
               確認刪除目標
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              請輸入 "delete" 以確認刪除此目標。此操作無法復原。
+              確定要刪除此目標嗎？此操作無法復原。
             </p>
-            <input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 mb-4"
-              placeholder="輸入 delete"
-            />
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => {
@@ -711,14 +706,13 @@ const StudentPlanning: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  if (deleteConfirmText === 'delete' && selectedGoal) {
+                  if (selectedGoal) {
                     handleDeleteGoal(selectedGoal.id);
                     setSelectedGoal(null);
                     setShowDeleteModal(false);
                     setDeleteConfirmText('');
                   }
                 }}
-                disabled={deleteConfirmText !== 'delete'}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 刪除
