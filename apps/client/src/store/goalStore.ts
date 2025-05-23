@@ -506,7 +506,7 @@ interface GoalStore {
   goals: Goal[];
   selectedGoalId: string | null;
   setSelectedGoalId: (id: string | null) => void;
-  addGoal: (goal: Goal) => void;
+  addGoal: (goal: Goal) => Goal;
   updateGoal: (goal: Goal) => void;
   addStep: (goalId: string, step: Step) => Step | null;
   updateStep: (goalId: string, step: Step) => Step | null;
@@ -522,15 +522,18 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
   
   setSelectedGoalId: (id) => set({ selectedGoalId: id }),
   
-  addGoal: (goal) => set((state) => {
+  addGoal: (goal: Goal) => {
     const newGoal = {
       ...goal,
       id: goal.id || crypto.randomUUID()
     };
-    const newState = { goals: [...state.goals, newGoal] };
-    saveGoals(newState.goals);
-    return newState;
-  }),
+    set(state => ({
+      ...state,
+      goals: [...state.goals, newGoal]
+    }));
+    saveGoals(get().goals);
+    return newGoal;
+  },
   
   updateGoal: (goal) => set((state) => {
     const newState = { goals: state.goals.map((g) => g.id === goal.id ? goal : g) };

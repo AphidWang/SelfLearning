@@ -392,6 +392,13 @@ export class MindMapService {
     return useGoalStore.getState().addTask(this.currentTopicId, stepId, task);
   }
 
+  addGoal(goal: Goal): Goal {
+    console.log('🎯 MindMapService.addGoal 開始', { goal });
+    const addedGoal = useGoalStore.getState().addGoal(goal);
+    console.log('✅ 目標已新增', { addedGoal });
+    return addedGoal;
+  }
+
   updateTask(stepId: string, taskId: string, updates: Task) {
     console.log('🔍 MindMapService.updateTask 開始', { stepId, taskId, updates });
     
