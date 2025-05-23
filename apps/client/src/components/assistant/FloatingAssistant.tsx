@@ -343,7 +343,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
               position: 'absolute',
               zIndex: isDragging ? 50 : 40
             }}
-            className="relative w-24 h-24"
+            className="relative w-16 h-16"
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -371,9 +371,9 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setMode(mode === 'menu' ? 'idle' : 'menu')}
-              className="absolute -top-2 -right-2 bg-white dark:bg-gray-800 rounded-full p-1 shadow-md"
+              className="absolute -top-1 -right-1 bg-white dark:bg-gray-800 rounded-full p-0.5 shadow-md"
             >
-              <Settings className="h-4 w-4 text-indigo-500" />
+              <Settings className="h-2.5 w-2.5 text-indigo-500" />
             </motion.button>
 
             {/* 聊天泡泡 */}
@@ -386,7 +386,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto select-text cursor-text min-h-[8rem] max-h-[8rem] overflow-y-auto"
+                      className="absolute bottom-[calc(100%+2rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-3 max-w-[350px] min-w-[250px] pointer-events-auto select-text cursor-text min-h-[5rem] max-h-[5rem] overflow-y-auto"
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',
                         transformOrigin: 'bottom right'
@@ -456,7 +456,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute bottom-[calc(100%+11rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto cursor-default"
+                      className="absolute bottom-[calc(100%+8rem)] right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-3 max-w-[350px] min-w-[250px] pointer-events-auto cursor-default"
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',
                         transformOrigin: 'bottom right'
@@ -507,8 +507,8 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 max-w-[500px] min-w-[400px] pointer-events-auto cursor-default ${
-                        uiState.showInput ? 'bottom-[calc(100%+22rem)]' : 'bottom-[calc(100%+11rem)]'
+                      className={`absolute right-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-3 max-w-[350px] min-w-[250px] pointer-events-auto cursor-default ${
+                        uiState.showInput ? 'bottom-[calc(100%+16rem)]' : 'bottom-[calc(100%+8rem)]'
                       }`}
                       style={{ 
                         pointerEvents: isDragging ? 'none' : 'auto',
@@ -522,12 +522,12 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => choice.action()}
-                            className="w-full p-4 bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-4"
+                            className="w-full p-3 bg-white dark:bg-gray-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-3"
                           >
-                            <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
+                            <div className="flex-shrink-0 w-8 h-8 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
                               {choice.icon}
                             </div>
-                            <div className="flex-1 text-left">
+                            <div className="flex-1 text-left min-w-[200px]">
                               <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                                 {choice.text}
                               </h3>

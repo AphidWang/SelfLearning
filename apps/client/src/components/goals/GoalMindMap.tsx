@@ -697,37 +697,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const newStepIndex = updatedGoal.steps.length - 1;
     const stepPos = getStepPosition(newStepIndex, updatedGoal.steps);
     const container = containerRef.current;
-    if (container) {
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
+    if (!container) return;
 
-      // 計算所有 step 的總高度（包含新增的 step）
-      const totalStepHeight = updatedGoal.steps.reduce((total, step) => {
-        return total + (120 + 40) * step.tasks.length;
-      }, 0);
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-      // 計算最佳縮放值
-      const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
-      const optimalZoom = Math.min(Math.max(1, optimalZoomY), 1.5);
+    // 計算新的位置，使 step 位於畫面中心
+    const newX = (containerWidth / 2 / zoom) - stepPos.x;
+    const newY = (containerHeight / 2 / zoom) - stepPos.y;
 
-      // 計算新的位置，使新的 step 出現在畫面中心偏下
-      const newX = (containerWidth / 2 / optimalZoom) - stepPos.x;
-      const newY = (containerHeight * 0.7 / optimalZoom) - stepPos.y;
-
-      // 更新縮放和位置
-      setZoom(optimalZoom);
-      setPosition({ x: newX, y: newY });
-    }
-
-    // 設置編輯狀態
-    console.log('✏️ 設置編輯狀態', { stepId: newAddedStep.id, title: newAddedStep.title });
-    setEditingStepId(newAddedStep.id);
-    setEditingStepTitle(newAddedStep.title);
-    setIsGoalSelected(false);
-
-    // Dump store 狀態
-    useGoalStore.getState().dump(goalId);
-  }, [goal, mindMapService, goalId]);
+    setPosition({ x: newX, y: newY });
+  }, [goal, mindMapService, zoom, goalId, getStepPosition]);
 
   // 處理 step 標題更新
   const handleStepTitleUpdate = useCallback((stepId: string, newTitle: string) => {
@@ -796,17 +776,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     );
 
     const container = containerRef.current;
-    if (container) {
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
+    if (!container) return;
 
-      // 計算新的位置，使新的 task 出現在畫面中心
-      const newX = (containerWidth / 2 / zoom) - taskPos.x;
-      const newY = (containerHeight / 2 / zoom) - taskPos.y;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-      // 更新位置
-      setPosition({ x: newX, y: newY });
-    }
+    // 計算新的位置，使新的 task 出現在畫面中心
+    const newX = (containerWidth / 2 / zoom) - taskPos.x;
+    const newY = (containerHeight / 2 / zoom) - taskPos.y;
+
+    // 更新位置
+    setPosition({ x: newX, y: newY });
 
     // 設置編輯狀態
     setEditingTaskId(newAddedTask.id);
@@ -818,7 +798,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     // Dump store 狀態
     useGoalStore.getState().dump(goalId);
-  }, [goal, mindMapService, zoom, goalId, editingTaskId, editingTaskTitle]);
+  }, [goal, mindMapService, zoom, goalId, editingTaskId, editingTaskTitle, getTaskPosition]);
 
   // 處理 task 標題更新
   const handleTaskTitleUpdate = useCallback((taskId: string, newTitle: string) => {
@@ -989,10 +969,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     status: 'active',
                     steps: []
                   };
-                  const store = useGoalStore.getState();
-                  store.addGoal(newGoal);
-                  // 取得新增的目標
-                  const addedGoal = store.goals[store.goals.length - 1];
+                  const mindMapService = new MindMapService();
+                  console.log('📝 準備新增目標', { newGoal });
+                  const addedGoal = mindMapService.addGoal(newGoal);
+                  console.log('✅ 目標已新增', { addedGoal });
                   // 直接導航到新目標
                   navigate(`/student/planning/goal/${addedGoal.id}`);
                 }}
