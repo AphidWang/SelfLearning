@@ -125,6 +125,14 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [taskZIndexes, setTaskZIndexes] = useState<{ [key: string]: number }>({});
   const baseZIndex = 1;
 
+  // 當 goalId 改變時重置狀態
+  useEffect(() => {
+    setInitialLoad(true);
+    setIsLoading(true);
+    setZoom(0.8);
+    setPosition({ x: 0, y: 0 });
+  }, [goalId]);
+
   // 追蹤目標節點位置
   const goalX = useMotionValue(0);
   const goalY = useMotionValue(0);
@@ -177,10 +185,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     // 計算最佳縮放值
     const optimalZoomX = (containerWidth * 0.8) / totalWidth;
     const optimalZoomY = (containerHeight * 0.8) / effectiveTotalHeight;
-    const optimalZoom = Math.min(Math.max(0.8, Math.min(optimalZoomX, optimalZoomY)), 1.5);
+    const optimalZoom = Math.min(Math.max(0.8, Math.min(optimalZoomX, optimalZoomY)), 1.2);
 
     // 計算目標應該在的位置（螢幕的左邊）
-    const targetScreenX = hasSteps ? containerWidth * 0.1 : containerWidth * 0.3;
+    const targetScreenX = hasSteps ? containerWidth * 0.1 : containerWidth * 0.35;
     
     // 計算需要的 translate 值
     const optimalX = (targetScreenX - centerGoalX * optimalZoom) / optimalZoom;
@@ -968,7 +976,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 onClick={() => {
                   const newGoal: Goal = {
                     id: '',  // store 會自動生成
-                    title: '新目標',  // 必填欄位
+                    title: '做點什麼呢?',  // 必填欄位
                     status: 'active',
                     steps: []
                   };
