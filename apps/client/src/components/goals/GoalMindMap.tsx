@@ -151,38 +151,41 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     // 計算所有 step 的總高度
     const totalStepHeight = goal.steps.reduce((total, step) => {
-      return total + (120 + 40) * step.tasks.length;
+      // 確保每個 step 至少有最小高度
+      const stepHeight = Math.max(120, (120 + 40) * Math.max(1, step.tasks.length));
+      return total + stepHeight;
     }, 0);
+
+    // 如果沒有 step，使用預設高度
+    const effectiveTotalHeight = totalStepHeight || 10;
 
     // 計算整個畫布的寬度（從最左到最右）
     const centerGoalX = 0;  // 中心目標的 x 位置
-    const rightmostTaskX = 400 + 300 + 200 + 256 + 100; // baseX + stepX + taskX + taskWidth
+    const hasSteps = goal.steps.length > 0;
+    const hasTasks = goal.steps.some(step => step.tasks.length > 0);
+    
+    // 根據是否有 step 和 task 決定最右邊的位置
+    const rightmostTaskX = hasSteps 
+      ? (hasTasks 
+        ? 400 + 300 + 200 + 256 + 100  // 有 step 有 task
+        : 400 + 300 + 100)             // 有 step 無 task
+      : 400 + 100;                     // 無 step
+    
     const leftmostX = centerGoalX;  // 中心目標左邊的空間
     const totalWidth = rightmostTaskX - leftmostX;  // 整個畫布的實際寬度
 
     // 計算最佳縮放值
     const optimalZoomX = (containerWidth * 0.8) / totalWidth;
-    const optimalZoomY = (containerHeight * 0.8) / totalStepHeight;
-    const optimalZoom = Math.min(Math.max(1, Math.min(optimalZoomX, optimalZoomY)), 1.5);
+    const optimalZoomY = (containerHeight * 0.8) / effectiveTotalHeight;
+    const optimalZoom = Math.min(Math.max(0.8, Math.min(optimalZoomX, optimalZoomY)), 1.5);
 
     // 計算目標應該在的位置（螢幕的左邊）
-    const targetScreenX = containerWidth * 0.1;
+    const targetScreenX = hasSteps ? containerWidth * 0.1 : containerWidth * 0.3;
     
     // 計算需要的 translate 值
     const optimalX = (targetScreenX - centerGoalX * optimalZoom) / optimalZoom;
-
     // 計算 Y 軸位置
-    let optimalY;
-    const scaledTotalHeight = totalStepHeight * optimalZoom;
-    
-    if (scaledTotalHeight > containerHeight) {
-      // 如果縮放後的高度超過容器高度，將位置設定為顯示第一個 task
-      // 考慮 goal 圖示的高度（96px）和一些上方間距（50px）
-      optimalY = 50 / optimalZoom;
-    } else {
-      // 如果高度足夠，置中顯示
-      optimalY = (containerHeight - totalStepHeight * optimalZoom) / 2 / optimalZoom;
-    }
+    const optimalY = (containerHeight - effectiveTotalHeight * optimalZoom) / 2 / optimalZoom;
 
     return {
       zoom: optimalZoom,
@@ -578,13 +581,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   }
 
   const getCenterGoalPosition = () => {
-    const totalTasksHeight = goal.steps.reduce((height, step) => {
-      return height + (120 + 20) * step.tasks.length;
-    }, 0);
+    const totalTasksHeight = goal.steps.length > 0 
+      ? getStepPosition(goal.steps.length, goal.steps).y  // 因為 getStepPosition 只算到中心點，所以要乘 2
+      : 0;
 
     return {
       x: 200,
-      y: (totalTasksHeight / 2),
+      y: totalTasksHeight / 2,
     };
   };
 
@@ -598,7 +601,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
     
     // 計算當前 step 的起始位置
-    const currentStepHeight = (120 + 40) * Math.max(1, steps[stepIndex].tasks.length);  // 確保最少有一個 task 的高度
+    const currentStepHeight = (120 + 40) * Math.max(1, steps[stepIndex]?.tasks.length || 1);  // 確保最少有一個 task 的高度
     baseY += currentStepHeight / 2;
 
     return {
