@@ -147,19 +147,19 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
             text: "幫我想分類", 
             icon: <ListChecks className="h-12 w-12 text-indigo-600" />,
             description: "幫你規劃學習目標的分類",
-            action: () => handleDirectInput("幫使用者設計學習步驟") 
+            action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個學習步驟") 
           },
           { 
             text: "幫我想任務", 
             icon: <Target className="h-12 w-12 text-emerald-600" />,
             description: "幫你規劃具體的學習任務",
-            action: () => handleDirectInput("幫使用者設計學習任務, 對應到正確的學習步驟") 
+            action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個新的學習任務") 
           },
           { 
             text: "跟我聊聊這個主題", 
             icon: <MessageSquare className="h-12 w-12 text-orange-600" />,
             description: "討論這個主題的相關內容",
-            action: () => handleDirectInput("跟我聊聊這個主題") 
+            action: () => handleDirectInput("跟我聊聊這個主題, 有沒有推薦的方向呢？") 
           },
           { 
             text: "隨便聊聊天", 
