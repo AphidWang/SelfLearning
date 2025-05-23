@@ -102,8 +102,8 @@ const calculateContentBounds = (
 };
 
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
-  const { goals } = useGoalStore();
-  const goal = goals.find((g) => g.id === goalId);
+  const { goals, addGoal } = useGoalStore();
+  const goal = goalId === 'new' ? null : goals.find((g) => g.id === goalId);
   const mindMapService = React.useMemo(() => new MindMapService(goalId), [goalId]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [isGoalSelected, setIsGoalSelected] = useState(false);
@@ -542,6 +542,32 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     return () => unsubscribe();
   }, [goalId, mindMapService, position, zoom]);
+
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [editingGoalTitle, setEditingGoalTitle] = useState('');
+
+  const handleGoalTitleUpdate = (newTitle: string) => {
+    if (!goal || !newTitle.trim()) return;
+    
+    const updatedGoal = {
+      ...goal,
+      title: newTitle.trim()
+    };
+    mindMapService.updateGoal(updatedGoal);
+    setIsEditingGoal(false);
+  };
+
+  if (goalId === 'new') {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Lottie
+          animationData={loadingAnimation}
+          loop={true}
+          className="w-48 h-48"
+        />
+      </div>
+    );
+  }
 
   if (!goal) {
     return (
@@ -1144,13 +1170,38 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           onClick={() => {
             setIsGoalSelected(!isGoalSelected);
           }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setIsEditingGoal(true);
+            setEditingGoalTitle(goal.title);
+          }}
         >
           <div 
             className="group relative w-48 h-48 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 border-4 border-purple-200 flex items-center justify-center p-6 shadow-lg cursor-pointer transition-all duration-200 hover:scale-105 hover:border-purple-400 hover:shadow-[0_0_0_4px_rgba(99,102,241,0.2)]"
           >
             <div className="text-center">
               <Target className="w-12 h-12 text-purple-500 mx-auto mb-2" />
-              <h2 className="text-lg font-bold text-purple-700">{goal.title}</h2>
+              {isEditingGoal ? (
+                <input
+                  type="text"
+                  value={editingGoalTitle}
+                  onChange={(e) => setEditingGoalTitle(e.target.value)}
+                  onBlur={() => handleGoalTitleUpdate(editingGoalTitle)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleGoalTitleUpdate(editingGoalTitle);
+                    } else if (e.key === 'Escape') {
+                      setIsEditingGoal(false);
+                      setEditingGoalTitle(goal.title);
+                    }
+                  }}
+                  className="w-full text-center bg-transparent border-b border-purple-300 focus:outline-none focus:border-purple-500 px-1 text-lg font-bold text-purple-700"
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <h2 className="text-lg font-bold text-purple-700">{goal.title || '新目標'}</h2>
+              )}
             </div>
 
             {/* 新增步驟按鈕 */}
