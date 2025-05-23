@@ -1,0 +1,77 @@
+{
+  "create_topic": {
+    "type": "create_topic",
+    "title": "建立新主題",
+    "description": "請輸入你想要學習的主題名稱",
+    "fields": [
+      {
+        "name": "topic",
+        "label": "主題名稱",
+        "type": "text",
+        "required": true
+      }
+    ],
+    "submitLabel": "建立",
+    "cancelLabel": "取消"
+  },
+  "create_step": {
+    "type": "create_step",
+    "title": "建立新步驟",
+    "description": "請輸入步驟名稱",
+    "fields": [
+      {
+        "name": "step_name",
+        "label": "步驟名稱",
+        "type": "text",
+        "required": true
+      }
+    ],
+    "submitLabel": "建立",
+    "cancelLabel": "取消"
+  },
+  "create_task": {
+    "type": "create_task",
+    "title": "建立新任務",
+    "description": "請輸入任務名稱和所屬步驟",
+    "fields": [
+      {
+        "name": "task_name",
+        "label": "任務名稱",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "step_tag",
+        "label": "所屬步驟",
+        "type": "text",
+        "required": true
+      }
+    ],
+    "submitLabel": "建立",
+    "cancelLabel": "取消"
+  },
+  "use_template_steps": {
+    "type": "use_template_steps",
+    "title": "使用模板步驟",
+    "description": "建立觀察/行動/紀錄/分享四個步驟",
+    "fields": [],
+    "submitLabel": "建立",
+    "cancelLabel": "取消"
+  },
+  "complete_topic": {
+    "type": "complete_topic",
+    "title": "完成主題",
+    "description": "將當前主題標記為已完成",
+    "fields": [],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  },
+  "mark_as_bookmark": {
+    "type": "mark_as_bookmark",
+    "title": "收藏主題",
+    "description": "將當前主題加入收藏",
+    "fields": [],
+    "submitLabel": "確認",
+    "cancelLabel": "取消"
+  }
+}
