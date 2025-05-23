@@ -369,6 +369,18 @@ export class MindMapService {
     return newStep;
   }
 
+  updateGoal(goal: Goal) {
+    console.log('🎯 MindMapService.updateGoal 開始', { goal });
+    if (!this.currentTopicId) {
+      console.log('❌ 更新失敗：沒有當前主題');
+      return null;
+    }
+
+    const result = useGoalStore.getState().updateGoal(goal);
+    console.log('✅ 目標更新結果', { result });
+    return result;
+  }
+
   updateStep(stepId: string, updates: Step) {
     if (!this.currentTopicId) return null;
 

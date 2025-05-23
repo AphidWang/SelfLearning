@@ -80,7 +80,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   // UI 狀態
   const [uiState, setUIState] = useState<AssistantUIState>({
     showChoices: false,
-    showInput: true,
+    showInput: false,
     message: '',
     choices: [],
     inputText: '',
@@ -139,134 +139,60 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
       updateUIState(prev => ({
         message: '嗨！今天想要做什麼呢？',
         showChoices: true,
-        showInput: true,
+        showInput: false,
         inputText: '',
         inputPlaceholder: '和我分享你的想法吧',
         choices: [
           { 
-            text: "我想問功課", 
-            icon: <BookOpen className="h-12 w-12 text-indigo-600" />,
-            description: "讓我來幫你解決課業上的疑問吧！",
-            action: () => handleHomeworkQuestion() 
+            text: "幫我想分類", 
+            icon: <ListChecks className="h-12 w-12 text-indigo-600" />,
+            description: "幫你規劃學習目標的分類",
+            action: () => handleDirectInput("幫我想分類") 
           },
           { 
-            text: "我想學新東西", 
-            icon: <Brain className="h-12 w-12 text-emerald-600" />,
-            description: "一起探索有趣的新知識！",
-            action: () => handleNewTopicQuestion() 
+            text: "幫我想任務", 
+            icon: <Target className="h-12 w-12 text-emerald-600" />,
+            description: "幫你規劃具體的學習任務",
+            action: () => handleDirectInput("幫我想任務") 
           },
           { 
-            text: "我想玩遊戲", 
-            icon: <Gamepad className="h-12 w-12 text-orange-600" />,
-            description: "來玩個益智遊戲吧！",
-            action: () => handleGameQuestion() 
+            text: "跟我聊聊這個主題", 
+            icon: <MessageSquare className="h-12 w-12 text-orange-600" />,
+            description: "討論這個主題的相關內容",
+            action: () => handleDirectInput("跟我聊聊這個主題") 
+          },
+          { 
+            text: "隨便聊聊天", 
+            icon: <Brain className="h-12 w-12 text-purple-600" />,
+            description: "來聊聊天吧！",
+            action: () => handleChatMode() 
           }
         ]
       }), 'initialSetup');
     }
   }, [enabled]);
 
-  const handleHomeworkQuestion = () => {
+  const handleDirectInput = (text: string) => {
     setMode('thinking');
-    setTimeout(() => {
-      updateUIState(prev => ({
-        message: "太好了！讓我來幫你解決功課的問題。你想問哪一科的功課呢？",
-        showChoices: true,
-        showInput: false,
-        choices: [
-          {
-            text: "數學",
-            icon: <span className="text-4xl">🔢</span>,
-            description: "解決數學計算和應用題",
-            action: () => handleSubjectSelect("數學")
-          },
-          {
-            text: "自然",
-            icon: <span className="text-4xl">🔬</span>,
-            description: "探索科學和自然現象",
-            action: () => handleSubjectSelect("自然")
-          },
-          {
-            text: "語文",
-            icon: <span className="text-4xl">📚</span>,
-            description: "國語、英語學習指導",
-            action: () => handleSubjectSelect("語文")
-          }
-        ]
-      }), 'handleHomeworkQuestion');
-      setMode('idle');
-    }, 1500);
+    // 直接將文字作為使用者輸入處理
+    handleSendMessage(text);
   };
 
-  const handleNewTopicQuestion = () => {
-    setMode('thinking');
-    setTimeout(() => {
-      updateUIState(prev => ({
-        message: "太棒了！想學習什麼新知識呢？",
-        showChoices: true,
-        showInput: false,
-        choices: [
-          {
-            text: "太空探索",
-            icon: <span className="text-4xl">🚀</span>,
-            description: "探索浩瀚的宇宙奧秘",
-            action: () => handleTopicSelect("太空探索")
-          },
-          {
-            text: "動物世界",
-            icon: <span className="text-4xl">🦁</span>,
-            description: "認識地球上的生物",
-            action: () => handleTopicSelect("動物世界")
-          }
-        ]
-      }), 'handleNewTopicQuestion');
-      setMode('idle');
-    }, 1500);
+  const handleChatMode = () => {
+    setMode('idle');
+    updateUIState(prev => ({
+      message: '好啊！想聊什麼呢？',
+      showChoices: false,
+      showInput: true,
+      inputText: '',
+      inputPlaceholder: '想聊什麼都可以喔！'
+    }), 'handleChatMode');
   };
 
-  const handleGameQuestion = () => {
-    setMode('thinking');
-    setTimeout(() => {
-      updateUIState(prev => ({
-        message: "好啊！想玩什麼類型的遊戲呢？",
-        showChoices: false,
-        showInput: true,
-        inputText: ''
-      }), 'handleGameQuestion');
-      setMode('idle');
-    }, 1500);
-  };
+  const handleSendMessage = useCallback(async (messageText?: string) => {
+    const textToSend = messageText || uiState.inputText;
+    if (!textToSend.trim() || isLoading) return;
 
-  const handleSubjectSelect = (subject: string) => {
-    setMode('thinking');
-    setTimeout(() => {
-      updateUIState(prev => ({
-        message: `好的！讓我們來解決${subject}的問題。請告訴我你遇到了什麼困難？`,
-        showChoices: false,
-        showInput: true,
-        inputText: ''
-      }), 'handleSubjectSelect');
-      setMode('idle');
-    }, 1500);
-  };
-
-  const handleTopicSelect = (topic: string) => {
-    setMode('thinking');
-    setTimeout(() => {
-      updateUIState(prev => ({
-        message: `${topic}真是個有趣的主題！你最想了解什麼呢？`,
-        showChoices: false,
-        showInput: true,
-        inputText: ''
-      }), 'handleTopicSelect');
-      setMode('idle');
-    }, 1500);
-  };
-
-  const handleSendMessage = useCallback(async () => {
-    if (!uiState.inputText.trim() || isLoading) return;
-
-    const messageText = uiState.inputText;
     setIsLoading(true);
     setMode('thinking');
     
@@ -277,10 +203,10 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     }), 'handleSendMessage-clear');
 
     try {
-      const response = await mindMapService.handleUserInput(messageText);
+      const response = await mindMapService.handleUserInput(textToSend);
       
       setChatHistory(prev => [...prev, 
-        { message: messageText, role: 'user' }
+        { message: textToSend, role: 'user' }
       ]);
 
       // 更新 UI 狀態
@@ -320,27 +246,33 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         updateUIState(prev => ({
           message: '嗨！今天想要做什麼呢？',
           showChoices: true,
-          showInput: true,
+          showInput: false,
           inputText: '',
           inputPlaceholder: '和我分享你的想法吧',
           choices: [
             { 
-              text: "我想問功課", 
-              icon: <BookOpen className="h-12 w-12 text-indigo-600" />,
-              description: "讓我來幫你解決課業上的疑問吧！",
-              action: () => handleHomeworkQuestion() 
+              text: "幫我想分類", 
+              icon: <ListChecks className="h-12 w-12 text-indigo-600" />,
+              description: "幫你規劃學習目標的分類",
+              action: () => handleDirectInput("幫我想分類") 
             },
             { 
-              text: "我想學新東西", 
-              icon: <Brain className="h-12 w-12 text-emerald-600" />,
-              description: "一起探索有趣的新知識！",
-              action: () => handleNewTopicQuestion() 
+              text: "幫我想任務", 
+              icon: <Target className="h-12 w-12 text-emerald-600" />,
+              description: "幫你規劃具體的學習任務",
+              action: () => handleDirectInput("幫我想任務") 
             },
             { 
-              text: "我想玩遊戲", 
-              icon: <Gamepad className="h-12 w-12 text-orange-600" />,
-              description: "來玩個益智遊戲吧！",
-              action: () => handleGameQuestion() 
+              text: "跟我聊聊這個主題", 
+              icon: <MessageSquare className="h-12 w-12 text-orange-600" />,
+              description: "討論這個主題的相關內容",
+              action: () => handleDirectInput("跟我聊聊這個主題") 
+            },
+            { 
+              text: "隨便聊聊天", 
+              icon: <Brain className="h-12 w-12 text-purple-600" />,
+              description: "來聊聊天吧！",
+              action: () => handleChatMode() 
             }
           ]
         }), 'handleAssistantClick-show');
