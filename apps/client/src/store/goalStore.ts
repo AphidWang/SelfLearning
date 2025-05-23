@@ -471,6 +471,7 @@ interface GoalStore {
   updateStep: (goalId: string, step: Step) => Step | null;
   addTask: (goalId: string, stepId: string, task: Task) => Task | null;
   updateTask: (goalId: string, stepId: string, task: Task) => Task | null;
+  setFocusElement: (goalId: string, focusElement: { type: 'step' | 'task', id: string } | undefined) => void;
   dump: (goalId?: string) => void;
 }
 
@@ -631,6 +632,14 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
     console.log('🔄 goalStore.updateTask 結果', { updatedTask });
     return updatedTask;
   },
+
+  setFocusElement: (goalId, focusElement) => set((state) => ({
+    goals: state.goals.map((g) =>
+      g.id === goalId
+        ? { ...g, focusElement }
+        : g
+    )
+  })),
 
   dump: (goalId?: string) => {
     const state = get();
