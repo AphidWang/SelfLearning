@@ -257,13 +257,15 @@ export class MindMapService {
             
             // 如果參數值是陣列，每個元素都要有自己的 action
             if (Array.isArray(paramValue)) {
-              const mappedOptions = paramValue.map(value => ({
-                label: typeof value === 'string' ? value : value.task_name,
-                action: {
-                  type: option.paramAction,
-                  params: value
-                }
-              }));
+              const mappedOptions = paramValue
+                .slice(0, 4) // 限制最多四個選項
+                .map(value => ({
+                  label: typeof value === 'string' ? value : value.task_name,
+                  action: {
+                    type: option.paramAction,
+                    params: value
+                  }
+                }));
               return mappedOptions;
             }
             
