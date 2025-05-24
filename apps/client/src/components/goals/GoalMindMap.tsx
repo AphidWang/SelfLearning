@@ -104,7 +104,10 @@ const calculateContentBounds = (
 export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const { goals, addGoal } = useGoalStore();
   const goal = goalId === 'new' ? null : goals.find((g) => g.id === goalId);
-  const mindMapService = React.useMemo(() => new MindMapService(goalId), [goalId]);
+  const mindMapService = React.useMemo(() => {
+    // 每次 goalId 改變時都建立新的實例
+    return new MindMapService(goalId);
+  }, [goalId]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [isGoalSelected, setIsGoalSelected] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);

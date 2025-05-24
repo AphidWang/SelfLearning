@@ -466,6 +466,88 @@ const initialGoals: Goal[] = [
       },
     ],
   },
+  {
+    id: '7',
+    title: '為什麼要讀書',
+    description: '探索讀書的意義與價值',
+    status: 'active',
+    steps: [
+      {
+        id: '7-1',
+        title: '[觀察] 讀書的現況',
+        tasks: [
+          {
+            id: '7-1-1',
+            title: '記錄自己每天的讀書時間',
+            status: 'todo',
+          },
+          {
+            id: '7-1-2',
+            title: '觀察身邊愛讀書的人',
+            status: 'todo',
+          },
+          {
+            id: '7-1-3',
+            title: '收集不同人對讀書的看法',
+            status: 'todo',
+          }
+        ],
+      },
+      {
+        id: '7-2',
+        title: '[行動] 體驗讀書',
+        tasks: [
+          {
+            id: '7-2-1',
+            title: '嘗試閱讀不同類型的書',
+            status: 'todo',
+          },
+          {
+            id: '7-2-2',
+            title: '記錄讀書時的感受',
+            status: 'todo',
+          }
+        ],
+      },
+      {
+        id: '7-3',
+        title: '[整理] 讀書的收穫',
+        tasks: [
+          {
+            id: '7-3-1',
+            title: '整理讀書學到的新知識',
+            status: 'todo',
+          },
+          {
+            id: '7-3-2',
+            title: '分析讀書對生活的影響',
+            status: 'todo',
+          },
+          {
+            id: '7-3-3',
+            title: '思考讀書帶來的改變',
+            status: 'todo',
+          }
+        ],
+      },
+      {
+        id: '7-4',
+        title: '[分享] 讀書的價值',
+        tasks: [
+          {
+            id: '7-4-1',
+            title: '製作讀書心得分享',
+            status: 'todo',
+          },
+          {
+            id: '7-4-2',
+            title: '與他人討論讀書經驗',
+            status: 'todo',
+          }
+        ],
+      },
+    ],
+  },
 ];
 
 const getInitialGoals = (): Goal[] => {
