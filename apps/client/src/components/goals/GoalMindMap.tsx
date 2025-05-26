@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus } from 'lucide-react';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, Switch, RefreshCw } from 'lucide-react';
 import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { FloatingAssistant } from '../assistant/FloatingAssistant';
+import { PanelAssistant } from '../assistant/PanelAssistant';
 import { useAssistant } from '../../hooks/useAssistant';
 import { MindMapService } from '../../services/mindmap';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -127,6 +128,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [goalOffset, setGoalOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [taskZIndexes, setTaskZIndexes] = useState<{ [key: string]: number }>({});
   const baseZIndex = 1;
+  const [assistantMode, setAssistantMode] = useState<'floating' | 'panel'>('floating');
 
   // 當 goalId 改變時重置狀態
   useEffect(() => {
@@ -1491,23 +1493,43 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
       {/* 浮動助理 */}
       <div className="fixed bottom-6 right-6 z-50">
-        <FloatingAssistant
-          enabled={showAssistant}
-          onToggle={handleToggleAssistant}
-          dragConstraints={containerRef}
-          initialPosition={calculateBottomRightPosition()}
-          onPositionChange={setAssistantPosition}
-          onDragEnd={handleAssistantDragEnd}
-          hideCloseButton
-          className="floating-assistant pointer-events-auto"
-          goalId={goalId}
-          onFocus={(elementId) => {
-            const element = document.getElementById(elementId);
-            if (element) {
-              flyToElement(elementId);
-            }
-          }}
-        />
+        {assistantMode === 'floating' ? (
+          <FloatingAssistant
+            enabled={showAssistant}
+            onToggle={handleToggleAssistant}
+            dragConstraints={containerRef}
+            initialPosition={calculateBottomRightPosition()}
+            onPositionChange={setAssistantPosition}
+            onDragEnd={handleAssistantDragEnd}
+            hideCloseButton
+            className="floating-assistant pointer-events-auto"
+            goalId={goalId}
+            onFocus={(elementId) => {
+              const element = document.getElementById(elementId);
+              if (element) {
+                flyToElement(elementId);
+              }
+            }}
+          />
+        ) : (
+          <PanelAssistant
+            enabled={showAssistant}
+            onToggle={handleToggleAssistant}
+            dragConstraints={containerRef}
+            initialPosition={calculateBottomRightPosition()}
+            onPositionChange={setAssistantPosition}
+            onDragEnd={handleAssistantDragEnd}
+            hideCloseButton
+            className="panel-assistant pointer-events-auto"
+            goalId={goalId}
+            onFocus={(elementId) => {
+              const element = document.getElementById(elementId);
+              if (element) {
+                flyToElement(elementId);
+              }
+            }}
+          />
+        )}
       </div>
 
       {/* 底部工具列 */}
@@ -1543,6 +1565,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           <ZoomOut className="w-5 h-5 text-gray-600" />
         </button>
         <div className="w-px h-6 bg-gray-200" />
+        <div className="relative">
+          <button
+            onClick={() => setAssistantMode(prev => prev === 'floating' ? 'panel' : 'floating')}
+            className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
+              assistantMode === 'panel' ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'hover:bg-gray-100 text-gray-600'
+            }`}
+            title={assistantMode === 'floating' ? '切換到面板模式' : '切換到浮動模式'}
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
         <div className="relative">
           <button
             onClick={handleToggleAssistant}
