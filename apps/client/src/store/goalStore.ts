@@ -23,14 +23,13 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '1-1-1',
-            title: '找出詩中的押韻字',
-            status: 'done',
-            completedAt: new Date('2024-03-15').toISOString(),
+            title: '詩韻優美',
+            status: 'idea',
           },
           {
             id: '1-1-2',
-            title: '用節奏朗讀詩句',
-            status: 'in_progress',
+            title: '押韻好記',
+            status: 'idea',
           },
         ],
       },
@@ -96,21 +95,14 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '2-1-1',
-            title: '找出生活中的分數例子',
-            status: 'done',
-            completedAt: new Date('2024-03-10').toISOString(),
+            title: '切蛋糕會用',
+            status: 'idea',
           },
           {
             id: '2-1-2',
-            title: '用圖片表示分數',
-            status: 'in_progress',
+            title: '公平分配',
+            status: 'idea',
           },
-          {
-            id: '2-1-3',
-            title: '分享生活中的分數應用',
-            status: 'done',
-            completedAt: new Date('2024-03-12').toISOString(),
-          }
         ],
       },
       {
@@ -186,14 +178,13 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '3-1-1',
-            title: '認識故事中的角色',
-            status: 'done',
-            completedAt: new Date('2024-03-18').toISOString(),
+            title: '角色如友',
+            status: 'idea',
           },
           {
             id: '3-1-2',
-            title: '找出故事中的場景',
-            status: 'in_progress',
+            title: '場景身歷',
+            status: 'idea',
           },
         ],
       },
@@ -259,14 +250,13 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '4-1-1',
-            title: '觀察不同種子的形狀',
-            status: 'done',
-            completedAt: new Date('2024-03-05').toISOString(),
+            title: '種子神奇',
+            status: 'idea',
           },
           {
             id: '4-1-2',
-            title: '記錄種子的特徵',
-            status: 'in_progress',
+            title: '形狀各異',
+            status: 'idea',
           },
         ],
       },
@@ -332,14 +322,13 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '5-1-1',
-            title: '認識基本色彩',
-            status: 'done',
-            completedAt: new Date('2024-03-15').toISOString(),
+            title: '我覺得顏色可以表達我的心情',
+            status: 'idea',
           },
           {
             id: '5-1-2',
-            title: '混合不同顏色',
-            status: 'in_progress',
+            title: '我發現混合顏色會產生新的顏色，很神奇',
+            status: 'idea',
           },
         ],
       },
@@ -405,14 +394,13 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '6-1-1',
-            title: '認識身體部位',
-            status: 'done',
-            completedAt: new Date('2024-03-20').toISOString(),
+            title: '我覺得運動後身體會變得更靈活',
+            status: 'idea',
           },
           {
             id: '6-1-2',
-            title: '了解身體機能',
-            status: 'in_progress',
+            title: '我發現運動可以讓我更有精神',
+            status: 'idea',
           },
         ],
       },
@@ -478,13 +466,13 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '7-1-1',
-            title: '記錄自己每天的讀書時間',
-            status: 'todo',
+            title: '我覺得讀書可以讓我看到不一樣的世界',
+            status: 'idea',
           },
           {
             id: '7-1-2',
-            title: '觀察身邊愛讀書的人',
-            status: 'todo',
+            title: '我發現讀書時會忘記時間，很投入',
+            status: 'idea',
           },
           {
             id: '7-1-3',

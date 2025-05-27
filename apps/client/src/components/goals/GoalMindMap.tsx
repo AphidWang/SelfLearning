@@ -1509,7 +1509,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             setEditingTaskId(task.id);
                             setEditingTaskTitle(task.title);
                           }}
-                          className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
+                          className={`task-card w-64 h-24 p-4 rounded-2xl shadow-lg border-2 cursor-move flex flex-col justify-center gap-2 relative ${
                             task.status === 'idea'
                               ? 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 rounded-3xl'
                               : task.status === 'done'
@@ -1519,18 +1519,16 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200'
                           }`}
                         >
-                          <div className="flex justify-between items-start">
-                            <div className="w-10 h-10 absolute top-2 right-2 flex items-center justify-center">
-                              {task.status === 'done' && (
-                                <span className="text-2xl">✅</span>
-                              )}
-                              {task.status === 'in_progress' && (
-                                <span className="text-2xl">🚀</span>
-                              )}
-                              {task.status === 'idea' && (
-                                <span className="text-2xl">💭</span>
-                              )}
-                            </div>
+                          <div className="absolute top-2 right-2 pointer-events-none z-10">
+                            {task.status === 'done' && (
+                              <span className="text-xl">✅</span>
+                            )}
+                            {task.status === 'in_progress' && (
+                              <span className="text-xl">🚀</span>
+                            )}
+                            {task.status === 'idea' && (
+                              <span className="text-xl">💭</span>
+                            )}
                           </div>
                           {editingTaskId === task.id ? (
                             <input
@@ -1546,24 +1544,28 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                                   setEditingTaskTitle('');
                                 }
                               }}
-                              className={`mt-3 w-full bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 px-1 text-lg font-semibold text-gray-900 pr-8 ${
-                                task.status === 'idea' ? 'italic' : ''
-                              }`}
+                              className={`w-full bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 px-1 ${
+                                task.status === 'idea' 
+                                  ? 'text-2xl font-bold text-center font-[Iansui] !text-[#d97706] tracking-wide' 
+                                  : 'text-lg font-semibold text-left'
+                              } text-gray-900 pr-8`}
                               autoFocus
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : (
-                            <h3 className={`mt-3 text-lg font-semibold text-gray-900 pr-8 ${
-                              task.status === 'idea' ? 'italic' : ''
-                            }`}>{task.title}</h3>
+                            <h3 className={`${
+                              task.status === 'idea' 
+                                ? 'text-2xl font-bold text-center font-[Iansui] !text-[#d97706] tracking-wide' 
+                                : 'text-lg font-semibold text-left'
+                            } text-gray-900 pr-8`}>{task.title}</h3>
                           )}
-                          <div className="h-[20px] mt-2">
-                            {task.completedAt && (
-                              <p className="text-xs text-gray-500">
-                                完成於 {new Date(task.completedAt).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
+                          {task.completedAt && (
+                            <p className={`text-xs text-gray-500 ${
+                              task.status === 'idea' ? 'text-center' : 'text-left'
+                            }`}>
+                              完成於 {new Date(task.completedAt).toLocaleDateString()}
+                            </p>
+                          )}
                         </motion.div>
                       </motion.div>
                     );
