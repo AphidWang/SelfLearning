@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, RefreshCw, Rocket } from 'lucide-react';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, Switch, RefreshCw } from 'lucide-react';
 import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
 import Lottie from 'lottie-react';
@@ -13,7 +13,6 @@ import { useAssistant } from '../../hooks/useAssistant';
 import { MindMapService } from '../../services/mindmap';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useNavigate } from 'react-router-dom';
-import { TaskBubbles } from './TaskBubbles';
 
 interface GoalMindMapProps {
   goalId: string;
@@ -916,45 +915,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   const navigate = useNavigate();
 
-  const getStepStyle = (stepIndex: number) => {
-    const styles = [
-      // 觀察階段
-      {
-        shape: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-        gradient: 'from-blue-50 to-blue-100',
-        border: 'border-blue-200',
-        icon: 'text-blue-500',
-        text: 'text-blue-700'
-      },
-      // 行動階段
-      {
-        shape: 'circle(50% at 50% 50%)',
-        gradient: 'from-green-50 to-green-100',
-        border: 'border-green-200',
-        icon: 'text-green-500',
-        text: 'text-green-700'
-      },
-      // 紀錄階段
-      {
-        shape: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)',
-        gradient: 'from-purple-50 to-purple-100',
-        border: 'border-purple-200',
-        icon: 'text-purple-500',
-        text: 'text-purple-700'
-      },
-      // 分享階段
-      {
-        shape: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-        gradient: 'from-orange-50 to-orange-100',
-        border: 'border-orange-200',
-        icon: 'text-orange-500',
-        text: 'text-orange-700'
-      }
-    ];
-
-    return styles[stepIndex % styles.length];
-  };
-
   return (
     <div 
       ref={containerRef}
@@ -1323,10 +1283,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     }}
                     style={{
                       position: 'relative',
-                      zIndex: getIndex(step.id),
-                      clipPath: getStepStyle(stepIndex).shape,
-                      overflow: 'hidden',
-                      backgroundColor: 'transparent'
+                      zIndex: getIndex(step.id)
                     }}
                     onClick={() => {
                       setSelectedStepId(isSelected ? null : step.id);
@@ -1336,9 +1293,14 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       setEditingStepId(step.id);
                       setEditingStepTitle(step.title);
                     }}
-                    className={`step-node w-32 h-32 bg-gradient-to-br ${
-                      getStepStyle(stepIndex).gradient
-                    } flex items-center justify-center p-4 ${editingStepId === step.id ? 'cursor-text' : 'cursor-move'}`}
+                    className={`step-node group w-32 h-32 rounded-full ${
+                      'border-4'
+                    } bg-gradient-to-br ${
+                      getStepColors(stepIndex, goal.steps.length).gradient
+                    } border-${
+                      getStepColors(stepIndex, goal.steps.length).border
+                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)] transition-all duration-200 ${editingStepId === step.id ? 'cursor-text' : 'cursor-move'}`}
+                    whileHover={{ scale: editingStepId === step.id ? 1 : 1.1 }}
                     whileDrag={{ scale: 1.05, zIndex: 50 }}
                   >
                     <div className="text-center">
@@ -1363,10 +1325,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       ) : (
                         <>
                           <ListTodo className={`w-8 h-8 mx-auto mb-1 ${
-                            getStepStyle(stepIndex).icon
+                            getStepColors(stepIndex, goal.steps.length).icon
                           }`} />
                           <h3 className={`text-sm font-bold ${
-                            getStepStyle(stepIndex).text
+                            getStepColors(stepIndex, goal.steps.length).text
                           }`}>{step.title}</h3>
                         </>
                       )}
@@ -1469,17 +1431,36 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           }`}
                         >
                           <div className="flex justify-between items-start">
-                            <div className="w-6 h-6" />
-                            <div className="w-8 h-8 -mt-2 -mr-2 flex items-center justify-center">
+                            <div
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                task.status === 'done'
+                                  ? 'border-green-500 bg-green-100'
+                                  : task.status === 'in_progress'
+                                  ? 'border-orange-500 bg-orange-100'
+                                  : 'border-pink-300 bg-white'
+                              }`}
+                            >
                               {task.status === 'done' && (
-                                <span className="text-base">✅</span>
+                                <CheckCircle2 className="w-4 h-4 text-green-500" />
                               )}
                               {task.status === 'in_progress' && (
-                                <span className="text-base">🚀</span>
+                                <Clock className="w-4 h-4 text-orange-500" />
                               )}
                             </div>
+                            <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                              task.status === 'done'
+                                ? 'bg-green-200 text-green-800'
+                                : task.status === 'in_progress'
+                                ? 'bg-orange-200 text-orange-800'
+                                : 'bg-pink-200 text-pink-800'
+                            }`}>
+                              {task.status === 'done'
+                                ? '已完成'
+                                : task.status === 'in_progress'
+                                ? '進行中'
+                                : '未開始'}
+                            </div>
                           </div>
-                          
                           {editingTaskId === task.id ? (
                             <input
                               type="text"
@@ -1494,68 +1475,19 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                                   setEditingTaskTitle('');
                                 }
                               }}
-                              className="mt-2 w-[calc(100%-2rem)] bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 px-1 text-lg font-semibold text-gray-900"
+                              className="mt-3 w-full bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 px-1 text-lg font-semibold text-gray-900"
                               autoFocus
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : (
-                            <h3 className="mt-2 w-[calc(100%-2rem)] text-lg font-semibold text-gray-900">{task.title}</h3>
+                            <h3 className="mt-3 text-lg font-semibold text-gray-900">{task.title}</h3>
                           )}
-                          
                           <div className="h-[20px] mt-2">
                             {task.completedAt && (
                               <p className="text-xs text-gray-500">
                                 完成於 {new Date(task.completedAt).toLocaleDateString()}
                               </p>
                             )}
-                          </div>
-                        </motion.div>
-
-                        {/* 互動泡泡 */}
-                        <motion.div
-                          className="absolute hidden"
-                          style={{
-                            left: 280, // 卡片寬度 + 間距
-                            top: 20,   // 稍微往下偏移
-                            zIndex: getIndex(task.id)
-                          }}
-                        >
-                          <div className="flex flex-col gap-2">
-                            {/* 背景說明泡泡 */}
-                            <motion.div
-                              whileHover={{ scale: 1.05 }}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 rounded-full text-sm text-purple-700 shadow-sm cursor-pointer"
-                              style={{
-                                clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 10% 50%, 0% 100%)'
-                              }}
-                            >
-                              <span>🗣️</span>
-                              <span>為什麼要學這個？</span>
-                            </motion.div>
-                            
-                            {/* 印象泡泡 */}
-                            <motion.div
-                              whileHover={{ scale: 1.05 }}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-pink-100 rounded-full text-sm text-pink-700 shadow-sm cursor-pointer"
-                              style={{
-                                clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 10% 50%, 0% 100%)'
-                              }}
-                            >
-                              <span>💭</span>
-                              <span>想到什麼？</span>
-                            </motion.div>
-                            
-                            {/* 選擇分支泡泡 */}
-                            <motion.div
-                              whileHover={{ scale: 1.05 }}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 rounded-full text-sm text-blue-700 shadow-sm cursor-pointer"
-                              style={{
-                                clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 10% 50%, 0% 100%)'
-                              }}
-                            >
-                              <span>🧭</span>
-                              <span>要怎麼開始？</span>
-                            </motion.div>
                           </div>
                         </motion.div>
                       </motion.div>
@@ -1566,6 +1498,47 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             );
           })}
         </AnimatePresence>
+      </div>
+
+      {/* 浮動助理 */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {assistantMode === 'floating' ? (
+          <FloatingAssistant
+            enabled={showAssistant}
+            onToggle={handleToggleAssistant}
+            dragConstraints={containerRef}
+            initialPosition={calculateBottomRightPosition()}
+            onPositionChange={setAssistantPosition}
+            onDragEnd={handleAssistantDragEnd}
+            hideCloseButton
+            className="floating-assistant pointer-events-auto"
+            goalId={goalId}
+            onFocus={(elementId) => {
+              const element = document.getElementById(elementId);
+              if (element) {
+                flyToElement(elementId);
+              }
+            }}
+          />
+        ) : (
+          <PanelAssistant
+            enabled={showAssistant}
+            onToggle={handleToggleAssistant}
+            dragConstraints={containerRef}
+            initialPosition={calculateBottomRightPosition()}
+            onPositionChange={setAssistantPosition}
+            onDragEnd={handleAssistantDragEnd}
+            hideCloseButton
+            className="panel-assistant pointer-events-auto"
+            goalId={goalId}
+            onFocus={(elementId) => {
+              const element = document.getElementById(elementId);
+              if (element) {
+                flyToElement(elementId);
+              }
+            }}
+          />
+        )}
       </div>
 
       {/* 底部工具列 */}
@@ -1603,6 +1576,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         <div className="w-px h-6 bg-gray-200" />
         <div className="relative">
           <button
+            onClick={() => setAssistantMode(prev => prev === 'floating' ? 'panel' : 'floating')}
+            className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
+              assistantMode === 'panel' ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'hover:bg-gray-100 text-gray-600'
+            }`}
+            title={assistantMode === 'floating' ? '切換到面板模式' : '切換到浮動模式'}
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="relative">
+          <button
             onClick={handleToggleAssistant}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
               showAssistant ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'hover:bg-gray-100 text-gray-600'
@@ -1612,27 +1596,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             <Sparkles className="w-5 h-5" />
           </button>
         </div>
-      </div>
-
-      {/* 浮動助理 */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <PanelAssistant
-          enabled={showAssistant}
-          onToggle={handleToggleAssistant}
-          dragConstraints={containerRef}
-          initialPosition={calculateBottomRightPosition()}
-          onPositionChange={setAssistantPosition}
-          onDragEnd={handleAssistantDragEnd}
-          hideCloseButton
-          className="panel-assistant pointer-events-auto"
-          goalId={goalId}
-          onFocus={(elementId) => {
-            const element = document.getElementById(elementId);
-            if (element) {
-              flyToElement(elementId);
-            }
-          }}
-        />
       </div>
     </div>
   );
