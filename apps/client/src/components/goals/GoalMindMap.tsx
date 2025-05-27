@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, RefreshCw, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, RefreshCw, MessageSquare, Trash2 } from 'lucide-react';
 import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
 import Lottie from 'lottie-react';
@@ -647,6 +647,38 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     setBubbleOffsets(prev => ({ ...prev, [newId]: { x: 0, y: 0 } }));
   }, [goal, centerGoalPos]);
 
+  // 處理刪除步驟
+  const handleDeleteStep = useCallback((stepId: string) => {
+    if (!goal) return;
+    
+    if (window.confirm('確定要刪除這個步驟嗎？這會同時刪除所有相關的任務。')) {
+      mindMapService.deleteStep(stepId);
+      
+      // 重新計算位置
+      const optimalView = calculateOptimalView();
+      if (optimalView) {
+        setZoom(optimalView.zoom);
+        setPosition(optimalView.position);
+      }
+    }
+  }, [goal, mindMapService, calculateOptimalView]);
+
+  // 處理刪除任務
+  const handleDeleteTask = useCallback((stepId: string, taskId: string) => {
+    if (!goal) return;
+    
+    if (window.confirm('確定要刪除這個任務嗎？')) {
+      mindMapService.deleteTask(stepId, taskId);
+      
+      // 重新計算位置
+      const optimalView = calculateOptimalView();
+      if (optimalView) {
+        setZoom(optimalView.zoom);
+        setPosition(optimalView.position);
+      }
+    }
+  }, [goal, mindMapService, calculateOptimalView]);
+
   if (goalId === 'new') {
     return (
       <div className="flex items-center justify-center h-full">
@@ -856,7 +888,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     // Dump store 狀態
     useGoalStore.getState().dump(goalId);
-  }, [goal, mindMapService, zoom, goalId, editingTaskId, editingTaskTitle, getTaskPosition]);
+  }, [goal, mindMapService]);
 
   // 處理 task 標題更新
   const handleTaskTitleUpdate = useCallback((taskId: string, newTitle: string) => {
@@ -1427,17 +1459,30 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                         zIndex: getIndex(step.id) + 1
                       }}
                     >
-                      <motion.div
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddTask(step.id);
-                        }}
-                        className="w-8 h-8 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
-                      >
-                        <Plus className="w-4 h-4 text-white" />
-                      </motion.div>
+                      <div className="flex space-x-2">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStep(step.id);
+                          }}
+                          className="w-8 h-8 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddTask(step.id);
+                          }}
+                          className="w-8 h-8 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4 text-white" />
+                        </motion.button>
+                      </div>
                     </div>
                   </motion.button>
                 </motion.div>
@@ -1525,7 +1570,21 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200 hover:border-pink-400 hover:shadow-[0_0_0_4px_rgba(236,72,153,0.2)]'
                           } `}
                         >
-                          <div className="absolute top-2 right-2 pointer-events-none z-10">
+                          <div className="absolute top-2 right-2 flex space-x-2">
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const step = goal.steps.find(s => s.tasks.some(t => t.id === task.id));
+                                if (step) {
+                                  handleDeleteTask(step.id, task.id);
+                                }
+                              }}
+                              className="w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 className="w-3 h-3 text-white" />
+                            </motion.button>
                             {task.status === 'done' && (
                               <span className="text-xl">✅</span>
                             )}

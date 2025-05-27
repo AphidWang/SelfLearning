@@ -582,6 +582,8 @@ interface GoalStore {
   updateStep: (goalId: string, step: Step) => Step | null;
   addTask: (goalId: string, stepId: string, task: Task) => Task | null;
   updateTask: (goalId: string, stepId: string, task: Task) => Task | null;
+  deleteStep: (goalId: string, stepId: string) => void;
+  deleteTask: (goalId: string, stepId: string, taskId: string) => void;
   setFocusElement: (goalId: string, focusElement: { type: 'step' | 'task', id: string } | undefined) => void;
   dump: (goalId?: string) => void;
 }
@@ -761,6 +763,56 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
 
     console.log('🔄 goalStore.updateTask 結果', { updatedTask });
     return updatedTask;
+  },
+
+  deleteStep: (goalId: string, stepId: string) => {
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                steps: g.steps.filter(s => s.id !== stepId)
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
+    });
+  },
+
+  deleteTask: (goalId: string, stepId: string, taskId: string) => {
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      const step = goal.steps.find(s => s.id === stepId);
+      if (!step) return state;
+
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                steps: g.steps.map((s) =>
+                  s.id === stepId
+                    ? {
+                        ...s,
+                        tasks: s.tasks.filter(t => t.id !== taskId)
+                      }
+                    : s
+                )
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
+    });
   },
 
   setFocusElement: (goalId, focusElement) => set((state) => {

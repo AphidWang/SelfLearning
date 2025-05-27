@@ -414,6 +414,16 @@ export class MindMapService {
     return result;
   }
 
+  deleteStep(stepId: string) {
+    if (!this.currentTopicId) return null;
+    return useGoalStore.getState().deleteStep(this.currentTopicId, stepId);
+  }
+
+  deleteTask(stepId: string, taskId: string) {
+    if (!this.currentTopicId) return null;
+    return useGoalStore.getState().deleteTask(this.currentTopicId, stepId, taskId);
+  }
+
   async handleAction(actionType: string, params: any): Promise<void> {
     console.log('👆 使用者觸發行為', { 
       actionType, 
