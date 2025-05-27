@@ -5,6 +5,7 @@ import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
+import mindMapBg from '../../assets/images/mindmap-bg.jpg';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { FloatingAssistant } from '../assistant/FloatingAssistant';
 import { PanelAssistant } from '../assistant/PanelAssistant';
@@ -917,9 +918,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   return (
     <div 
       ref={containerRef}
-      className="w-full h-full relative bg-gray-50 overflow-hidden"
+      className="w-full h-full relative overflow-hidden"
       onMouseDown={handleMouseDown}
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      style={{ 
+        cursor: isDragging ? 'grabbing' : 'grab',
+        backgroundImage: `url(${mindMapBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundBlendMode: 'overlay'
+      }}
     >
       {/* Loading 遮罩 */}
       <AnimatePresence>
