@@ -1339,7 +1339,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     className={`step-node w-32 h-32 bg-gradient-to-br ${
                       getStepStyle(stepIndex).gradient
                     } flex items-center justify-center p-4 ${editingStepId === step.id ? 'cursor-text' : 'cursor-move'}`}
-                    whileHover={{ scale: 1.05 }}
                     whileDrag={{ scale: 1.05, zIndex: 50 }}
                   >
                     <div className="text-center">
