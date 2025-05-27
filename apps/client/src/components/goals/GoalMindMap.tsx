@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, Switch, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, RefreshCw, MessageSquare } from 'lucide-react';
 import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
 import { Goal, Step, Task } from '../../types/goal';
 import Lottie from 'lottie-react';
@@ -17,6 +17,17 @@ import { useNavigate } from 'react-router-dom';
 interface GoalMindMapProps {
   goalId: string;
   onBack?: () => void;
+}
+
+interface Node {
+  id: string;
+  type: 'goal' | 'step' | 'task' | 'bubble';
+  title: string;
+  parentId?: string;
+  children?: Node[];
+  position: { x: number; y: number };
+  bubbleType?: 'impression' | 'background';
+  content?: string;
 }
 
 // 在 GoalMindMap 組件前添加顏色計算函數
@@ -107,7 +118,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const { goals, addGoal } = useGoalStore();
   const goal = goalId === 'new' ? null : goals.find((g) => g.id === goalId);
   const mindMapService = React.useMemo(() => {
-    // 每次 goalId 改變時都建立新的實例
     return new MindMapService(goalId);
   }, [goalId]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -130,6 +140,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [taskZIndexes, setTaskZIndexes] = useState<{ [key: string]: number }>({});
   const baseZIndex = 1;
   const [assistantMode, setAssistantMode] = useState<'floating' | 'panel'>('floating');
+  const [bubbles, setBubbles] = useState<Node[]>([]);
+  const [bubbleOffsets, setBubbleOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
 
   // 當 goalId 改變時重置狀態
   useEffect(() => {
@@ -421,8 +433,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 拖行相關的處理函數
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    console.log('Canvas mouse down event triggered');
     // 如果點擊的是助理或其相關元素，不觸發畫布拖曳
-    if ((e.target as HTMLElement).closest('.floating-assistant, .goal-node, .step-node, .task-card')) {
+    if ((e.target as HTMLElement).closest('.floating-assistant, .goal-node, .step-node, .task-card, .bubble-node')) {
       return;
     }
 
@@ -574,6 +587,66 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     setIsEditingGoal(false);
   };
 
+  const getStepPosition = (stepIndex: number, steps: Step[]) => {
+    const baseX = 400 + 300;  // 基礎位置
+    let baseY = 0;
+    
+    // 計算前面所有 step 的總高度
+    for (let i = 0; i < stepIndex; i++) {
+      baseY += (120 + 40) * Math.max(1, steps[i].tasks.length);  // 確保最少有一個 task 的高度
+    }
+    
+    // 計算當前 step 的起始位置
+    const currentStepHeight = (120 + 40) * Math.max(1, steps[stepIndex]?.tasks.length || 1);  // 確保最少有一個 task 的高度
+    baseY += currentStepHeight / 2;
+
+    return {
+      x: baseX,
+      y: baseY
+    };
+  };
+
+  const getCenterGoalPosition = () => {
+    if (!goal) return { x: 200, y: 0 };
+    
+    const totalTasksHeight = goal.steps.length > 0 
+      ? getStepPosition(goal.steps.length, goal.steps).y
+      : 0;
+
+    return {
+      x: 200,
+      y: totalTasksHeight / 2,
+    };
+  };
+
+  const centerGoalPos = getCenterGoalPosition();
+
+  // 移動 handleAddBubble 到這裡
+  const handleAddBubble = useCallback((parentId: string, type: 'impression' | 'background') => {
+    const parentNode = goal?.id === parentId ? goal : goal?.steps.find(s => s.id === parentId);
+    if (!parentNode) return;
+
+    // 計算初始位置（在 goal 左邊）
+    const initialPosition = {
+      x: centerGoalPos.x - 200,  // 在 goal 左邊 200px
+      y: centerGoalPos.y + (type === 'background' ? 100 : -100)  // 印象泡泡在上，背景泡泡在下
+    };
+
+    const newId = `bubble-${Date.now()}`;
+    const newBubble: Node = {
+      id: newId,
+      type: 'bubble',
+      title: type === 'impression' ? '新印象' : '新背景',
+      parentId,
+      bubbleType: type,
+      content: '',
+      position: initialPosition
+    };
+
+    setBubbles(prev => [...prev, newBubble]);
+    setBubbleOffsets(prev => ({ ...prev, [newId]: { x: 0, y: 0 } }));
+  }, [goal, centerGoalPos]);
+
   if (goalId === 'new') {
     return (
       <div className="flex items-center justify-center h-full">
@@ -593,36 +666,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       </div>
     );
   }
-
-  const getCenterGoalPosition = () => {
-    const totalTasksHeight = goal.steps.length > 0 
-      ? getStepPosition(goal.steps.length, goal.steps).y  // 因為 getStepPosition 只算到中心點，所以要乘 2
-      : 0;
-
-    return {
-      x: 200,
-      y: totalTasksHeight / 2,
-    };
-  };
-
-  const getStepPosition = (stepIndex: number, steps: Step[]) => {
-    const baseX = 400 + 300;  // 基礎位置
-    let baseY = 0;
-    
-    // 計算前面所有 step 的總高度
-    for (let i = 0; i < stepIndex; i++) {
-      baseY += (120 + 40) * Math.max(1, steps[i].tasks.length);  // 確保最少有一個 task 的高度
-    }
-    
-    // 計算當前 step 的起始位置
-    const currentStepHeight = (120 + 40) * Math.max(1, steps[stepIndex]?.tasks.length || 1);  // 確保最少有一個 task 的高度
-    baseY += currentStepHeight / 2;
-
-    return {
-      x: baseX,
-      y: baseY
-    };
-  };
 
   const getTaskPosition = (stepIndex: number, taskIndex: number, totalTasks: number) => {
     const stepPos = getStepPosition(stepIndex, goal.steps);
@@ -665,8 +708,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       },
     };
   };
-
-  const centerGoalPos = getCenterGoalPosition();
 
   // 新增 step 後重新計算位置並置中到新 step
   const focusOnStep = useCallback((stepId: string) => {
@@ -1098,6 +1139,30 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             );
           })}
 
+          {bubbles.map(bubble => {
+            const offset = bubbleOffsets[bubble.id] || { x: 0, y: 0 };
+            const parentNode = bubble.parentId === goal.id ? goal : goal?.steps.find(s => s.id === bubble.parentId);
+            if (!parentNode) return null;
+            const parentPos = bubble.parentId === goal.id 
+              ? { x: centerGoalPos.x + 96 + goalOffset.x + 5000, y: centerGoalPos.y + goalOffset.y + 5000 }
+              : { x: getStepPosition(goal.steps.findIndex(s => s.id === bubble.parentId), goal.steps).x - 64 + 5000, 
+                  y: getStepPosition(goal.steps.findIndex(s => s.id === bubble.parentId), goal.steps).y + 5000 };
+            const bubblePos = { x: bubble.position.x + offset.x + 5000, y: bubble.position.y + offset.y + 5000 };
+            return (
+              <path
+                key={`bubble-line-${bubble.id}`}
+                d={`M ${parentPos.x} ${parentPos.y} \
+                    C ${(parentPos.x + bubblePos.x) / 2} ${parentPos.y},\
+                      ${(parentPos.x + bubblePos.x) / 2} ${bubblePos.y},\
+                      ${bubblePos.x} ${bubblePos.y}`}
+                stroke="#818cf8"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+                fill="none"
+              />
+            );
+          })}
+
           {goal.steps.map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex, goal.steps);
             const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
@@ -1112,6 +1177,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 { x: stepPos.x + 64 + stepOffset.x + 5000, y: stepPos.y + stepOffset.y + 5000 },
                 { x: taskPos.x + taskOffset.x + 5000, y: taskPos.y + 60 + taskOffset.y + 5000 }
               );
+
+              // 檢查是否為觀察步驟
+              const isObservationStep = step.title.includes('觀察');
+              const isThoughtTask = isObservationStep && task.title.includes('想法');
 
               return (
                 <path
@@ -1153,6 +1222,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           dragElastic={0}
           onDragStart={(e) => {
             e.stopPropagation();
+            console.log('Goal drag start event triggered');
             bringToFront('goal');
           }}
           onDrag={(e) => {
@@ -1218,17 +1288,30 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 transform: 'translate(50%, -50%)',
               }}
             >
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddStep();
-                }}
-                className="w-9 h-9 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <Plus className="w-5 h-5 text-white" />
-              </motion.button>
+              <div className="flex space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddBubble(goal.id, 'impression');
+                  }}
+                  className="w-9 h-9 bg-purple-500 hover:bg-purple-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  <MessageSquare className="w-5 h-5 text-white" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddStep();
+                  }}
+                  className="w-9 h-9 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  <Plus className="w-5 h-5 text-white" />
+                </motion.button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -1367,6 +1450,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       step.tasks.length
                     );
 
+                    // 檢查是否為觀察步驟
+                    const isObservationStep = step.title.includes('觀察');
+                    const isThoughtTask = isObservationStep && task.title.includes('想法');
+
                     return (
                       <motion.div
                         key={`task-${step.id}-${task.id}`}
@@ -1423,7 +1510,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             setEditingTaskTitle(task.title);
                           }}
                           className={`task-card w-64 p-4 rounded-2xl shadow-lg border-2 cursor-move ${
-                            task.status === 'done'
+                            task.status === 'idea'
+                              ? 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 rounded-3xl'
+                              : task.status === 'done'
                               ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
                               : task.status === 'in_progress'
                               ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
@@ -1431,34 +1520,16 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           }`}
                         >
                           <div className="flex justify-between items-start">
-                            <div
-                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                task.status === 'done'
-                                  ? 'border-green-500 bg-green-100'
-                                  : task.status === 'in_progress'
-                                  ? 'border-orange-500 bg-orange-100'
-                                  : 'border-pink-300 bg-white'
-                              }`}
-                            >
+                            <div className="w-10 h-10 absolute top-2 right-2 flex items-center justify-center">
                               {task.status === 'done' && (
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                <span className="text-2xl">✅</span>
                               )}
                               {task.status === 'in_progress' && (
-                                <Clock className="w-4 h-4 text-orange-500" />
+                                <span className="text-2xl">🚀</span>
                               )}
-                            </div>
-                            <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                              task.status === 'done'
-                                ? 'bg-green-200 text-green-800'
-                                : task.status === 'in_progress'
-                                ? 'bg-orange-200 text-orange-800'
-                                : 'bg-pink-200 text-pink-800'
-                            }`}>
-                              {task.status === 'done'
-                                ? '已完成'
-                                : task.status === 'in_progress'
-                                ? '進行中'
-                                : '未開始'}
+                              {task.status === 'idea' && (
+                                <span className="text-2xl">💭</span>
+                              )}
                             </div>
                           </div>
                           {editingTaskId === task.id ? (
@@ -1475,12 +1546,16 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                                   setEditingTaskTitle('');
                                 }
                               }}
-                              className="mt-3 w-full bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 px-1 text-lg font-semibold text-gray-900"
+                              className={`mt-3 w-full bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 px-1 text-lg font-semibold text-gray-900 pr-8 ${
+                                task.status === 'idea' ? 'italic' : ''
+                              }`}
                               autoFocus
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : (
-                            <h3 className="mt-3 text-lg font-semibold text-gray-900">{task.title}</h3>
+                            <h3 className={`mt-3 text-lg font-semibold text-gray-900 pr-8 ${
+                              task.status === 'idea' ? 'italic' : ''
+                            }`}>{task.title}</h3>
                           )}
                           <div className="h-[20px] mt-2">
                             {task.completedAt && (
@@ -1495,6 +1570,71 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   })}
                 </AnimatePresence>
               </React.Fragment>
+            );
+          })}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {bubbles.map(bubble => {
+            const offset = bubbleOffsets[bubble.id] || { x: 0, y: 0 };
+            return (
+              <motion.div
+                key={bubble.id}
+                className="absolute"
+                style={{
+                  left: bubble.position.x-64,
+                  top: bubble.position.y-64,
+                  transform: 'none'
+                }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              >
+                <motion.div
+                  drag
+                  dragMomentum={false}
+                  dragElastic={0}
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    console.log('Bubble drag start event triggered');
+                    bringToFront(bubble.id);
+                  }}
+                  onDrag={(event, info) => {
+                    event.stopPropagation();
+                    const dx = info.delta.x;
+                    const dy = info.delta.y;
+                    setBubbleOffsets(prev => {
+                      const current = prev[bubble.id] || { x: 0, y: 0 };
+                      return {
+                        ...prev,
+                        [bubble.id]: {
+                          x: current.x + dx,
+                          y: current.y + dy
+                        }
+                      };
+                    });
+                  }}
+                  onDragEnd={(e) => {
+                    e.stopPropagation();
+                  }}
+                  style={{
+                    position: 'relative',
+                    zIndex: getIndex(bubble.id)
+                  }}
+                  whileDrag={{ 
+                    scale: 1.05,
+                    zIndex: 50 
+                  }}
+                  whileHover={{ 
+                    scale: 1.02 
+                  }}
+                  className="bubble-node w-32 h-32 rounded-full bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 shadow-lg cursor-move"
+                >
+                  <div className="p-4 text-sm text-purple-700">
+                    {bubble.title}
+                  </div>
+                </motion.div>
+              </motion.div>
             );
           })}
         </AnimatePresence>
