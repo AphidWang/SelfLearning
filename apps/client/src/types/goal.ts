@@ -26,6 +26,7 @@ export interface Step {
   description?: string;
   tasks: Task[];
   order?: number;
+  status?: 'active' | 'archived';
 }
 
 export interface Task {

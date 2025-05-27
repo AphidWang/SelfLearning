@@ -586,6 +586,8 @@ interface GoalStore {
   deleteTask: (goalId: string, stepId: string, taskId: string) => void;
   setFocusElement: (goalId: string, focusElement: { type: 'step' | 'task', id: string } | undefined) => void;
   dump: (goalId?: string) => void;
+  getActiveSteps: (goalId: string) => Step[];
+  getActiveTasks: (goalId: string, stepId: string) => Task[];
 }
 
 export const useGoalStore = create<GoalStore>((set, get) => ({
@@ -775,7 +777,11 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
           g.id === goalId
             ? {
                 ...g,
-                steps: g.steps.filter(s => s.id !== stepId)
+                steps: g.steps.map(s => 
+                  s.id === stepId 
+                    ? { ...s, status: 'archived' as const }
+                    : s
+                )
               }
             : g
         )
@@ -793,6 +799,9 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
       const step = goal.steps.find(s => s.id === stepId);
       if (!step) return state;
 
+      const task = step.tasks.find(t => t.id === taskId);
+      if (!task) return state;
+
       const newState = {
         goals: state.goals.map((g) =>
           g.id === goalId
@@ -802,7 +811,11 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
                   s.id === stepId
                     ? {
                         ...s,
-                        tasks: s.tasks.filter(t => t.id !== taskId)
+                        tasks: s.tasks.map(t =>
+                          t.id === taskId
+                            ? { ...t, status: 'done' as const }
+                            : t
+                        )
                       }
                     : s
                 )
@@ -833,5 +846,16 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
       const goal = state.goals.find(g => g.id === goalId);
       if (!goal) return;
     }
+  },
+
+  getActiveSteps: (goalId: string) => {
+    const goal = get().goals.find(g => g.id === goalId);
+    return goal?.steps.filter(step => step.status !== 'archived') || [];
+  },
+
+  getActiveTasks: (goalId: string, stepId: string) => {
+    const goal = get().goals.find(g => g.id === goalId);
+    const step = goal?.steps.find(s => s.id === stepId);
+    return step?.tasks.filter(task => task.status !== 'done') || [];
   }
 })); 

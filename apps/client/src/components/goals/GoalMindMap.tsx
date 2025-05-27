@@ -176,19 +176,25 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const containerHeight = container.clientHeight;
 
     // 計算所有 step 的總高度
-    const totalStepHeight = goal.steps.reduce((total, step) => {
-      // 確保每個 step 至少有最小高度
-      const stepHeight = Math.max(120, (120 + 40) * Math.max(1, step.tasks.length));
-      return total + stepHeight;
-    }, 0);
+    const totalStepHeight = goal.steps
+      .filter(step => step.status !== 'archived')
+      .reduce((total, step) => {
+        // 確保每個 step 至少有最小高度
+        const stepHeight = Math.max(120, (120 + 40) * Math.max(1, step.tasks.length));
+        return total + stepHeight;
+      }, 0);
 
     // 如果沒有 step，使用預設高度
     const effectiveTotalHeight = totalStepHeight || 10;
 
     // 計算整個畫布的寬度（從最左到最右）
     const centerGoalX = 0;  // 中心目標的 x 位置
-    const hasSteps = goal.steps.length > 0;
-    const hasTasks = goal.steps.some(step => step.tasks.length > 0);
+    const hasSteps = goal.steps
+      .filter(step => step.status !== 'archived')
+      .length > 0;
+    const hasTasks = goal.steps
+      .filter(step => step.status !== 'archived')
+      .some(step => step.tasks.length > 0);
     
     // 根據是否有 step 和 task 決定最右邊的位置
     const rightmostTaskX = hasSteps 
@@ -244,12 +250,14 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       const initialStepOffsets: { [key: string]: { x: number; y: number } } = {};
       const initialTaskOffsets: { [key: string]: { x: number; y: number } } = {};
 
-      goal.steps.forEach((step, stepIndex) => {
-        initialStepOffsets[step.id] = { x: 0, y: 0 };
-        step.tasks.forEach((task) => {
-          initialTaskOffsets[task.id] = { x: 0, y: 0 };
+      goal.steps
+        .filter(step => step.status !== 'archived')
+        .forEach((step, stepIndex) => {
+          initialStepOffsets[step.id] = { x: 0, y: 0 };
+          step.tasks.forEach((task) => {
+            initialTaskOffsets[task.id] = { x: 0, y: 0 };
+          });
         });
-      });
 
       setStepOffsets(initialStepOffsets);
       setTaskOffsets(initialTaskOffsets);
@@ -591,13 +599,18 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const baseX = 400 + 300;  // 基礎位置
     let baseY = 0;
     
+    // 使用 store 的 getter
+    const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
+    
     // 計算前面所有 step 的總高度
     for (let i = 0; i < stepIndex; i++) {
-      baseY += (120 + 40) * Math.max(1, steps[i].tasks.length);  // 確保最少有一個 task 的高度
+      if (activeSteps[i]) {
+        baseY += (120 + 40) * Math.max(1, activeSteps[i].tasks.length);
+      }
     }
     
     // 計算當前 step 的起始位置
-    const currentStepHeight = (120 + 40) * Math.max(1, steps[stepIndex]?.tasks.length || 1);  // 確保最少有一個 task 的高度
+    const currentStepHeight = (120 + 40) * Math.max(1, activeSteps[stepIndex]?.tasks.length || 1);
     baseY += currentStepHeight / 2;
 
     return {
@@ -609,7 +622,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const getCenterGoalPosition = () => {
     if (!goal) return { x: 200, y: 0 };
     
-    const totalTasksHeight = goal.steps.length > 0 
+    const totalTasksHeight = goal.steps
+      .filter(step => step.status !== 'archived')
+      .length > 0 
       ? getStepPosition(goal.steps.length, goal.steps).y
       : 0;
 
@@ -704,6 +719,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const taskX = 200;
     const cardHeight = 120;
     const cardSpacing = 40;
+
+    // 使用 store 的 getter
+    const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
+    const currentStep = activeSteps[stepIndex];
+    if (!currentStep) return { x: 0, y: 0 };
 
     // 計算當前任務之前的所有卡片高度和間距
     const currentStepPreviousHeight = (cardHeight * taskIndex) + (cardSpacing * taskIndex);
@@ -940,7 +960,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     let markdown = `# ${goal.title}\n\n`;
 
-    goal.steps.forEach((step, stepIndex) => {
+    goal.steps
+      .filter(step => step.status !== 'archived')
+      .forEach((step, stepIndex) => {
       markdown += `## ${stepIndex + 1}. ${step.title}\n\n`;
       
       step.tasks.forEach((task, taskIndex) => {
@@ -1149,7 +1171,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             minHeight: '20000px'
           }}
         >
-          {goal.steps.map((step, stepIndex) => {
+          {goal.steps
+            .filter(step => step.status !== 'archived')
+            .map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex, goal.steps);
             const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
             const curvePoints = getCurvePoints(
@@ -1195,7 +1219,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             );
           })}
 
-          {goal.steps.map((step, stepIndex) => {
+          {goal.steps
+            .filter(step => step.status !== 'archived')
+            .map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex, goal.steps);
             const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
             return step.tasks.map((task, taskIndex) => {
@@ -1349,7 +1375,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </motion.div>
 
         <AnimatePresence>
-          {goal.steps.map((step, stepIndex) => {
+          {goal.steps
+            .filter(step => step.status !== 'archived')
+            .map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex, goal.steps);
             const isSelected = selectedStepId === step.id;
 
