@@ -1474,14 +1474,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       >
                         <motion.div
                           id={`task-${task.id}`}
-                          drag
+                          drag={editingTaskId !== task.id}
                           dragMomentum={false}
-                          whileDrag={{ scale: 1.02 }}
+                          whileDrag={{ scale: 1.05 }}
+                          whileHover={{ scale: editingTaskId === task.id ? 1 : 1.1 }}
                           onDragStart={(e) => {
+                            if (editingTaskId === task.id) return;
                             e.stopPropagation();
                             bringToFront(task.id);
                           }}
                           onDrag={(event, info) => {
+                            if (editingTaskId === task.id) return;
                             event.stopPropagation();
                             const dx = info.delta.x;
                             const dy = info.delta.y;
@@ -1497,6 +1500,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               };
                             });
                           }}
+                          onDragEnd={() => {
+                            if (editingTaskId === task.id) return;
+                          }}
                           style={{
                             position: 'relative',
                             zIndex: getIndex(task.id)
@@ -1511,13 +1517,13 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           }}
                           className={`task-card w-64 h-24 p-4 rounded-2xl shadow-lg border-2 cursor-move flex flex-col justify-center gap-2 relative ${
                             task.status === 'idea'
-                              ? 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 rounded-3xl'
+                              ? 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 rounded-3xl hover:border-purple-400 hover:shadow-[0_0_0_4px_rgba(99,102,241,0.2)]'
                               : task.status === 'done'
-                              ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
+                              ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 hover:border-green-400 hover:shadow-[0_0_0_4px_rgba(34,197,94,0.2)]'
                               : task.status === 'in_progress'
-                              ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
-                              : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200'
-                          }`}
+                              ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 hover:border-orange-400 hover:shadow-[0_0_0_4px_rgba(249,115,22,0.2)]'
+                              : 'bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200 hover:border-pink-400 hover:shadow-[0_0_0_4px_rgba(236,72,153,0.2)]'
+                          } `}
                         >
                           <div className="absolute top-2 right-2 pointer-events-none z-10">
                             {task.status === 'done' && (
