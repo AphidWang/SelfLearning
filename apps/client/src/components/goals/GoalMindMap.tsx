@@ -1500,47 +1500,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </AnimatePresence>
       </div>
 
-      {/* 浮動助理 */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {assistantMode === 'floating' ? (
-          <FloatingAssistant
-            enabled={showAssistant}
-            onToggle={handleToggleAssistant}
-            dragConstraints={containerRef}
-            initialPosition={calculateBottomRightPosition()}
-            onPositionChange={setAssistantPosition}
-            onDragEnd={handleAssistantDragEnd}
-            hideCloseButton
-            className="floating-assistant pointer-events-auto"
-            goalId={goalId}
-            onFocus={(elementId) => {
-              const element = document.getElementById(elementId);
-              if (element) {
-                flyToElement(elementId);
-              }
-            }}
-          />
-        ) : (
-          <PanelAssistant
-            enabled={showAssistant}
-            onToggle={handleToggleAssistant}
-            dragConstraints={containerRef}
-            initialPosition={calculateBottomRightPosition()}
-            onPositionChange={setAssistantPosition}
-            onDragEnd={handleAssistantDragEnd}
-            hideCloseButton
-            className="panel-assistant pointer-events-auto"
-            goalId={goalId}
-            onFocus={(elementId) => {
-              const element = document.getElementById(elementId);
-              if (element) {
-                flyToElement(elementId);
-              }
-            }}
-          />
-        )}
-      </div>
-
       {/* 底部工具列 */}
       <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-2xl shadow-xl bg-white/80 backdrop-blur border border-gray-200" style={{minWidth:'fit-content'}}>
         <button
@@ -1576,17 +1535,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         <div className="w-px h-6 bg-gray-200" />
         <div className="relative">
           <button
-            onClick={() => setAssistantMode(prev => prev === 'floating' ? 'panel' : 'floating')}
-            className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
-              assistantMode === 'panel' ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'hover:bg-gray-100 text-gray-600'
-            }`}
-            title={assistantMode === 'floating' ? '切換到面板模式' : '切換到浮動模式'}
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="relative">
-          <button
             onClick={handleToggleAssistant}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
               showAssistant ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'hover:bg-gray-100 text-gray-600'
@@ -1596,6 +1544,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             <Sparkles className="w-5 h-5" />
           </button>
         </div>
+      </div>
+
+      {/* 浮動助理 */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <PanelAssistant
+          enabled={showAssistant}
+          onToggle={handleToggleAssistant}
+          dragConstraints={containerRef}
+          initialPosition={calculateBottomRightPosition()}
+          onPositionChange={setAssistantPosition}
+          onDragEnd={handleAssistantDragEnd}
+          hideCloseButton
+          className="panel-assistant pointer-events-auto"
+          goalId={goalId}
+          onFocus={(elementId) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+              flyToElement(elementId);
+            }
+          }}
+        />
       </div>
     </div>
   );
