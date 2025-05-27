@@ -1525,6 +1525,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             <motion.div
                               whileHover={{ scale: 1.05 }}
                               className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 rounded-full text-sm text-purple-700 shadow-sm cursor-pointer"
+                              style={{
+                                clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 10% 50%, 0% 100%)'
+                              }}
                             >
                               <span>🗣️</span>
                               <span>為什麼要學這個？</span>
@@ -1534,6 +1537,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             <motion.div
                               whileHover={{ scale: 1.05 }}
                               className="flex items-center gap-1 px-3 py-1.5 bg-pink-100 rounded-full text-sm text-pink-700 shadow-sm cursor-pointer"
+                              style={{
+                                clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 10% 50%, 0% 100%)'
+                              }}
                             >
                               <span>💭</span>
                               <span>想到什麼？</span>
@@ -1543,6 +1549,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             <motion.div
                               whileHover={{ scale: 1.05 }}
                               className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 rounded-full text-sm text-blue-700 shadow-sm cursor-pointer"
+                              style={{
+                                clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 10% 50%, 0% 100%)'
+                              }}
                             >
                               <span>🧭</span>
                               <span>要怎麼開始？</span>
