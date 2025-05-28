@@ -24,6 +24,7 @@ import { ChatService } from '../../lib/ai/services/chat';
 import { MindMapService } from '../../services/mindmap';
 import { ChatResponse } from '../../lib/ai/types';
 import type { LLMResponse, ActionForm } from '../../lib/ai/types/llm';
+import { EventType } from '../../services/mindmap/config/events';
 
 // Avatar 的行為狀態
 export type AssistantMode = 'idle' | 'thinking' | 'voice' | 'menu';
@@ -118,7 +119,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         action: async () => {
           try {
             setMode('thinking');
-            await mindMapService.handleAction(option.action.type, option.action.params);
+            await mindMapService.handleAction(option.action.type as EventType, option.action.params);
             setMode('idle');
           } catch (error) {
             console.error('Failed to handle option click:', error);
@@ -481,7 +482,7 @@ export const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={handleSendMessage}
+                            onClick={() => handleSendMessage()}
                             disabled={isLoading || !uiState.inputText.trim()}
                             className="p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >

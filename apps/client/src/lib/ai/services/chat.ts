@@ -7,6 +7,9 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { BaseMessage } from '@langchain/core/messages';
 import { RunnableSequence } from '@langchain/core/runnables';
+import { STATE_PROMPTS } from '../config/prompts/states';
+import { LEVEL_PROMPTS } from '../config/prompts/levels';
+import { buildChatPrompt } from '../config/prompts/prompt';
 // 移除無法找到的模組導入
 // import { LLMChain } from '@langchain/core/chains';
 
@@ -189,6 +192,8 @@ export class ChatService {
   private model: ChatOpenAI;
   private chain: RunnableSequence;
   private mindmapContext: string = '';
+  private currentState: keyof typeof STATE_PROMPTS = 'init';
+  private currentLevel: keyof typeof LEVEL_PROMPTS = 'L0';
 
   constructor() {
     this.model = new ChatOpenAI({
@@ -199,27 +204,46 @@ export class ChatService {
     // 初始化自定義記憶系統
     this.memory = new CustomSummaryMemory();
 
-    // 建立提示模板
-    const prompt = ChatPromptTemplate.fromMessages([
-      ['system', SYSTEM_PROMPT_WITH_ACTIONS],
-      ['system', 'Current Mindmap Context: {mindmapContext}'],
-      new MessagesPlaceholder('history'),
-      ['human', '{input}']
-    ]);
-
     // 建立對話鏈
     this.chain = RunnableSequence.from([
       async (input: string) => {
         const memoryVars = await this.memory.loadMemoryVariables({});
+        const prompt = ChatPromptTemplate.fromMessages([
+          ['system', await this.buildSystemPrompt()],
+          ['system', 'Current Mindmap Context: {mindmapContext}'],
+          new MessagesPlaceholder('history'),
+          ['human', '{input}']
+        ]);
         return {
           input,
           history: memoryVars.history,
-          mindmapContext: this.mindmapContext
+          mindmapContext: this.mindmapContext,
+          prompt
         };
       },
-      prompt,
+      async ({ input, history, mindmapContext, prompt }) => {
+        return prompt.formatMessages({
+          input,
+          history,
+          mindmapContext
+        });
+      },
       this.model,
     ]);
+  }
+
+  private async buildSystemPrompt(): Promise<string> {
+    const memoryVars = await this.memory.loadMemoryVariables({});
+    return buildChatPrompt({
+      state: this.currentState,
+      level: this.currentLevel,
+      mindmapContext: this.mindmapContext,
+      history: memoryVars.history.map(msg => ({
+        role: msg.type === 'human' ? 'user' : 'assistant',
+        content: msg.content
+      })),
+      tools: actions
+    });
   }
 
   // 更新 mindmap 上下文
@@ -228,22 +252,32 @@ export class ChatService {
   }
 
   // 發送訊息並獲取回應
-  public async sendMessage(message: string): Promise<ChatResponse> {
+  public async sendMessage(
+    message: string,
+    options?: {
+      state?: keyof typeof STATE_PROMPTS;
+      level?: keyof typeof LEVEL_PROMPTS;
+    }
+  ): Promise<ChatResponse> {
     try {
+      // 如果有提供新的 state 或 level，就更新
+      if (options?.state) this.currentState = options.state;
+      if (options?.level) this.currentLevel = options.level;
+
       // 從記憶中獲取歷史
       const memoryVars = await this.memory.loadMemoryVariables({});
       
       // 呼叫後端 API
       const response = await api.post('/api/chat/completions', {
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT_WITH_ACTIONS },
+          { role: 'system', content: await this.buildSystemPrompt() },
           { role: 'system', content: `Current Mindmap Context: ${this.mindmapContext}` },
           ...memoryVars.history.map(msg => ({
             role: msg.type === 'human' ? 'user' : 'assistant',
             content: msg.content
           })),
           { role: 'user', content: message }
-        ].filter(msg => msg.content), // 過濾掉沒有內容的訊息
+        ].filter(msg => msg.content),
         temperature: 0.7
       });
 

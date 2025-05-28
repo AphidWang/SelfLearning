@@ -7,7 +7,7 @@ export class MindmapStateController {
   private stateHistory: string[] = [];
   private readonly maxHistoryLength = 10;
 
-  constructor(initialState: string = 'idle') {
+  constructor(initialState: string = 'init') {
     this.currentState = initialState;
     this.stateHistory.push(initialState);
   }
@@ -95,6 +95,10 @@ export class MindmapStateController {
   transition(event: EventType): boolean {
     const actionResult = this.handleAIAction(event);
     if (!actionResult.allowed) {
+      // 如果狀態沒有改變，就不輸出警告
+      if (actionResult.nextState === this.currentState) {
+        return true;
+      }
       console.warn(`❌ 無法從 ${this.currentState} 轉換到 ${event} 事件: ${actionResult.reason}`);
       return false;
     }
@@ -104,13 +108,16 @@ export class MindmapStateController {
       return false;
     }
 
-    console.log(`🔄 狀態轉換: ${this.currentState} -> ${actionResult.nextState} (事件: ${event})`);
-    this.currentState = actionResult.nextState;
-    
-    // 更新歷史記錄
-    this.stateHistory.push(actionResult.nextState);
-    if (this.stateHistory.length > this.maxHistoryLength) {
-      this.stateHistory.shift();
+    // 如果狀態沒有改變，就不輸出日誌
+    if (actionResult.nextState !== this.currentState) {
+      console.log(`🔄 狀態轉換: ${this.currentState} -> ${actionResult.nextState} (事件: ${event})`);
+      this.currentState = actionResult.nextState;
+      
+      // 更新歷史記錄
+      this.stateHistory.push(actionResult.nextState);
+      if (this.stateHistory.length > this.maxHistoryLength) {
+        this.stateHistory.shift();
+      }
     }
 
     return true;

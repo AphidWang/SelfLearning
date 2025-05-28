@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Goal, Step, Task } from '../types/goal';
+import type { Goal, Step, Task, Bubble } from '../types/goal';
 import { GOAL_STATUSES } from '../constants/goals';
 import { SUBJECTS } from '../constants/subjects';
 
@@ -16,6 +16,22 @@ const initialGoals: Goal[] = [
     title: '探索唐詩之美',
     description: '透過詩歌感受唐代文人的情感與智慧',
     status: 'in-progress',
+    bubbles: [
+      {
+        id: 'bubble-1-1',
+        title: '詩歌欣賞',
+        parentId: '1',
+        bubbleType: 'background',
+        content: '在課堂上讀到李白的詩，被他的豪邁氣概所吸引'
+      },
+      {
+        id: 'bubble-1-2',
+        title: '詩詞創作',
+        parentId: '1',
+        bubbleType: 'background',
+        content: '詩歌、韻律、意境、典故、創作'
+      }
+    ],
     steps: [
       {
         id: '1-1',
@@ -88,6 +104,22 @@ const initialGoals: Goal[] = [
     title: '探索分數的奧秘',
     description: '透過生活情境理解分數的概念',
     status: 'active',
+    bubbles: [
+      {
+        id: 'bubble-2-1',
+        title: '生活應用',
+        parentId: '2',
+        bubbleType: 'background',
+        content: '在切蛋糕時發現需要平均分配，這讓我對分數產生興趣'
+      },
+      {
+        id: 'bubble-2-2',
+        title: '分數概念',
+        parentId: '2',
+        bubbleType: 'background',
+        content: '分數、比例、除法、比較'
+      }
+    ],
     steps: [
       {
         id: '2-1',
@@ -95,12 +127,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '2-1-1',
-            title: '切蛋糕會用',
+            title: '平均分配',
             status: 'idea',
           },
           {
             id: '2-1-2',
-            title: '公平分配',
+            title: '公平分享',
             status: 'idea',
           },
         ],
@@ -171,6 +203,22 @@ const initialGoals: Goal[] = [
     title: '探索英語故事創作',
     description: '透過故事學習英語表達',
     status: 'active',
+    bubbles: [
+      {
+        id: 'bubble-3-1',
+        title: '故事閱讀',
+        parentId: '3',
+        bubbleType: 'background',
+        content: '讀到有趣的英文故事，想要自己也能寫出這樣的故事'
+      },
+      {
+        id: 'bubble-3-2',
+        title: '寫作技巧',
+        parentId: '3',
+        bubbleType: 'background',
+        content: '角色、場景、情節、對話'
+      }
+    ],
     steps: [
       {
         id: '3-1',
@@ -178,12 +226,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '3-1-1',
-            title: '角色如友',
+            title: '角色塑造',
             status: 'idea',
           },
           {
             id: '3-1-2',
-            title: '場景身歷',
+            title: '場景描寫',
             status: 'idea',
           },
         ],
@@ -243,6 +291,22 @@ const initialGoals: Goal[] = [
     title: '探索植物生長',
     description: '透過觀察了解植物的生命週期',
     status: 'active',
+    bubbles: [
+      {
+        id: 'bubble-4-1',
+        title: '種子發芽',
+        parentId: '4',
+        bubbleType: 'background',
+        content: '看到種子發芽的過程，對植物的生長感到好奇'
+      },
+      {
+        id: 'bubble-4-2',
+        title: '植物生長',
+        parentId: '4',
+        bubbleType: 'background',
+        content: '發芽、生長、開花、結果'
+      }
+    ],
     steps: [
       {
         id: '4-1',
@@ -250,12 +314,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '4-1-1',
-            title: '種子神奇',
+            title: '種子變化',
             status: 'idea',
           },
           {
             id: '4-1-2',
-            title: '形狀各異',
+            title: '發芽過程',
             status: 'idea',
           },
         ],
@@ -315,6 +379,22 @@ const initialGoals: Goal[] = [
     title: '探索色彩藝術',
     description: '透過色彩認識藝術表現',
     status: 'active',
+    bubbles: [
+      {
+        id: 'bubble-5-1',
+        title: '美術課',
+        parentId: '5',
+        bubbleType: 'background',
+        content: '在美術課上看到同學用不同顏色畫出漂亮的畫，讓我很好奇顏色是怎麼搭配的'
+      },
+      {
+        id: 'bubble-5-2',
+        title: '色彩學',
+        parentId: '5',
+        bubbleType: 'background',
+        content: '色彩學、色輪、色彩心理學、繪畫技巧'
+      }
+    ],
     steps: [
       {
         id: '5-1',
@@ -322,12 +402,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '5-1-1',
-            title: '我覺得顏色可以表達我的心情',
+            title: '不同的心情',
             status: 'idea',
           },
           {
             id: '5-1-2',
-            title: '我發現混合顏色會產生新的顏色，很神奇',
+            title: '顏色混合',
             status: 'idea',
           },
         ],
@@ -338,12 +418,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '5-2-1',
-            title: '用顏色表達心情',
+            title: '試著用溫暖的顏色畫出快樂的場景',
             status: 'in_progress',
           },
           {
             id: '5-2-2',
-            title: '創作情緒色彩畫',
+            title: '用冷色調表現下雨天的感覺',
             status: 'todo',
           },
         ],
@@ -354,12 +434,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '5-3-1',
-            title: '學習色彩搭配',
+            title: '學習如何讓顏色和諧地搭配在一起',
             status: 'todo',
           },
           {
             id: '5-3-2',
-            title: '創作色彩構圖',
+            title: '練習用不同深淺的顏色創造層次感',
             status: 'todo',
           },
         ],
@@ -370,12 +450,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '5-4-1',
-            title: '用色彩講述故事',
+            title: '用顏色來表達一個故事的情緒變化',
             status: 'todo',
           },
           {
             id: '5-4-2',
-            title: '創作色彩連環畫',
+            title: '創作一幅用顏色說故事的畫',
             status: 'todo',
           },
         ],
@@ -387,6 +467,22 @@ const initialGoals: Goal[] = [
     title: '探索身體運動',
     description: '透過運動了解身體機能',
     status: 'active',
+    bubbles: [
+      {
+        id: 'bubble-6-1',
+        title: '體育課',
+        parentId: '6',
+        bubbleType: 'background',
+        content: '看到同學在體育課上玩得很開心，我也想學會這些運動'
+      },
+      {
+        id: 'bubble-6-2',
+        title: '體能訓練',
+        parentId: '6',
+        bubbleType: 'background',
+        content: '體能訓練、運動技巧、健康生活、團隊合作'
+      }
+    ],
     steps: [
       {
         id: '6-1',
@@ -394,12 +490,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '6-1-1',
-            title: '我覺得運動後身體會變得更靈活',
+            title: '心跳變化',
             status: 'idea',
           },
           {
             id: '6-1-2',
-            title: '我發現運動可以讓我更有精神',
+            title: '肌肉伸展',
             status: 'idea',
           },
         ],
@@ -410,12 +506,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '6-2-1',
-            title: '學習基本動作',
+            title: '學習正確的跑步姿勢，避免受傷',
             status: 'in_progress',
           },
           {
             id: '6-2-2',
-            title: '練習協調性',
+            title: '練習基本的跳躍和平衡動作',
             status: 'todo',
           },
         ],
@@ -426,12 +522,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '6-3-1',
-            title: '學習運動技巧',
+            title: '學習投球和接球的技巧',
             status: 'todo',
           },
           {
             id: '6-3-2',
-            title: '練習運動組合',
+            title: '練習團隊運動中的傳球和配合',
             status: 'todo',
           },
         ],
@@ -442,12 +538,12 @@ const initialGoals: Goal[] = [
         tasks: [
           {
             id: '6-4-1',
-            title: '設計運動遊戲',
+            title: '設計一個有趣的運動遊戲，讓大家都能參與',
             status: 'todo',
           },
           {
             id: '6-4-2',
-            title: '參與運動競賽',
+            title: '參加班際運動比賽，體驗團隊合作',
             status: 'todo',
           },
         ],
@@ -459,77 +555,93 @@ const initialGoals: Goal[] = [
     title: '為什麼要讀書',
     description: '探索讀書的意義與價值',
     status: 'active',
+    bubbles: [
+      {
+        id: 'bubble-7-1',
+        title: '爸媽建議',
+        parentId: '7',
+        bubbleType: 'background',
+        content: '爸媽常說讀書很重要，但我想知道為什麼'
+      },
+      {
+        id: 'bubble-7-2',
+        title: '學習方法',
+        parentId: '7',
+        bubbleType: 'background',
+        content: '學習方法、知識獲取、思考能力、自我成長'
+      }
+    ],
     steps: [
       {
         id: '7-1',
-        title: '[觀察] 讀書的現況',
+        title: '讀書的現況',
         tasks: [
           {
             id: '7-1-1',
-            title: '我覺得讀書可以讓我看到不一樣的世界',
+            title: '想像場景',
             status: 'idea',
           },
           {
             id: '7-1-2',
-            title: '我發現讀書時會忘記時間，很投入',
+            title: '時間飛逝',
             status: 'idea',
           },
           {
             id: '7-1-3',
-            title: '收集不同人對讀書的看法',
+            title: '訪問同學',
             status: 'todo',
           }
         ],
       },
       {
         id: '7-2',
-        title: '[行動] 體驗讀書',
+        title: '體驗讀書',
         tasks: [
           {
             id: '7-2-1',
-            title: '嘗試閱讀不同類型的書',
+            title: '試著讀一本故事書，記錄下自己的感受和想法',
             status: 'todo',
           },
           {
             id: '7-2-2',
-            title: '記錄讀書時的感受',
+            title: '讀一本科普書，看看能學到什麼新知識',
             status: 'todo',
           }
         ],
       },
       {
         id: '7-3',
-        title: '[整理] 讀書的收穫',
+        title: '讀書的收穫',
         tasks: [
           {
             id: '7-3-1',
-            title: '整理讀書學到的新知識',
+            title: '整理讀書時學到的新詞彙和概念',
             status: 'todo',
           },
           {
             id: '7-3-2',
-            title: '分析讀書對生活的影響',
+            title: '思考讀書如何幫助我解決生活中的問題',
             status: 'todo',
           },
           {
             id: '7-3-3',
-            title: '思考讀書帶來的改變',
+            title: '記錄讀書後的想法和啟發',
             status: 'todo',
           }
         ],
       },
       {
         id: '7-4',
-        title: '[分享] 讀書的價值',
+        title: '讀書的價值',
         tasks: [
           {
             id: '7-4-1',
-            title: '製作讀書心得分享',
+            title: '製作一個讀書心得分享，說明讀書帶來的改變',
             status: 'todo',
           },
           {
             id: '7-4-2',
-            title: '與他人討論讀書經驗',
+            title: '和同學討論讀書的樂趣和收穫',
             status: 'todo',
           }
         ],
@@ -588,6 +700,9 @@ interface GoalStore {
   dump: (goalId?: string) => void;
   getActiveSteps: (goalId: string) => Step[];
   getActiveTasks: (goalId: string, stepId: string) => Task[];
+  addBubble: (goalId: string, bubble: Bubble) => void;
+  updateBubble: (goalId: string, bubbleId: string, bubble: Partial<Bubble>) => void;
+  deleteBubble: (goalId: string, bubbleId: string) => void;
 }
 
 export const useGoalStore = create<GoalStore>((set, get) => ({
@@ -813,7 +928,7 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
                         ...s,
                         tasks: s.tasks.map(t =>
                           t.id === taskId
-                            ? { ...t, status: 'done' as const }
+                            ? { ...t, status: 'archived' as const }
                             : t
                         )
                       }
@@ -850,12 +965,86 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
 
   getActiveSteps: (goalId: string) => {
     const goal = get().goals.find(g => g.id === goalId);
-    return goal?.steps.filter(step => step.status !== 'archived') || [];
+    if (!goal) return [];
+    
+    // 過濾掉已存檔的步驟，並且只保留未存檔的任務
+    return goal.steps
+      .filter(step => step.status !== 'archived')
+      .map(step => ({
+        ...step,
+        tasks: step.tasks.filter(task => task.status !== 'archived')
+      }));
   },
 
   getActiveTasks: (goalId: string, stepId: string) => {
     const goal = get().goals.find(g => g.id === goalId);
-    const step = goal?.steps.find(s => s.id === stepId);
-    return step?.tasks.filter(task => task.status !== 'done') || [];
+    if (!goal) return [];
+    
+    const step = goal.steps.find(s => s.id === stepId);
+    if (!step || step.status === 'archived') return [];
+    
+    return step.tasks.filter(task => task.status !== 'archived');
+  },
+
+  addBubble: (goalId, bubble) => {
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                bubbles: [...(g.bubbles || []), bubble],
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
+    });
+  },
+
+  updateBubble: (goalId, bubbleId, bubble) => {
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                bubbles: (g.bubbles || []).map((b) =>
+                  b.id === bubbleId ? { ...b, ...bubble } : b
+                ),
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
+    });
+  },
+
+  deleteBubble: (goalId, bubbleId) => {
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                bubbles: (g.bubbles || []).filter((b) => b.id !== bubbleId),
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
+    });
   }
 })); 

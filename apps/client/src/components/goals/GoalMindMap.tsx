@@ -188,12 +188,38 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [bubbleOffsets, setBubbleOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
 
   // 當 goalId 改變時重置狀態
-  useEffect(() => {
-    setInitialLoad(true);
-    setIsLoading(true);
-    setZoom(0.8);
-    setPosition({ x: 0, y: 0 });
-  }, [goalId]);
+ // 當 goalId 改變時重置狀態
+ useEffect(() => {
+  setInitialLoad(true);
+  setIsLoading(true);
+  setZoom(0.8);
+  setPosition({ x: 0, y: 0 });
+  setActiveSteps([]);
+  setActiveTasks(new Map());
+  setSelectedStepId(null);
+  setIsGoalSelected(false);
+  setEditingStepId(null);
+  setEditingStepTitle('');
+  setEditingTaskId(null);
+  setEditingTaskTitle('');
+  setStepOffsets({});
+  setTaskOffsets({});
+  setBubbleOffsets({});
+  setBubbles([]);
+  setGoalOffset({ x: 0, y: 0 });
+  setGoalPosition({ x: 200, y: 0 });
+
+      // 如果有 goal，立即初始化 activeSteps
+      if (goal) {
+        const steps = useGoalStore.getState().getActiveSteps(goalId);
+        const tasksMap = new Map<string, Task[]>();
+        steps.forEach(step => {
+          tasksMap.set(step.id, useGoalStore.getState().getActiveTasks(goalId, step.id));
+        });
+        setActiveSteps(steps);
+        setActiveTasks(tasksMap);
+      }
+}, [goalId, goal]);
 
   // 追蹤目標節點位置
   const goalX = useMotionValue(0);

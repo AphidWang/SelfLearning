@@ -10,11 +10,17 @@ export const useAssistant = (initialState?: Partial<AssistantState>) => {
   const [position, setPosition] = useState(initialState?.position ?? { x: 0, y: 0 });
 
   const toggleAssistant = () => setIsVisible(!isVisible);
+  
+  const reset = () => {
+    setIsVisible(initialState?.isVisible ?? true);
+    setPosition(initialState?.position ?? { x: 0, y: 0 });
+  };
 
   return {
     isVisible,
     position,
     setPosition,
-    toggleAssistant
+    toggleAssistant,
+    reset
   };
 }; 

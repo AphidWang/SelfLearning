@@ -18,6 +18,7 @@ import { Goal, Step, Task, Bubble } from '../../types/goal';
 import { stateMachine } from './config/stateMachine';
 import { EventType } from './config/events';
 import { MindmapStateController } from './controller/MindmapStateController';
+import { STATE_PROMPTS } from '../../lib/ai/config/prompts/states';
 
 // 系統錯誤
 class SystemError extends Error {
@@ -68,6 +69,10 @@ export class MindMapService {
     this.formConfigs = forms;
     this.currentTopicId = topicId;
     this.setupContextSubscription();
+    // 設定初始狀態為 init
+    this.stateController.transition('init');
+    // 清空 chatService 的歷史記錄
+    this.chatService.clearHistory();
   }
 
   setCurrentTopic(topicId: string | null) {
@@ -225,7 +230,10 @@ export class MindMapService {
         const currentContext = await this.getMindmapContext();
         this.chatService.updateMindmapContext(currentContext);
 
-        const response = await this.chatService.sendMessage(actualInput);
+        const response = await this.chatService.sendMessage(actualInput, {
+          level: 'L3',
+          state: this.stateController.getCurrentState() as keyof typeof STATE_PROMPTS
+        });
         
         // 先檢查 API 狀態
         if ('status' in response) {

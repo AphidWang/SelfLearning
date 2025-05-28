@@ -25,6 +25,7 @@ import { ChatService } from '../../lib/ai/services/chat';
 import { MindMapService } from '../../services/mindmap';
 import { ChatResponse } from '../../lib/ai/types';
 import type { LLMResponse, ActionForm } from '../../lib/ai/types/llm';
+import { EventType } from '../../services/mindmap/config/events';
 
 // Avatar 的行為狀態
 export type AssistantMode = 'idle' | 'thinking' | 'voice' | 'menu';
@@ -120,7 +121,7 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
         action: async () => {
           try {
             setMode('thinking');
-            await mindMapService.handleAction(option.action.type, option.action.params);
+            await mindMapService.handleAction(option.action.type as EventType, option.action.params);
             setMode('idle');
           } catch (error) {
             console.error('Failed to handle option click:', error);
@@ -154,6 +155,14 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
       scrollToBottom();
     }
   }, [mode, scrollToBottom]);
+
+  // 當 goalId 改變時重置 chatHistory
+  useEffect(() => {
+    setUIState(prev => ({
+      ...prev,
+      chatHistory: []
+    }));
+  }, [goalId]);
 
   useEffect(() => {
     if (enabled) {

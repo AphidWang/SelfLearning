@@ -1,0 +1,94 @@
+{
+    "states": {
+      "init": {
+        "name": "初始階段",
+        "description": "尚未選擇任何主題，等待孩子提出或選擇一個主題",
+        "defaultTools": ["suggest_topics", "chat"],
+        "transitions": {
+          "topic_selected": "clarify",
+          "createTopic": "clarify",
+          "createTopics": "clarify"
+        }
+      },
+      "clarify": {
+        "name": "釐清階段",
+        "description": "釐清動機、問題或興趣，協助孩子聚焦主題",
+        "defaultTools": ["chat", "ask_for_input"],
+        "transitions": {
+          "input_received": "observe",
+          "suggest_steps_accepted": "observe",
+          "createStep": "observe",
+          "createSteps": "observe",
+          "use_template_steps": "observe"
+        }
+      },
+      "observe": {
+        "name": "觀察階段",
+        "description": "觀察現象、提出問題、回顧經驗",
+        "defaultTools": ["use_template_steps", "suggest_tasks", "chat"],
+        "transitions": {
+          "task_started": "act",
+          "createTask": "act",
+          "createTasks": "act"
+        }
+      },
+      "act": {
+        "name": "行動階段",
+        "description": "實踐任務，進行探索、實驗、蒐集資訊等活動",
+        "defaultTools": ["suggest_tasks", "chat"],
+        "transitions": {
+          "task_completed": "organize",
+          "createTask": "act",
+          "createTasks": "act"
+        }
+      },
+      "organize": {
+        "name": "整理階段",
+        "description": "對任務成果或過程進行統整與歸納",
+        "defaultTools": ["suggest_tasks", "ask_for_input", "chat"],
+        "transitions": {
+          "task_completed": "share",
+          "createTask": "organize",
+          "createTasks": "organize"
+        }
+      },
+      "share": {
+        "name": "分享階段",
+        "description": "將學習成果以創作或故事形式分享給他人",
+        "defaultTools": ["suggest_tasks", "ask_for_input", "chat"],
+        "transitions": {
+          "task_completed": "explore_more",
+          "createTask": "share",
+          "createTasks": "share"
+        }
+      },
+      "explore_more": {
+        "name": "延伸探索",
+        "description": "探索其他子方向、分支問題或轉換主題",
+        "defaultTools": ["explore_more", "suggest_topics", "chat"],
+        "transitions": {
+          "topic_selected": "clarify",
+          "createTopic": "clarify",
+          "createTopics": "clarify"
+        }
+      },
+      "pause": {
+        "name": "中斷階段",
+        "description": "孩子休息一段時間後回來，提供銜接與回顧",
+        "defaultTools": ["chat", "summarize_progress"],
+        "transitions": {
+          "input_received": "clarify",
+          "resume": "clarify"
+        }
+      },
+      "done": {
+        "name": "完成階段",
+        "description": "主題結束後，標記成果與紀錄",
+        "defaultTools": ["mark_as_bookmark", "complete_topic", "chat"],
+        "transitions": {
+          "ask_to_explore_more": "explore_more"
+        }
+      }
+    }
+  }
+  
