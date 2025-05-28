@@ -120,6 +120,50 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const mindMapService = React.useMemo(() => {
     return new MindMapService(goalId);
   }, [goalId]);
+
+  // 使用 state 來管理 activeSteps 和 activeTasks
+  const [activeSteps, setActiveSteps] = useState<Step[]>([]);
+  const [activeTasks, setActiveTasks] = useState<Map<string, Task[]>>(new Map());
+
+  // 初始化數據
+  useEffect(() => {
+    if (!goal) {
+      setActiveSteps([]);
+      setActiveTasks(new Map());
+      return;
+    }
+
+    const steps = useGoalStore.getState().getActiveSteps(goalId);
+    const tasksMap = new Map<string, Task[]>();
+    steps.forEach(step => {
+      tasksMap.set(step.id, useGoalStore.getState().getActiveTasks(goalId, step.id));
+    });
+
+    setActiveSteps(steps);
+    setActiveTasks(tasksMap);
+  }, [goal, goalId]);
+
+  // 訂閱 store 更新
+  useEffect(() => {
+    const unsubscribe = useGoalStore.subscribe((state) => {
+      const currentGoal = state.goals.find(g => g.id === goalId);
+      if (!currentGoal) return;
+
+      // 重新計算 activeSteps 和 activeTasks
+      const steps = state.getActiveSteps(goalId);
+      const tasksMap = new Map<string, Task[]>();
+      steps.forEach(step => {
+        tasksMap.set(step.id, state.getActiveTasks(goalId, step.id));
+      });
+
+      // 更新狀態
+      setActiveSteps(steps);
+      setActiveTasks(tasksMap);
+    });
+
+    return () => unsubscribe();
+  }, [goalId]);
+
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [isGoalSelected, setIsGoalSelected] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
@@ -606,6 +650,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     for (let i = 0; i < stepIndex; i++) {
       if (activeSteps[i]) {
         baseY += (120 + 40) * Math.max(1, activeSteps[i].tasks.length);
+        console.log('📊 計算高度', {
+          stepId: activeSteps[i].id,
+          stepTitle: activeSteps[i].title,
+          tasksLength: activeSteps[i].tasks.length,
+        });
       }
     }
     
@@ -685,6 +734,29 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     if (window.confirm('確定要刪除這個任務嗎？')) {
       mindMapService.deleteTask(stepId, taskId);
       
+      // 重新計算所有 step 的位置
+      const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
+      const newStepOffsets: { [key: string]: { x: number; y: number } } = {};
+      
+      activeSteps.forEach((step, stepIndex) => {
+        // 計算新的位置
+        const stepPos = getStepPosition(stepIndex, goal.steps);
+        const currentOffset = stepOffsets[step.id] || { x: 0, y: 0 };
+        
+        // 計算需要移動的距離
+        const targetY = stepPos.y;
+        const currentY = stepPos.y + currentOffset.y;
+        const deltaY = targetY - currentY;
+        
+        newStepOffsets[step.id] = {
+          x: currentOffset.x,
+          y: deltaY
+        };
+      });
+      
+      // 更新 step 的位置
+      setStepOffsets(newStepOffsets);
+      
       // 重新計算位置
       const optimalView = calculateOptimalView();
       if (optimalView) {
@@ -692,7 +764,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         setPosition(optimalView.position);
       }
     }
-  }, [goal, mindMapService, calculateOptimalView]);
+  }, [goal, mindMapService, calculateOptimalView, goalId, stepOffsets, getStepPosition]);
 
   if (goalId === 'new') {
     return (
@@ -1219,12 +1291,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             );
           })}
 
-          {goal.steps
-            .filter(step => step.status !== 'archived')
-            .map((step, stepIndex) => {
+          {activeSteps.map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex, goal.steps);
             const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
-            return step.tasks.map((task, taskIndex) => {
+            return activeTasks.get(step.id)?.map((task, taskIndex) => {
               const taskPos = getTaskPosition(
                 stepIndex,
                 taskIndex,
@@ -1341,9 +1411,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             <div 
               className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
               style={{
-                right: '0px',
-                top: '75%',
-                transform: 'translate(50%, -50%)',
+                right: '-10px',
+                bottom: '10px',
+                transform: 'translate(50%, 50%)',
+                zIndex: getIndex('goal') + 1
               }}
             >
               <div className="flex space-x-2">
@@ -1352,22 +1423,22 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleAddBubble(goal.id, 'impression');
+                    handleAddStep();
                   }}
-                  className="w-9 h-9 bg-purple-500 hover:bg-purple-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-8 h-8 bg-indigo-100 hover:bg-indigo-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  <MessageSquare className="w-5 h-5 text-white" />
+                  <Plus className="w-4 h-4 text-indigo-500" />
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleAddStep();
+                    handleAddBubble(goal.id, 'impression');
                   }}
-                  className="w-9 h-9 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-8 h-8 bg-purple-100 hover:bg-purple-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  <Plus className="w-5 h-5 text-white" />
+                  <MessageSquare className="w-4 h-4 text-purple-500" />
                 </motion.button>
               </div>
             </div>
@@ -1375,9 +1446,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </motion.div>
 
         <AnimatePresence>
-          {goal.steps
-            .filter(step => step.status !== 'archived')
-            .map((step, stepIndex) => {
+          {activeSteps.map((step, stepIndex) => {
             const stepPos = getStepPosition(stepIndex, goal.steps);
             const isSelected = selectedStepId === step.id;
 
@@ -1394,10 +1463,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                 >
-                  <motion.button
+                  <motion.div
                     id={`step-${step.id}`}
                     drag={editingStepId !== step.id}
                     dragMomentum={false}
+                    dragElastic={0}
                     onDragStart={(event, info) => {
                       if (editingStepId === step.id) return;
                       event.stopPropagation();
@@ -1481,7 +1551,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     <div 
                       className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                       style={{
-                        right: '-10px',
+                        right: '-15px',
                         bottom: '0px',
                         transform: 'translate(50%, 50%)',
                         zIndex: getIndex(step.id) + 1
@@ -1493,30 +1563,30 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           whileTap={{ scale: 0.95 }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteStep(step.id);
+                            handleAddTask(step.id);
                           }}
-                          className="w-8 h-8 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                          className="w-8 h-8 bg-indigo-100 hover:bg-indigo-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                         >
-                          <Trash2 className="w-4 h-4 text-white" />
+                          <Plus className="w-4 h-4 text-indigo-500" />
                         </motion.button>
-                        <motion.button
+                        <motion.div
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleAddTask(step.id);
+                            handleDeleteStep(step.id);
                           }}
-                          className="w-8 h-8 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                          className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                         >
-                          <Plus className="w-4 h-4 text-white" />
-                        </motion.button>
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </motion.div>
                       </div>
                     </div>
-                  </motion.button>
+                  </motion.div>
                 </motion.div>
 
                 <AnimatePresence>
-                  {step.tasks.map((task, taskIndex) => {
+                  {activeTasks.get(step.id)?.map((task, taskIndex) => {
                     const taskPos = getTaskPosition(
                       stepIndex,
                       taskIndex,
@@ -1588,7 +1658,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                             setEditingTaskId(task.id);
                             setEditingTaskTitle(task.title);
                           }}
-                          className={`task-card w-64 h-24 p-4 rounded-2xl shadow-lg border-2 cursor-move flex flex-col justify-center gap-2 relative ${
+                          className={`task-card group w-64 h-24 p-4 rounded-2xl shadow-lg border-2 cursor-move flex flex-col justify-center gap-2 relative ${
                             task.status === 'idea'
                               ? 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 rounded-3xl hover:border-purple-400 hover:shadow-[0_0_0_4px_rgba(99,102,241,0.2)]'
                               : task.status === 'done'
@@ -1599,20 +1669,6 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           } `}
                         >
                           <div className="absolute top-2 right-2 flex space-x-2">
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const step = goal.steps.find(s => s.tasks.some(t => t.id === task.id));
-                                if (step) {
-                                  handleDeleteTask(step.id, task.id);
-                                }
-                              }}
-                              className="w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer opacity-0 group-hover:opacity-100"
-                            >
-                              <Trash2 className="w-3 h-3 text-white" />
-                            </motion.button>
                             {task.status === 'done' && (
                               <span className="text-xl">✅</span>
                             )}
@@ -1659,6 +1715,34 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               完成於 {new Date(task.completedAt).toLocaleDateString()}
                             </p>
                           )}
+
+                          {/* 新增任務按鈕 */}
+                          <div 
+                            className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            style={{
+                              right: '-20px',
+                              bottom: '-5px',
+                              transform: 'translate(50%, 50%)',
+                              zIndex: getIndex(task.id) + 1
+                            }}
+                          >
+                            <div className="flex space-x-2">
+                              <motion.div
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const step = goal.steps.find(s => s.tasks.some(t => t.id === task.id));
+                                  if (step) {
+                                    handleDeleteTask(step.id, task.id);
+                                  }
+                                }}
+                                className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </motion.div>
+                            </div>
+                          </div>
                         </motion.div>
                       </motion.div>
                     );
