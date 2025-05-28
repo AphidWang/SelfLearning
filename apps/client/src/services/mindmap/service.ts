@@ -14,7 +14,7 @@ import { tools } from '../../lib/ai/tools';
 import type { Tool } from '../../lib/ai/tools/types';
 import forms from './config/forms.json';
 import actions from '../../lib/ai/config/actions.json';
-import { Goal, Step, Task } from '../../types/goal';
+import { Goal, Step, Task, Bubble } from '../../types/goal';
 
 // 系統錯誤
 class SystemError extends Error {
@@ -422,6 +422,22 @@ export class MindMapService {
   deleteTask(stepId: string, taskId: string) {
     if (!this.currentTopicId) return null;
     return useGoalStore.getState().deleteTask(this.currentTopicId, stepId, taskId);
+  }
+
+  // Bubble 相關方法
+  addBubble(bubble: Bubble) {
+    if (!this.currentTopicId) return null;
+    return useGoalStore.getState().addBubble(this.currentTopicId, bubble);
+  }
+
+  updateBubble(bubbleId: string, updates: Partial<Bubble>) {
+    if (!this.currentTopicId) return null;
+    return useGoalStore.getState().updateBubble(this.currentTopicId, bubbleId, updates);
+  }
+
+  deleteBubble(bubbleId: string) {
+    if (!this.currentTopicId) return null;
+    return useGoalStore.getState().deleteBubble(this.currentTopicId, bubbleId);
   }
 
   async handleAction(actionType: string, params: any): Promise<void> {

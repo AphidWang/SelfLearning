@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
 import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, RefreshCw, MessageSquare, Trash2 } from 'lucide-react';
 import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
-import { Goal, Step, Task } from '../../types/goal';
+import { Goal, Step, Task, Bubble } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
 import mindMapBg from '../../assets/images/mindmap-bg.jpg';
@@ -184,7 +184,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [taskZIndexes, setTaskZIndexes] = useState<{ [key: string]: number }>({});
   const baseZIndex = 1;
   const [assistantMode, setAssistantMode] = useState<'floating' | 'panel'>('floating');
-  const [bubbles, setBubbles] = useState<Node[]>([]);
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [bubbleOffsets, setBubbleOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
 
   // 當 goalId 改變時重置狀態
@@ -708,10 +708,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       y: startY + yOffset
     };
 
-    const newId = `bubble-${Date.now()}`;
-    const newBubble: Node = {
-      id: newId,
-      type: 'bubble',
+    const newBubble: Bubble = {
+      id: `bubble-${Date.now()}`,
       title: type === 'impression' ? '新印象' : '新背景',
       parentId,
       bubbleType: type,
@@ -719,9 +717,48 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       position: initialPosition
     };
 
-    setBubbles(prev => [...prev, newBubble]);
-    setBubbleOffsets(prev => ({ ...prev, [newId]: { x: 0, y: 0 } }));
-  }, [goal, centerGoalPos, bubbles]);
+    // 使用 MindMapService 新增 bubble
+    mindMapService.addBubble(newBubble);
+  }, [goal, centerGoalPos, bubbles, mindMapService]);
+
+  // 處理刪除 bubble
+  const handleDeleteBubble = useCallback((bubbleId: string) => {
+    if (!goal) return;
+    
+    if (window.confirm('確定要刪除這個氣泡嗎？')) {
+      mindMapService.deleteBubble(bubbleId);
+    }
+  }, [goal, mindMapService]);
+
+  // 處理更新 bubble
+  const handleUpdateBubble = useCallback((bubbleId: string, updates: Partial<Bubble>) => {
+    if (!goal) return;
+    mindMapService.updateBubble(bubbleId, updates);
+  }, [goal, mindMapService]);
+
+  // 初始化 bubbles
+  useEffect(() => {
+    if (!goal) {
+      setBubbles([]);
+      return;
+    }
+
+    const goalBubbles = goal.bubbles || [];
+    setBubbles(goalBubbles);
+  }, [goal]);
+
+  // 訂閱 store 更新
+  useEffect(() => {
+    const unsubscribe = useGoalStore.subscribe((state) => {
+      const currentGoal = state.goals.find(g => g.id === goalId);
+      if (!currentGoal) return;
+
+      // 更新 bubbles
+      setBubbles(currentGoal.bubbles || []);
+    });
+
+    return () => unsubscribe();
+  }, [goalId]);
 
   // 處理刪除步驟
   const handleDeleteStep = useCallback((stepId: string) => {
@@ -1807,6 +1844,19 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   }}
                   onDragEnd={(e) => {
                     e.stopPropagation();
+                    // 更新 bubble 位置
+                    const currentOffset = bubbleOffsets[bubble.id] || { x: 0, y: 0 };
+                    handleUpdateBubble(bubble.id, {
+                      position: {
+                        x: bubble.position.x + currentOffset.x,
+                        y: bubble.position.y + currentOffset.y
+                      }
+                    });
+                    // 重置 offset
+                    setBubbleOffsets(prev => ({
+                      ...prev,
+                      [bubble.id]: { x: 0, y: 0 }
+                    }));
                   }}
                   style={{
                     position: 'relative',
@@ -1819,10 +1869,32 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   whileHover={{ 
                     scale: 1.02 
                   }}
-                  className="bubble-node w-32 h-32 rounded-full bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 shadow-lg cursor-move flex items-center justify-center"
+                  className="bubble-node w-32 h-32 rounded-full bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 shadow-lg cursor-move flex items-center justify-center group"
                 >
                   <div className="text-center font-[Iansui] text-2xl text-purple-700">
                     {bubble.title}
+                  </div>
+                  {/* 刪除按鈕 */}
+                  <div 
+                    className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    style={{
+                      right: '-10px',
+                      top: '-10px',
+                      transform: 'translate(50%, -50%)',
+                      zIndex: getIndex(bubble.id) + 1
+                    }}
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteBubble(bubble.id);
+                      }}
+                      className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </motion.div>
                   </div>
                 </motion.div>
               </motion.div>
