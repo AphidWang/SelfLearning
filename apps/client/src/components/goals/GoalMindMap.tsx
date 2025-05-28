@@ -186,6 +186,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [assistantMode, setAssistantMode] = useState<'floating' | 'panel'>('floating');
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [bubbleOffsets, setBubbleOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
+  const [editingBubbleId, setEditingBubbleId] = useState<string | null>(null);
+  const [editingBubbleTitle, setEditingBubbleTitle] = useState('');
 
   // 當 goalId 改變時重置狀態
  // 當 goalId 改變時重置狀態
@@ -219,7 +221,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         setActiveSteps(steps);
         setActiveTasks(tasksMap);
       }
-}, [goalId, goal]);
+}, [goalId]);
 
   // 追蹤目標節點位置
   const goalX = useMotionValue(0);
@@ -1173,6 +1175,14 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   const navigate = useNavigate();
 
+  // 處理泡泡標題更新
+  const handleBubbleTitleUpdate = useCallback((bubbleId: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    mindMapService.updateBubble(bubbleId, { title: newTitle.trim() });
+    setEditingBubbleId(null);
+    setEditingBubbleTitle('');
+  }, [mindMapService]);
+
   return (
     <div 
       ref={containerRef}
@@ -1915,17 +1925,42 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     scale: 1.02 
                   }}
                   className="bubble-node w-32 h-32 rounded-full bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 shadow-lg cursor-move flex items-center justify-center group"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingBubbleId(bubble.id);
+                    setEditingBubbleTitle(bubble.title);
+                  }}
                 >
-                  <div className="text-center font-[Iansui] text-2xl text-purple-700">
-                    {bubble.title}
-                  </div>
+                  {editingBubbleId === bubble.id ? (
+                    <input
+                      type="text"
+                      value={editingBubbleTitle}
+                      onChange={(e) => setEditingBubbleTitle(e.target.value)}
+                      onBlur={() => handleBubbleTitleUpdate(bubble.id, editingBubbleTitle)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleBubbleTitleUpdate(bubble.id, editingBubbleTitle);
+                        } else if (e.key === 'Escape') {
+                          setEditingBubbleId(null);
+                          setEditingBubbleTitle('');
+                        }
+                      }}
+                      className="w-full text-center bg-transparent border-b border-purple-300 focus:outline-none focus:border-purple-500 px-1 font-[Iansui] text-2xl text-purple-700"
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className="text-center font-[Iansui] text-2xl text-purple-700">
+                      {bubble.title}
+                    </div>
+                  )}
                   {/* 刪除按鈕 */}
                   <div 
                     className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                     style={{
                       right: '-10px',
-                      top: '-10px',
-                      transform: 'translate(50%, -50%)',
+                      bottom: ' 10px',
+                      transform: 'translate(50%, 50%)',
                       zIndex: getIndex(bubble.id) + 1
                     }}
                   >
