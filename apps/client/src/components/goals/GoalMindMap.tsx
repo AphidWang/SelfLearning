@@ -690,10 +690,22 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const parentNode = goal?.id === parentId ? goal : goal?.steps.find(s => s.id === parentId);
     if (!parentNode) return;
 
-    // 計算初始位置（在 goal 左邊）
+    // 計算當前已有的 bubble 數量
+    const existingBubbles = bubbles.filter(b => b.parentId === parentId);
+    const bubbleCount = existingBubbles.length;
+
+    // 計算初始位置
+    const baseX = centerGoalPos.x - 200;  // 在 goal 左邊 200px
+    const bubbleHeight = 128;  // bubble 的高度 (w-32 h-32 = 128px)
+    const spacing = 40;  // bubble 之間的間距
+    const totalHeight = bubbleHeight * 3 + spacing * 2;  // 三個 bubble 的總高度（包含兩個間距）
+    const startY = centerGoalPos.y - totalHeight / 2 + bubbleHeight / 2;  // 從中心點往上偏移，並考慮第一個 bubble 的高度
+
+    // 根據當前 bubble 數量計算 Y 位置
+    const yOffset = (bubbleHeight + spacing) * bubbleCount;
     const initialPosition = {
-      x: centerGoalPos.x - 200,  // 在 goal 左邊 200px
-      y: centerGoalPos.y + (type === 'background' ? 100 : -100)  // 印象泡泡在上，背景泡泡在下
+      x: baseX,
+      y: startY + yOffset
     };
 
     const newId = `bubble-${Date.now()}`;
@@ -709,7 +721,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     setBubbles(prev => [...prev, newBubble]);
     setBubbleOffsets(prev => ({ ...prev, [newId]: { x: 0, y: 0 } }));
-  }, [goal, centerGoalPos]);
+  }, [goal, centerGoalPos, bubbles]);
 
   // 處理刪除步驟
   const handleDeleteStep = useCallback((stepId: string) => {
@@ -1807,9 +1819,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   whileHover={{ 
                     scale: 1.02 
                   }}
-                  className="bubble-node w-32 h-32 rounded-full bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 shadow-lg cursor-move"
+                  className="bubble-node w-32 h-32 rounded-full bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 shadow-lg cursor-move flex items-center justify-center"
                 >
-                  <div className="p-4 text-sm text-purple-700">
+                  <div className="text-center font-[Iansui] text-2xl text-purple-700">
                     {bubble.title}
                   </div>
                 </motion.div>
