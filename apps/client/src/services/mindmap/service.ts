@@ -15,6 +15,9 @@ import type { Tool } from '../../lib/ai/tools/types';
 import forms from './config/forms.json';
 import actions from '../../lib/ai/config/actions.json';
 import { Goal, Step, Task, Bubble } from '../../types/goal';
+import { stateMachine } from './config/stateMachine';
+import { EventType } from './config/events';
+import { MindmapStateController } from './controller/MindmapStateController';
 
 // 系統錯誤
 class SystemError extends Error {
@@ -49,6 +52,7 @@ export interface MindMapAction {
 }
 
 export class MindMapService {
+  private stateController: MindmapStateController;
   private chatService: ChatService;
   private validator = new ActionValidator();
   private maxRetries = 3;  // 一般錯誤的重試次數
@@ -59,6 +63,7 @@ export class MindMapService {
   private errorContext: string | null = null;  // 新增錯誤 context
 
   constructor(topicId: string | null = null) {
+    this.stateController = new MindmapStateController();
     this.chatService = new ChatService();
     this.formConfigs = forms;
     this.currentTopicId = topicId;
@@ -195,7 +200,7 @@ export class MindMapService {
       console.error('❌ Failed to process LLM response:', error);
       throw error;
     }
-  }
+  }  
 
   async handleUserInput(input: string): Promise<LLMResponse> {
     let retries = 0;
@@ -204,11 +209,17 @@ export class MindMapService {
 
     while (retries < maxAttempts) {
       try {
+        // 處理使用者輸入，不觸發狀態轉換
+        const userEventResult = this.stateController.handleUserEvent('input_received', input);
+        if (!userEventResult.allowed) {
+          throw new Error(`Invalid user event: ${userEventResult.reason}`);
+        }
+
         // 如果有錯誤 context，加到輸入中
         const actualInput = this.errorContext 
           ? `${this.errorContext}`
           : input;
-        this.errorContext = null;  // 清空錯誤 context
+        this.errorContext = null;
         
         // 更新 mindmap 上下文
         const currentContext = await this.getMindmapContext();
@@ -291,6 +302,11 @@ export class MindMapService {
             params: option.text
           }
         })) || [];
+
+        // 檢查 LLM 回應的 action 是否合法
+        if (!this.stateController.isToolAllowed(parsedResponse.tool)) {
+          throw new Error(`當前狀態不允許使用工具: ${parsedResponse.tool}`);
+        }
 
         return {
           tool: parsedResponse.tool,
@@ -440,11 +456,23 @@ export class MindMapService {
     return useGoalStore.getState().deleteBubble(this.currentTopicId, bubbleId);
   }
 
-  async handleAction(actionType: string, params: any): Promise<void> {
+  async handleAction(actionType: EventType, params: any): Promise<void> {
+    // 檢查 AI 動作是否允許
+    const actionResult = this.stateController.handleAIAction(actionType, params);
+    if (!actionResult.allowed) {
+      throw new Error(`Invalid action: ${actionResult.reason}`);
+    }
+
+    // 如果允許，執行狀態轉換
+    if (actionResult.nextState) {
+      this.stateController.transition(actionType);
+    }
+
     console.log('👆 使用者觸發行為', { 
       actionType, 
       params,
-      currentTopicId: this.currentTopicId 
+      currentTopicId: this.currentTopicId,
+      currentState: this.stateController.getCurrentState()
     });
 
     const topic = this.getTopic();
@@ -496,6 +524,7 @@ export class MindMapService {
           break;
 
         case 'createTask':
+          this.stateController.transition('task_started');
           try {
             console.log('📝 準備新增任務', { params });
             if (!params.step_id) {
@@ -689,5 +718,26 @@ export class MindMapService {
     );
 
     return Math.round((completedTasks / totalTasks) * 100);
+  }
+
+  // 新增狀態相關方法
+  getCurrentState(): string {
+    return this.stateController.getCurrentState();
+  }
+
+  getStateInfo() {
+    return this.stateController.getCurrentStateInfo();
+  }
+
+  getAvailableTools(): string[] {
+    return this.stateController.getAvailableTools();
+  }
+
+  getAvailableEvents(): EventType[] {
+    return this.stateController.getAvailableEvents();
+  }
+
+  canTrigger(event: EventType): boolean {
+    return this.stateController.canTrigger(event);
   }
 } 
