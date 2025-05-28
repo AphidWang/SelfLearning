@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
 import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, RefreshCw, MessageSquare, Trash2 } from 'lucide-react';
 import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
@@ -623,7 +623,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     });
 
     return () => unsubscribe();
-  }, [goalId, mindMapService, position, zoom]);
+  }, [goalId, mindMapService]); // 移除 position 和 zoom 依賴
 
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [editingGoalTitle, setEditingGoalTitle] = useState('');
@@ -639,36 +639,33 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     setIsEditingGoal(false);
   };
 
-  const getStepPosition = (stepIndex: number, steps: Step[]) => {
-    const baseX = 400 + 300;  // 基礎位置
-    let baseY = 0;
-    
-    // 使用 store 的 getter
-    const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
-    
-    // 計算前面所有 step 的總高度
-    for (let i = 0; i < stepIndex; i++) {
-      if (activeSteps[i]) {
-        baseY += (120 + 40) * Math.max(1, activeSteps[i].tasks.length);
-        console.log('📊 計算高度', {
-          stepId: activeSteps[i].id,
-          stepTitle: activeSteps[i].title,
-          tasksLength: activeSteps[i].tasks.length,
-        });
+  const getStepPosition = useMemo(() => {
+    return (stepIndex: number, steps: Step[]) => {
+      const baseX = 400 + 300;  // 基礎位置
+      let baseY = 0;
+      
+      // 使用 store 的 getter
+      const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
+      
+      // 計算前面所有 step 的總高度
+      for (let i = 0; i < stepIndex; i++) {
+        if (activeSteps[i]) {
+          baseY += (120 + 40) * Math.max(1, activeSteps[i].tasks.length);
+        }
       }
-    }
-    
-    // 計算當前 step 的起始位置
-    const currentStepHeight = (120 + 40) * Math.max(1, activeSteps[stepIndex]?.tasks.length || 1);
-    baseY += currentStepHeight / 2;
+      
+      // 計算當前 step 的起始位置
+      const currentStepHeight = (120 + 40) * Math.max(1, activeSteps[stepIndex]?.tasks.length || 1);
+      baseY += currentStepHeight / 2;
 
-    return {
-      x: baseX,
-      y: baseY
+      return {
+        x: baseX,
+        y: baseY
+      };
     };
-  };
+  }, [goalId]);
 
-  const getCenterGoalPosition = () => {
+  const centerGoalPos = useMemo(() => {
     if (!goal) return { x: 200, y: 0 };
     
     const totalTasksHeight = goal.steps
@@ -681,9 +678,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       x: 200,
       y: totalTasksHeight / 2,
     };
-  };
-
-  const centerGoalPos = getCenterGoalPosition();
+  }, [goal, getStepPosition]);
 
   // 移動 handleAddBubble 到這裡
   const handleAddBubble = useCallback((parentId: string, type: 'impression' | 'background') => {
@@ -744,8 +739,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     }
 
     const goalBubbles = goal.bubbles || [];
-    setBubbles(goalBubbles);
-  }, [goal]);
+    // 計算每個 bubble 的初始位置
+    const bubblesWithPosition = goalBubbles.map((bubble, index) => {
+      const baseX = centerGoalPos.x - 200;  // 在 goal 左邊 200px
+      const bubbleHeight = 128;  // bubble 的高度 (w-32 h-32 = 128px)
+      const spacing = 40;  // bubble 之間的間距
+      const totalHeight = bubbleHeight * 3 + spacing * 2;  // 三個 bubble 的總高度（包含兩個間距）
+      const startY = centerGoalPos.y - totalHeight / 2 + bubbleHeight / 2;  // 從中心點往上偏移，並考慮第一個 bubble 的高度
+
+      // 根據當前 bubble 數量計算 Y 位置
+      const yOffset = (bubbleHeight + spacing) * index;
+      return {
+        ...bubble,
+        position: {
+          x: baseX,
+          y: startY + yOffset
+        }
+      };
+    });
+
+    setBubbles(bubblesWithPosition);
+  }, [goal, centerGoalPos]);
 
   // 訂閱 store 更新
   useEffect(() => {
@@ -835,31 +849,33 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     );
   }
 
-  const getTaskPosition = (stepIndex: number, taskIndex: number, totalTasks: number) => {
-    const stepPos = getStepPosition(stepIndex, goal.steps);
-    const taskX = 200;
-    const cardHeight = 120;
-    const cardSpacing = 40;
+  const getTaskPosition = useMemo(() => {
+    return (stepIndex: number, taskIndex: number, totalTasks: number) => {
+      const stepPos = getStepPosition(stepIndex, goal.steps);
+      const taskX = 200;
+      const cardHeight = 120;
+      const cardSpacing = 40;
 
-    // 使用 store 的 getter
-    const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
-    const currentStep = activeSteps[stepIndex];
-    if (!currentStep) return { x: 0, y: 0 };
+      // 使用 store 的 getter
+      const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
+      const currentStep = activeSteps[stepIndex];
+      if (!currentStep) return { x: 0, y: 0 };
 
-    // 計算當前任務之前的所有卡片高度和間距
-    const currentStepPreviousHeight = (cardHeight * taskIndex) + (cardSpacing * taskIndex);
-    
-    // 計算整個 step 的總高度（所有卡片高度 + 間距）
-    const totalHeight = (cardHeight * totalTasks) + (cardSpacing * (totalTasks - 1));
-    
-    // 從 step 中心點開始計算位置
-    const baseY = stepPos.y - (totalHeight / 2) + currentStepPreviousHeight;
+      // 計算當前任務之前的所有卡片高度和間距
+      const currentStepPreviousHeight = (cardHeight * taskIndex) + (cardSpacing * taskIndex);
+      
+      // 計算整個 step 的總高度（所有卡片高度 + 間距）
+      const totalHeight = (cardHeight * totalTasks) + (cardSpacing * (totalTasks - 1));
+      
+      // 從 step 中心點開始計算位置
+      const baseY = stepPos.y - (totalHeight / 2) + currentStepPreviousHeight;
 
-    return {
-      x: stepPos.x + taskX,
-      y: baseY
+      return {
+        x: stepPos.x + taskX,
+        y: baseY
+      };
     };
-  };
+  }, [goal, getStepPosition, goalId]);
 
   // 計算曲線控制點
   const getCurvePoints = (start: { x: number; y: number }, end: { x: number; y: number }) => {
@@ -1324,7 +1340,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
               ? { x: centerGoalPos.x + 96 + goalOffset.x + 5000, y: centerGoalPos.y + goalOffset.y + 5000 }
               : { x: getStepPosition(goal.steps.findIndex(s => s.id === bubble.parentId), goal.steps).x - 64 + 5000, 
                   y: getStepPosition(goal.steps.findIndex(s => s.id === bubble.parentId), goal.steps).y + 5000 };
-            const bubblePos = { x: bubble.position.x + offset.x + 5000, y: bubble.position.y + offset.y + 5000 };
+            const bubblePos = { 
+              x: (bubble.position?.x ?? 0) + offset.x + 5000, 
+              y: (bubble.position?.y ?? 0) + offset.y + 5000 
+            };
             return (
               <path
                 key={`bubble-line-${bubble.id}`}
@@ -1810,8 +1829,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 key={bubble.id}
                 className="absolute"
                 style={{
-                  left: bubble.position.x-64,
-                  top: bubble.position.y-64,
+                  left: (bubble.position?.x ?? 0) - 64,
+                  top: (bubble.position?.y ?? 0) - 64,
                   transform: 'none'
                 }}
                 initial={{ scale: 0 }}
@@ -1848,8 +1867,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                     const currentOffset = bubbleOffsets[bubble.id] || { x: 0, y: 0 };
                     handleUpdateBubble(bubble.id, {
                       position: {
-                        x: bubble.position.x + currentOffset.x,
-                        y: bubble.position.y + currentOffset.y
+                        x: (bubble.position?.x ?? 0) + currentOffset.x,
+                        y: (bubble.position?.y ?? 0) + currentOffset.y
                       }
                     });
                     // 重置 offset
