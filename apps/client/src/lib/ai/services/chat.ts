@@ -5,11 +5,12 @@ import actions from '../config/actions.json';
 import { CustomSummaryMemory } from './memory';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
-import { BaseMessage } from '@langchain/core/messages';
+import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { STATE_PROMPTS } from '../config/prompts/states';
 import { LEVEL_PROMPTS } from '../config/prompts/levels';
 import { buildChatPrompt } from '../config/prompts/prompt';
+import { stateMachine } from '../../../services/mindmap/config/stateMachine';
 // 移除無法找到的模組導入
 // import { LLMChain } from '@langchain/core/chains';
 
@@ -120,73 +121,6 @@ const DEFAULT_SYSTEM_PROMPT = `
 
 `;
 
-
-// 將 actions 轉換為易讀的格式
-//console.log('🔍 Actions:', actions);
-const actionsDescription = Object.entries(actions.actions)
-  .map(([name, action]) => {
-    const params = Object.entries(action.params)
-      .map(([paramName, param]) => {
-        const paramInfo = param as any;
-        let typeDesc = paramInfo.type;
-        
-        if (paramInfo.type === 'array' && paramInfo.items) {
-          if (paramInfo.items.type === 'object') {
-            const properties = Object.entries(paramInfo.items.properties || {})
-              .map(([propName, prop]) => `${propName}: ${(prop as any).type}`)
-              .join(', ');
-            typeDesc = `array of objects with properties: {${properties}}`;
-          } else {
-            typeDesc = `array of ${paramInfo.items.type}`;
-          }
-        }
-        
-        return `${paramName}${paramInfo.required ? ' (required)' : ''}: ${paramInfo.description} (${typeDesc})`;
-      })
-      .join('\n    ');
-    return `${name}:
-  Description: ${action.description}
-  Parameters:
-    ${params}`;
-  })
-  .join('\n\n');
-
-const SYSTEM_PROMPT_WITH_ACTIONS = `${DEFAULT_SYSTEM_PROMPT}
-===
-根據使用者輸入「建議一個最適合的動作」，並提供建議的參數。
-
-目標是幫助孩子找到 [學習的方向] 並且結構化的放進 Mindmap 中
-使用對談的方式和孩子討論 [學習的方向], 若孩子沒有明確的進行方向，釐清動機 / 給予提示或鼓勵來引導
-參照目前的 Mindmap Context 和孩子討論下一步的 [主題],[分類] 或[挑戰]
-若孩子沒有明確的方向和動機，不要使用建議工具, 使用聊天工具繼續詢問
-- 你對學習的主題/分類/挑戰 有什麼想法嗎?
-- 想要我幫你建議兩個相關的主題嗎?
-- 我這邊有幾個好玩的挑戰, 你想要試試看嗎?
-若孩子出現明確的動機或方向，使用建議類型的工具和孩子互動
-若孩子想要抒發感想或心得，用聊天的工具，扮演一個聆聽者
-
-
-請注意：
-1. 你不能直接執行動作，只能「建議應該做什麼動作」。
-2. 系統會根據你的建議內容，請使用者確認是否執行，真正的執行會由系統完成。
-3. 請在回應中加入鼓勵與引導語句，但不能說「我已經為你建立了...」、「我已經完成...」，這樣會誤導使用者。
-
-可用的動作列表：
-
-Available actions:
-${actionsDescription}
-
-Please respond with a JSON object in the following format:
-{
-  "tool": "action_name",
-  "params": {
-    "param_name": "param_value"
-  },
-  "message": "Your response message to the user"
-}`.replace(/{/g, '{{').replace(/}/g, '}}');
-
-//console.log('📝 SYSTEM_PROMPT_WITH_ACTIONS: ', SYSTEM_PROMPT_WITH_ACTIONS);
-
 export class ChatService {
   private memory: CustomSummaryMemory;
   private model: ChatOpenAI;
@@ -194,6 +128,46 @@ export class ChatService {
   private mindmapContext: string = '';
   private currentState: keyof typeof STATE_PROMPTS = 'init';
   private currentLevel: keyof typeof LEVEL_PROMPTS = 'L0';
+
+  private getActionsDescription(): string {
+    return Object.entries(actions.actions)
+      .filter(([name]) => stateMachine.getAvailableTools(this.currentState).includes(name))
+      .map(([name, action]) => {
+        const params = Object.entries(action.params)
+          .map(([paramName, param]) => {
+            const paramInfo = param as any;
+            return `${paramName}（${paramInfo.type}）：${paramInfo.description}`;
+          })
+          .join('\n');
+        return `工具：${name}
+- 功能：${action.description}
+- 參數：
+${params}`;
+      })
+      .join('\n\n');
+  }
+
+  private getToolUsagePrompt(): string {
+    return `【工具使用說明】
+工具使用說明：
+1. 你不能直接執行動作，只能「建議應該做什麼動作」。
+2. 系統會根據你的建議內容，請使用者確認是否執行，真正的執行會由系統完成。
+3. 請在回應中加入鼓勵與引導語句，但不能說「我已經為你建立了...」、「我已經完成...」，這樣會誤導使用者。
+4. 不能選擇不存在的工具，請選擇可用的工具。
+
+【可用工具 - 必須在以下挑一個工具來使用, 若無適合的則使用 chat 工具】
+${this.getActionsDescription()}
+*** 必須使用以上的工具，否則系統無法執行。 ***
+
+請使用以下 JSON 格式回應：
+{
+  "tool": "action_name",
+  "params": {
+    "param_name": "param_value"
+  },
+  "message": "Your response message to the user"
+}`;
+  }
 
   constructor() {
     this.model = new ChatOpenAI({
@@ -233,16 +207,10 @@ export class ChatService {
   }
 
   private async buildSystemPrompt(): Promise<string> {
-    const memoryVars = await this.memory.loadMemoryVariables({});
     return buildChatPrompt({
       state: this.currentState,
       level: this.currentLevel,
-      mindmapContext: this.mindmapContext,
-      history: memoryVars.history.map(msg => ({
-        role: msg.type === 'human' ? 'user' : 'assistant',
-        content: msg.content
-      })),
-      tools: actions
+      tools: this.getActionsDescription()
     });
   }
 
@@ -271,9 +239,24 @@ export class ChatService {
       const response = await api.post('/api/chat/completions', {
         messages: [
           { role: 'system', content: await this.buildSystemPrompt() },
-          { role: 'system', content: `Current Mindmap Context: ${this.mindmapContext}` },
+          { role: 'system', name:"mindmap_context", content: this.mindmapContext },
+          { 
+            role: 'system', 
+            name: 'state_prompt',
+            content: STATE_PROMPTS[this.currentState]
+          },
+          { 
+            role: 'system', 
+            name: 'level_prompt',
+            content: LEVEL_PROMPTS[this.currentLevel]
+          },
+          { 
+            role: 'system', 
+            name: 'tool_usage', 
+            content: this.getActionsDescription() ? this.getToolUsagePrompt() : ''
+          },
           ...memoryVars.history.map(msg => ({
-            role: msg.type === 'human' ? 'user' : 'assistant',
+            role: msg instanceof HumanMessage ? 'user' : 'assistant',
             content: msg.content
           })),
           { role: 'user', content: message }
