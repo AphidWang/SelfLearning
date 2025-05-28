@@ -239,11 +239,11 @@ ${this.getActionsDescription()}
       const response = await api.post('/api/chat/completions', {
         messages: [
           { role: 'system', content: await this.buildSystemPrompt() },
-          { role: 'system', name:"mindmap_context", content: this.mindmapContext },
+          { role: 'system', name: "mindmap_context", content: this.mindmapContext },
           { 
             role: 'system', 
             name: 'state_prompt',
-            content: STATE_PROMPTS[this.currentState]
+            content: JSON.stringify(STATE_PROMPTS[this.currentState])
           },
           { 
             role: 'system', 
@@ -257,7 +257,8 @@ ${this.getActionsDescription()}
           },
           ...memoryVars.history.map(msg => ({
             role: msg instanceof HumanMessage ? 'user' : 'assistant',
-            content: msg.content
+            content: msg.content,
+            name: msg.name
           })),
           { role: 'user', content: message }
         ].filter(msg => msg.content),
