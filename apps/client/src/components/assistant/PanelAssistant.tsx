@@ -156,51 +156,44 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
     }
   }, [mode, scrollToBottom]);
 
-  // 當 goalId 改變時重置 chatHistory
+  // 當 goalId 改變時重置到初始狀態
   useEffect(() => {
     setUIState(prev => ({
       ...prev,
-      chatHistory: []
+      chatHistory: [],
+      message: '嗨！今天想要做什麼呢？',
+      showChoices: true,
+      showInput: false,
+      inputText: '',
+      inputPlaceholder: '和我分享你的想法吧',
+      choices: [
+        { 
+          text: "幫我想分類", 
+          icon: <ListChecks className="h-12 w-12 text-indigo-600" />,
+          description: "幫你規劃學習目標的分類",
+          action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個學習步驟") 
+        },
+        { 
+          text: "幫我想任務", 
+          icon: <Target className="h-12 w-12 text-emerald-600" />,
+          description: "幫你規劃具體的學習任務",
+          action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個新的學習任務") 
+        },
+        { 
+          text: "跟我聊聊這個主題", 
+          icon: <MessageSquare className="h-12 w-12 text-orange-600" />,
+          description: "討論這個主題的相關內容",
+          action: () => handleDirectInput("跟我聊聊這個主題, 有沒有推薦的方向呢？") 
+        },
+        { 
+          text: "隨便聊聊天", 
+          icon: <Brain className="h-12 w-12 text-purple-600" />,
+          description: "來聊聊天吧！",
+          action: () => handleChatMode() 
+        }
+      ]
     }));
   }, [goalId]);
-
-  useEffect(() => {
-    if (enabled) {
-      updateUIState(prev => ({
-        message: '嗨！今天想要做什麼呢？',
-        showChoices: true,
-        showInput: false,
-        inputText: '',
-        inputPlaceholder: '和我分享你的想法吧',
-        choices: [
-          { 
-            text: "幫我想分類", 
-            icon: <ListChecks className="h-12 w-12 text-indigo-600" />,
-            description: "幫你規劃學習目標的分類",
-            action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個學習步驟") 
-          },
-          { 
-            text: "幫我想任務", 
-            icon: <Target className="h-12 w-12 text-emerald-600" />,
-            description: "幫你規劃具體的學習任務",
-            action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個新的學習任務") 
-          },
-          { 
-            text: "跟我聊聊這個主題", 
-            icon: <MessageSquare className="h-12 w-12 text-orange-600" />,
-            description: "討論這個主題的相關內容",
-            action: () => handleDirectInput("跟我聊聊這個主題, 有沒有推薦的方向呢？") 
-          },
-          { 
-            text: "隨便聊聊天", 
-            icon: <Brain className="h-12 w-12 text-purple-600" />,
-            description: "來聊聊天吧！",
-            action: () => handleChatMode() 
-          }
-        ]
-      }), 'initialSetup');
-    }
-  }, [enabled]);
 
   const handleDirectInput = (text: string) => {
     setMode('thinking');

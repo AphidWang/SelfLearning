@@ -73,18 +73,21 @@ export class MindmapStateController {
       };
     }
 
+    // 檢查是否有對應的狀態轉換
     const nextState = stateConfig.transitions[actionType];
-    if (!nextState) {
+    
+    // 如果有下一個狀態，就返回它
+    if (nextState) {
       return {
-        allowed: false,
-        reason: "invalid_transition",
-        nextState: this.currentState
+        allowed: true,
+        nextState
       };
     }
 
+    // 如果沒有對應的狀態轉換，但動作是有效的，也允許執行
     return {
       allowed: true,
-      nextState
+      nextState: this.currentState
     };
   }
 
