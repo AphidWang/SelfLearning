@@ -188,6 +188,18 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [bubbleOffsets, setBubbleOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [editingBubbleId, setEditingBubbleId] = useState<string | null>(null);
   const [editingBubbleTitle, setEditingBubbleTitle] = useState('');
+  const [assistantInputHandler, setAssistantInputHandler] = useState<((input: string, params?: Record<string, any>) => void) | null>(null);
+
+  // 新增一個 useEffect 來追蹤 assistantInputHandler 的變化
+  useEffect(() => {
+    console.log('🔍 Assistant input handler updated:', !!assistantInputHandler);
+  }, [assistantInputHandler]);
+
+  // 處理外部輸入的設置
+  const handleSetAssistantInput = useCallback((handler: (input: string, params?: Record<string, any>) => void) => {
+    console.log('🔍 Setting assistant input handler');
+    setAssistantInputHandler(() => handler);
+  }, []);
 
   // 初始化心智圖狀態
   const initializeMindMap = useCallback((currentGoal: Goal | null) => {
@@ -1195,6 +1207,31 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     setEditingBubbleTitle('');
   }, [mindMapService]);
 
+  // AI 分析相關函數
+  const handleAnalyzeGoal = useCallback((goalTitle: string) => {
+    if (!goal || !assistantInputHandler) return;
+    console.log('🔍 Analyzing goal:', goalTitle);
+    assistantInputHandler(`總結主題：${goalTitle}`, { mode: 'summarize' });
+  }, [goal, assistantInputHandler]);
+
+  const handleAnalyzeStep = useCallback((stepTitle: string) => {
+    if (!goal || !assistantInputHandler) return;
+    console.log('🔍 Analyzing step:', stepTitle);
+    assistantInputHandler(`總結目標：${stepTitle}`, { mode: 'step_search' });
+  }, [goal, assistantInputHandler]);
+
+  const handleAnalyzeTask = useCallback((taskTitle: string) => {
+    if (!goal || !assistantInputHandler) return;
+    console.log('🔍 Analyzing task:', taskTitle);
+    assistantInputHandler(`分析任務：${taskTitle}`, { mode: 'mission_search' });
+  }, [goal, assistantInputHandler]);
+
+  const handleAnalyzeBubble = useCallback((bubbleTitle: string) => {
+    if (!goal || !assistantInputHandler) return;
+    console.log('🔍 Analyzing bubble:', bubbleTitle);
+    assistantInputHandler(`分析想法：${bubbleTitle}`, { mode: 'bubble_idea_search' });
+  }, [goal, assistantInputHandler]);
+
   return (
     <div 
       ref={containerRef}
@@ -1558,6 +1595,31 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 </motion.button>
               </div>
             </div>
+
+            {/* 新增 AI 按鈕 */}
+            <div 
+              className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              style={{
+                right: '-5px',
+                top: '-15px',
+                transform: 'translate(50%, 50%)',
+                zIndex: getIndex('goal') + 1
+              }}
+            >
+              <div className="flex space-x-2">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAnalyzeGoal(goal.title);
+                  }}
+                  className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-white" />
+                </motion.div>
+              </div>
+            </div>
           </div>
         </motion.div>
 
@@ -1695,6 +1757,31 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4 text-red-500" />
+                        </motion.div>
+                      </div>
+                    </div>
+
+                    {/* 新增 AI 按鈕 */}
+                    <div 
+                      className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      style={{
+                        right: '-15px',
+                        top: '-15px',
+                        transform: 'translate(50%, 50%)',
+                        zIndex: getIndex(step.id) + 1
+                      }}
+                    >
+                      <div className="flex space-x-2">
+                        <motion.div
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAnalyzeStep(step.title);
+                          }}
+                          className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                        >
+                          <Sparkles className="w-4 h-4 text-white" />
                         </motion.div>
                       </div>
                     </div>
@@ -1859,6 +1946,31 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                               </motion.div>
                             </div>
                           </div>
+
+                          {/* 新增 AI 按鈕 */}
+                          <div 
+                            className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            style={{
+                              right: '-20px',
+                              top: '-35px',
+                              transform: 'translate(50%, 50%)',
+                              zIndex: getIndex(task.id) + 1
+                            }}
+                          >
+                            <div className="flex space-x-2">
+                              <motion.div
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAnalyzeTask(task.title);
+                                }}
+                                className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                              >
+                                <Sparkles className="w-4 h-4 text-white" />
+                              </motion.div>
+                            </div>
+                          </div>
                         </motion.div>
                       </motion.div>
                     );
@@ -1988,6 +2100,31 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       <Trash2 className="w-4 h-4 text-red-500" />
                     </motion.div>
                   </div>
+
+                  {/* 新增 AI 按鈕 */}
+                  <div 
+                    className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    style={{
+                      right: '-15px',
+                      top: '-15px',
+                      transform: 'translate(50%, 50%)',
+                      zIndex: getIndex(bubble.id) + 1
+                    }}
+                  >
+                    <div className="flex space-x-2">
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAnalyzeBubble(bubble.title);
+                        }}
+                        className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-white" />
+                      </motion.div>
+                    </div>
+                  </div>
                 </motion.div>
               </motion.div>
             );
@@ -2059,6 +2196,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
               flyToElement(elementId);
             }
           }}
+          onExternalInput={handleSetAssistantInput}
         />
       </div>
     </div>
