@@ -136,7 +136,24 @@ export class ChatService {
         const params = Object.entries(action.params)
           .map(([paramName, param]) => {
             const paramInfo = param as any;
-            return `${paramName}（${paramInfo.type}）：${paramInfo.description}`;
+            let paramDesc = `${paramName}（${paramInfo.type}）：${paramInfo.description}`;
+            
+            // 如果是陣列且有 items 定義，加入陣列項目的結構說明
+            if (paramInfo.type === 'array' && paramInfo.items) {
+              if (paramInfo.items.type === 'object' && paramInfo.items.properties) {
+                const itemProps = Object.entries(paramInfo.items.properties)
+                  .map(([propName, prop]) => {
+                    const propInfo = prop as any;
+                    return `    - ${propName}（${propInfo.type}）：${propInfo.description}`;
+                  })
+                  .join('\n');
+                paramDesc += `\n  陣列項目結構：\n${itemProps}`;
+              } else {
+                paramDesc += `\n  陣列項目類型：${paramInfo.items.type}`;
+              }
+            }
+            
+            return paramDesc;
           })
           .join('\n');
         return `工具：${name}

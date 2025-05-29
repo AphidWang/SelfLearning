@@ -7,7 +7,21 @@
         "transitions": {
           "topic_selected": "clarify",
           "createTopic": "clarify",
-          "createTopics": "clarify"
+          "createTopics": "clarify",
+          "exploration": "exploration"
+        }
+      },
+      "exploration": {
+        "name": "探索階段",
+        "description": "協助孩子從主題出發，循環推進觀察、行動、整理與分享任務",
+        "defaultTools": ["use_template_steps", "suggest_tasks", "suggest_steps", "chat", "add_impression", "add_idea"],
+        "transitions": {
+          "task_started": "act",
+          "createTask": "act",
+          "createTasks": "act",
+          "createStep": "observe",
+          "createSteps": "observe",
+          "use_template_steps": "observe"
         }
       },
       "clarify": {

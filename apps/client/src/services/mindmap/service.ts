@@ -69,8 +69,8 @@ export class MindMapService {
     this.formConfigs = forms;
     this.currentTopicId = topicId
     this.setupContextSubscription();
-    // 設定初始狀態為 init
-    this.stateController.transition('init');
+    // 設定初始狀態為 exploration
+    this.stateController.transition('exploration');
     // 清空 chatService 的歷史記錄
     this.chatService.clearHistory();
   }
@@ -260,8 +260,28 @@ export class MindMapService {
         const actionConfig = actions.actions[parsedResponse.tool];
         console.log('⚡ Action Config:', actionConfig);
 
+        // 檢查 LLM 回應的 action 是否合法
+        if (!this.stateController.isToolAllowed(parsedResponse.tool)) {
+          throw new Error(`當前狀態不允許使用工具: ${parsedResponse.tool}`);
+        }
+
+        // 如果動作合法但沒有對應的 form，當作聊天處理
         if (!formConfig) {
-          throw new Error(`Unknown form type: ${parsedResponse.tool}`);
+          console.log('⚠️ 動作合法但沒有對應的 form，轉為聊天處理', { 
+            tool: parsedResponse.tool,
+            params: parsedResponse.params 
+          });
+          return {
+            tool: 'chat',
+            params: {},
+            message: response.message,
+            form: {
+              type: 'chat',
+              title: '聊天',
+              description: '與 AI 對話',
+              options: []
+            }
+          };
         }
 
         if (!actionConfig) {
@@ -310,11 +330,6 @@ export class MindMapService {
             params: option.text
           }
         })) || [];
-
-        // 檢查 LLM 回應的 action 是否合法
-        if (!this.stateController.isToolAllowed(parsedResponse.tool)) {
-          throw new Error(`當前狀態不允許使用工具: ${parsedResponse.tool}`);
-        }
 
         return {
           tool: parsedResponse.tool,

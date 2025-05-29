@@ -1,5 +1,6 @@
 export type EventType = 
   | 'init'              // 初始化狀態
+  | 'exploration'       // 進入探索階段
   | 'topic_selected'      // 選擇了主題
   | 'input_received'      // 收到使用者輸入
   | 'suggest_steps_accepted'  // 接受建議的步驟
@@ -20,6 +21,7 @@ export type EventType =
 
 export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   init: '初始化學習狀態',
+  exploration: '進入探索階段',
   topic_selected: '選擇了一個新的學習主題',
   input_received: '收到使用者的輸入或回應',
   suggest_steps_accepted: '接受了建議的學習步驟',
@@ -41,6 +43,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
 
 export const EVENT_EMOJIS: Record<EventType, string> = {
   init: '🎬',
+  exploration: '🔍',
   topic_selected: '🎯',
   input_received: '💭',
   suggest_steps_accepted: '✅',
