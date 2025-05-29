@@ -764,8 +764,8 @@ const initialGoals: Goal[] = [
         "tasks": [
           {
             "id": "9-1-1",
-            "title": "火箭會飛到天空",
-            "status": "idea"
+            "title": "火箭怎麼起飛",
+            "status": "done"
           },
           {
             "id": "9-1-2",
@@ -786,12 +786,12 @@ const initialGoals: Goal[] = [
           {
             "id": "9-2-1",
             "title": "查飛機、太空站的高度並畫圖比較",
-            "status": "done"
+            "status": "in_progress"
           },
           {
             "id": "9-2-2",
             "title": "整理你找到的高度資料做成表格",
-            "status": "in_progress"
+            "status": "todo"
           }
         ]
       },
@@ -806,7 +806,7 @@ const initialGoals: Goal[] = [
           },
           {
             "id": "9-3-2",
-            "title": "錄一段影片介紹你查到的內容",
+            "title": "錄一段影片：我是火箭小主播",
             "status": "todo"
           }
         ]

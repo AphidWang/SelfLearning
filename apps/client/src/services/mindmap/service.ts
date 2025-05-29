@@ -153,6 +153,29 @@ export class MindMapService {
 
   async processLLMResponse(response: string): Promise<LLMResponse> {
     try {
+      console.log('🔍 Raw LLM Response:', response);
+      console.log('🔍 Response type:', typeof response);
+      console.log('🔍 Response length:', response.length);
+      
+      // 清理 JSON 字串
+      response = response.trim();
+      
+      // 確保是有效的 JSON 字串
+      if (!response.startsWith('{') || !response.endsWith('}')) {
+        console.error('❌ Invalid JSON format:', response);
+        throw new Error('Invalid JSON format');
+      }
+      
+      // 只處理 message 欄位中的換行符號
+      const messageMatch = response.match(/"message":\s*"([^"]*)"/);
+      if (messageMatch) {
+        const originalMessage = messageMatch[1];
+        const escapedMessage = originalMessage.replace(/\n/g, '\\n');
+        response = response.replace(originalMessage, escapedMessage);
+      }
+      
+      console.log('🔍 Cleaned Response:', response);
+      
       const parsedResponse = JSON.parse(response) as LLMResponse;
       console.log('🔍 Parsed Response:', parsedResponse);
       

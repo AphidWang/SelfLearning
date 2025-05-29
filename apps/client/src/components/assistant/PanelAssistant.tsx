@@ -231,12 +231,18 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
       if (response.form) {
         updateUIFromForm(response.form, response.message);
         updateUIState(prev => ({
-          chatHistory: [...prev.chatHistory, { message: response.message, role: 'assistant' }]
+          chatHistory: [...prev.chatHistory, { 
+            message: response.message.replace(/\\n/g, '\n'), 
+            role: 'assistant' 
+          }]
         }), 'handleSendMessage-response');
       } else {
         updateUIState(prev => ({
           message: response.message || '你想跟我說什麼呢',
-          chatHistory: [...prev.chatHistory, { message: response.message, role: 'assistant' }]
+          chatHistory: [...prev.chatHistory, { 
+            message: response.message.replace(/\\n/g, '\n'), 
+            role: 'assistant' 
+          }]
         }), 'handleSendMessage');
       }
 
@@ -397,7 +403,22 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
                           : 'bg-white/80 dark:bg-purple-900/30 text-gray-900 dark:text-gray-100 shadow-sm'
                       }`}
                     >
-                      {chat.message}
+                      {chat.message.split('\n').map((line, i) => (
+                        <React.Fragment key={i}>
+                          {line.split(/(\*\*.*?\*\*)/).map((part, j) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <strong key={j}>{part.slice(2, -2)}</strong>;
+                            }
+                            return part;
+                          })}
+                          {i < chat.message.split('\n').length - 1 && (
+                            <>
+                              <br />
+                              <br />
+                            </>
+                          )}
+                        </React.Fragment>
+                      ))}
                     </div>
                   </div>
                 ))}
