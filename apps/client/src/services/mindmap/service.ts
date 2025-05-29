@@ -111,10 +111,10 @@ export class MindMapService {
             bubbleType: bubble.bubbleType
           }))
         },
-        steps: topic.steps.map(step => ({
+        steps: topic.steps.filter(step => step.status !== 'archived').map(step => ({
           id: step.id,
           title: step.title,
-          tasks: step.tasks?.map(task => ({
+          tasks: step.tasks?.filter(task => task.status !== 'archived').map(task => ({
             id: task.id,
             title: task.title,
             status: task.status
