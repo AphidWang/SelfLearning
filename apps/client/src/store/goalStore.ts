@@ -648,6 +648,172 @@ const initialGoals: Goal[] = [
       },
     ],
   },
+  {
+    id: '8',
+    title: '火箭能飛多高',
+    description: '透過觀察、行動、學習和分享，探索火箭飛行的原理',
+    status: 'active',
+    bubbles: [
+      {
+        id: 'bubble-8-1',
+        title: '可以去月球嗎',
+        parentId: '8',
+        bubbleType: 'background',
+        content: '看到火箭發射的影片，想知道為什麼火箭能飛得這麼高'
+      },
+      {
+        id: 'bubble-8-2',
+        title: '想知道飛行原理',
+        parentId: '8',
+        bubbleType: 'background',
+        content: '火箭、推力、重力、空氣阻力、牛頓運動定律'
+      }
+    ],
+    steps: [
+      {
+        id: '8-1',
+        title: '觀察火箭',
+        tasks: [
+          {
+            id: '8-1-1',
+            title: '收集火箭發射的影片和圖片',
+            status: 'idea',
+          },
+          {
+            id: '8-1-2',
+            title: '觀察火箭發射時的變化',
+            status: 'idea',
+          },
+        ],
+      },
+      {
+        id: '8-2',
+        title: '動手實驗',
+        tasks: [
+          {
+            id: '8-2-1',
+            title: '製作簡單的水火箭',
+            status: 'todo',
+          },
+          {
+            id: '8-2-2',
+            title: '測試不同水量對飛行高度的影響',
+            status: 'todo',
+          },
+        ],
+      },
+      {
+        id: '8-3',
+        title: '學習原理',
+        tasks: [
+          {
+            id: '8-3-1',
+            title: '了解牛頓第三運動定律',
+            status: 'todo',
+          },
+          {
+            id: '8-3-2',
+            title: '探索空氣阻力和重力的影響',
+            status: 'todo',
+          },
+        ],
+      },
+      {
+        id: '8-4',
+        title: '分享發現',
+        tasks: [
+          {
+            id: '8-4-1',
+            title: '製作實驗報告，記錄觀察結果',
+            status: 'todo',
+          },
+          {
+            id: '8-4-2',
+            title: '向同學展示水火箭實驗',
+            status: 'todo',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    "id": "9",
+    "title": "火箭可以飛多高？",
+    "description": "探索火箭能飛多高與太空邊界",
+    "status": "active",
+    "bubbles": [
+      {
+        "id": "bubble-9-1",
+        "title": "會離開地球嗎？",
+        "parentId": "9",
+        "bubbleType": "background",
+        "content": "我們知道火箭會飛上天，但它可以飛多高？會超過雲、飛機、太空站，還是可以飛到月球？"
+      },
+      {
+        "id": "bubble-9-2",
+        "title": "能飛到太陽嗎？",
+        "parentId": "9",
+        "bubbleType": "background",
+        "content": "地球外的大氣層有很多層，太空的起點是「卡門線」，大約在地面上方 100 公里。"
+      }
+    ],
+    "steps": [
+      {
+        "id": "9-1",
+        "title": "火箭飛到哪裡去？",
+        "tasks": [
+          {
+            "id": "9-1-1",
+            "title": "火箭會飛到天空",
+            "status": "idea"
+          },
+          {
+            "id": "9-1-2",
+            "title": "查查太空從哪裡開始（卡門線）",
+            "status": "done"
+          },
+          {
+            "id": "9-1-3",
+            "title": "找出真實火箭可飛多高",
+            "status": "done"
+          }
+        ]
+      },
+      {
+        "id": "9-2",
+        "title": "和其他飛行器比較",
+        "tasks": [
+          {
+            "id": "9-2-1",
+            "title": "查飛機、太空站的高度並畫圖比較",
+            "status": "done"
+          },
+          {
+            "id": "9-2-2",
+            "title": "整理你找到的高度資料做成表格",
+            "status": "in_progress"
+          }
+        ]
+      },
+      {
+        "id": "9-3",
+        "title": "創作與分享你的發現",
+        "tasks": [
+          {
+            "id": "9-3-1",
+            "title": "製作小報或簡報介紹火箭飛多高",
+            "status": "todo"
+          },
+          {
+            "id": "9-3-2",
+            "title": "錄一段影片介紹你查到的內容",
+            "status": "todo"
+          }
+        ]
+      }
+    ]
+  }  
+    
 ];
 
 const getInitialGoals = (): Goal[] => {
