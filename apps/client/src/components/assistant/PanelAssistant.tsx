@@ -204,7 +204,6 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
 
   const handleDirectInput = (text: string) => {
     setMode('thinking');
-    // 直接將文字作為使用者輸入處理
     handleSendMessage(text);
   };
 
@@ -226,7 +225,6 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
     setIsLoading(true);
     setMode('thinking');
     
-    // 立即清空輸入框
     updateUIState(prev => ({
       ...prev,
       inputText: '',

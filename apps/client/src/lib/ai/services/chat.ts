@@ -242,7 +242,7 @@ ${this.getActionsDescription()}
           { role: 'system', content: JSON.stringify({ type: 'mindmap_context', data: this.mindmapContext }) },
           { role: 'system', content: JSON.stringify({ type: 'state_prompt', data: STATE_PROMPTS[this.currentState] }) },
           { role: 'system', content: JSON.stringify({ type: 'level_prompt', data: LEVEL_PROMPTS[this.currentLevel] }) },
-          { role: 'system', content: this.getActionsDescription() ? JSON.stringify({ type: 'tool_usage', data: this.getToolUsagePrompt() }) : '' },
+          { role: 'system', content: this.getActionsDescription() ? this.getToolUsagePrompt() : '' },
           ...memoryVars.history.map(msg => ({
             role: msg instanceof HumanMessage ? 'user' : 'assistant',
             content: msg.content
