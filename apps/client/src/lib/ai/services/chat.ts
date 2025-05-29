@@ -125,7 +125,7 @@ export class ChatService {
   private memory: CustomSummaryMemory;
   private model: ChatOpenAI;
   private chain: RunnableSequence;
-  private mindmapContext: string = '';
+  private mindmapContext: any = null;
   private currentState: keyof typeof STATE_PROMPTS = 'init';
   private currentLevel: keyof typeof LEVEL_PROMPTS = 'L0';
 
@@ -148,7 +148,7 @@ ${params}`;
   }
 
   private getToolUsagePrompt(): string {
-    return `【工具使用說明】
+    return `
 工具使用說明：
 1. 你不能直接執行動作，只能「建議應該做什麼動作」。
 2. 系統會根據你的建議內容，請使用者確認是否執行，真正的執行會由系統完成。
@@ -215,7 +215,7 @@ ${this.getActionsDescription()}
   }
 
   // 更新 mindmap 上下文
-  public updateMindmapContext(context: string) {
+  public updateMindmapContext(context: any) {
     this.mindmapContext = context;
   }
 
@@ -239,26 +239,13 @@ ${this.getActionsDescription()}
       const response = await api.post('/api/chat/completions', {
         messages: [
           { role: 'system', content: await this.buildSystemPrompt() },
-          { role: 'system', name: "mindmap_context", content: this.mindmapContext },
-          { 
-            role: 'system', 
-            name: 'state_prompt',
-            content: JSON.stringify(STATE_PROMPTS[this.currentState])
-          },
-          { 
-            role: 'system', 
-            name: 'level_prompt',
-            content: LEVEL_PROMPTS[this.currentLevel]
-          },
-          { 
-            role: 'system', 
-            name: 'tool_usage', 
-            content: this.getActionsDescription() ? this.getToolUsagePrompt() : ''
-          },
+          { role: 'system', content: JSON.stringify({ type: 'mindmap_context', data: this.mindmapContext }) },
+          { role: 'system', content: JSON.stringify({ type: 'state_prompt', data: STATE_PROMPTS[this.currentState] }) },
+          { role: 'system', content: JSON.stringify({ type: 'level_prompt', data: LEVEL_PROMPTS[this.currentLevel] }) },
+          { role: 'system', content: this.getActionsDescription() ? JSON.stringify({ type: 'tool_usage', data: this.getToolUsagePrompt() }) : '' },
           ...memoryVars.history.map(msg => ({
             role: msg instanceof HumanMessage ? 'user' : 'assistant',
-            content: msg.content,
-            name: msg.name
+            content: msg.content
           })),
           { role: 'user', content: message }
         ].filter(msg => msg.content),

@@ -59,7 +59,7 @@ export class MindMapService {
   private maxRetries = 3;  // 一般錯誤的重試次數
   private formConfigs: Record<string, ActionFormConfig>;
   private currentTopicId: string | null;
-  private contextCache: string | null = null;
+  private contextCache: any = null;
   private unsubscribe: (() => void) | null = null;
   private errorContext: string | null = null;  // 新增錯誤 context
 
@@ -67,7 +67,7 @@ export class MindMapService {
     this.stateController = new MindmapStateController();
     this.chatService = new ChatService();
     this.formConfigs = forms;
-    this.currentTopicId = topicId;
+    this.currentTopicId = topicId
     this.setupContextSubscription();
     // 設定初始狀態為 init
     this.stateController.transition('init');
@@ -90,7 +90,7 @@ export class MindMapService {
     }
 
     if (!this.currentTopicId) {
-      this.contextCache = 'No active topic';
+      this.contextCache = null;
       return;
     }
 
@@ -103,7 +103,13 @@ export class MindMapService {
         topic: {
           id: topic.id,
           title: topic.title,
-          description: topic.description
+          description: topic.description,
+          bubbles: topic.bubbles?.map(bubble => ({
+            id: bubble.id,
+            title: bubble.title,
+            content: bubble.content,
+            bubbleType: bubble.bubbleType
+          }))
         },
         steps: topic.steps.map(step => ({
           id: step.id,
@@ -120,22 +126,16 @@ export class MindMapService {
     // 訂閱變化
     this.unsubscribe = useGoalStore.subscribe((state) => {
       const context = selector(state);
-      if (context) {
-        this.contextCache = JSON.stringify(context, null, 2);
-      } else {
-        this.contextCache = 'Topic not found';
-      }
+      this.contextCache = context || null;
     });
 
     // 初始化 context
     const initialContext = selector(useGoalStore.getState());
-    this.contextCache = initialContext 
-      ? JSON.stringify(initialContext, null, 2)
-      : 'Topic not found';
+    this.contextCache = initialContext || null;
   }
 
-  private async getMindmapContext(): Promise<string> {
-    return this.contextCache || 'No active topic';
+  private async getMindmapContext(): Promise<any> {
+    return this.contextCache || null;
   }
 
   private convertJsonSchemaToParamType(schema: any): { type: ParamType } {
