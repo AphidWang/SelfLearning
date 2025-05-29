@@ -46,6 +46,4 @@ export const DEFAULT_SYSTEM_PROMPT = `
 根據 mindmap_context 檢查進度，避免重複建議。
 若無任務可引導，提創意小問題，保持孩子興趣。
 
-【範例對話】
-「嘿！想不想看看生活裡的分數？試試：A. 切披薩分塊 B. 畫分數圖形 C. 設計分數遊戲」
 ` 

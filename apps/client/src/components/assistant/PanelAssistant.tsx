@@ -383,7 +383,7 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
               {/* 標題列 */}
               <div className="flex items-center p-4 relative">
                 <div className="flex items-center space-x-3">
-                  <h2 className="text-lg font-semibold text-purple-800/90 dark:text-purple-200/90">樹懶小幫手</h2>
+                  <h2 className="text-lg font-semibold text-purple-800/90 dark:text-purple-200/90 select-text">樹懶小幫手</h2>
                 </div>
               </div>
 
@@ -398,7 +398,7 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
                     className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-2xl p-3 backdrop-blur-sm ${
+                      className={`max-w-[80%] rounded-2xl p-3 backdrop-blur-sm select-text ${
                         chat.role === 'user'
                           ? 'bg-purple-500/90 text-white shadow-md'
                           : 'bg-white/80 dark:bg-purple-900/30 text-gray-900 dark:text-gray-100 shadow-sm'
