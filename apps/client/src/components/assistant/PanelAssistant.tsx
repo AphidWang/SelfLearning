@@ -60,6 +60,7 @@ interface PanelAssistantProps {
   onActionSubmit?: (action: string, params: Record<string, any>) => void;
   goalId?: string | null;
   onFocus?: (focus: string) => void;
+  onExternalInput?: (handler: (input: string, params?: Record<string, any>) => void) => void;
 }
 
 export const PanelAssistant: React.FC<PanelAssistantProps> = ({
@@ -70,7 +71,8 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
   className = '',
   onActionSubmit,
   goalId = null,
-  onFocus
+  onFocus,
+  onExternalInput
 }) => {
   const [mode, setMode] = useState<AssistantMode>('idle');
   const [isDragging, setIsDragging] = useState(false);
@@ -168,27 +170,21 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
       inputPlaceholder: '和我分享你的想法吧',
       choices: [
         { 
-          text: "幫我想分類", 
-          icon: <ListChecks className="h-12 w-12 text-indigo-600" />,
-          description: "幫你規劃學習目標的分類",
-          action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個學習步驟") 
-        },
-        { 
-          text: "幫我想任務", 
+          text: "看看導師有什麼建議", 
           icon: <Target className="h-12 w-12 text-emerald-600" />,
-          description: "幫你規劃具體的學習任務",
+          description: "讓導師幫你規劃學習任務",
           action: () => handleDirectInput("根據現在的主題和結構, 幫我建議 1~3 個新的學習任務") 
         },
         { 
-          text: "跟我聊聊這個主題", 
+          text: "看看今天的任務", 
           icon: <MessageSquare className="h-12 w-12 text-orange-600" />,
-          description: "討論這個主題的相關內容",
-          action: () => handleDirectInput("跟我聊聊這個主題, 有沒有推薦的方向呢？") 
+          description: "總結目前的主題內容",
+          action: () => handleDirectInput("總結整個主題的內容") 
         },
         { 
-          text: "隨便聊聊天", 
+          text: "來聊聊天吧！", 
           icon: <Brain className="h-12 w-12 text-purple-600" />,
-          description: "來聊聊天吧！",
+          description: "隨便聊聊吧",
           action: () => handleChatMode() 
         }
       ]
@@ -334,6 +330,35 @@ export const PanelAssistant: React.FC<PanelAssistantProps> = ({
     const randomIndex = Math.floor(Math.random() * icons.length);
     return icons[randomIndex];
   };
+
+  // 新增處理外部輸入的方法
+  const handleExternalInput = useCallback((input: string, params?: Record<string, any>) => {
+    console.log('🔍 External input:', input, params);
+    if (!input?.trim()) return;
+    
+    setMode('thinking');
+    
+    // 如果有額外參數，先設置到 service
+    if (params) {
+      mindMapService.setMode(params.mode);
+    }
+    
+    handleSendMessage(input);
+  }, [handleSendMessage, mindMapService]);
+
+  // 監聽外部輸入
+  useEffect(() => {
+    console.log('🔍 Setting up external input handler');
+    if (onExternalInput) {
+      const handler = (input: string, params?: Record<string, any>) => {
+        console.log('🔍 External input received:', input, params);
+        if (input) {
+          handleExternalInput(input, params);
+        }
+      };
+      onExternalInput(handler);
+    }
+  }, [onExternalInput, handleExternalInput]);
 
   return (
     <AnimatePresence>
