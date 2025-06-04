@@ -1,8 +1,29 @@
 import express from 'express';
 import type { User, LoginCredentials } from '@self-learning/types';
-import { generateToken } from '../utils/jwt';
+import { generateToken, verifyToken } from '../utils/jwt';
 
 const router = express.Router();
+
+// 驗證 token 的中間件
+const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  console.log('Auth middleware:', { authHeader, token });
+  
+  if (!token) {
+    return res.status(401).json({ message: '未提供 token' });
+  }
+
+  const decoded = verifyToken(token);
+  console.log('Token verification:', { decoded });
+  
+  if (!decoded) {
+    return res.status(401).json({ message: '無效的 token' });
+  }
+
+  next();
+};
 
 router.post('/login', (req, res) => {
   const { email, password }: LoginCredentials = req.body;
@@ -29,6 +50,30 @@ router.post('/login', (req, res) => {
 
   // TODO: 實作真正的登入邏輯
   res.status(401).json({ message: '無效的帳號或密碼' });
+});
+
+router.get('/me', authenticateToken, (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  const decoded = verifyToken(token!);
+  
+  console.log('GET /me:', { decoded });
+  
+  if (!decoded) {
+    return res.status(401).json({ message: '無效的 token' });
+  }
+
+  // 根據 decoded 中的 userId 和 role 返回對應的用戶資料
+  const user: User = {
+    id: decoded.userId,
+    name: decoded.role === 'student' ? 'Alex Student' : 'Sam Mentor',
+    role: decoded.role,
+    avatar: decoded.role === 'student' 
+      ? 'https://images.pexels.com/photos/1462630/pexels-photo-1462630.jpeg?auto=compress&cs=tinysrgb&w=150'
+      : 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=150'
+  };
+
+  res.json(user);
 });
 
 router.post('/logout', (req, res) => {
