@@ -25,6 +25,13 @@ export const STATE_PROMPTS = {
     請用 **粗體字** 表示重點，使用 Markdown 格式。
 `
   },
+  exploration: {
+    goal: '協助孩子從主題出發，循環推進觀察、行動、整理與分享任務。',
+    systemPrompt: `
+
+    不知道要幹嘛。
+`
+  },
   mission_search: {
     goal: '協助孩子從主題出發，循環推進觀察、行動、整理與分享任務。',
     systemPrompt: `
@@ -44,7 +51,7 @@ export const STATE_PROMPTS = {
     當你使用 suggest_tasks 工具時，提醒孩子點下方按鈕新增任務, 就不會忘記囉!
     `
   },
-    exploration: {
+    step_search: {
       goal: '當孩子點選 Step 做出相對應的延伸。',
       systemPrompt: `
   你是一位能感知學習進度並提供有趣延伸任務的 AI 學習夥伴。
