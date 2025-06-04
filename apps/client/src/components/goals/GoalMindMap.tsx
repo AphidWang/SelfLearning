@@ -601,64 +601,77 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 飛到指定元素旁邊
   const flyToElement = (elementId: string) => {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-
-    // 取得容器資訊
-    const container = containerRef.current;
-    if (!container) return;
-
-    const elementRect = element.getBoundingClientRect();
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-
-    // 計算需要的位移
-    // 1. 計算元素中心點
-    const elementCenterX = elementRect.left + elementRect.width / 2;
-    const elementCenterY = elementRect.top + elementRect.height / 2;
-
-    // 2. 計算容器中心點
-    const containerCenterX = containerWidth / 2;
-    const containerCenterY = containerHeight / 2;
-
-    // 3. 計算需要的位移（從元素到容器中心）
-    const dx = containerCenterX - elementCenterX;
-    const dy = containerCenterY - elementCenterY;
-
-    // 4. 更新位置（考慮縮放）
-    const newPosition = {
-      x: position.x + dx / zoom,
-      y: position.y + dy / zoom
-    };
-
-    console.log('🎯 計算後的位置', { 
-      current: {
-        x: position.x,
-        y: position.y
-      },
-      element: {
-        centerX: elementCenterX,
-        centerY: elementCenterY
-      },
-      container: {
-        centerX: containerCenterX,
-        centerY: containerCenterY
-      },
-      delta: {
-        dx,
-        dy
-      },
-      new: newPosition,
-      zoom
-    });
-
-    // 更新畫布位置
-    setPosition(newPosition);
-
-    // 等待畫布移動動畫完成後清除 focus
+    console.log('🎯 飛到元素:', elementId);
+    
+    // 使用 setTimeout 確保元素已經渲染
     setTimeout(() => {
-      mindMapService.clearFocusElement();
-    }, 500);
+      const element = document.getElementById(elementId);
+      if (!element) {
+        console.log('❌ 找不到元素:', elementId);
+        return;
+      }
+
+      // 取得容器資訊
+      const container = containerRef.current;
+      if (!container) {
+        console.log('❌ 找不到容器');
+        return;
+      }
+
+      const elementRect = element.getBoundingClientRect();
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+
+      // 計算需要的位移
+      // 1. 計算元素中心點
+      const elementCenterX = elementRect.left + elementRect.width / 2;
+      const elementCenterY = elementRect.top + elementRect.height / 2;
+
+      // 2. 計算容器中心點
+      const containerCenterX = containerWidth / 2;
+      const containerCenterY = containerHeight / 2;
+
+      // 3. 計算需要的位移（從元素到容器中心）
+      const dx = containerCenterX - elementCenterX;
+      const dy = containerCenterY - elementCenterY;
+
+      // 4. 更新位置（考慮縮放）
+      const newPosition = {
+        x: position.x + dx / zoom,
+        y: position.y + dy / zoom
+      };
+
+      console.log('🎯 計算後的位置', { 
+        current: {
+          x: position.x,
+          y: position.y
+        },
+        element: {
+          centerX: elementCenterX,
+          centerY: elementCenterY
+        },
+        container: {
+          centerX: containerCenterX,
+          centerY: containerCenterY
+        },
+        delta: {
+          dx,
+          dy
+        },
+        new: newPosition,
+        zoom
+      });
+
+      // 使用 requestAnimationFrame 確保在下一幀更新位置
+      requestAnimationFrame(() => {
+        setPosition(newPosition);
+      });
+
+      // 等待畫布移動動畫完成後清除 focus
+      setTimeout(() => {
+        mindMapService.clearFocusElement();
+      }, 500);
+    }, 100); // 給元素 100ms 的渲染時間
   };
 
   useEffect(() => {
@@ -675,7 +688,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     });
 
     return () => unsubscribe();
-  }, [goalId, mindMapService]); // 移除 position 和 zoom 依賴
+  }, [goalId, mindMapService, position, zoom]); // 加回 position 和 zoom 依賴
 
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [editingGoalTitle, setEditingGoalTitle] = useState('');
