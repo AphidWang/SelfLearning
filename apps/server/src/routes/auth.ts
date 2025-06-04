@@ -1,6 +1,7 @@
 import express from 'express';
 import type { User, LoginCredentials } from '@self-learning/types';
 import { generateToken, verifyToken } from '../utils/jwt';
+import { JwtPayload } from 'jsonwebtoken';
 
 const router = express.Router();
 
@@ -59,15 +60,15 @@ router.get('/me', authenticateToken, (req, res) => {
   
   console.log('GET /me:', { decoded });
   
-  if (!decoded) {
+  if (!decoded || typeof decoded === 'string') {
     return res.status(401).json({ message: '無效的 token' });
   }
 
-  // 根據 decoded 中的 userId 和 role 返回對應的用戶資料
+  // 這裡 decoded 一定是 JwtPayload
   const user: User = {
-    id: decoded.userId,
+    id: decoded.userId as string,
     name: decoded.role === 'student' ? 'Alex Student' : 'Sam Mentor',
-    role: decoded.role,
+    role: decoded.role as 'student' | 'mentor',
     avatar: decoded.role === 'student' 
       ? 'https://images.pexels.com/photos/1462630/pexels-photo-1462630.jpeg?auto=compress&cs=tinysrgb&w=150'
       : 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=150'
