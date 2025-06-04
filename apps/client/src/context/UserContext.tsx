@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { authService, User } from '../services/auth';
 
 interface UserContextType {
@@ -13,22 +13,41 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-export const useUser = () => {
+function useUser() {
   const context = useContext(UserContext);
   if (context === undefined) {
     throw new Error('useUser must be used within a UserProvider');
   }
   return context;
-};
-
-interface UserProviderProps {
-  children: ReactNode;
 }
 
-export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
+function UserProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    console.log('Initial auth check:', { storedUser, token });
+    
+    if (storedUser && token) {
+      setCurrentUser(JSON.parse(storedUser));
+      authService.getCurrentUser().then(user => {
+        console.log('Token validation result:', { user });
+        if (!user) {
+          console.log('Token invalid, clearing storage');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setCurrentUser(null);
+        }
+      }).finally(() => {
+        setIsLoading(false);
+      });
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -37,6 +56,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       const { user, token } = await authService.login({ email, password });
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
       setCurrentUser(user);
       return true;
     } catch (err) {
@@ -50,6 +70,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       await authService.logout();
+      localStorage.removeItem('user');
       setCurrentUser(null);
     } catch (err) {
       console.error('Logout failed:', err);
@@ -66,7 +87,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     error
   };
 
-  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
-};
+  if (isLoading) {
+    return null;
+  }
 
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
+}
+
+export { UserProvider, useUser };
 export type { User as UserRole };

@@ -17,6 +17,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children, title }) => {
 
   React.useEffect(() => {
     if (!isAuthenticated) {
+      console.log('Not authenticated, redirecting to login');
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
