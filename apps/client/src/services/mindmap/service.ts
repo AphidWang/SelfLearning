@@ -62,6 +62,7 @@ export class MindMapService {
   private contextCache: any = null;
   private unsubscribe: (() => void) | null = null;
   private errorContext: string | null = null;  // 新增錯誤 context
+  private currentMode: string | null = null;  // 新增 mode 屬性
 
   constructor(topicId: string | null = null) {
     this.stateController = new MindmapStateController();
@@ -253,10 +254,21 @@ export class MindMapService {
         const currentContext = await this.getMindmapContext();
         this.chatService.updateMindmapContext(currentContext);
 
-        const response = await this.chatService.sendMessage(actualInput, {
-          level: 'L3',
-          state: this.stateController.getCurrentState() as keyof typeof STATE_PROMPTS
-        });
+        // 根據當前模式添加提示
+        let modePrompt = '';
+        const currentState = this.stateController.getCurrentState();
+        
+        if (currentState === 'analysis') {
+          modePrompt = '請以分析師的角度，深入分析以下內容：';
+        }
+
+        const response = await this.chatService.sendMessage(
+          modePrompt ? `${modePrompt}\n${actualInput}` : actualInput, 
+          {
+            level: 'L3',
+            state: currentState as keyof typeof STATE_PROMPTS
+          }
+        );
         
         // 先檢查 API 狀態
         if ('status' in response) {
@@ -785,5 +797,40 @@ export class MindMapService {
 
   canTrigger(event: EventType): boolean {
     return this.stateController.canTrigger(event);
+  }
+
+  // 新增 setMode 方法
+  setMode(mode: string | null) {
+    console.log('🎯 設置模式:', mode);
+
+    // 根據 mode 設定對應的 state
+    switch (mode) {
+      case 'summarize':
+        this.stateController.setState('summarize');
+        break;
+      case 'exploration':
+        this.stateController.setState('exploration');
+        break;
+      case 'mission_search':
+        this.stateController.setState('mission_search');
+        break;
+      case 'bubble_idea_search':
+        this.stateController.setState('bubble_idea_search');
+        break;
+      case 'step_search':
+        this.stateController.setState('step_search');
+        break;
+      default:
+        this.stateController.setState('exploration');
+    }
+
+    this.currentMode = mode;
+    // 清空歷史記錄，避免上下文混淆
+    this.chatService.clearHistory();
+  }
+
+  // 新增 getMode 方法
+  getMode(): string | null {
+    return this.currentMode;
   }
 } 

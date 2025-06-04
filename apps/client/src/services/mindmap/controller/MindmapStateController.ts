@@ -6,6 +6,7 @@ export class MindmapStateController {
   private currentState: string;
   private stateHistory: string[] = [];
   private readonly maxHistoryLength = 10;
+  private stateMachine = stateMachine;
 
   constructor(initialState: string = 'init') {
     this.currentState = initialState;
@@ -186,5 +187,13 @@ export class MindmapStateController {
       event,
       description: `可以執行 ${event} 事件`
     }));
+  }
+
+  // 新增 setState 方法
+  setState(state: string) {
+    if (!this.stateMachine.isValidState(state)) {
+      throw new Error(`Invalid state: ${state}`);
+    }
+    this.currentState = state;
   }
 } 

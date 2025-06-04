@@ -2,7 +2,7 @@
     "states": {
       "init": {
         "name": "初始階段",
-        "description": "尚未選擇任何主題，等待孩子提出或選擇一個主題",
+        "description": "建立探索的起點，協助孩子從生活中找出感興趣的事物",
         "defaultTools": ["suggest_topics", "chat"],
         "transitions": {
           "topic_selected": "clarify",
@@ -11,12 +11,39 @@
           "exploration": "exploration"
         }
       },
+      "summarize": {
+        "name": "總結階段",
+        "description": "協助孩子從主題出發，循環推進觀察、行動、整理與分享任務",
+        "defaultTools": ["use_template_steps", "suggest_tasks", "suggest_steps", "chat", "add_impression", "add_idea"],
+        "transitions": {
+        }
+      },
       "exploration": {
         "name": "探索階段",
         "description": "協助孩子從主題出發，循環推進觀察、行動、整理與分享任務",
         "defaultTools": ["use_template_steps", "suggest_tasks", "suggest_steps", "chat", "add_impression", "add_idea"],
         "transitions": {
-
+        }
+      },
+      "mission_search": {
+        "name": "任務搜尋階段",
+        "description": "協助孩子從主題出發，循環推進觀察、行動、整理與分享任務",
+        "defaultTools": ["use_template_steps", "suggest_tasks", "suggest_steps", "chat", "add_impression", "add_idea"],
+        "transitions": {
+        }
+      },
+      "bubble_idea_search": {
+        "name": "想法搜尋階段",
+        "description": "當孩子點選 Step / Bubble / Idea 的想法時，請親切回應這個想法，並延伸一個具體可執行的任務",
+        "defaultTools": ["use_template_steps", "suggest_tasks", "suggest_steps", "chat", "add_impression", "add_idea"],
+        "transitions": {
+        }
+      },
+      "step_search": {
+        "name": "步驟搜尋階段",
+        "description": "當孩子點選 Step 做出相對應的延伸",
+        "defaultTools": ["use_template_steps", "suggest_tasks", "suggest_steps", "chat", "add_impression", "add_idea"],
+        "transitions": {
         }
       },
       "clarify": {
