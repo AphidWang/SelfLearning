@@ -97,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
                     to={item.path}
                     className={({ isActive }) => 
                       `flex items-center px-4 py-2.5 text-sm rounded-lg transition-colors ${
-                        isActive 
+                        isActive && item.path === window.location.pathname
                           ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 font-medium' 
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                       }`
