@@ -22,7 +22,7 @@
     "caniuse-lite": "^1.0.30001717",
     "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
-    "framer-motion": "^12.12.1",
+    "framer-motion": "^12.16.0",
     "langchain": "^0.3.26",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.511.0",
@@ -32,7 +32,7 @@
     "react-router-dom": "^7.6.0",
     "react-xarrows": "^2.0.2",
     "reactflow": "^11.11.4",
-    "zustand": "^5.0.4"
+    "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
