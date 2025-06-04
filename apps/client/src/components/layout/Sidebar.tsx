@@ -23,6 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
       { name: '儀表板', path: '/student', icon: <BookOpen size={20} /> },
       { name: '學習規劃', path: '/student/planning', icon: <Target size={20} /> },
+      { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
       { name: '學習日誌', path: '/student/journal', icon: <BookMarked size={20} /> },
     ],
     mentor: [

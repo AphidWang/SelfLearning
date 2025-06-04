@@ -18,6 +18,7 @@ import { CurriculumProvider } from './context/CurriculumContext';
 import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
 import LottiePreview from './pages/preview/LottiePreview';
+import { StudentLearningMap } from './pages/student/StudentLearningMap';
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
             <Route path="/student/planning/goal/:goalId" element={<GoalMindMapPage />} />
             <Route path="/student/journal" element={<StudentJournal />} />
             <Route path="/student/goals" element={<StudentGoals />} />
+            <Route path="/student/learning-map" element={<StudentLearningMap />} />
             <Route path="/student/subject/:subjectId" element={<SubjectPage />} />
             
             {/* Mentor Routes */}
