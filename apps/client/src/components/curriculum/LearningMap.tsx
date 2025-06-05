@@ -1,9 +1,9 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Xarrow, { Xwrapper } from 'react-xarrows';
 import { DndContext, DragEndEvent, useDraggable, DragStartEvent, DragMoveEvent } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
-import { Lock, Unlock, Star, Trophy, Flag, Map, Compass, Award, Plus, Edit2, Tag } from 'lucide-react';
+import { Lock, Star, Trophy, Flag, Map, Compass, Award, Plus, Edit2, Tag } from 'lucide-react';
+import CurriculumDialog from './CurriculumDialog';
 
 type RewardType = {
   type: 'points' | 'badge' | 'experience';
@@ -32,7 +32,6 @@ interface NodeProps {
   showRewardAnimation?: boolean;
   isStudent?: boolean;
   isEditable?: boolean;
-  isDragging?: boolean;
   dragStartPosition?: { x: number; y: number } | null;
   nodes?: LearningNode[];
   allowDragOut?: boolean;
@@ -48,12 +47,12 @@ const Node: React.FC<NodeProps> = React.memo(({
   showRewardAnimation,
   isStudent,
   isEditable,
-  isDragging,
   dragStartPosition,
   allowDragOut
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
   const nodeRef = useRef<HTMLElement | null>(null);
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: node.id,
@@ -89,7 +88,8 @@ const Node: React.FC<NodeProps> = React.memo(({
     }
   };
 
-  const handleEdit = () => {
+  const handleEdit = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setIsEditing(true);
   };
 
@@ -112,6 +112,12 @@ const Node: React.FC<NodeProps> = React.memo(({
     setIsEditing(false);
   };
 
+  const handleOpenDialog = () => {
+    if (!isEditing) {
+      setShowDialog(true);
+    }
+  };
+
   useEffect(() => {
     if (!allowDragOut) return;
 
@@ -126,10 +132,10 @@ const Node: React.FC<NodeProps> = React.memo(({
       }
     };
 
-    const handleNativeDragEnd = (e: DragEvent) => {
+    const handleNativeDragEnd = () => {
       if (dragStartPosition && nodes) {
-        const updatedNodes = nodes.map(n => 
-          n.id === node.id 
+        const updatedNodes = nodes.map(n =>
+          n.id === node.id
             ? { ...n, position: dragStartPosition }
             : n
         );
@@ -144,7 +150,7 @@ const Node: React.FC<NodeProps> = React.memo(({
       element.removeEventListener('dragstart', handleNativeDragStart);
       element.removeEventListener('dragend', handleNativeDragEnd);
     };
-  }, [node.id, allowDragOut, dragStartPosition, nodes]);
+  }, [node.id, allowDragOut, dragStartPosition, nodes, onNodesChange]);
 
   if (isEditing && isEditable) {
     return (
@@ -242,6 +248,7 @@ const Node: React.FC<NodeProps> = React.memo(({
   }
 
   return (
+    <>
     <motion.div
       id={node.id}
       ref={(el) => {
@@ -250,6 +257,7 @@ const Node: React.FC<NodeProps> = React.memo(({
       }}
       {...attributes}
       {...listeners}
+      onClick={handleOpenDialog}
       style={{
         position: 'absolute',
         left: node.position.x,
@@ -290,7 +298,7 @@ const Node: React.FC<NodeProps> = React.memo(({
         {/* Edit Button */}
         {isEditable && !isStudent && (
           <button
-            onClick={handleEdit}
+            onClick={(e) => handleEdit(e)}
             className="absolute -left-4 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 transition-colors z-10"
           >
             <Edit2 size={16} />
@@ -412,13 +420,16 @@ const Node: React.FC<NodeProps> = React.memo(({
         )}
       </div>
     </motion.div>
+    {showDialog && (
+      <CurriculumDialog goalId={node.id} onClose={() => setShowDialog(false)} />
+    )}
+    </>
   );
 }, (prev, next) => {
   return (
     prev.node.id === next.node.id &&
     prev.node.position.x === next.node.position.x &&
     prev.node.position.y === next.node.position.y &&
-    prev.isDragging === next.isDragging &&
     prev.showRewardAnimation === next.showRewardAnimation &&
     prev.isEditable === next.isEditable &&
     prev.isStudent === next.isStudent &&
@@ -603,7 +614,6 @@ const LearningMap: React.FC<LearningMapProps> = ({
                 showRewardAnimation={showRewardAnimation}
                 isStudent={isStudent}
                 isEditable={isEditable}
-                isDragging={node.id === draggingNodeId}
                 dragStartPosition={dragStartPosition}
                 allowDragOut={allowDragOut}
               />
