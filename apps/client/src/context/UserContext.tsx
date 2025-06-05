@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { authService, User } from '../services/auth';
+import { trackEvent } from '../utils/analytics';
 
 interface UserContextType {
   currentUser: User | null;
@@ -58,9 +59,11 @@ function UserProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       setCurrentUser(user);
+      trackEvent('login_success', 'auth');
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : '登入失敗');
+      trackEvent('login_failed', 'auth');
       return false;
     } finally {
       setIsLoading(false);
@@ -72,6 +75,7 @@ function UserProvider({ children }: { children: ReactNode }) {
       await authService.logout();
       localStorage.removeItem('user');
       setCurrentUser(null);
+      trackEvent('logout', 'auth');
     } catch (err) {
       console.error('Logout failed:', err);
     }
