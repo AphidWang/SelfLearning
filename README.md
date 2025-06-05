@@ -48,6 +48,7 @@ npm run dev
 ### 環境設定
 ```env
 VITE_APP_TITLE=Learning Progress Tracker
+VITE_GA_ID=<your-ga-id>
 ```
 
 ## 技術架構
