@@ -24,16 +24,20 @@ export const MapIcon: React.FC<MapIconProps> = ({ task, src, left, top, onTaskCl
   return (
     <motion.div
       className="absolute cursor-pointer z-10"
-      style={{ 
-        left: `${left}%`, 
-        top: `${top}%`, 
+      style={{
         transform: 'translate(-50%, -50%)',
         transformOrigin: 'center center'
       }}
-      animate={{ 
+      animate={{
+        left: `${left}%`,
+        top: `${top}%`,
         scale: isHovered ? 1.15 : 1
       }}
-      transition={{ duration: 0.2 }}
+      transition={{
+        left: { duration: 1, ease: 'linear' },
+        top: { duration: 1, ease: 'linear' },
+        scale: { duration: 0.2 }
+      }}
       onClick={() => onTaskClick(task.id)}
       initial={false}
       onHoverStart={() => setIsHovered(true)}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { MapIcon } from './MapIcon';
 import mapImage from '../../assets/maps/sep-twtour/map-sep.png';
 import heyaImg from '../../assets/maps/sep-twtour/buildings/heya.png';
@@ -25,8 +25,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ tasks, onTaskCli
     return jinImg;
   };
 
+  // 初始角色位置，可依需求調整
+  const [characterPos, setCharacterPos] = useState({ left: 20, top: 58 });
+  const mapRef = useRef<HTMLDivElement>(null);
+
+  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!mapRef.current) return;
+    const rect = mapRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setCharacterPos({ left: x, top: y });
+  };
+
   return (
-    <div className="w-full h-full relative">
+    <div
+      className="w-full h-full relative"
+      ref={mapRef}
+      onDoubleClick={handleDoubleClick}
+    >
       {/* 背景地圖 */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
@@ -43,8 +59,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ tasks, onTaskCli
         <MapIcon
           task={tasks[0]}
           src={jinImg}
-          left={20}
-          top={58}
+          left={characterPos.left}
+          top={characterPos.top}
           onTaskClick={onTaskClick}
         />
       )}
