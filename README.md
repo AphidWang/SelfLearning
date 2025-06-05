@@ -48,8 +48,11 @@ npm run dev
 ### 環境設定
 ```env
 VITE_APP_TITLE=Learning Progress Tracker
+VITE_API_URL=http://localhost:3000
 VITE_GA_ID=<your-ga-id>
 ```
+
+`VITE_API_URL` 用於設定前端存取後端 API 的端點。
 
 ## 技術架構
 - React 18+
