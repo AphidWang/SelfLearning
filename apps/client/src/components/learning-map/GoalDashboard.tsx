@@ -1,6 +1,7 @@
 import React from 'react';
 import { Goal } from '../../types/goal';
 import { subjects } from '../../styles/tokens';
+import { useGoalStore } from '../../store/goalStore';
 import { X } from 'lucide-react';
 
 interface GoalDashboardProps {
@@ -9,14 +10,7 @@ interface GoalDashboardProps {
 }
 
 export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick }) => {
-  const getCompletionRate = (goal: Goal) => {
-    const totalTasks = goal.steps.reduce((sum, step) => sum + step.tasks.length, 0);
-    const completedTasks = goal.steps.reduce(
-      (sum, step) => sum + step.tasks.filter(task => task.status === 'done').length,
-      0
-    );
-    return totalTasks === 0 ? 0 : (completedTasks / totalTasks) * 100;
-  };
+  const { getCompletionRate } = useGoalStore();
 
   const getSubjectGradient = (subject: string, progress: number) => {
     const style = subjects.getSubjectStyle(subject);
@@ -39,17 +33,20 @@ export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick
       <div className="flex-1 overflow-auto p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {goals.map(goal => {
-            const completionRate = getCompletionRate(goal);
-            const gradient = getSubjectGradient(goal.subject || '未分類', completionRate);
+            const completionRate = getCompletionRate(goal.id);
             return (
               <button
                 key={goal.id}
                 onClick={() => onGoalClick(goal.id)}
-                className={`relative p-4 rounded-lg bg-gradient-to-r ${gradient} hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 max-w-[200px] h-[80px]`}
+                className="relative p-4 rounded-lg hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 max-w-[200px] h-[80px] border-l-4"
+                style={{ 
+                  borderLeftColor: subjects.getSubjectStyle(goal.subject || '').accent,
+                  background: `linear-gradient(to right, ${subjects.getSubjectStyle(goal.subject || '').accent}10, ${subjects.getSubjectStyle(goal.subject || '').accent}10)`
+                }}
               >
                 <div className="flex items-start justify-between gap-2 h-full">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-white line-clamp-2">
+                    <h3 className="text-sm font-medium text-gray-900 line-clamp-2">
                       {goal.title}
                     </h3>
                   </div>
@@ -60,7 +57,7 @@ export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick
                           a 15.9155 15.9155 0 0 1 0 31.831
                           a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
-                        stroke="rgba(255,255,255,0.2)"
+                        stroke="rgba(0,0,0,0.1)"
                         strokeWidth="3"
                       />
                       <path
@@ -68,13 +65,13 @@ export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick
                           a 15.9155 15.9155 0 0 1 0 31.831
                           a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
-                        stroke="white"
+                        stroke={subjects.getSubjectStyle(goal.subject || '').accent}
                         strokeWidth="3"
                         strokeDasharray={`${completionRate}, 100`}
                       />
                     </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
-                      {Math.round(completionRate)}%
+                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-900">
+                      {completionRate}%
                     </span>
                   </div>
                 </div>

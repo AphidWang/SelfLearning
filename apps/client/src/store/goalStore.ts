@@ -16,6 +16,7 @@ const initialGoals: Goal[] = [
     title: '探索唐詩之美',
     description: '透過詩歌感受唐代文人的情感與智慧',
     status: 'in-progress',
+    subject: SUBJECTS.CHINESE,
     bubbles: [
       {
         id: 'bubble-1-1',
@@ -104,6 +105,7 @@ const initialGoals: Goal[] = [
     title: '探索分數的奧秘',
     description: '透過生活情境理解分數的概念',
     status: 'active',
+    subject: SUBJECTS.MATH,
     bubbles: [
       {
         id: 'bubble-2-1',
@@ -203,6 +205,7 @@ const initialGoals: Goal[] = [
     title: '探索英語故事創作',
     description: '透過故事學習英語表達',
     status: 'active',
+    subject: SUBJECTS.ENGLISH,
     bubbles: [
       {
         id: 'bubble-3-1',
@@ -291,6 +294,7 @@ const initialGoals: Goal[] = [
     title: '探索植物生長',
     description: '透過觀察了解植物的生命週期',
     status: 'active',
+    subject: SUBJECTS.SCIENCE,
     bubbles: [
       {
         id: 'bubble-4-1',
@@ -379,6 +383,7 @@ const initialGoals: Goal[] = [
     title: '探索色彩藝術',
     description: '透過色彩認識藝術表現',
     status: 'active',
+    subject: SUBJECTS.ARTS,
     bubbles: [
       {
         id: 'bubble-5-1',
@@ -467,6 +472,7 @@ const initialGoals: Goal[] = [
     title: '探索身體運動',
     description: '透過運動了解身體機能',
     status: 'active',
+    subject: SUBJECTS.PE,
     bubbles: [
       {
         id: 'bubble-6-1',
@@ -555,6 +561,7 @@ const initialGoals: Goal[] = [
     title: '為什麼要讀書',
     description: '探索讀書的意義與價值',
     status: 'active',
+    subject: SUBJECTS.SOCIAL,
     bubbles: [
       {
         id: 'bubble-7-1',
@@ -653,6 +660,7 @@ const initialGoals: Goal[] = [
     title: '火箭能飛多高',
     description: '透過觀察、行動、學習和分享，探索火箭飛行的原理',
     status: 'active',
+    subject: SUBJECTS.SCIENCE,
     bubbles: [
       {
         id: 'bubble-8-1',
@@ -741,6 +749,7 @@ const initialGoals: Goal[] = [
     "title": "火箭可以飛多高？",
     "description": "探索火箭能飛多高與太空邊界",
     "status": "active",
+    "subject": SUBJECTS.SCIENCE,
     "bubbles": [
       {
         "id": "bubble-9-1",
@@ -856,6 +865,7 @@ interface GoalStore {
   setSelectedGoalId: (id: string | null) => void;
   addGoal: (goal: Goal) => Goal;
   updateGoal: (goal: Goal) => void;
+  deleteGoal: (goalId: string) => void;
   addStep: (goalId: string, step: Step) => Step | null;
   updateStep: (goalId: string, step: Step) => Step | null;
   addTask: (goalId: string, stepId: string, task: Task) => Task | null;
@@ -866,6 +876,7 @@ interface GoalStore {
   dump: (goalId?: string) => void;
   getActiveSteps: (goalId: string) => Step[];
   getActiveTasks: (goalId: string, stepId: string) => Task[];
+  getCompletionRate: (goalId: string) => number;
   addBubble: (goalId: string, bubble: Bubble) => void;
   updateBubble: (goalId: string, bubbleId: string, bubble: Partial<Bubble>) => void;
   deleteBubble: (goalId: string, bubbleId: string) => void;
@@ -892,6 +903,18 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
   
   updateGoal: (goal) => set((state) => {
     const newState = { goals: state.goals.map((g) => g.id === goal.id ? goal : g) };
+    saveGoals(newState.goals);
+    return newState;
+  }),
+
+  deleteGoal: (goalId) => set((state) => {
+    const newState = {
+      goals: state.goals.map((g) =>
+        g.id === goalId
+          ? { ...g, status: 'archived' as const }
+          : g
+      )
+    };
     saveGoals(newState.goals);
     return newState;
   }),
@@ -1133,12 +1156,11 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
     const goal = get().goals.find(g => g.id === goalId);
     if (!goal) return [];
     
-    // 過濾掉已存檔的步驟，並且只保留未存檔的任務
     return goal.steps
-      .filter(step => step.status !== 'archived')
+      .filter(step => !step.status || step.status !== 'archived')
       .map(step => ({
         ...step,
-        tasks: step.tasks.filter(task => task.status !== 'archived')
+        tasks: step.tasks.filter(task => !task.status || task.status !== 'archived')
       }));
   },
 
@@ -1150,6 +1172,16 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
     if (!step || step.status === 'archived') return [];
     
     return step.tasks.filter(task => task.status !== 'archived');
+  },
+
+  getCompletionRate: (goalId: string) => {
+    const activeSteps = get().getActiveSteps(goalId);
+    const totalTasks = activeSteps.reduce((sum, step) => sum + step.tasks.length, 0);
+    const completedTasks = activeSteps.reduce(
+      (sum, step) => sum + step.tasks.filter(task => task.status === 'done').length,
+      0
+    );
+    return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   },
 
   addBubble: (goalId, bubble) => {

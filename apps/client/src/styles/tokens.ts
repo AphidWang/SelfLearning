@@ -178,6 +178,17 @@ export const goalStatusColors = {
   archived: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
 } as const;
 
+export const subjectColors = {
+  '國語': '#4F46E5',  // indigo
+  '數學': '#0EA5E9',  // sky
+  '英語': '#F97316',  // orange
+  '自然': '#10B981',  // emerald
+  '社會': '#8B5CF6',  // violet
+  '藝術': '#EC4899',  // pink
+  '體育': '#EF4444',  // red
+  '未分類': '#6B7280', // gray
+} as const;
+
 export const priorityColors = {
   high: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',

@@ -72,7 +72,7 @@ export const StudentLearningMap: React.FC = () => {
           <div className="h-[calc(100vh-8rem)] p-4">
             <InteractiveMap
               goals={goals}
-              onTaskClick={handleTaskClick}
+              onGoalClick={handleGoalClick}
             />
           </div>
         </div>

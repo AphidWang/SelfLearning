@@ -4,21 +4,25 @@ import { Goal } from '../../types/goal';
 import mapImage from '../../assets/maps/sep-twtour/map-sep.png';
 import heyaImg from '../../assets/maps/sep-twtour/buildings/heya.png';
 import jinImg from '../../assets/maps/sep-twtour/character/jin.png';
+import fireImg from '../../assets/maps/sep-twtour/buildings/fire.png';
+import mailboxImg from '../../assets/maps/sep-twtour/buildings/mailbox.png';
 
 interface InteractiveMapProps {
   goals: Goal[];
-  onTaskClick: (taskId: string) => void;
+  onGoalClick: (goalId: string) => void;
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onTaskClick }) => {
+export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalClick }) => {
   // 根據 subject 決定圖示
   const getIcon = (subject: string) => {
     if (subject.includes('地標') || subject.includes('房')) return heyaImg;
+    if (subject.includes('火')) return fireImg;
+    if (subject.includes('信箱')) return mailboxImg;
     return jinImg;
   };
 
   // 初始角色位置，可依需求調整
-  const [characterPos, setCharacterPos] = useState({ left: 20, top: 58 });
+  const [characterPos, setCharacterPos] = useState({ left: 26, top: 34 });
   const mapRef = useRef<HTMLDivElement>(null);
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -61,7 +65,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onTaskCli
             src={jinImg}
             left={characterPos.left}
             top={characterPos.top}
-            onTaskClick={onTaskClick}
+            onGoalClick={onGoalClick}
           />
         )}
 
@@ -70,9 +74,32 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onTaskCli
           <MapIcon
             goal={goals[1]}
             src={heyaImg}
-            left={58}
-            top={38}
-            onTaskClick={onTaskClick}
+            left={1}
+            top={18}
+            onGoalClick={onGoalClick}
+            flip={true}
+          />
+        )}
+
+        {/* 固定位置的火 - 第三個 goal */}
+        {goals[2] && (
+          <MapIcon
+            goal={goals[2]}
+            src={fireImg}
+            left={26}
+            top={65}
+            onGoalClick={onGoalClick}
+          />
+        )}
+
+        {/* 固定位置的信箱 - 第四個 goal */}
+        {goals[3] && (
+          <MapIcon
+            goal={goals[3]}
+            src={mailboxImg}
+            left={59}
+            top={22}
+            onGoalClick={onGoalClick}
           />
         )}
       </div>
