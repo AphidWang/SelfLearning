@@ -6,7 +6,6 @@ import { usePlanner } from '../../context/PlannerContext';
 import { useCurriculum } from '../../context/CurriculumContext';
 import { PlannerProvider } from '../../context/PlannerContext';
 import { CurriculumProvider } from '../../context/CurriculumContext';
-import { WeekPlan } from '../../types/planner';
 
 const TaskPlannerContent: React.FC = () => {
   const { weeks, assignments } = usePlanner();

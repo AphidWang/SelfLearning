@@ -1,15 +1,49 @@
 import React, { useState } from 'react';
+import { GoalDashboard } from '../../components/learning-map/GoalDashboard';
 import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
+import { TaskDetail } from '../../components/learning-map/TaskDetail';
 import { GoalDetails } from '../../components/learning-map/GoalDetails';
 import { useGoalStore } from '../../store/goalStore';
 import PageLayout from '../../components/layout/PageLayout';
+import { Goal, Task } from '../../types/goal';
 
 export const StudentLearningMap: React.FC = () => {
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [view, setView] = useState<'dashboard' | 'goal' | 'task'>('dashboard');
   const { goals } = useGoalStore();
+
+  const selectedGoal = goals.find(g => g.id === selectedGoalId);
+  const selectedTask = selectedGoal?.steps.flatMap(step => step.tasks).find(t => t.id === selectedTaskId);
+
+  const handleGoalClick = (goalId: string) => {
+    setSelectedGoalId(goalId);
+    setView('goal');
+  };
 
   const handleTaskClick = (taskId: string) => {
     setSelectedTaskId(taskId);
+    setView('task');
+  };
+
+  const handleBackToGoals = () => {
+    setSelectedGoalId(null);
+    setView('dashboard');
+  };
+
+  const handleBackToGoal = () => {
+    setSelectedTaskId(null);
+    setView('goal');
+  };
+
+  const handleTaskStatusChange = (taskId: string, status: 'in_progress' | 'completed') => {
+    // 更新任務狀態
+    console.log('Task status changed:', taskId, status);
+  };
+
+  const handleHelpRequest = (taskId: string) => {
+    // 處理協助請求
+    console.log('Help requested for task:', taskId);
   };
 
   // 過濾出有任務的目標，並轉換為地圖點
@@ -33,36 +67,45 @@ export const StudentLearningMap: React.FC = () => {
       };
     });
 
-  const selectedTask = tasks.find(task => task.id === selectedTaskId);
-  const selectedGoal = selectedTask ? goals.find(goal => goal.id === selectedTask.goalId) : null;
-
   return (
     <PageLayout title="學習地圖">
-      <div className="w-full h-[calc(100vh-4rem)] relative overflow-hidden bg-gray-50">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-          {/* 地圖區域 */}
-          <div className="lg:col-span-2 h-full">
-            <InteractiveMap 
-              tasks={tasks}
+      <div className="h-full grid lg:grid-cols-2 gap-6 p-6">
+        {/* 左側：地圖或目標列表 */}
+        <div className="h-full">
+          {view === 'dashboard' ? (
+            <GoalDashboard
+              goals={goals}
+              onGoalClick={handleGoalClick}
+            />
+          ) : (
+            <InteractiveMap
+              goals={goals}
               onTaskClick={handleTaskClick}
             />
-          </div>
+          )}
+        </div>
 
-          {/* 目標詳情區域 */}
-          <div className="lg:col-span-1 h-full">
-            {selectedGoal ? (
-              <GoalDetails
-                goal={selectedGoal}
-                onClose={() => setSelectedTaskId(null)}
-              />
-            ) : (
-              <div className="bg-white rounded-lg shadow p-6 h-full flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-gray-500">點擊地圖上的景點查看學習目標</p>
-                </div>
+        {/* 右側：目標詳情或任務詳情 */}
+        <div className="h-full">
+          {view === 'task' && selectedTask ? (
+            <TaskDetail
+              task={selectedTask}
+              onBack={handleBackToGoal}
+              onStatusChange={handleTaskStatusChange}
+              onHelpRequest={handleHelpRequest}
+            />
+          ) : selectedGoal ? (
+            <GoalDetails
+              goal={selectedGoal}
+              onClose={handleBackToGoals}
+            />
+          ) : (
+            <div className="bg-white rounded-lg shadow p-6 h-full flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-gray-500">點擊地圖上的景點查看學習目標</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </PageLayout>

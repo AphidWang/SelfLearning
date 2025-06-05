@@ -1,24 +1,16 @@
 import React, { useRef, useState } from 'react';
 import { MapIcon } from './MapIcon';
+import { Goal } from '../../types/goal';
 import mapImage from '../../assets/maps/sep-twtour/map-sep.png';
 import heyaImg from '../../assets/maps/sep-twtour/buildings/heya.png';
 import jinImg from '../../assets/maps/sep-twtour/character/jin.png';
 
-interface Task {
-  id: string;
-  label: string;
-  subject: string;
-  completed: boolean;
-  position: { x: number; y: number };
-  goalId: string;
-}
-
 interface InteractiveMapProps {
-  tasks: Task[];
+  goals: Goal[];
   onTaskClick: (taskId: string) => void;
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({ tasks, onTaskClick }) => {
+export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onTaskClick }) => {
   // 根據 subject 決定圖示
   const getIcon = (subject: string) => {
     if (subject.includes('地標') || subject.includes('房')) return heyaImg;
@@ -37,6 +29,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ tasks, onTaskCli
     setCharacterPos({ left: x, top: y });
   };
 
+
   return (
     <div
       className="w-full h-full relative"
@@ -54,10 +47,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ tasks, onTaskCli
         }}
       />
 
-      {/* 固定位置的小人 */}
-      {tasks[0] && (
+      {/* 固定位置的小人 - 第一個 goal */}
+      {goals[0] && (
         <MapIcon
-          task={tasks[0]}
+          goal={goals[0]}
           src={jinImg}
           left={characterPos.left}
           top={characterPos.top}
@@ -65,10 +58,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ tasks, onTaskCli
         />
       )}
 
-      {/* 固定位置的房子 */}
-      {tasks[1] && (
+      {/* 固定位置的房子 - 第二個 goal */}
+      {goals[1] && (
         <MapIcon
-          task={tasks[1]}
+          goal={goals[1]}
           src={heyaImg}
           left={58}
           top={38}

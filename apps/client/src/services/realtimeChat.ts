@@ -28,7 +28,7 @@ export const realtimeChatService = {
       orderBy('timestamp'),
     );
     return onSnapshot(q, snap => {
-      const msgs = snap.docs.map(d => ({ id: d.id, ...(d.data() as ChatMessage) }));
+      const msgs = snap.docs.map(d => ({ ...(d.data() as ChatMessage), id: d.id }));
       callback(msgs);
     });
   },
@@ -40,7 +40,7 @@ export const realtimeChatService = {
   listenContacts: (userId: string, callback: (contacts: Contact[]) => void) => {
     const q = collection(db, 'users', userId, 'contacts');
     return onSnapshot(q, snap => {
-      const contacts = snap.docs.map(d => ({ id: d.id, ...(d.data() as Contact) }));
+      const contacts = snap.docs.map(d => ({ ...(d.data() as Contact), id: d.id }));
       callback(contacts);
     });
   },

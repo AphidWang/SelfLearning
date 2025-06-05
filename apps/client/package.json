@@ -22,7 +22,7 @@
     "caniuse-lite": "^1.0.30001717",
     "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
-    "firebase": "^10.12.2",
+    "firebase": "^11.8.1",
     "framer-motion": "^12.16.0",
     "langchain": "^0.3.26",
     "lottie-react": "^2.4.1",

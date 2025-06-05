@@ -19,14 +19,15 @@ import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
-import Analytics from './components/Analytics';
+// import { initGA } from './utils/analytics';
+
+// initGA();
 
 function App() {
   return (
     <CurriculumProvider>
       <UserProvider>
         <Router>
-          <Analytics />
           <Routes>
             <Route path="/login" element={<Login />} />
             
