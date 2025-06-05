@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Task } from '../../types/goal';
 import { 
@@ -6,7 +6,7 @@ import {
   HelpCircle, CheckCircle, PlayCircle,
   Smile, Meh, Frown,
   Battery, BatteryMedium, BatteryLow,
-  Target
+  Target, Upload
 } from 'lucide-react';
 
 interface TaskDetailProps {
@@ -16,6 +16,34 @@ interface TaskDetailProps {
   onHelpRequest: (taskId: string) => void;
 }
 
+type MoodLevel = 'very_good' | 'good' | 'neutral' | 'bad' | 'very_bad';
+type EnergyLevel = 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+type ChallengeLevel = 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+
+const moodLabels: Record<MoodLevel, string> = {
+  very_good: '超開心',
+  good: '快樂',
+  neutral: '普通',
+  bad: '不開心',
+  very_bad: '很難過'
+};
+
+const energyLabels: Record<EnergyLevel, string> = {
+  very_high: '充滿力量',
+  high: '精神很好',
+  medium: '還不錯',
+  low: '有點累',
+  very_low: '很疲憊'
+};
+
+const challengeLabels: Record<ChallengeLevel, string> = {
+  very_high: '非常有挑戰',
+  high: '很有挑戰',
+  medium: '一般般',
+  low: '還算輕鬆',
+  very_low: '非常輕鬆'
+};
+
 export const TaskDetail: React.FC<TaskDetailProps> = ({
   task,
   onBack,
@@ -23,157 +51,213 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onHelpRequest
 }) => {
   const [comment, setComment] = useState('');
-  const [mood, setMood] = useState<'good' | 'neutral' | 'bad'>('neutral');
-  const [energy, setEnergy] = useState<'high' | 'medium' | 'low'>('medium');
-  const [challenge, setChallenge] = useState<'high' | 'medium' | 'low'>('medium');
+  const [mood, setMood] = useState<MoodLevel | null>(null);
+  const [energy, setEnergy] = useState<EnergyLevel | null>(null);
+  const [challenge, setChallenge] = useState<ChallengeLevel | null>(null);
+  const [showStatusOptions, setShowStatusOptions] = useState(false);
+  const statusButtonRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusButtonRef.current && !statusButtonRef.current.contains(event.target as Node)) {
+        setShowStatusOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleStatusSelect = (status: 'in_progress' | 'completed') => {
+    onStatusChange(task.id, status);
+    setShowStatusOptions(false);
+  };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 h-full flex flex-col">
-      {/* 標題和返回按鈕 */}
-      <div className="flex items-center mb-6">
+    <div className="bg-white rounded-lg shadow-lg h-full flex flex-col">
+      {/* 頂部導航欄 */}
+      <div className="flex items-center p-4 border-b">
         <button
           onClick={onBack}
-          className="mr-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="mr-4 p-1 hover:bg-gray-100 rounded-full transition-colors"
+          aria-label="返回"
         >
-          <ChevronLeft size={24} />
+          <ChevronLeft size={20} />
         </button>
-        <h2 className="text-2xl font-bold text-gray-900">{task.title}</h2>
+        <h2 className="text-xl font-bold flex-1 text-center">{task.title}</h2>
       </div>
 
-      {/* 任務狀態 */}
-      <div className="flex gap-4 mb-6">
-        <button
-          onClick={() => onStatusChange(task.id, 'in_progress')}
-          className="flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
-        >
-          <PlayCircle size={20} className="mr-2" />
-          進行中
-        </button>
-        <button
-          onClick={() => onStatusChange(task.id, 'completed')}
-          className="flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
-        >
-          <CheckCircle size={20} className="mr-2" />
-          完成
-        </button>
-      </div>
+      {/* 內容區域 - 可滾動 */}
+      <div className="flex-1 overflow-auto">
+        {/* 任務說明 */}
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-2">任務說明</h3>
+          <p className="text-gray-700">{task.description}</p>
+        </div>
 
-      {/* 心情和能量追蹤 */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">心情</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMood('good')}
-              className={`p-2 rounded-full ${mood === 'good' ? 'bg-green-100 text-green-700' : 'text-gray-400'}`}
-            >
-              <Smile size={20} />
-            </button>
-            <button
-              onClick={() => setMood('neutral')}
-              className={`p-2 rounded-full ${mood === 'neutral' ? 'bg-yellow-100 text-yellow-700' : 'text-gray-400'}`}
-            >
-              <Meh size={20} />
-            </button>
-            <button
-              onClick={() => setMood('bad')}
-              className={`p-2 rounded-full ${mood === 'bad' ? 'bg-red-100 text-red-700' : 'text-gray-400'}`}
-            >
-              <Frown size={20} />
-            </button>
+        <div className="border-t border-gray-200" />
+
+        {/* 我的紀錄 */}
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-4">我的紀錄</h3>
+          <div className="flex-1 flex flex-col">
+            <div className="flex-1 bg-gray-50 rounded-lg p-4 mb-4 overflow-y-auto">
+              {/* 這裡放歷史紀錄列表 */}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  // 上傳檔案
+                }}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Paperclip size={20} />
+              </button>
+              <input
+                type="text"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="紀錄一下..."
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={() => {
+                  // 發送紀錄
+                  setComment('');
+                }}
+                className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <MessageSquare size={20} />
+              </button>
+            </div>
           </div>
         </div>
-        <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">能量</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setEnergy('high')}
-              className={`p-2 rounded-full ${energy === 'high' ? 'bg-green-100 text-green-700' : 'text-gray-400'}`}
-            >
-              <Battery size={20} />
-            </button>
-            <button
-              onClick={() => setEnergy('medium')}
-              className={`p-2 rounded-full ${energy === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'text-gray-400'}`}
-            >
-              <BatteryMedium size={20} />
-            </button>
-            <button
-              onClick={() => setEnergy('low')}
-              className={`p-2 rounded-full ${energy === 'low' ? 'bg-red-100 text-red-700' : 'text-gray-400'}`}
-            >
-              <BatteryLow size={20} />
-            </button>
+
+        <div className="border-t border-gray-200" />
+
+        {/* 底部固定區域 */}
+        <div className="border-t border-gray-200">
+          {/* 心情和能量追蹤 */}
+          <div className="p-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">今天的心情如何？</h3>
+              <div className="flex justify-between">
+                {(['very_bad', 'bad', 'neutral', 'good', 'very_good'] as MoodLevel[]).map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setMood(level)}
+                    className={`w-16 p-2 rounded-full flex flex-col items-center gap-1 ${
+                      mood === level 
+                        ? level === 'very_bad' || level === 'bad' 
+                          ? 'bg-red-100 text-red-700' 
+                          : level === 'neutral'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-green-100 text-green-700'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {level === 'very_bad' && <Frown size={20} />}
+                    {level === 'bad' && <Frown size={20} />}
+                    {level === 'neutral' && <Meh size={20} />}
+                    {level === 'good' && <Smile size={20} />}
+                    {level === 'very_good' && <Smile size={20} />}
+                    <span className="text-xs whitespace-nowrap">{moodLabels[level]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">現在的能量如何？</h3>
+              <div className="flex justify-between">
+                {(['very_low', 'low', 'medium', 'high', 'very_high'] as EnergyLevel[]).map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setEnergy(level)}
+                    className={`w-16 p-2 rounded-full flex flex-col items-center gap-1 ${
+                      energy === level 
+                        ? level === 'very_low' || level === 'low' 
+                          ? 'bg-red-100 text-red-700' 
+                          : level === 'medium'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-green-100 text-green-700'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {level === 'very_low' && <BatteryLow size={20} />}
+                    {level === 'low' && <BatteryLow size={20} />}
+                    {level === 'medium' && <BatteryMedium size={20} />}
+                    {level === 'high' && <Battery size={20} />}
+                    {level === 'very_high' && <Battery size={20} />}
+                    <span className="text-xs whitespace-nowrap">{energyLabels[level]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">任務有挑戰嗎？</h3>
+              <div className="flex justify-between">
+                {(['very_low', 'low', 'medium', 'high', 'very_high'] as ChallengeLevel[]).map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setChallenge(level)}
+                    className={`w-16 p-2 rounded-full flex flex-col items-center gap-1 ${
+                      challenge === level 
+                        ? level === 'very_low' 
+                          ? 'bg-blue-50 text-blue-700' 
+                          : level === 'low'
+                          ? 'bg-blue-100 text-blue-700'
+                          : level === 'medium'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : level === 'high'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-purple-200 text-purple-700'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    <Target size={20} />
+                    <span className="text-xs whitespace-nowrap">{challengeLabels[level]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 狀態按鈕 */}
+          <div className="p-4 border-t border-gray-200">
+            <div className="flex justify-end">
+              <div className="relative" ref={statusButtonRef}>
+                <button
+                  onClick={() => setShowStatusOptions(!showStatusOptions)}
+                  className="px-6 py-2 rounded-full text-white transition-colors flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+                >
+                  <PlayCircle size={20} />
+                  進行中
+                </button>
+                
+                {showStatusOptions && (
+                  <div className="absolute bottom-full right-0 mb-2 space-y-2">
+                    <button
+                      onClick={() => handleStatusSelect('in_progress')}
+                      className="w-full px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full hover:from-indigo-600 hover:to-purple-600 transition-colors whitespace-nowrap flex items-center gap-2"
+                    >
+                      <PlayCircle size={20} />
+                      進行中
+                    </button>
+                    <button
+                      onClick={() => handleStatusSelect('completed')}
+                      className="w-full px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full hover:from-green-600 hover:to-emerald-600 transition-colors whitespace-nowrap flex items-center gap-2"
+                    >
+                      <CheckCircle size={20} />
+                      完成
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">挑戰度</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setChallenge('high')}
-              className={`p-2 rounded-full ${challenge === 'high' ? 'bg-red-100 text-red-700' : 'text-gray-400'}`}
-            >
-              <Target size={20} />
-            </button>
-            <button
-              onClick={() => setChallenge('medium')}
-              className={`p-2 rounded-full ${challenge === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'text-gray-400'}`}
-            >
-              <Target size={20} />
-            </button>
-            <button
-              onClick={() => setChallenge('low')}
-              className={`p-2 rounded-full ${challenge === 'low' ? 'bg-green-100 text-green-700' : 'text-gray-400'}`}
-            >
-              <Target size={20} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 留言區 */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 bg-gray-50 rounded-lg p-4 mb-4 overflow-y-auto">
-          {/* 這裡放留言列表 */}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="輸入留言..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <button
-            onClick={() => {
-              // 發送留言
-              setComment('');
-            }}
-            className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <MessageSquare size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* 底部按鈕 */}
-      <div className="flex gap-4 mt-6">
-        <button
-          onClick={() => {
-            // 上傳附件
-          }}
-          className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-        >
-          <Paperclip size={20} className="mr-2" />
-          上傳附件
-        </button>
-        <button
-          onClick={() => onHelpRequest(task.id)}
-          className="flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-        >
-          <HelpCircle size={20} className="mr-2" />
-          請求協助
-        </button>
       </div>
     </div>
   );
