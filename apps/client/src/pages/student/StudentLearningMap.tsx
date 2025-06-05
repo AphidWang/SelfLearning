@@ -14,6 +14,7 @@ export const StudentLearningMap: React.FC = () => {
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
   const selectedTask = selectedGoal?.steps.flatMap(step => step.tasks).find(t => t.id === selectedTaskId);
+  const selectedStep = selectedGoal?.steps.find(step => step.tasks.some(t => t.id === selectedTaskId));
 
   const handleGoalClick = (goalId: string) => {
     setSelectedGoalId(goalId);
@@ -79,16 +80,17 @@ export const StudentLearningMap: React.FC = () => {
 
         {/* 右側：目標列表、目標詳情或任務詳情 */}
         <div className="h-full lg:col-span-2">
-          {selectedTask ? (
+          {selectedTaskId && selectedTask && selectedStep ? (
             <TaskDetail
               task={selectedTask}
+              stepId={selectedStep.id}
+              goalId={selectedGoalId!}
               onBack={handleBackToGoal}
-              onStatusChange={handleTaskStatusChange}
               onHelpRequest={handleHelpRequest}
             />
-          ) : selectedGoal ? (
+          ) : selectedGoalId ? (
             <GoalDetails
-              goal={selectedGoal}
+              goal={selectedGoal!}
               onBack={handleBackToGoals}
               onTaskClick={handleTaskClick}
             />

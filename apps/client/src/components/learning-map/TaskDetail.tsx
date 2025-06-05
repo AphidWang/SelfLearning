@@ -6,13 +6,15 @@ import {
   HelpCircle, CheckCircle, PlayCircle,
   Smile, Meh, Frown,
   Battery, BatteryMedium, BatteryLow,
-  Target, Upload
+  Target, Upload, PauseCircle
 } from 'lucide-react';
+import { useGoalStore } from '../../store/goalStore';
 
 interface TaskDetailProps {
   task: Task;
+  stepId: string;
+  goalId: string;
   onBack: () => void;
-  onStatusChange: (taskId: string, status: 'in_progress' | 'completed') => void;
   onHelpRequest: (taskId: string) => void;
 }
 
@@ -46,10 +48,12 @@ const challengeLabels: Record<ChallengeLevel, string> = {
 
 export const TaskDetail: React.FC<TaskDetailProps> = ({
   task,
+  stepId,
+  goalId,
   onBack,
-  onStatusChange,
   onHelpRequest
 }) => {
+  const { updateTask } = useGoalStore();
   const [comment, setComment] = useState('');
   const [mood, setMood] = useState<MoodLevel | null>(null);
   const [energy, setEnergy] = useState<EnergyLevel | null>(null);
@@ -68,9 +72,14 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleStatusSelect = (status: 'in_progress' | 'completed') => {
-    onStatusChange(task.id, status);
+  const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
+    updateTask(goalId, stepId, {
+      ...task,
+      status,
+      completedAt: status === 'done' ? new Date().toISOString() : undefined
+    });
     setShowStatusOptions(false);
+    onBack();
   };
 
   return (
@@ -239,6 +248,13 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
                 {showStatusOptions && (
                   <div className="absolute bottom-full right-0 mb-2 space-y-2">
                     <button
+                      onClick={() => handleStatusSelect('todo')}
+                      className="w-full px-6 py-2 bg-gradient-to-r from-slate-400 to-gray-500 text-white rounded-full hover:from-slate-500 hover:to-gray-600 transition-colors whitespace-nowrap flex items-center gap-2"
+                    >
+                      <PauseCircle size={20} />
+                      暫停
+                    </button>
+                    <button
                       onClick={() => handleStatusSelect('in_progress')}
                       className="w-full px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full hover:from-indigo-600 hover:to-purple-600 transition-colors whitespace-nowrap flex items-center gap-2"
                     >
@@ -246,8 +262,8 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
                       進行中
                     </button>
                     <button
-                      onClick={() => handleStatusSelect('completed')}
-                      className="w-full px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full hover:from-green-600 hover:to-emerald-600 transition-colors whitespace-nowrap flex items-center gap-2"
+                      onClick={() => handleStatusSelect('done')}
+                      className="w-full px-6 py-2 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 text-white rounded-full hover:from-emerald-500 hover:via-green-600 hover:to-teal-600 transition-colors whitespace-nowrap flex items-center gap-2"
                     >
                       <CheckCircle size={20} />
                       完成

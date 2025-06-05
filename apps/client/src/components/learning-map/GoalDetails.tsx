@@ -40,9 +40,9 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
   const [editedGoal, setEditedGoal] = useState<Goal>({
     ...goal,
     templateType: goal.templateType || '學習目標',
-    subject: goal.subject || '未分類'
+    subject: goal.subject || SUBJECTS.CUSTOM
   });
-  const { deleteGoal, addStep, deleteStep, addTask, deleteTask, updateGoal, getActiveSteps } = useGoalStore();
+  const { deleteGoal, addStep, deleteStep, addTask, deleteTask, updateGoal, getActiveSteps, updateTask } = useGoalStore();
   const [activeSteps, setActiveSteps] = useState<Step[]>([]);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
     setEditedGoal({
       ...goal,
       templateType: goal.templateType || '學習目標',
-      subject: goal.subject || '未分類'
+      subject: goal.subject || SUBJECTS.CUSTOM
     });
   }, [goal]);
 
@@ -153,6 +153,15 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
   const handleSave = () => {
     updateGoal(editedGoal);
     setIsEditing(false);
+  };
+
+  const handleTaskStatusChange = (stepId: string, task: Task) => {
+    const newStatus = task.status === 'done' ? 'in_progress' : 'done';
+    updateTask(goal.id, stepId, {
+      ...task,
+      status: newStatus,
+      completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
+    });
   };
 
   return (
@@ -434,14 +443,22 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
                     <div key={task.id} className="flex items-center justify-between group">
                       <button
                         onClick={() => onTaskClick(task.id)}
-                        className="flex items-center flex-1 p-2 rounded hover:bg-gray-100 transition-colors"
+                        className={`flex items-center flex-1 p-2 rounded hover:bg-gray-100 transition-colors ${
+                          task.status === 'done' ? 'bg-green-50' : 
+                          task.status === 'in_progress' ? 'bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100' : ''
+                        }`}
                       >
                         {task.status === 'done' ? (
                           <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+                        ) : task.status === 'in_progress' ? (
+                          <AlertCircle className="h-5 w-5 text-purple-500 mr-2" />
                         ) : (
                           <AlertCircle className="h-5 w-5 text-gray-400 mr-2" />
                         )}
-                        <span className={task.status === 'done' ? 'text-gray-500 line-through' : ''}>
+                        <span className={`${
+                          task.status === 'done' ? 'text-gray-400' : 
+                          task.status === 'in_progress' ? 'text-purple-700 font-medium' : ''
+                        }`}>
                           {task.title}
                         </span>
                       </button>
