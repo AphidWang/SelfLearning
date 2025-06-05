@@ -12,6 +12,7 @@ interface PlannerContextType {
   assignTaskToWeek: (taskId: string, weekId: number) => void;
   removeTaskFromWeek: (taskId: string, weekId: number) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
+  updateTask: (task: Task) => void;
   
   // 任務分配
   assignTasksToStudents: (params: {
@@ -83,6 +84,19 @@ export const PlannerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
+  const updateTask = (task: Task) => {
+    setTasks(prevTasks =>
+      prevTasks.map(t => (t.id === task.id ? { ...t, ...task } : t))
+    );
+
+    setWeeks(prevWeeks =>
+      prevWeeks.map(week => ({
+        ...week,
+        tasks: week.tasks.map(t => (t.id === task.id ? { ...t, ...task } : t))
+      }))
+    );
+  };
+
   // 任務分配功能
   const assignTasksToStudents = async ({
     weekId,
@@ -136,6 +150,7 @@ export const PlannerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     assignTaskToWeek,
     removeTaskFromWeek,
     updateTaskStatus,
+    updateTask,
     assignTasksToStudents
   };
 
