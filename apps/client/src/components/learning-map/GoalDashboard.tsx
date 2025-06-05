@@ -1,7 +1,6 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { BookOpen, Target } from 'lucide-react';
-import { Goal, Task } from '../../types/goal';
+import { Goal } from '../../types/goal';
+import { subjects } from '../../styles/tokens';
 
 interface GoalDashboardProps {
   goals: Goal[];
@@ -9,56 +8,72 @@ interface GoalDashboardProps {
 }
 
 export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick }) => {
+  const getCompletionRate = (goal: Goal) => {
+    const totalTasks = goal.steps.reduce((sum, step) => sum + step.tasks.length, 0);
+    const completedTasks = goal.steps.reduce(
+      (sum, step) => sum + step.tasks.filter(task => task.status === 'done').length,
+      0
+    );
+    return totalTasks === 0 ? 0 : (completedTasks / totalTasks) * 100;
+  };
+
+  const getSubjectGradient = (subject: string, progress: number) => {
+    const style = subjects.getSubjectStyle(subject);
+    const gradientPosition = 100 - (progress * 0.8);
+    return `${style.gradient} bg-[length:200%_100%] bg-[position:${gradientPosition}%_50%]`;
+  };
+
+  const truncateText = (text: string, maxLength: number) => {
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-      {goals.map((goal) => (
-        <motion.div
-          key={goal.id}
-          className="bg-white rounded-lg shadow-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
-          whileHover={{ scale: 1.02 }}
-          onClick={() => onGoalClick(goal.id)}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">{goal.title}</h3>
-              <div className="flex items-center mt-2">
-                <BookOpen size={16} className="text-indigo-500 mr-1" />
-                <span className="text-sm text-gray-600">{goal.subject}</span>
+    <div className="h-full bg-white rounded-lg shadow p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {goals.map(goal => {
+          const completionRate = getCompletionRate(goal);
+          const gradient = getSubjectGradient(goal.subject || '未分類', completionRate);
+          return (
+            <button
+              key={goal.id}
+              onClick={() => onGoalClick(goal.id)}
+              className={`relative p-4 rounded-lg bg-gradient-to-r ${gradient} hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 max-w-[200px] h-[80px]`}
+            >
+              <div className="flex items-start justify-between gap-2 h-full">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-white line-clamp-2">
+                    {goal.title}
+                  </h3>
+                </div>
+                <div className="relative w-8 h-8 flex-shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 36 36">
+                    <path
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.2)"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="3"
+                      strokeDasharray={`${completionRate}, 100`}
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                    {Math.round(completionRate)}%
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="relative w-12 h-12">
-              <svg className="w-full h-full" viewBox="0 0 36 36">
-                <path
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#E5E7EB"
-                  strokeWidth="3"
-                />
-                <path
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#6366F1"
-                  strokeWidth="3"
-                  strokeDasharray={`${goal.steps.every(step => step.tasks.every(task => task.status === 'done')) ? 100 : 0}, 100`}
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-xs font-medium">
-                {Math.round(goal.steps.every(step => step.tasks.every(task => task.status === 'done')) ? 100 : 0)}%
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center">
-            <Target size={16} className="text-indigo-500 mr-1" />
-            <span className="text-sm text-gray-600">
-              {goal.steps.flatMap(step => step.tasks).filter(t => t.status === 'done').length} / {goal.steps.flatMap(step => step.tasks).length} 任務完成
-            </span>
-          </div>
-        </motion.div>
-      ))}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }; 

@@ -84,6 +84,7 @@ type SubjectStyle = {
   bg: string;
   text: string;
   accent: string;
+  gradient: string;
 };
 
 type SubjectColors = {
@@ -95,49 +96,58 @@ export const subjects = {
     '國語': {
       bg: 'bg-blue-100 dark:bg-blue-900/30',
       text: 'text-blue-800 dark:text-blue-300',
-      accent: '#3B82F6'
+      accent: '#3B82F6',
+      gradient: 'from-blue-400 to-blue-600'
     },
     '英語': {
       bg: 'bg-cyan-100 dark:bg-cyan-900/30',
       text: 'text-cyan-800 dark:text-cyan-300',
-      accent: '#06B6D4'
+      accent: '#06B6D4',
+      gradient: 'from-cyan-400 to-cyan-600'
     },
     '數學': {
       bg: 'bg-orange-100 dark:bg-orange-900/30',
       text: 'text-orange-800 dark:text-orange-300',
-      accent: '#F97316'
+      accent: '#F97316',
+      gradient: 'from-orange-400 to-orange-600'
     },
     '自然': {
       bg: 'bg-emerald-100 dark:bg-emerald-900/30',
       text: 'text-emerald-800 dark:text-emerald-300',
-      accent: '#10B981'
+      accent: '#10B981',
+      gradient: 'from-emerald-400 to-emerald-600'
     },
     '社會': {
       bg: 'bg-amber-100 dark:bg-amber-900/30',
       text: 'text-amber-800 dark:text-amber-300',
-      accent: '#F59E0B'
+      accent: '#F59E0B',
+      gradient: 'from-amber-400 to-amber-600'
     },
     '藝術': {
       bg: 'bg-fuchsia-100 dark:bg-fuchsia-900/30',
       text: 'text-fuchsia-800 dark:text-fuchsia-300',
-      accent: '#D946EF'
+      accent: '#D946EF',
+      gradient: 'from-fuchsia-400 to-fuchsia-600'
     },
     '體育': {
       bg: 'bg-rose-100 dark:bg-rose-900/30',
       text: 'text-rose-800 dark:text-rose-300',
-      accent: '#E11D48'
+      accent: '#E11D48',
+      gradient: 'from-rose-400 to-rose-600'
     },
     '自訂': {
       bg: 'bg-violet-100 dark:bg-violet-900/30',
       text: 'text-violet-800 dark:text-violet-300',
-      accent: '#8B5CF6'
+      accent: '#8B5CF6',
+      gradient: 'from-violet-400 to-violet-600'
     }
   } as SubjectColors,
   getSubjectStyle: (subjectName: string) => {
     const defaultStyle = {
       bg: 'bg-gray-100 dark:bg-gray-800',
       text: 'text-gray-600 dark:text-gray-400',
-      accent: '#6B7280'
+      accent: '#6B7280',
+      gradient: 'from-purple-400 to-purple-600'
     };
     return subjects.colors[subjectName] || defaultStyle;
   }
