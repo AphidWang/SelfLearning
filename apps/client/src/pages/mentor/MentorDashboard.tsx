@@ -8,6 +8,7 @@ import { TasksBlock } from '../../components/blocks/TasksBlock';
 import { RecentActivitiesBlock } from '../../components/blocks/RecentActivitiesBlock';
 import { text, layout } from '../../styles/tokens';
 import { mockStudents } from '../../mocks/students';
+import ChatModule from '../../components/chat/ChatModule';
 
 // 動態生成日期
 const today = new Date();
@@ -107,6 +108,9 @@ const MentorDashboard: React.FC = () => {
             <RecentActivitiesBlock activities={recentActivities} />
           </section>
         </div>
+      </div>
+      <div className="mt-6">
+        <ChatModule />
       </div>
     </PageLayout>
   );
