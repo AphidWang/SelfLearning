@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Goal, Step, Task } from '../../types/goal';
 
 interface GoalDetailsProps {
   goal: Goal;
-  onClose: () => void;
+  onBack: () => void;
   onTaskClick: (taskId: string) => void;
 }
 
-export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onClose, onTaskClick }) => {
+export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskClick }) => {
   const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
 
   const toggleStep = (stepId: string) => {
@@ -27,15 +27,15 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onClose, onTaskC
 
   return (
     <div className="h-full bg-white rounded-lg shadow flex flex-col">
-      <div className="flex justify-between items-center p-4 border-b">
-        <h2 className="text-xl font-bold">{goal.title}</h2>
-        <button 
-          onClick={onClose}
-          className="p-1 rounded-full hover:bg-gray-100"
-          aria-label="關閉側邊欄"
+      <div className="flex items-center p-4 border-b">
+        <button
+          onClick={onBack}
+          className="mr-4 p-1 hover:bg-gray-100 rounded-full transition-colors"
+          aria-label="返回"
         >
-          <X size={20} />
+          <ChevronLeft size={20} />
         </button>
+        <h2 className="text-xl font-bold flex-1 text-center">{goal.title}</h2>
       </div>
 
       <div className="flex-1 overflow-auto p-4">

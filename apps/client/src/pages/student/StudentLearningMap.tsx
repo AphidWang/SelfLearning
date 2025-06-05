@@ -68,11 +68,13 @@ export const StudentLearningMap: React.FC = () => {
     <PageLayout title="學習地圖">
       <div className="h-full grid lg:grid-cols-6 gap-6 p-6">
         {/* 左側：互動式地圖 */}
-        <div className="h-full lg:col-span-4">
-          <InteractiveMap
-            goals={goals}
-            onTaskClick={handleTaskClick}
-          />
+        <div className="lg:col-span-4 sticky top-0 self-start">
+          <div className="h-[calc(100vh-8rem)] p-4">
+            <InteractiveMap
+              goals={goals}
+              onTaskClick={handleTaskClick}
+            />
+          </div>
         </div>
 
         {/* 右側：目標列表、目標詳情或任務詳情 */}
@@ -87,7 +89,7 @@ export const StudentLearningMap: React.FC = () => {
           ) : selectedGoal ? (
             <GoalDetails
               goal={selectedGoal}
-              onClose={handleBackToGoals}
+              onBack={handleBackToGoals}
               onTaskClick={handleTaskClick}
             />
           ) : (

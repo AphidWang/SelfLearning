@@ -1,6 +1,7 @@
 import React from 'react';
 import { Goal } from '../../types/goal';
 import { subjects } from '../../styles/tokens';
+import { X } from 'lucide-react';
 
 interface GoalDashboardProps {
   goals: Goal[];
@@ -28,51 +29,59 @@ export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick
   };
 
   return (
-    <div className="h-full bg-white rounded-lg shadow p-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {goals.map(goal => {
-          const completionRate = getCompletionRate(goal);
-          const gradient = getSubjectGradient(goal.subject || '未分類', completionRate);
-          return (
-            <button
-              key={goal.id}
-              onClick={() => onGoalClick(goal.id)}
-              className={`relative p-4 rounded-lg bg-gradient-to-r ${gradient} hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 max-w-[200px] h-[80px]`}
-            >
-              <div className="flex items-start justify-between gap-2 h-full">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-white line-clamp-2">
-                    {goal.title}
-                  </h3>
+    <div className="h-full bg-white rounded-lg shadow flex flex-col">
+      {/* 頂部導航欄 */}
+      <div className="flex justify-center items-center p-4 border-b">
+        <h2 className="text-xl font-bold">學習目標</h2>
+      </div>
+
+      {/* 內容區域 */}
+      <div className="flex-1 overflow-auto p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {goals.map(goal => {
+            const completionRate = getCompletionRate(goal);
+            const gradient = getSubjectGradient(goal.subject || '未分類', completionRate);
+            return (
+              <button
+                key={goal.id}
+                onClick={() => onGoalClick(goal.id)}
+                className={`relative p-4 rounded-lg bg-gradient-to-r ${gradient} hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 max-w-[200px] h-[80px]`}
+              >
+                <div className="flex items-start justify-between gap-2 h-full">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-medium text-white line-clamp-2">
+                      {goal.title}
+                    </h3>
+                  </div>
+                  <div className="relative w-8 h-8 flex-shrink-0">
+                    <svg className="w-full h-full" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.2)"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="3"
+                        strokeDasharray={`${completionRate}, 100`}
+                      />
+                    </svg>
+                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                      {Math.round(completionRate)}%
+                    </span>
+                  </div>
                 </div>
-                <div className="relative w-8 h-8 flex-shrink-0">
-                  <svg className="w-full h-full" viewBox="0 0 36 36">
-                    <path
-                      d="M18 2.0845
-                        a 15.9155 15.9155 0 0 1 0 31.831
-                        a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="rgba(255,255,255,0.2)"
-                      strokeWidth="3"
-                    />
-                    <path
-                      d="M18 2.0845
-                        a 15.9155 15.9155 0 0 1 0 31.831
-                        a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="3"
-                      strokeDasharray={`${completionRate}, 100`}
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
-                    {Math.round(completionRate)}%
-                  </span>
-                </div>
-              </div>
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
