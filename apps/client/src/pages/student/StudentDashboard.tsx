@@ -4,6 +4,7 @@ import Calendar from '../../components/calendar/Calendar';
 import { Task } from '../../components/tasks/TaskList';
 import ProgressChart from '../../components/progress/ProgressChart';
 import { Check, BookOpen, Clock, FileText } from 'lucide-react';
+import ChatModule from '../../components/chat/ChatModule';
 
 // Mock data for demonstration
 const todayEvents = [
@@ -341,6 +342,9 @@ const StudentDashboard: React.FC = () => {
             </div>
           </section>
         </div>
+      </div>
+      <div className="mt-6">
+        <ChatModule />
       </div>
     </PageLayout>
   );
