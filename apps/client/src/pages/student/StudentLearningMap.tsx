@@ -10,7 +10,6 @@ import { Goal, Task } from '../../types/goal';
 export const StudentLearningMap: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [view, setView] = useState<'dashboard' | 'goal' | 'task'>('dashboard');
   const { goals } = useGoalStore();
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
@@ -18,22 +17,20 @@ export const StudentLearningMap: React.FC = () => {
 
   const handleGoalClick = (goalId: string) => {
     setSelectedGoalId(goalId);
-    setView('goal');
+    setSelectedTaskId(null);
   };
 
   const handleTaskClick = (taskId: string) => {
     setSelectedTaskId(taskId);
-    setView('task');
   };
 
   const handleBackToGoals = () => {
     setSelectedGoalId(null);
-    setView('dashboard');
+    setSelectedTaskId(null);
   };
 
   const handleBackToGoal = () => {
     setSelectedTaskId(null);
-    setView('goal');
   };
 
   const handleTaskStatusChange = (taskId: string, status: 'in_progress' | 'completed') => {
@@ -69,25 +66,18 @@ export const StudentLearningMap: React.FC = () => {
 
   return (
     <PageLayout title="學習地圖">
-      <div className="h-full grid lg:grid-cols-2 gap-6 p-6">
-        {/* 左側：地圖或目標列表 */}
-        <div className="h-full">
-          {view === 'dashboard' ? (
-            <GoalDashboard
-              goals={goals}
-              onGoalClick={handleGoalClick}
-            />
-          ) : (
-            <InteractiveMap
-              goals={goals}
-              onTaskClick={handleTaskClick}
-            />
-          )}
+      <div className="h-full grid lg:grid-cols-6 gap-6 p-6">
+        {/* 左側：互動式地圖 */}
+        <div className="h-full lg:col-span-4">
+          <InteractiveMap
+            goals={goals}
+            onTaskClick={handleTaskClick}
+          />
         </div>
 
-        {/* 右側：目標詳情或任務詳情 */}
-        <div className="h-full">
-          {view === 'task' && selectedTask ? (
+        {/* 右側：目標列表、目標詳情或任務詳情 */}
+        <div className="h-full lg:col-span-2">
+          {selectedTask ? (
             <TaskDetail
               task={selectedTask}
               onBack={handleBackToGoal}
@@ -98,13 +88,13 @@ export const StudentLearningMap: React.FC = () => {
             <GoalDetails
               goal={selectedGoal}
               onClose={handleBackToGoals}
+              onTaskClick={handleTaskClick}
             />
           ) : (
-            <div className="bg-white rounded-lg shadow p-6 h-full flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-gray-500">點擊地圖上的景點查看學習目標</p>
-              </div>
-            </div>
+            <GoalDashboard
+              goals={goals}
+              onGoalClick={handleGoalClick}
+            />
           )}
         </div>
       </div>

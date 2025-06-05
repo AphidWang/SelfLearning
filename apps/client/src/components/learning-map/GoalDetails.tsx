@@ -5,9 +5,10 @@ import type { Goal, Step, Task } from '../../types/goal';
 interface GoalDetailsProps {
   goal: Goal;
   onClose: () => void;
+  onTaskClick: (taskId: string) => void;
 }
 
-export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onClose }) => {
+export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onClose, onTaskClick }) => {
   const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
 
   const toggleStep = (stepId: string) => {
@@ -74,9 +75,10 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onClose }) => {
               {expandedSteps.includes(step.id) && (
                 <div className="p-3 space-y-2">
                   {step.tasks.map(task => (
-                    <div
+                    <button
                       key={task.id}
-                      className="flex items-center p-2 rounded hover:bg-gray-50"
+                      onClick={() => onTaskClick(task.id)}
+                      className="w-full flex items-center p-2 rounded hover:bg-gray-100 transition-colors"
                     >
                       {task.status === 'done' ? (
                         <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
@@ -86,7 +88,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onClose }) => {
                       <span className={task.status === 'done' ? 'text-gray-500 line-through' : ''}>
                         {task.title}
                       </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
