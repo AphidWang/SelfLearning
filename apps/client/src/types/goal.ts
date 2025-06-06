@@ -43,6 +43,7 @@ export interface Task {
   completedAt?: string;
   assignedTo?: string;
   notes?: string;
+  order?: number;
 }
 
 export interface Bubble {

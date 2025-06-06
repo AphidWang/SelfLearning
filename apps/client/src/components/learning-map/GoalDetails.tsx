@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Trash2, Plus, Pencil, Brain, Target, Sparkles, PartyPopper, X } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Trash2, Plus, Pencil, Brain, Target, Sparkles, PartyPopper, X, GripVertical } from 'lucide-react';
 import type { Goal, Step, Task } from '../../types/goal';
 import { useGoalStore } from '../../store/goalStore';
 import { subjectColors } from '../../styles/tokens';
 import { goalTemplates } from '../../constants/goalTemplates';
 import { SUBJECTS } from '../../constants/subjects';
 import { subjects } from '../../styles/tokens';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 interface GoalDetailsProps {
   goal: Goal;
@@ -42,7 +43,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
     templateType: goal.templateType || '學習目標',
     subject: goal.subject || SUBJECTS.CUSTOM
   });
-  const { deleteGoal, addStep, deleteStep, addTask, deleteTask, updateGoal, getActiveSteps, updateTask } = useGoalStore();
+  const { deleteGoal, addStep, deleteStep, addTask, deleteTask, updateGoal, getActiveSteps, updateTask, reorderTasks } = useGoalStore();
   const [activeSteps, setActiveSteps] = useState<Step[]>([]);
 
   useEffect(() => {
@@ -164,6 +165,34 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
     });
   };
 
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
+
+    const { source, destination } = result;
+    const sourceStepId = source.droppableId;
+    const destStepId = destination.droppableId;
+
+    // 如果是同一個步驟內的移動
+    if (sourceStepId === destStepId) {
+      reorderTasks(goal.id, sourceStepId, source.index, destination.index);
+    } else {
+      // 如果是跨步驟移動，需要先從原步驟移除，再添加到新步驟
+      const sourceStep = activeSteps.find(step => step.id === sourceStepId);
+      const destStep = activeSteps.find(step => step.id === destStepId);
+      
+      if (sourceStep && destStep) {
+        const task = sourceStep.tasks[source.index];
+        // 先從原步驟移除
+        deleteTask(goal.id, sourceStepId, task.id);
+        // 再添加到新步驟
+        addTask(goal.id, destStepId, {
+          ...task,
+          order: destination.index
+        });
+      }
+    }
+  };
+
   return (
     <div className="h-full bg-white rounded-lg shadow flex flex-col">
       {/* 刪除確認視窗 */}
@@ -228,47 +257,26 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
               </button>
               <button
                 onClick={() => {
-                  setIsEditing(false);
-                  setEditedGoal(goal);
-                }}
-                className="p-2 text-gray-500 hover:bg-gray-50 rounded-full transition-colors"
-                aria-label="取消"
-              >
-                <AlertCircle size={20} />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  setIsEditing(true);
-                  setEditedGoal(goal);
-                }}
-                className={`p-2 rounded-full transition-colors ${
-                  isEditing 
-                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
-                    : 'text-blue-500 hover:bg-blue-50'
-                }`}
-                aria-label="編輯模式"
-              >
-                <Pencil size={20} />
-              </button>
-              <button
-                onClick={() => {
-                  setIsEditing(false);
                   setDeleteTarget({ type: 'goal', goalId: goal.id });
                   setShowDeleteConfirm(true);
                 }}
-                className={`p-2 rounded-full transition-colors ${
-                  deleteTarget && deleteTarget.type === 'goal' 
-                    ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                    : 'text-red-500 hover:bg-red-50'
-                }`}
+                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
                 aria-label="刪除目標"
               >
                 <Trash2 size={20} />
               </button>
             </>
+          ) : (
+            <button
+              onClick={() => {
+                setIsEditing(true);
+                setEditedGoal(goal);
+              }}
+              className="p-2 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
+              aria-label="編輯模式"
+            >
+              <Pencil size={20} />
+            </button>
           )}
         </div>
       </div>
@@ -398,178 +406,235 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
           )}
         </div>
 
-        <div className="space-y-4">
-          {activeSteps.map(step => (
-            <div key={step.id} className="border rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm shadow-sm group">
-              <div className="flex items-center justify-between p-3 bg-gray-50 group">
-                <button
-                  onClick={() => toggleStep(step.id)}
-                  className="flex items-center flex-1"
-                >
-                  {expandedSteps.includes(step.id) ? (
-                    <ChevronDown className="h-5 w-5 text-gray-500" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5 text-gray-500" />
-                  )}
-                  <span className="ml-2 font-medium">{step.title}</span>
-                </button>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-500 mr-2">
-                      {getCompletionRate(step)}%
-                    </span>
-                    <div className="w-16 h-2 bg-gray-200 rounded-full">
-                      <div
-                        className="bg-green-500 h-2 rounded-full"
-                        style={{ width: `${getCompletionRate(step)}%` }}
-                      />
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="space-y-4">
+            {activeSteps.map(step => (
+              <div key={step.id} className="border rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm shadow-sm group">
+                <div className="flex items-center justify-between p-3 bg-gray-50 group">
+                  <button
+                    onClick={() => toggleStep(step.id)}
+                    className="flex items-center flex-1"
+                  >
+                    {expandedSteps.includes(step.id) ? (
+                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-gray-500" />
+                    )}
+                    <span className="ml-2 font-medium">{step.title}</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center">
+                      <span className="text-sm text-gray-500 mr-2">
+                        {getCompletionRate(step)}%
+                      </span>
+                      <div className="w-16 h-2 bg-gray-200 rounded-full">
+                        <div
+                          className="bg-green-500 h-2 rounded-full"
+                          style={{ width: `${getCompletionRate(step)}%` }}
+                        />
+                      </div>
                     </div>
+                    {isEditing && (
+                      <button
+                        onClick={() => handleDelete('step', goal.id, step.id)}
+                        className="text-red-500 hover:bg-red-50 rounded-full p-1"
+                        aria-label="刪除步驟"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
-                  {isEditing && (
-                    <button
-                      onClick={() => handleDelete('step', goal.id, step.id)}
-                      className="text-red-500 hover:bg-red-50 rounded-full p-1"
-                      aria-label="刪除步驟"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
                 </div>
-              </div>
 
-              {expandedSteps.includes(step.id) && (
-                <div className="p-3 space-y-2">
-                  {step.tasks.map(task => (
-                    <div key={task.id} className="flex items-center justify-between group">
-                      <button
-                        onClick={() => onTaskClick(task.id)}
-                        className={`flex items-center flex-1 p-2 rounded hover:bg-gray-100 transition-colors ${
-                          task.status === 'done' ? 'bg-green-50' : 
-                          task.status === 'in_progress' ? 'bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100' : ''
-                        }`}
-                      >
-                        {task.status === 'done' ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
-                        ) : task.status === 'in_progress' ? (
-                          <AlertCircle className="h-5 w-5 text-purple-500 mr-2" />
-                        ) : (
-                          <AlertCircle className="h-5 w-5 text-gray-400 mr-2" />
-                        )}
-                        <span className={`${
-                          task.status === 'done' ? 'text-gray-400' : 
-                          task.status === 'in_progress' ? 'text-purple-700 font-medium' : ''
-                        }`}>
-                          {task.title}
-                        </span>
-                      </button>
-                      {isEditing && (
-                        <button
-                          onClick={() => handleDelete('task', goal.id, step.id, task.id)}
-                          className="text-red-500 hover:bg-red-50 rounded-full p-1"
-                          aria-label="刪除任務"
+                {expandedSteps.includes(step.id) && (
+                  <div className="p-3 space-y-2">
+                    <Droppable droppableId={step.id}>
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="min-h-[50px]"
                         >
-                          <Trash2 size={16} />
-                        </button>
+                          {step.tasks
+                            .sort((a, b) => (a.order || 0) - (b.order || 0))
+                            .map((task, index) => (
+                            <Draggable
+                              key={task.id}
+                              draggableId={task.id}
+                              index={index}
+                              isDragDisabled={!isEditing}
+                            >
+                              {(provided, snapshot) => (
+                                <React.Fragment>
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    className={`flex items-center justify-between group ${
+                                      snapshot.isDragging ? 'opacity-100 shadow-lg' : ''
+                                    }`}
+                                  >
+                                    <div className={`flex items-center justify-between flex-1 p-2 rounded hover:bg-gray-100 transition-colors ${
+                                      task.status === 'done' ? 'bg-green-50' : 
+                                      task.status === 'in_progress' ? 'bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100' : ''
+                                    }`}>
+                                      <button
+                                        onClick={() => onTaskClick(task.id)}
+                                        className="flex items-center flex-1"
+                                      >
+                                        {task.status === 'done' ? (
+                                          <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+                                        ) : task.status === 'in_progress' ? (
+                                          <AlertCircle className="h-5 w-5 text-purple-500 mr-2" />
+                                        ) : (
+                                          <AlertCircle className="h-5 w-5 text-gray-400 mr-2" />
+                                        )}
+                                        <span className={`${
+                                          task.status === 'done' ? 'text-gray-400' : 
+                                          task.status === 'in_progress' ? 'text-purple-700 font-medium' : ''
+                                        }`}>
+                                          {task.title}
+                                        </span>
+                                      </button>
+                                      <div className="flex items-center gap-2">
+                                        {isEditing && (
+                                          <>
+                                            <button
+                                              onClick={() => handleDelete('task', goal.id, step.id, task.id)}
+                                              className="text-red-500 hover:bg-red-50 rounded-full p-1"
+                                              aria-label="刪除任務"
+                                            >
+                                              <Trash2 size={16} />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedStepId(step.id);
+                                                setNewTaskTitle('');
+                                              }}
+                                              className="text-blue-500 hover:bg-blue-50 rounded-full p-1"
+                                              aria-label="新增任務"
+                                            >
+                                              <Plus size={16} />
+                                            </button>
+                                            <div {...provided.dragHandleProps}>
+                                              <button
+                                                className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+                                                aria-label="拖曳排序"
+                                              >
+                                                <GripVertical size={16} />
+                                              </button>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {selectedStepId === step.id && index === step.tasks.length - 1 && (
+                                    <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50 ml-8">
+                                      <AlertCircle className="h-5 w-5 text-gray-400" />
+                                      <input
+                                        type="text"
+                                        value={newTaskTitle}
+                                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                                        placeholder="輸入任務名稱..."
+                                        className="flex-1 bg-transparent border-none focus:outline-none"
+                                        autoFocus
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') {
+                                            handleAddTask(step.id);
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={() => handleAddTask(step.id)}
+                                        className="p-1 text-blue-500 hover:bg-blue-50 rounded-full"
+                                        aria-label="確認新增"
+                                      >
+                                        <CheckCircle2 size={20} />
+                                      </button>
+                                      <button
+                                        onClick={() => setSelectedStepId(null)}
+                                        className="p-1 text-gray-500 hover:bg-gray-50 rounded-full"
+                                        aria-label="取消"
+                                      >
+                                        <X size={20} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </React.Fragment>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
                       )}
-                    </div>
-                  ))}
-                  {selectedStepId === step.id ? (
-                    <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
-                      <AlertCircle className="h-5 w-5 text-gray-400" />
-                      <input
-                        type="text"
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        placeholder="輸入任務名稱..."
-                        className="flex-1 bg-transparent border-none focus:outline-none"
-                        autoFocus
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleAddTask(step.id);
-                          }
+                    </Droppable>
+                    {step.tasks.length === 0 && !selectedStepId && isEditing && (
+                      <button
+                        onClick={() => {
+                          setSelectedStepId(step.id);
+                          setNewTaskTitle('');
                         }}
-                      />
-                      <button
-                        onClick={() => handleAddTask(step.id)}
-                        className="p-1 text-blue-500 hover:bg-blue-50 rounded-full"
-                        aria-label="確認新增"
+                        className="w-full flex items-center justify-center gap-2 p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors"
                       >
-                        <CheckCircle2 size={20} />
+                        <Plus size={16} />
+                        <span>新增任務</span>
                       </button>
-                      <button
-                        onClick={() => setSelectedStepId(null)}
-                        className="p-1 text-gray-500 hover:bg-gray-50 rounded-full"
-                        aria-label="取消"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedStepId(step.id);
-                        setNewTaskTitle('');
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            {selectedStepId === 'new' ? (
+              <div className="border rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm shadow-sm">
+                <div className="flex items-center justify-between p-3 bg-gray-50">
+                  <div className="flex items-center flex-1">
+                    <ChevronRight className="h-5 w-5 text-gray-500" />
+                    <input
+                      type="text"
+                      value={newStepTitle}
+                      onChange={(e) => setNewStepTitle(e.target.value)}
+                      placeholder="輸入步驟名稱..."
+                      className="ml-2 font-medium bg-transparent border-none focus:outline-none"
+                      autoFocus
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddStep();
+                        }
                       }}
-                      className="w-full flex items-center justify-center gap-2 p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleAddStep}
+                      className="p-1 text-blue-500 hover:bg-blue-50 rounded-full"
+                      aria-label="確認新增"
                     >
-                      <Plus size={16} />
-                      <span>新增任務</span>
+                      <CheckCircle2 size={20} />
                     </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-          {selectedStepId === 'new' ? (
-            <div className="border rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm shadow-sm">
-              <div className="flex items-center justify-between p-3 bg-gray-50">
-                <div className="flex items-center flex-1">
-                  <ChevronRight className="h-5 w-5 text-gray-500" />
-                  <input
-                    type="text"
-                    value={newStepTitle}
-                    onChange={(e) => setNewStepTitle(e.target.value)}
-                    placeholder="輸入步驟名稱..."
-                    className="ml-2 font-medium bg-transparent border-none focus:outline-none"
-                    autoFocus
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddStep();
-                      }
-                    }}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleAddStep}
-                    className="p-1 text-blue-500 hover:bg-blue-50 rounded-full"
-                    aria-label="確認新增"
-                  >
-                    <CheckCircle2 size={20} />
-                  </button>
-                  <button
-                    onClick={() => setSelectedStepId(null)}
-                    className="p-1 text-gray-500 hover:bg-gray-50 rounded-full"
-                    aria-label="取消"
-                  >
-                    <X size={20} />
-                  </button>
+                    <button
+                      onClick={() => setSelectedStepId(null)}
+                      className="p-1 text-gray-500 hover:bg-gray-50 rounded-full"
+                      aria-label="取消"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                setSelectedStepId('new');
-                setNewStepTitle('');
-              }}
-              className="w-full flex items-center justify-center gap-2 p-3 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors border border-dashed border-gray-300"
-            >
-              <Plus size={20} />
-              <span>新增步驟</span>
-            </button>
-          )}
-        </div>
+            ) : isEditing && (
+              <button
+                onClick={() => {
+                  setSelectedStepId('new');
+                  setNewStepTitle('');
+                }}
+                className="w-full flex items-center justify-center gap-2 p-3 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors border border-dashed border-gray-300"
+              >
+                <Plus size={20} />
+                <span>新增步驟</span>
+              </button>
+            )}
+          </div>
+        </DragDropContext>
       </div>
     </div>
   );

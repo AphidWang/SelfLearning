@@ -880,6 +880,7 @@ interface GoalStore {
   addBubble: (goalId: string, bubble: Bubble) => void;
   updateBubble: (goalId: string, bubbleId: string, bubble: Partial<Bubble>) => void;
   deleteBubble: (goalId: string, bubbleId: string) => void;
+  reorderTasks: (goalId: string, stepId: string, sourceIndex: number, destinationIndex: number) => void;
 }
 
 export const useGoalStore = create<GoalStore>((set, get) => ({
@@ -992,9 +993,15 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
         throw new Error(`Step ${stepId} not found in goal ${goalId}`);
       }
 
+      // 計算新任務的順序
+      const maxOrder = step.tasks.length > 0 
+        ? Math.max(...step.tasks.map(t => t.order || 0))
+        : -1;
+
       newTask = {
         ...task,
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
+        order: maxOrder + 1
       };
 
       const newState = {
@@ -1237,6 +1244,42 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
             ? {
                 ...g,
                 bubbles: (g.bubbles || []).filter((b) => b.id !== bubbleId),
+              }
+            : g
+        )
+      };
+      saveGoals(newState.goals);
+      return newState;
+    });
+  },
+
+  reorderTasks: (goalId: string, stepId: string, sourceIndex: number, destinationIndex: number) => {
+    set((state) => {
+      const goal = state.goals.find(g => g.id === goalId);
+      if (!goal) return state;
+
+      const step = goal.steps.find(s => s.id === stepId);
+      if (!step) return state;
+
+      const newTasks = Array.from(step.tasks);
+      const [removed] = newTasks.splice(sourceIndex, 1);
+      newTasks.splice(destinationIndex, 0, removed);
+
+      // 更新任務的順序
+      const updatedTasks = newTasks.map((task, index) => ({
+        ...task,
+        order: index
+      }));
+
+      const updatedStep = { ...step, tasks: updatedTasks };
+      const newState = {
+        goals: state.goals.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                steps: g.steps.map((s) =>
+                  s.id === stepId ? updatedStep : s
+                )
               }
             : g
         )
