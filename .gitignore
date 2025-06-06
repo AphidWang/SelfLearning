@@ -47,4 +47,6 @@ pnpm-debug.log*
 .node_repl_history
 
 # Vite
-.vite/
+.vite
+
+package-lock.json
