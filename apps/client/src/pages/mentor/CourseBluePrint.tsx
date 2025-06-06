@@ -68,7 +68,7 @@ const CourseBluePrint: React.FC = () => {
           defaultEdgeOptions={{
             type: 'smoothstep',
             animated: true,
-            style: { stroke: '#94a3b8', strokeWidth: 2 }
+            style: { stroke: '#0f172a', strokeWidth: 2 }
           }}
           connectionMode={ConnectionMode.Loose}
           snapToGrid={true}

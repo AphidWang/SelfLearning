@@ -14,6 +14,7 @@ import SubjectPage from './pages/shared/SubjectPage';
 import NotFound from './pages/NotFound';
 import MentorCurriculum from './pages/mentor/MentorCurriculum';
 import MentorTaskPlanner from './pages/mentor/MentorTaskPlanner.tsx';
+import CourseBluePrint from './pages/mentor/CourseBluePrint';
 import { CurriculumProvider } from './context/CurriculumContext';
 import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
@@ -51,6 +52,7 @@ function App() {
             <Route path="/mentor/task-planner" element={<MentorTaskPlanner />} />
             <Route path="/mentor/subject/:subjectId" element={<SubjectPage isMentor={true} />} />
             <Route path="/mentor/curriculum" element={<MentorCurriculum />} />
+            <Route path="/mentor/course-blueprint" element={<CourseBluePrint />} />
             
             {/* Default and Not Found Routes */}
             <Route path="/" element={<Navigate to="/login" replace />} />

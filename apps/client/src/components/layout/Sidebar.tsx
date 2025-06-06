@@ -31,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
       { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
       { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
+      { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
     ]
   };
 
