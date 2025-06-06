@@ -15,6 +15,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Lock, Target, BookOpen, CheckSquare } from "lucide-react";
+import { Handle, Position } from "reactflow";
 
 const baseStyle = {
   padding: "1rem",
@@ -55,81 +56,31 @@ const getNodeColor = (type: string) => {
   }
 };
 
+const NodeCard = ({ type, data }: { type: string; data: { label: string; description: string } }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: 1, scale: 1 }}
+    whileHover={{ scale: 1.02 }}
+    className={`relative ${baseStyle}`}
+  >
+    <Handle type="target" position={Position.Left} />
+    <Handle type="source" position={Position.Right} />
+    <div className={`absolute -inset-2 rounded-xl bg-gradient-to-r ${getNodeColor(type)} opacity-75 blur-lg`} />
+    <div className="relative bg-white dark:bg-gray-800 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-2">
+        {getNodeIcon(type)}
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{data.label}</h3>
+      </div>
+      {data.description && (
+        <p className="text-sm text-gray-600 dark:text-gray-300">{data.description}</p>
+      )}
+    </div>
+  </motion.div>
+);
+
 export const nodeTypes = {
-  phase: ({ data }) => (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02 }}
-      className={`relative ${baseStyle}`}
-    >
-      <div className={`absolute -inset-2 rounded-xl bg-gradient-to-r ${getNodeColor("phase")} opacity-75 blur-lg`} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          {getNodeIcon("phase")}
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{data.label}</h3>
-        </div>
-        {data.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-300">{data.description}</p>
-        )}
-      </div>
-    </motion.div>
-  ),
-  goal: ({ data }) => (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02 }}
-      className={`relative ${baseStyle}`}
-    >
-      <div className={`absolute -inset-2 rounded-xl bg-gradient-to-r ${getNodeColor("goal")} opacity-75 blur-lg`} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          {getNodeIcon("goal")}
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{data.label}</h3>
-        </div>
-        {data.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-300">{data.description}</p>
-        )}
-      </div>
-    </motion.div>
-  ),
-  syllabus: ({ data }) => (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02 }}
-      className={`relative ${baseStyle}`}
-    >
-      <div className={`absolute -inset-2 rounded-xl bg-gradient-to-r ${getNodeColor("syllabus")} opacity-75 blur-lg`} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          {getNodeIcon("syllabus")}
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{data.label}</h3>
-        </div>
-        {data.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-300">{data.description}</p>
-        )}
-      </div>
-    </motion.div>
-  ),
-  task: ({ data }) => (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02 }}
-      className={`relative ${baseStyle}`}
-    >
-      <div className={`absolute -inset-2 rounded-xl bg-gradient-to-r ${getNodeColor("task")} opacity-75 blur-lg`} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          {getNodeIcon("task")}
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{data.label}</h3>
-        </div>
-        {data.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-300">{data.description}</p>
-        )}
-      </div>
-    </motion.div>
-  ),
+  phase: ({ data }) => <NodeCard type="phase" data={data} />,
+  goal: ({ data }) => <NodeCard type="goal" data={data} />,
+  syllabus: ({ data }) => <NodeCard type="syllabus" data={data} />,
+  task: ({ data }) => <NodeCard type="task" data={data} />,
 }; 
