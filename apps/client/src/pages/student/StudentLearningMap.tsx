@@ -5,12 +5,14 @@ import { TaskDetail } from '../../components/learning-map/TaskDetail';
 import { GoalDetails } from '../../components/learning-map/GoalDetails';
 import { useGoalStore } from '../../store/goalStore';
 import PageLayout from '../../components/layout/PageLayout';
-import { Goal, Task } from '../../types/goal';
+import { Goal, Task, GoalStatus } from '../../types/goal';
+import { SUBJECTS } from '../../constants/subjects';
 
 export const StudentLearningMap: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const { goals } = useGoalStore();
+  const [isCreatingNewGoal, setIsCreatingNewGoal] = useState(false);
+  const { goals, addGoal } = useGoalStore();
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
   const selectedTask = selectedGoal?.steps.flatMap(step => step.tasks).find(t => t.id === selectedTaskId);
@@ -19,6 +21,22 @@ export const StudentLearningMap: React.FC = () => {
   const handleGoalClick = (goalId: string) => {
     setSelectedGoalId(goalId);
     setSelectedTaskId(null);
+    setIsCreatingNewGoal(false);
+  };
+
+  const handleAddGoal = () => {
+    const newGoal = {
+      id: '',
+      title: '新目標',
+      description: '',
+      steps: [],
+      subject: SUBJECTS.CUSTOM,
+      templateType: '學習目標',
+      status: 'in_progress' as GoalStatus
+    };
+    addGoal(newGoal);
+    setSelectedGoalId(newGoal.id);
+    setIsCreatingNewGoal(true);
   };
 
   const handleTaskClick = (taskId: string) => {
@@ -28,6 +46,7 @@ export const StudentLearningMap: React.FC = () => {
   const handleBackToGoals = () => {
     setSelectedGoalId(null);
     setSelectedTaskId(null);
+    setIsCreatingNewGoal(false);
   };
 
   const handleBackToGoal = () => {
@@ -93,11 +112,13 @@ export const StudentLearningMap: React.FC = () => {
               goal={selectedGoal!}
               onBack={handleBackToGoals}
               onTaskClick={handleTaskClick}
+              isCreating={isCreatingNewGoal}
             />
           ) : (
             <GoalDashboard
               goals={goals}
               onGoalClick={handleGoalClick}
+              onAddGoal={handleAddGoal}
             />
           )}
         </div>

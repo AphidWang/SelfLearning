@@ -12,19 +12,11 @@ interface GoalDetailsProps {
   goal: Goal;
   onBack: () => void;
   onTaskClick: (taskId: string) => void;
+  isCreating?: boolean;
 }
 
-export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskClick }) => {
-  const [expandedSteps, setExpandedSteps] = useState<string[]>(() => {
-    // 初始化時，只展開未完成的步驟
-    return goal.steps
-      .filter(step => {
-        const totalTasks = step.tasks.length;
-        const completedTasks = step.tasks.filter(task => task.status === 'done').length;
-        return totalTasks > 0 && completedTasks < totalTasks;
-      })
-      .map(step => step.id);
-  });
+export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskClick, isCreating = false }) => {
+  const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ 
     type: 'step' | 'task' | 'goal', 
@@ -32,7 +24,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
     stepId?: string, 
     taskId?: string 
   } | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(isCreating);
   const [newStepTitle, setNewStepTitle] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -49,7 +41,16 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
   useEffect(() => {
     const steps = getActiveSteps(goal.id);
     setActiveSteps(steps);
-    console.log('🔍 GoalDetails - initial activeSteps:', steps);
+    // 初始化時，只展開未完成的步驟
+    setExpandedSteps(
+      steps
+        .filter(step => {
+          const totalTasks = step.tasks.length;
+          const completedTasks = step.tasks.filter(task => task.status === 'done').length;
+          return totalTasks > 0 && completedTasks < totalTasks;
+        })
+        .map(step => step.id)
+    );
   }, [goal.id, goal.steps]);
 
   useEffect(() => {
@@ -59,6 +60,24 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
       subject: goal.subject || SUBJECTS.CUSTOM
     });
   }, [goal]);
+
+  // 當進入編輯模式時，展開所有步驟
+  useEffect(() => {
+    if (isEditing) {
+      setExpandedSteps(activeSteps.map(step => step.id));
+    } else {
+      // 退出編輯模式時，恢復預設展開邏輯
+      setExpandedSteps(
+        activeSteps
+          .filter(step => {
+            const totalTasks = step.tasks.length;
+            const completedTasks = step.tasks.filter(task => task.status === 'done').length;
+            return totalTasks > 0 && completedTasks < totalTasks;
+          })
+          .map(step => step.id)
+      );
+    }
+  }, [isEditing, activeSteps]);
 
   const handleClickOutside = (event: MouseEvent) => {
     const target = event.target as HTMLElement;
