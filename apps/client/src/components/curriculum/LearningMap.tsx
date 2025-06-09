@@ -69,13 +69,7 @@ const Node: React.FC<NodeProps> = React.memo(({
     completed: 'bg-green-500 dark:bg-green-600'
   };
 
-  const levelColors = [
-    'from-blue-500 to-purple-500',
-    'from-purple-500 to-pink-500',
-    'from-pink-500 to-red-500',
-    'from-red-500 to-orange-500',
-    'from-orange-500 to-yellow-500'
-  ];
+  const pointsReward = node.rewards.find(r => r.type === 'points');
 
   const handleAddBranch = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -276,23 +270,23 @@ const Node: React.FC<NodeProps> = React.memo(({
     >
       {/* Level Ring */}
       <div className={`
-        absolute -inset-2 rounded-xl bg-gradient-to-r ${levelColors[node.level % levelColors.length]}
-        opacity-75 blur-lg transition-opacity duration-300
+        absolute -inset-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500
+        opacity-70 blur-lg transition-opacity duration-300
         ${isHovered ? 'opacity-100' : 'opacity-50'}
       `} />
 
       {/* Node Content */}
-      <div 
+      <div
         className={`
           w-64 p-4 rounded-xl relative bg-white dark:bg-gray-800
-          border-2 ${
-            node.status === 'locked' 
-              ? 'border-gray-300 dark:border-gray-700' 
+          border ${
+            node.status === 'locked'
+              ? 'border-gray-300 dark:border-gray-700'
               : node.status === 'completed'
                 ? 'border-green-500 dark:border-green-600'
                 : 'border-indigo-500 dark:border-indigo-600'
           }
-          shadow-xl backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90
+          shadow-md
         `}
       >
         {/* Edit Button */}
@@ -313,6 +307,13 @@ const Node: React.FC<NodeProps> = React.memo(({
           >
             <Plus size={16} />
           </button>
+        )}
+
+        {pointsReward && (
+          <div className="absolute bottom-3 right-3 bg-white/80 text-indigo-600 text-sm font-semibold rounded-md px-2 py-1 shadow flex items-center">
+            <Star className="w-3 h-3 mr-1" />
+            {pointsReward.value}
+          </div>
         )}
 
         {/* Status Badge */}
