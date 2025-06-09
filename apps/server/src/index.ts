@@ -7,7 +7,7 @@ import path from 'path';
 
 dotenv.config();
 
-const app = express();
+export const app = express();
 const port = process.env.PORT || 3000;
 
 // CORS 設置必須在其他 middleware 之前
@@ -42,6 +42,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-}); 
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
+
+

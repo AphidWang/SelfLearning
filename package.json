@@ -7,7 +7,8 @@
     "start": "cd apps/server && yarn start",
     "dev:client": "cd apps/client && vite",
     "dev:server": "cd apps/server && yarn dev",
-    "dev": "npm-run-all --parallel dev:client dev:server"
+    "dev": "npm-run-all --parallel dev:client dev:server",
+    "test": "vitest run"
   },
   "workspaces": [
     "apps/*",
@@ -24,6 +25,10 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/node": "^22.15.21"
-  }
+    "@types/node": "^22.15.21",
+    "vitest": "^1.4.0",
+    "supertest": "^6.3.3",
+    "ts-node": "^10.9.2"
+  },
+  "packageManager": "yarn@4.9.2"
 }
