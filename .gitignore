@@ -1,6 +1,8 @@
 # Dependencies
 node_modules
 .pnpm-store
+.yarn/
+.yarnrc.yml
 .pnpm-debug.log*
 
 # 需要包含在 Git 中
