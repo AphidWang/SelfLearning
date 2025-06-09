@@ -7,9 +7,10 @@ import { X } from 'lucide-react';
 interface GoalDashboardProps {
   goals: Goal[];
   onGoalClick: (goalId: string) => void;
+  onAddGoal: () => void;
 }
 
-export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick }) => {
+export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick, onAddGoal }) => {
   const { getCompletionRate } = useGoalStore();
 
   const getSubjectGradient = (subject: string, progress: number) => {
@@ -78,6 +79,14 @@ export const GoalDashboard: React.FC<GoalDashboardProps> = ({ goals, onGoalClick
               </button>
             );
           })}
+          {/* 新增目標卡片 */}
+          <button
+            onClick={onAddGoal}
+            className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 max-w-[200px] h-[80px]"
+          >
+            <span className="text-3xl text-blue-400">+</span>
+            <span className="text-xs text-gray-500 mt-1">新增目標</span>
+          </button>
         </div>
       </div>
     </div>
