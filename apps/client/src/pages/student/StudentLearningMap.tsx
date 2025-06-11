@@ -239,12 +239,24 @@ export const StudentLearningMap: React.FC = () => {
       <div className="h-full p-6">
         {/* 全寬：互動式地圖 */}
         <div className="h-[calc(100vh-8rem)]" ref={mapRef}>
-          <InteractiveMap
-            goals={goals}
-            onGoalClick={handleGoalClick}
-            onCampfireClick={() => setShowReview(true)}
-            onMailboxClick={() => setShowGoalCards(true)}
-          />
+          <div className={`h-full transition-all duration-500 ${
+            showReview 
+              ? 'blur-sm opacity-90 pointer-events-none' 
+              : ''
+          }`}>
+            <InteractiveMap
+              goals={goals}
+              onGoalClick={handleGoalClick}
+              onCampfireClick={() => {
+                setShowReview(true);
+                setShowGoalCards(false);
+                setSelectedGoalId(null);
+                setSelectedTaskId(null);
+                setIsCreatingNewGoal(false);
+              }}
+              onMailboxClick={() => setShowGoalCards(true)}
+            />
+          </div>
         </div>
       </div>
     </PageLayout>

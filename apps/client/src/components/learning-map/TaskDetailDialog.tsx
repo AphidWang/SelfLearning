@@ -81,7 +81,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
       completedAt: status === 'done' ? new Date().toISOString() : undefined
     });
     setShowStatusOptions(false);
-    onClose();
+    onBack();
   };
 
   return (
