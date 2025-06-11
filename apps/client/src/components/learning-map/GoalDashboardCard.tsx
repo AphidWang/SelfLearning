@@ -20,7 +20,7 @@ export const GoalDashboardCard: React.FC<GoalDashboardCardProps> = ({ title, sub
       }}
     >
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+        <div className="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" style={{ textWrap: 'balance' }}>
           {title}
         </div>
       </div>
