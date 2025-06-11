@@ -11,9 +11,10 @@ interface InteractiveMapProps {
   goals: Goal[];
   onGoalClick: (goalId: string) => void;
   onCampfireClick?: () => void;
+  onMailboxClick?: () => void;
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalClick, onCampfireClick }) => {
+export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalClick, onCampfireClick, onMailboxClick }) => {
   // 根據 subject 決定圖示
   const getIcon = (subject: string) => {
     if (subject.includes('地標') || subject.includes('房')) return heyaImg;
@@ -197,8 +198,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalCli
                 top: `${(31 / 100) * mapSize.height / scale}px`,
                 transform: 'translate(-50%, -50%)',
                 width: '128px',
-                height: '128px'
-              }}>
+                height: '128px',
+                cursor: onMailboxClick ? 'pointer' : undefined
+              }}
+              onClick={onMailboxClick}
+              >
                 <MapIcon
                   goal={goals[3]}
                   src={mailboxImg}

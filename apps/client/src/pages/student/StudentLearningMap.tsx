@@ -8,22 +8,24 @@ import PageLayout from '../../components/layout/PageLayout';
 import { Goal, Task, GoalStatus } from '../../types/goal';
 import { SUBJECTS } from '../../constants/subjects';
 import { DailyReviewCarousel } from '../../components/learning-map/DailyReviewCarousel';
+import { GoalDashboardCard } from '../../components/learning-map/GoalDashboardCard';
 
 export const StudentLearningMap: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isCreatingNewGoal, setIsCreatingNewGoal] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  const { goals, addGoal } = useGoalStore();
+  const [showGoalCards, setShowGoalCards] = useState(false);
+  const { goals, addGoal, getCompletionRate } = useGoalStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
 
   useLayoutEffect(() => {
-    if (showReview && mapRef.current) {
+    if ((showReview || showGoalCards) && mapRef.current) {
       const rect = mapRef.current.getBoundingClientRect();
       setMapRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
-  }, [showReview]);
+  }, [showReview, showGoalCards]);
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
   const selectedTask = selectedGoal?.steps.flatMap(step => step.tasks).find(t => t.id === selectedTaskId);
@@ -137,6 +139,71 @@ export const StudentLearningMap: React.FC = () => {
           </button>
         </>
       )}
+
+      {showGoalCards && mapRect && (
+        <>
+          {/* 遮罩只覆蓋地圖區域 */}
+          <div
+            className="fixed z-40 bg-black/10 cursor-pointer"
+            style={{ left: mapRect.left, top: mapRect.top, width: mapRect.width, height: mapRect.height }}
+            onClick={() => setShowGoalCards(false)}
+          />
+          {/* popup 對齊地圖右側 */}
+          <div
+            className="fixed z-50 pointer-events-auto"
+            style={{
+              left: mapRect.left,
+              top: mapRect.top,
+              width: mapRect.width,
+              height: mapRect.height,
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                right: '20px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'auto',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[400px] max-w-[90vw] flex flex-col" style={{ height: '80%' }}>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-300">學習目標概覽</h2>
+                  <button
+                    className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                    onClick={() => setShowGoalCards(false)}
+                    aria-label="關閉"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex-1 overflow-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {goals.map(goal => (
+                      <GoalDashboardCard
+                        key={goal.id}
+                        title={goal.title}
+                        subject={goal.subject || '未分類'}
+                        progress={getCompletionRate(goal.id)}
+                        onClick={() => {
+                          setShowGoalCards(false);
+                          handleGoalClick(goal.id);
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="h-full grid lg:grid-cols-6 gap-6 p-6">
         {/* 左側：互動式地圖 */}
         <div className="lg:col-span-4 sticky top-0 self-start" ref={mapRef}>
@@ -145,6 +212,7 @@ export const StudentLearningMap: React.FC = () => {
               goals={goals}
               onGoalClick={handleGoalClick}
               onCampfireClick={() => setShowReview(true)}
+              onMailboxClick={() => setShowGoalCards(true)}
             />
           </div>
         </div>
