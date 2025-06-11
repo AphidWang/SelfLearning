@@ -10,9 +10,10 @@ import mailboxImg from '../../assets/maps/sep-twtour/buildings/mailbox.png';
 interface InteractiveMapProps {
   goals: Goal[];
   onGoalClick: (goalId: string) => void;
+  onCampfireClick?: () => void;
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalClick }) => {
+export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalClick, onCampfireClick }) => {
   // 根據 subject 決定圖示
   const getIcon = (subject: string) => {
     if (subject.includes('地標') || subject.includes('房')) return heyaImg;
@@ -174,8 +175,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalCli
                 top: `${(74 / 100) * mapSize.height / scale}px`,
                 transform: 'translate(-50%, -50%)',
                 width: '128px',
-                height: '128px'
-              }}>
+                height: '128px',
+                cursor: onCampfireClick ? 'pointer' : undefined
+              }}
+              onClick={onCampfireClick}
+              >
                 <MapIcon
                   goal={goals[2]}
                   src={fireImg}

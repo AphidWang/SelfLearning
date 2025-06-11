@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { GoalDashboard } from '../../components/learning-map/GoalDashboard';
 import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
 import { TaskDetail } from '../../components/learning-map/TaskDetail';
@@ -7,12 +7,23 @@ import { useGoalStore } from '../../store/goalStore';
 import PageLayout from '../../components/layout/PageLayout';
 import { Goal, Task, GoalStatus } from '../../types/goal';
 import { SUBJECTS } from '../../constants/subjects';
+import { DailyReviewCarousel } from '../../components/learning-map/DailyReviewCarousel';
 
 export const StudentLearningMap: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isCreatingNewGoal, setIsCreatingNewGoal] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const { goals, addGoal } = useGoalStore();
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
+
+  useLayoutEffect(() => {
+    if (showReview && mapRef.current) {
+      const rect = mapRef.current.getBoundingClientRect();
+      setMapRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+    }
+  }, [showReview]);
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
   const selectedTask = selectedGoal?.steps.flatMap(step => step.tasks).find(t => t.id === selectedTaskId);
@@ -86,19 +97,60 @@ export const StudentLearningMap: React.FC = () => {
 
   return (
     <PageLayout title="學習地圖">
+      {showReview && mapRect && (
+        <>
+          {/* 遮罩只覆蓋地圖區域 */}
+          <div
+            className="fixed z-40 bg-black/10 cursor-pointer"
+            style={{ left: mapRect.left, top: mapRect.top, width: mapRect.width, height: mapRect.height }}
+            onClick={() => setShowReview(false)}
+          />
+          {/* popup 對齊地圖正中央 */}
+          <div
+            className="fixed z-50 pointer-events-auto"
+            style={{
+              left: mapRect.left,
+              top: mapRect.top,
+              width: mapRect.width,
+              height: mapRect.height,
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'auto',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <DailyReviewCarousel className="max-h-[80vh] overflow-y-auto w-full max-w-[440px]" onClose={() => setShowReview(false)} />
+            </div>
+          </div>
+          <button
+            className="fixed top-8 right-8 z-50 bg-white/80 dark:bg-gray-800/80 backdrop-blur px-3 py-1 rounded-full shadow border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            onClick={() => setShowReview(false)}
+          >
+            關閉
+          </button>
+        </>
+      )}
       <div className="h-full grid lg:grid-cols-6 gap-6 p-6">
         {/* 左側：互動式地圖 */}
-        <div className="lg:col-span-4 sticky top-0 self-start">
+        <div className="lg:col-span-4 sticky top-0 self-start" ref={mapRef}>
           <div className="h-[calc(100vh-8rem)] p-4">
             <InteractiveMap
               goals={goals}
               onGoalClick={handleGoalClick}
+              onCampfireClick={() => setShowReview(true)}
             />
           </div>
         </div>
 
         {/* 右側：目標列表、目標詳情或任務詳情 */}
-        <div className="h-full lg:col-span-2">
+        <div className="h-full lg:col-span-2 overflow-y-auto max-h-[calc(100vh-64px)] mt-8 bg-gray-50 dark:bg-gray-900/40 rounded-2xl shadow-sm p-4">
           {selectedTaskId && selectedTask && selectedStep ? (
             <TaskDetail
               task={selectedTask}
