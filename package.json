@@ -2,10 +2,9 @@
   "name": "self-learning-platform",
   "private": true,
   "scripts": {
-    "install": "cd apps/server && yarn install && cd ../client && yarn install",
-    "build": "cd apps/server && yarn build && cd ../client && yarn build",
+    "build": "yarn workspaces foreach --all run build",
     "start": "cd apps/server && yarn start",
-    "dev:client": "cd apps/client && vite",
+    "dev:client": "cd apps/client && yarn dev",
     "dev:server": "cd apps/server && yarn dev",
     "dev": "npm-run-all --parallel dev:client dev:server",
     "test": "vitest run"
@@ -15,20 +14,14 @@
     "packages/*"
   ],
   "dependencies": {
-    "@radix-ui/react-dropdown-menu": "^2.1.14",
-    "framer-motion": "^10.16.4",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.1",
-    "lucide-react": "^0.294.0",
-    "npm-run-all": "^4.1.5",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "npm-run-all": "^4.1.5"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
-    "vitest": "^1.4.0",
     "supertest": "^6.3.3",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "vitest": "^1.4.0"
   },
   "packageManager": "yarn@4.9.2"
 }
