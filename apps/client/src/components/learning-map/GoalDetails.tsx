@@ -135,6 +135,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
     
     if (deleteTarget.type === 'goal') {
       deleteGoal(deleteTarget.goalId);
+      onBack(); // 刪除目標後回到上一頁
     } else if (deleteTarget.type === 'step' && deleteTarget.stepId) {
       deleteStep(deleteTarget.goalId, deleteTarget.stepId);
     } else if (deleteTarget.type === 'task' && deleteTarget.stepId && deleteTarget.taskId) {
@@ -374,17 +375,31 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
             )}
           </div>
           {isEditing ? (
-            <textarea
-              value={editedGoal.description}
-              onChange={(e) => {
-                const updatedGoal = {...editedGoal, description: e.target.value};
-                setEditedGoal(updatedGoal);
-                updateGoal(updatedGoal);
-              }}
-              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="描述你的目標..."
-            />
+            <div className="space-y-3">
+              <textarea
+                value={editedGoal.description}
+                onChange={(e) => {
+                  const updatedGoal = {...editedGoal, description: e.target.value};
+                  setEditedGoal(updatedGoal);
+                  updateGoal(updatedGoal);
+                }}
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                placeholder="描述你的目標..."
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setDeleteTarget({ type: 'goal', goalId: goal.id });
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors text-sm"
+                >
+                  <Trash2 size={16} />
+                  刪除目標
+                </button>
+              </div>
+            </div>
           ) : (
             <p className="text-gray-700">{goal.description}</p>
           )}

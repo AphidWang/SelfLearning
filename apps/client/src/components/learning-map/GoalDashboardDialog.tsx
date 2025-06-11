@@ -1,22 +1,22 @@
 import React from 'react';
 import { Goal } from '../../types/goal';
 import { GoalDashboardCard } from './GoalDashboardCard';
+import { useGoalStore } from '../../store/goalStore';
 
 interface GoalDashboardDialogProps {
-  goals: Goal[];
   onClose: () => void;
   onGoalClick: (goalId: string) => void;
   onAddGoal: () => void;
-  getCompletionRate: (goalId: string) => number;
 }
 
 export const GoalDashboardDialog: React.FC<GoalDashboardDialogProps> = ({
-  goals,
   onClose,
   onGoalClick,
   onAddGoal,
-  getCompletionRate
 }) => {
+  const { getActiveGoals, getCompletionRate } = useGoalStore();
+  const goals = getActiveGoals();
+  
   return (
     <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[400px] max-w-[90vw] flex flex-col h-full">
       <div className="flex justify-between items-center mb-4 select-none" data-draggable-header>

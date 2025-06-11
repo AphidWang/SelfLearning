@@ -192,11 +192,9 @@ export const StudentLearningMap: React.FC = () => {
           headerSelector="[data-draggable-header]"
         >
           <GoalDashboardDialog
-            goals={goals}
             onClose={() => setShowGoalCards(false)}
             onGoalClick={(goalId) => handleGoalClick(goalId, true)}
             onAddGoal={handleAddGoal}
-            getCompletionRate={getCompletionRate}
           />
         </DraggableDialog>
       )}
@@ -254,7 +252,13 @@ export const StudentLearningMap: React.FC = () => {
                 setSelectedTaskId(null);
                 setIsCreatingNewGoal(false);
               }}
-              onMailboxClick={() => setShowGoalCards(true)}
+              onMailboxClick={() => {
+                setShowGoalCards(true);
+                setShowReview(false);
+                setSelectedGoalId(null);
+                setSelectedTaskId(null);
+                setIsCreatingNewGoal(false);
+              }}
             />
           </div>
         </div>
