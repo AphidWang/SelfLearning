@@ -11,6 +11,7 @@ import { DailyReviewCarousel } from '../../components/learning-map/DailyReviewCa
 import { GoalDashboardCard } from '../../components/learning-map/GoalDashboardCard';
 import { GoalDashboardDialog } from '../../components/learning-map/GoalDashboardDialog';
 import { GoalDetailsDialog } from '../../components/learning-map/GoalDetailsDialog';
+import { DraggableDialog } from '../../components/learning-map/DraggableDialog';
 
 export const StudentLearningMap: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -22,13 +23,16 @@ export const StudentLearningMap: React.FC = () => {
   const { goals, addGoal, getCompletionRate } = useGoalStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
+  
+  // 共享的 dialog 位置狀態
+  const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
 
   useLayoutEffect(() => {
-    if ((showReview || showGoalCards) && mapRef.current) {
+    if ((showReview || showGoalCards || selectedGoalId) && mapRef.current) {
       const rect = mapRef.current.getBoundingClientRect();
       setMapRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
-  }, [showReview, showGoalCards]);
+  }, [showReview, showGoalCards, selectedGoalId]);
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
   // 當有 selectedTaskId 時，從所有目標中尋找該任務
@@ -181,37 +185,55 @@ export const StudentLearningMap: React.FC = () => {
       )}
 
       {showGoalCards && mapRect && (
-        <GoalDashboardDialog
-          goals={goals}
+        <DraggableDialog
           mapRect={mapRect}
-          onClose={() => setShowGoalCards(false)}
-          onGoalClick={(goalId) => handleGoalClick(goalId, true)}
-          onAddGoal={handleAddGoal}
-          getCompletionRate={getCompletionRate}
-        />
+          position={dialogPosition}
+          onPositionChange={setDialogPosition}
+          headerSelector="[data-draggable-header]"
+        >
+          <GoalDashboardDialog
+            goals={goals}
+            onClose={() => setShowGoalCards(false)}
+            onGoalClick={(goalId) => handleGoalClick(goalId, true)}
+            onAddGoal={handleAddGoal}
+            getCompletionRate={getCompletionRate}
+          />
+        </DraggableDialog>
       )}
 
       {selectedGoalId && selectedGoal && mapRect && !selectedTaskId && (
-        <GoalDetailsDialog
-          goal={selectedGoal}
+        <DraggableDialog
           mapRect={mapRect}
-          onClose={handleCloseAll}
-          onBack={handleBackToGoals}
-          onTaskClick={handleTaskClick}
-          isCreating={isCreatingNewGoal}
-        />
+          position={dialogPosition}
+          onPositionChange={setDialogPosition}
+          headerSelector="[data-draggable-header]"
+        >
+          <GoalDetailsDialog
+            goal={selectedGoal}
+            onClose={handleCloseAll}
+            onBack={handleBackToGoals}
+            onTaskClick={handleTaskClick}
+            isCreating={isCreatingNewGoal}
+          />
+        </DraggableDialog>
       )}
 
       {selectedTaskId && selectedTask && selectedStep && taskGoal && mapRect && (
-        <TaskDetailDialog
-          task={selectedTask}
-          stepId={selectedStep.id}
-          goalId={taskGoal.id}
+        <DraggableDialog
           mapRect={mapRect}
-          onClose={handleCloseAll}
-          onBack={handleBackToGoal}
-          onHelpRequest={handleHelpRequest}
-        />
+          position={dialogPosition}
+          onPositionChange={setDialogPosition}
+          headerSelector="[data-draggable-header]"
+        >
+          <TaskDetailDialog
+            task={selectedTask}
+            stepId={selectedStep.id}
+            goalId={taskGoal.id}
+            onClose={handleCloseAll}
+            onBack={handleBackToGoal}
+            onHelpRequest={handleHelpRequest}
+          />
+        </DraggableDialog>
       )}
 
       <div className="h-full p-6">
