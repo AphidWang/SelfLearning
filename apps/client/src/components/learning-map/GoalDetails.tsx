@@ -13,9 +13,11 @@ interface GoalDetailsProps {
   onBack: () => void;
   onTaskClick: (taskId: string) => void;
   isCreating?: boolean;
+  isEditing?: boolean;
+  onEditToggle?: () => void;
 }
 
-export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskClick, isCreating = false }) => {
+export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskClick, isCreating = false, isEditing = isCreating, onEditToggle }) => {
   const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ 
@@ -24,7 +26,6 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
     stepId?: string, 
     taskId?: string 
   } | null>(null);
-  const [isEditing, setIsEditing] = useState(isCreating);
   const [newStepTitle, setNewStepTitle] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -172,8 +173,21 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
 
   const handleSave = () => {
     updateGoal(editedGoal);
-    setIsEditing(false);
+    if (onEditToggle) {
+      onEditToggle();
+    }
   };
+
+  // 當編輯狀態變化時重新設置 editedGoal
+  useEffect(() => {
+    if (isEditing) {
+      setEditedGoal({
+        ...goal,
+        templateType: goal.templateType || '學習目標',
+        subject: goal.subject || SUBJECTS.CUSTOM
+      });
+    }
+  }, [isEditing, goal]);
 
   const handleTaskStatusChange = (stepId: string, task: Task) => {
     const newStatus = task.status === 'done' ? 'in_progress' : 'done';
@@ -213,7 +227,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
   };
 
   return (
-    <div className="h-full bg-white rounded-lg shadow flex flex-col">
+    <div className="h-full flex flex-col">
       {/* 刪除確認視窗 */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -242,63 +256,6 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
           </div>
         </div>
       )}
-
-      <div className="flex items-center p-4 border-b bg-white/80 backdrop-blur-sm">
-        <button
-          onClick={onBack}
-          className="mr-4 p-1 hover:bg-gray-100 rounded-full transition-colors"
-          aria-label="返回"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        {isEditing ? (
-          <div className="flex-1">
-            <input
-              type="text"
-              value={editedGoal.title}
-              onChange={(e) => setEditedGoal({...editedGoal, title: e.target.value})}
-              className="w-full text-xl font-bold bg-transparent border-b border-gray-300 focus:border-indigo-500 focus:outline-none"
-              placeholder="輸入目標標題"
-            />
-          </div>
-        ) : (
-          <h2 className="text-xl font-bold flex-1 text-center">{goal.title}</h2>
-        )}
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <button
-                onClick={handleSave}
-                className="p-2 text-green-500 hover:bg-green-50 rounded-full transition-colors"
-                aria-label="保存"
-              >
-                <CheckCircle2 size={20} />
-              </button>
-              <button
-                onClick={() => {
-                  setDeleteTarget({ type: 'goal', goalId: goal.id });
-                  setShowDeleteConfirm(true);
-                }}
-                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                aria-label="刪除目標"
-              >
-                <Trash2 size={20} />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => {
-                setIsEditing(true);
-                setEditedGoal(goal);
-              }}
-              className="p-2 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
-              aria-label="編輯模式"
-            >
-              <Pencil size={20} />
-            </button>
-          )}
-        </div>
-      </div>
 
       <div className="flex-1 overflow-auto p-4">
         <div 
@@ -335,7 +292,9 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
                           <button
                             key={type}
                             onClick={() => {
-                              setEditedGoal({...editedGoal, templateType: type});
+                              const updatedGoal = {...editedGoal, templateType: type};
+                              setEditedGoal(updatedGoal);
+                              updateGoal(updatedGoal);
                               setShowTypeSelect(false);
                             }}
                             className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dropdown-option ${
@@ -375,7 +334,9 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
                           <button
                             key={key}
                             onClick={() => {
-                              setEditedGoal({...editedGoal, subject: value});
+                              const updatedGoal = {...editedGoal, subject: value};
+                              setEditedGoal(updatedGoal);
+                              updateGoal(updatedGoal);
                               setShowSubjectSelect(false);
                             }}
                             className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dropdown-option ${
@@ -415,7 +376,11 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
           {isEditing ? (
             <textarea
               value={editedGoal.description}
-              onChange={(e) => setEditedGoal({...editedGoal, description: e.target.value})}
+              onChange={(e) => {
+                const updatedGoal = {...editedGoal, description: e.target.value};
+                setEditedGoal(updatedGoal);
+                updateGoal(updatedGoal);
+              }}
               className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows={3}
               placeholder="描述你的目標..."
@@ -429,7 +394,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
           <div className="space-y-4">
             {activeSteps.map(step => (
               <div key={step.id} className="border rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm shadow-sm group">
-                <div className="flex items-center justify-between p-3 bg-gray-50 group">
+                <div className="flex items-center justify-between p-3 bg-gray-100/60 backdrop-blur-sm group">
                   <button
                     onClick={() => toggleStep(step.id)}
                     className="flex items-center flex-1"
@@ -466,7 +431,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
                 </div>
 
                 {expandedSteps.includes(step.id) && (
-                  <div className="p-3 space-y-2">
+                  <div className="p-3 space-y-2 bg-gray-50/20 backdrop-blur-sm">
                     <Droppable droppableId={step.id}>
                       {(provided) => (
                         <div
@@ -605,7 +570,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
             ))}
             {selectedStepId === 'new' ? (
               <div className="border rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm shadow-sm">
-                <div className="flex items-center justify-between p-3 bg-gray-50">
+                <div className="flex items-center justify-between p-3 bg-gray-50/80 backdrop-blur-sm">
                   <div className="flex items-center flex-1">
                     <ChevronRight className="h-5 w-5 text-gray-500" />
                     <input

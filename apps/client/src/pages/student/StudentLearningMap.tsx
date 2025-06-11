@@ -1,7 +1,7 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { GoalDashboard } from '../../components/learning-map/GoalDashboard';
 import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
-import { TaskDetail } from '../../components/learning-map/TaskDetail';
+import { TaskDetailDialog } from '../../components/learning-map/TaskDetailDialog';
 import { GoalDetails } from '../../components/learning-map/GoalDetails';
 import { useGoalStore } from '../../store/goalStore';
 import PageLayout from '../../components/layout/PageLayout';
@@ -10,6 +10,7 @@ import { SUBJECTS } from '../../constants/subjects';
 import { DailyReviewCarousel } from '../../components/learning-map/DailyReviewCarousel';
 import { GoalDashboardCard } from '../../components/learning-map/GoalDashboardCard';
 import { GoalDashboardDialog } from '../../components/learning-map/GoalDashboardDialog';
+import { GoalDetailsDialog } from '../../components/learning-map/GoalDetailsDialog';
 
 export const StudentLearningMap: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -17,6 +18,7 @@ export const StudentLearningMap: React.FC = () => {
   const [isCreatingNewGoal, setIsCreatingNewGoal] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showGoalCards, setShowGoalCards] = useState(false);
+  const [openedFromDashboard, setOpenedFromDashboard] = useState(false);
   const { goals, addGoal, getCompletionRate } = useGoalStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
@@ -29,13 +31,31 @@ export const StudentLearningMap: React.FC = () => {
   }, [showReview, showGoalCards]);
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
-  const selectedTask = selectedGoal?.steps.flatMap(step => step.tasks).find(t => t.id === selectedTaskId);
-  const selectedStep = selectedGoal?.steps.find(step => step.tasks.some(t => t.id === selectedTaskId));
+  // 當有 selectedTaskId 時，從所有目標中尋找該任務
+  const taskInfo = selectedTaskId ? (() => {
+    for (const goal of goals) {
+      for (const step of goal.steps) {
+        const task = step.tasks.find(t => t.id === selectedTaskId);
+        if (task) {
+          return { task, step, goal };
+        }
+      }
+    }
+    return null;
+  })() : null;
+  
+  const selectedTask = taskInfo?.task;
+  const selectedStep = taskInfo?.step;
+  const taskGoal = taskInfo?.goal;
 
-  const handleGoalClick = (goalId: string) => {
+  const handleGoalClick = (goalId: string, fromDashboard = false) => {
     setSelectedGoalId(goalId);
     setSelectedTaskId(null);
     setIsCreatingNewGoal(false);
+    setOpenedFromDashboard(fromDashboard);
+    if (!fromDashboard) {
+      setShowGoalCards(false);
+    }
   };
 
   const handleAddGoal = () => {
@@ -55,16 +75,35 @@ export const StudentLearningMap: React.FC = () => {
 
   const handleTaskClick = (taskId: string) => {
     setSelectedTaskId(taskId);
+    // 保留 selectedGoalId，這樣在關閉任務詳情時可以回到目標詳情
   };
 
-  const handleBackToGoals = () => {
+  const handleCloseAll = () => {
     setSelectedGoalId(null);
     setSelectedTaskId(null);
     setIsCreatingNewGoal(false);
   };
 
+  const handleBackToGoals = () => {
+    if (openedFromDashboard) {
+      // 如果是從 dashboard 打開的，回到 dashboard
+      setSelectedGoalId(null);
+      setSelectedTaskId(null);
+      setIsCreatingNewGoal(false);
+      setOpenedFromDashboard(false);
+      setShowGoalCards(true);
+    } else {
+      // 如果是從地圖直接打開的，直接關掉
+      setSelectedGoalId(null);
+      setSelectedTaskId(null);
+      setIsCreatingNewGoal(false);
+      setOpenedFromDashboard(false);
+    }
+  };
+
   const handleBackToGoal = () => {
     setSelectedTaskId(null);
+    // selectedGoalId 保持不變，這樣會顯示 GoalDetailsDialog
   };
 
   const handleTaskStatusChange = (taskId: string, status: 'in_progress' | 'completed') => {
@@ -146,49 +185,44 @@ export const StudentLearningMap: React.FC = () => {
           goals={goals}
           mapRect={mapRect}
           onClose={() => setShowGoalCards(false)}
-          onGoalClick={handleGoalClick}
+          onGoalClick={(goalId) => handleGoalClick(goalId, true)}
           onAddGoal={handleAddGoal}
           getCompletionRate={getCompletionRate}
         />
       )}
 
-      <div className="h-full grid lg:grid-cols-6 gap-6 p-6">
-        {/* 左側：互動式地圖 */}
-        <div className="lg:col-span-4 sticky top-0 self-start" ref={mapRef}>
-          <div className="h-[calc(100vh-8rem)] p-4">
-            <InteractiveMap
-              goals={goals}
-              onGoalClick={handleGoalClick}
-              onCampfireClick={() => setShowReview(true)}
-              onMailboxClick={() => setShowGoalCards(true)}
-            />
-          </div>
-        </div>
+      {selectedGoalId && selectedGoal && mapRect && !selectedTaskId && (
+        <GoalDetailsDialog
+          goal={selectedGoal}
+          mapRect={mapRect}
+          onClose={handleCloseAll}
+          onBack={handleBackToGoals}
+          onTaskClick={handleTaskClick}
+          isCreating={isCreatingNewGoal}
+        />
+      )}
 
-        {/* 右側：目標列表、目標詳情或任務詳情 */}
-        <div className="h-full lg:col-span-2 overflow-y-auto max-h-[calc(100vh-64px)] mt-8 bg-gray-50 dark:bg-gray-900/40 rounded-2xl shadow-sm p-4">
-          {selectedTaskId && selectedTask && selectedStep ? (
-            <TaskDetail
-              task={selectedTask}
-              stepId={selectedStep.id}
-              goalId={selectedGoalId!}
-              onBack={handleBackToGoal}
-              onHelpRequest={handleHelpRequest}
-            />
-          ) : selectedGoalId ? (
-            <GoalDetails
-              goal={selectedGoal!}
-              onBack={handleBackToGoals}
-              onTaskClick={handleTaskClick}
-              isCreating={isCreatingNewGoal}
-            />
-          ) : (
-            <GoalDashboard
-              goals={goals}
-              onGoalClick={handleGoalClick}
-              onAddGoal={handleAddGoal}
-            />
-          )}
+      {selectedTaskId && selectedTask && selectedStep && taskGoal && mapRect && (
+        <TaskDetailDialog
+          task={selectedTask}
+          stepId={selectedStep.id}
+          goalId={taskGoal.id}
+          mapRect={mapRect}
+          onClose={handleCloseAll}
+          onBack={handleBackToGoal}
+          onHelpRequest={handleHelpRequest}
+        />
+      )}
+
+      <div className="h-full p-6">
+        {/* 全寬：互動式地圖 */}
+        <div className="h-[calc(100vh-8rem)]" ref={mapRef}>
+          <InteractiveMap
+            goals={goals}
+            onGoalClick={handleGoalClick}
+            onCampfireClick={() => setShowReview(true)}
+            onMailboxClick={() => setShowGoalCards(true)}
+          />
         </div>
       </div>
     </PageLayout>
