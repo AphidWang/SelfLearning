@@ -12,6 +12,7 @@ import { GoalDashboardCard } from '../../components/learning-map/GoalDashboardCa
 import { GoalDashboardDialog } from '../../components/learning-map/GoalDashboardDialog';
 import { GoalDetailsDialog } from '../../components/learning-map/GoalDetailsDialog';
 import { DraggableDialog } from '../../components/learning-map/DraggableDialog';
+import { GoalProgressDialog } from '../../components/learning-map/GoalProgressDialog';
 
 export const StudentLearningMap: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -19,6 +20,7 @@ export const StudentLearningMap: React.FC = () => {
   const [isCreatingNewGoal, setIsCreatingNewGoal] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showGoalCards, setShowGoalCards] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
   const [openedFromDashboard, setOpenedFromDashboard] = useState(false);
   const { goals, addGoal, getCompletionRate } = useGoalStore();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -28,11 +30,11 @@ export const StudentLearningMap: React.FC = () => {
   const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
 
   useLayoutEffect(() => {
-    if ((showReview || showGoalCards || selectedGoalId) && mapRef.current) {
+    if ((showReview || showGoalCards || selectedGoalId || showProgress) && mapRef.current) {
       const rect = mapRef.current.getBoundingClientRect();
       setMapRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
-  }, [showReview, showGoalCards, selectedGoalId]);
+  }, [showReview, showGoalCards, selectedGoalId, showProgress]);
 
   const selectedGoal = goals.find(g => g.id === selectedGoalId);
   // 當有 selectedTaskId 時，從所有目標中尋找該任務
@@ -143,6 +145,47 @@ export const StudentLearningMap: React.FC = () => {
 
   return (
     <PageLayout title="學習地圖">
+      {showProgress && mapRect && (
+        <>
+          {/* 遮罩只覆蓋地圖區域 */}
+          <div
+            className="fixed z-40 bg-black/10 cursor-pointer"
+            style={{ left: mapRect.left, top: mapRect.top, width: mapRect.width, height: mapRect.height }}
+            onClick={() => setShowProgress(false)}
+          />
+          {/* popup 對齊地圖正中央 */}
+          <div
+            className="fixed z-50 pointer-events-auto"
+            style={{
+              left: mapRect.left,
+              top: mapRect.top,
+              width: mapRect.width,
+              height: mapRect.height,
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'auto',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <GoalProgressDialog
+                onClose={() => setShowProgress(false)}
+                onGoalClick={(goalId) => {
+                  setShowProgress(false);
+                  setSelectedGoalId(goalId);
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
       {showReview && mapRect && (
         <>
           {/* 遮罩只覆蓋地圖區域 */}
@@ -235,11 +278,10 @@ export const StudentLearningMap: React.FC = () => {
       )}
 
       <div className="h-full p-6">
-        {/* 全寬：互動式地圖 */}
         <div className="h-[calc(100vh-8rem)]" ref={mapRef}>
           <div className={`h-full transition-all duration-500 ${
-            showReview 
-              ? 'blur-sm opacity-90 pointer-events-none' 
+            showReview || showProgress
+              ? 'opacity-80 pointer-events-none' 
               : ''
           }`}>
             <InteractiveMap
@@ -258,6 +300,16 @@ export const StudentLearningMap: React.FC = () => {
                 setSelectedGoalId(null);
                 setSelectedTaskId(null);
                 setIsCreatingNewGoal(false);
+              }}
+              onHouseClick={() => {
+                setShowProgress(true);
+                setShowGoalCards(false);
+                setShowReview(false);
+                setSelectedGoalId(null);
+                setSelectedTaskId(null);
+                setIsCreatingNewGoal(false);
+                setOpenedFromDashboard(false);
+                console.log('onHouseClick');
               }}
             />
           </div>
