@@ -10,11 +10,18 @@ import mailboxImg from '../../assets/maps/sep-twtour/buildings/mailbox.png';
 interface InteractiveMapProps {
   goals: Goal[];
   onGoalClick: (goalId: string) => void;
-  onCampfireClick?: () => void;
-  onMailboxClick?: () => void;
+  onCampfireClick: () => void;
+  onMailboxClick: () => void;
+  onHouseClick: () => void;
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalClick, onCampfireClick, onMailboxClick }) => {
+export const InteractiveMap: React.FC<InteractiveMapProps> = ({
+  goals,
+  onGoalClick,
+  onCampfireClick,
+  onMailboxClick,
+  onHouseClick,
+}) => {
   // 根據 subject 決定圖示
   const getIcon = (subject: string) => {
     if (subject.includes('地標') || subject.includes('房')) return heyaImg;
@@ -100,118 +107,121 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ goals, onGoalCli
   };
 
   return (
-    <div
-      className="w-full h-full relative overflow-hidden select-none"
-      ref={mapRef}
-      onDoubleClick={handleDoubleClick}
-    >
-      <div className="absolute inset-0 w-full h-full">
-        {/* 背景地圖 */}
-        <div className="relative w-full h-full">
-          <img 
-            src={mapImage}
-            alt="地圖"
-            className="w-full h-full object-contain select-none"
-            onLoad={handleMapLoad}
-          />
+    <div className="relative w-full h-full bg-gradient-to-b from-blue-100 to-green-100 dark:from-blue-950 dark:to-green-950">
 
-          {/* Icon 容器 */}
-          <div 
-            className="absolute"
-            style={{
-              left: mapOffset.x,
-              top: mapOffset.y,
-              width: mapSize.width,
-              height: mapSize.height,
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left'
-            }}
-          >
-            {/* 固定位置的小人 - 第一個 goal */}
-            {goals[0] && mapSize.width > 0 && (
-              <div 
-                className="absolute transition-all duration-[1500ms] linear"
-                style={{
-                  left: `${(characterPos.left / 100) * mapSize.width / scale}px`,
-                  top: `${(characterPos.top / 100) * mapSize.height / scale}px`,
+      <div
+        className="w-full h-full relative overflow-hidden select-none"
+        ref={mapRef}
+        onDoubleClick={handleDoubleClick}
+      >
+        <div className="absolute inset-0 w-full h-full">
+          {/* 背景地圖 */}
+          <div className="relative w-full h-full">
+            <img 
+              src={mapImage}
+              alt="地圖"
+              className="w-full h-full object-contain select-none"
+              onLoad={handleMapLoad}
+            />
+
+            {/* Icon 容器 */}
+            <div 
+              className="absolute"
+              style={{
+                left: mapOffset.x,
+                top: mapOffset.y,
+                width: mapSize.width,
+                height: mapSize.height,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left'
+              }}
+            >
+              {/* 固定位置的小人 - 第一個 goal */}
+              {goals[0] && mapSize.width > 0 && (
+                <div 
+                  className="absolute transition-all duration-[1500ms] linear"
+                  style={{
+                    left: `${(characterPos.left / 100) * mapSize.width / scale}px`,
+                    top: `${(characterPos.top / 100) * mapSize.height / scale}px`,
+                    transform: 'translate(-50%, -50%)',
+                    width: '128px',
+                    height: '128px'
+                  }}
+                >
+                  <MapIcon
+                    goal={goals[0]}
+                    src={jinImg}
+                    left={0}
+                    top={0}
+                    onGoalClick={onGoalClick}
+                  />
+                </div>
+              )}
+
+              {/* 固定位置的房子 - 第二個 goal */}
+              {goals[1] && mapSize.width > 0 && (
+                <div className="absolute" style={{
+                  left: `${(8 / 100) * mapSize.width / scale}px`,
+                  top: `${(26 / 100) * mapSize.height / scale}px`,
                   transform: 'translate(-50%, -50%)',
                   width: '128px',
                   height: '128px'
+                }}>
+                  <MapIcon
+                    goal={goals[1]}
+                    src={heyaImg}
+                    left={0}
+                    top={0}
+                    onGoalClick={onHouseClick}
+                    flip={true}
+                  />
+                </div>
+              )}
+
+              {/* 固定位置的火 - 第三個 goal */}
+              {goals[2] && mapSize.width > 0 && (
+                <div className="absolute" style={{
+                  left: `${(34 / 100) * mapSize.width / scale}px`,
+                  top: `${(74 / 100) * mapSize.height / scale}px`,
+                  transform: 'translate(-50%, -50%)',
+                  width: '128px',
+                  height: '128px',
+                  cursor: 'pointer'
                 }}
-              >
-                <MapIcon
-                  goal={goals[0]}
-                  src={jinImg}
-                  left={0}
-                  top={0}
-                  onGoalClick={onGoalClick}
-                />
-              </div>
-            )}
+                onClick={onCampfireClick}
+                >
+                  <MapIcon
+                    goal={goals[2]}
+                    src={fireImg}
+                    left={0}
+                    top={0}
+                    onGoalClick={onGoalClick}
+                  />
+                </div>
+              )}
 
-            {/* 固定位置的房子 - 第二個 goal */}
-            {goals[1] && mapSize.width > 0 && (
-              <div className="absolute" style={{
-                left: `${(8 / 100) * mapSize.width / scale}px`,
-                top: `${(26 / 100) * mapSize.height / scale}px`,
-                transform: 'translate(-50%, -50%)',
-                width: '128px',
-                height: '128px'
-              }}>
-                <MapIcon
-                  goal={goals[1]}
-                  src={heyaImg}
-                  left={0}
-                  top={0}
-                  onGoalClick={onGoalClick}
-                  flip={true}
-                />
-              </div>
-            )}
-
-            {/* 固定位置的火 - 第三個 goal */}
-            {goals[2] && mapSize.width > 0 && (
-              <div className="absolute" style={{
-                left: `${(34 / 100) * mapSize.width / scale}px`,
-                top: `${(74 / 100) * mapSize.height / scale}px`,
-                transform: 'translate(-50%, -50%)',
-                width: '128px',
-                height: '128px',
-                cursor: onCampfireClick ? 'pointer' : undefined
-              }}
-              onClick={onCampfireClick}
-              >
-                <MapIcon
-                  goal={goals[2]}
-                  src={fireImg}
-                  left={0}
-                  top={0}
-                  onGoalClick={onGoalClick}
-                />
-              </div>
-            )}
-
-            {/* 固定位置的信箱 - 第四個 goal */}
-            {goals[3] && mapSize.width > 0 && (
-              <div className="absolute" style={{
-                left: `${(69 / 100) * mapSize.width / scale}px`,
-                top: `${(31 / 100) * mapSize.height / scale}px`,
-                transform: 'translate(-50%, -50%)',
-                width: '128px',
-                height: '128px',
-                cursor: onMailboxClick ? 'pointer' : undefined
-              }}
-              onClick={onMailboxClick}
-              >
-                <MapIcon
-                  goal={goals[3]}
-                  src={mailboxImg}
-                  left={0}
-                  top={0}
-                  onGoalClick={onGoalClick}
-                />
-              </div>
-            )}
+              {/* 固定位置的信箱 - 第四個 goal */}
+              {goals[3] && mapSize.width > 0 && (
+                <div className="absolute" style={{
+                  left: `${(69 / 100) * mapSize.width / scale}px`,
+                  top: `${(31 / 100) * mapSize.height / scale}px`,
+                  transform: 'translate(-50%, -50%)',
+                  width: '128px',
+                  height: '128px',
+                  cursor: 'pointer'
+                }}
+                onClick={onMailboxClick}
+                >
+                  <MapIcon
+                    goal={goals[3]}
+                    src={mailboxImg}
+                    left={0}
+                    top={0}
+                    onGoalClick={onGoalClick}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
