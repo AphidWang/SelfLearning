@@ -62,19 +62,22 @@ export const DraggableDialog: React.FC<DraggableDialogProps> = ({
       const newX = dragRef.current.initialX + deltaX;
       const newY = dragRef.current.initialY + deltaY;
       
-      // 限制在地圖範圍內
-      const dialogWidth = 400;
-      const dialogHeight = dialogEl.offsetHeight || 600;
-      
-      const minX = -mapRect.width + dialogWidth - 20; // 留一點邊距
-      const maxX = 20;
-      const minY = 10;
-      const maxY = mapRect.height - dialogHeight - 10;
-      
-      const constrainedX = Math.max(minX, Math.min(maxX, newX));
-      const constrainedY = Math.max(minY, Math.min(maxY, newY));
-      
-      onPositionChange({ x: constrainedX, y: constrainedY });
+      // 只限制標題不要超出地圖範圍
+      const header = dialogEl.querySelector(headerSelector) as HTMLElement;
+      if (header) {
+        const headerRect = header.getBoundingClientRect();
+        const minX = -mapRect.width + 40; // 留一點邊距
+        const maxX = 40;
+        const minY = 0;
+        const maxY = mapRect.height - headerRect.height;
+        
+        const constrainedX = Math.max(minX, Math.min(maxX, newX));
+        const constrainedY = Math.max(minY, Math.min(maxY, newY));
+        
+        onPositionChange({ x: constrainedX, y: constrainedY });
+      } else {
+        onPositionChange({ x: newX, y: newY });
+      }
     };
 
     const handleMouseUp = () => {
