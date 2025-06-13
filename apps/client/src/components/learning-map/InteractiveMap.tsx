@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MapIcon } from './MapIcon';
 import { Goal } from '../../types/goal';
 import mapImage from '../../assets/maps/sep-twtour/map-sep.png';
@@ -6,6 +7,7 @@ import heyaImg from '../../assets/maps/sep-twtour/buildings/heya.png';
 import jinImg from '../../assets/maps/sep-twtour/character/jin.png';
 import fireImg from '../../assets/maps/sep-twtour/buildings/fire.png';
 import mailboxImg from '../../assets/maps/sep-twtour/buildings/mailbox.png';
+import { Sparkles } from 'lucide-react';
 
 interface InteractiveMapProps {
   goals: Goal[];
@@ -37,6 +39,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [scale, setScale] = useState(1);
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
   const [isMoving, setIsMoving] = useState(false);
+  const [showGoalOrbs, setShowGoalOrbs] = useState(false);
+  const [hoveredMailbox, setHoveredMailbox] = useState(false);
+  const [hoveredOrbArea, setHoveredOrbArea] = useState(false);
+
 
   // 更新地圖尺寸
   const updateMapSize = () => {
@@ -166,7 +172,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   transform: 'translate(-50%, -50%)',
                   width: '128px',
                   height: '128px'
-                }}>
+                }}
+                onClick={onHouseClick}
+                >
                   <MapIcon
                     goal={goals[1]}
                     src={heyaImg}
@@ -202,15 +210,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
               {/* 固定位置的信箱 - 第四個 goal */}
               {goals[3] && mapSize.width > 0 && (
-                <div className="absolute" style={{
-                  left: `${(69 / 100) * mapSize.width / scale}px`,
-                  top: `${(31 / 100) * mapSize.height / scale}px`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '128px',
-                  height: '128px',
-                  cursor: 'pointer'
-                }}
-                onClick={onMailboxClick}
+                <div 
+                  className="absolute"
+                  style={{
+                    left: `${(69 / 100) * mapSize.width / scale}px`,
+                    top: `${(31 / 100) * mapSize.height / scale}px`,
+                    transform: 'translate(-50%, -50%)',
+                    width: '128px',
+                    height: '128px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={onMailboxClick}
                 >
                   <MapIcon
                     goal={goals[3]}
@@ -218,6 +228,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                     left={0}
                     top={0}
                     onGoalClick={onGoalClick}
+                    showOrbs={true}
+                    orbGoals={[goals[0], goals[1], goals[2]]}
                   />
                 </div>
               )}

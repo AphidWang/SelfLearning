@@ -882,6 +882,7 @@ interface GoalStore {
   deleteBubble: (goalId: string, bubbleId: string) => void;
   reorderTasks: (goalId: string, stepId: string, sourceIndex: number, destinationIndex: number) => void;
   getActiveGoals: () => Goal[];
+  getGoal: (goalId: string) => Goal | undefined;
 }
 
 export const useGoalStore = create<GoalStore>((set, get) => ({
@@ -1292,5 +1293,7 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
 
   getActiveGoals: () => {
     return get().goals.filter(goal => goal.status !== 'archived');
-  }
+  },
+
+  getGoal: (goalId: string) => get().goals.find(g => g.id === goalId),
 })); 

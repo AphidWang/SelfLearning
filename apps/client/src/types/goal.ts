@@ -44,6 +44,7 @@ export interface Task {
   assignedTo?: string;
   notes?: string;
   order?: number;
+  challenge?: number;
 }
 
 export interface Bubble {

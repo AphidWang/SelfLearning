@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Task } from '../../types/goal';
 import { 
   ChevronLeft, MessageSquare, Paperclip, 
   HelpCircle, CheckCircle, PlayCircle,
-  Smile, Meh, Frown,
-  Battery, BatteryMedium, BatteryLow,
-  Target, Upload, PauseCircle, X
+  Target, Upload, PauseCircle, X, Pencil, Star, Sparkles, Edit3
 } from 'lucide-react';
 import { useGoalStore } from '../../store/goalStore';
+import { subjects } from '../../styles/tokens';
 
 interface TaskDetailDialogProps {
   task: Task;
@@ -19,33 +18,8 @@ interface TaskDetailDialogProps {
   onHelpRequest: (taskId: string) => void;
 }
 
-type MoodLevel = 'very_good' | 'good' | 'neutral' | 'bad' | 'very_bad';
-type EnergyLevel = 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
-type ChallengeLevel = 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
-
-const moodLabels: Record<MoodLevel, string> = {
-  very_good: '超開心',
-  good: '快樂',
-  neutral: '普通',
-  bad: '不開心',
-  very_bad: '很難過'
-};
-
-const energyLabels: Record<EnergyLevel, string> = {
-  very_high: '充滿力量',
-  high: '精神很好',
-  medium: '還不錯',
-  low: '有點累',
-  very_low: '很疲憊'
-};
-
-const challengeLabels: Record<ChallengeLevel, string> = {
-  very_high: '非常有挑戰',
-  high: '很有挑戰',
-  medium: '一般般',
-  low: '還算輕鬆',
-  very_low: '非常輕鬆'
-};
+// 移除 MoodLevel 和 EnergyLevel，只保留 ChallengeLevel 但簡化為數字
+type ChallengeLevel = 1 | 2 | 3 | 4 | 5;
 
 export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   task,
@@ -55,231 +29,364 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   onBack,
   onHelpRequest
 }) => {
-  const { updateTask } = useGoalStore();
+  const { updateTask, getGoal } = useGoalStore();
   const [comment, setComment] = useState('');
-  const [mood, setMood] = useState<MoodLevel | null>(null);
-  const [energy, setEnergy] = useState<EnergyLevel | null>(null);
-  const [challenge, setChallenge] = useState<ChallengeLevel | null>(null);
-  const [showStatusOptions, setShowStatusOptions] = useState(false);
-  const statusButtonRef = useRef<HTMLDivElement>(null);
+  const [challenge, setChallenge] = useState<ChallengeLevel | undefined>(task.challenge as ChallengeLevel | undefined);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [editedTask, setEditedTask] = useState(task);
+  const [isEditing, setIsEditing] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (statusButtonRef.current && !statusButtonRef.current.contains(event.target as Node)) {
-        setShowStatusOptions(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const goal = getGoal(goalId);
+  const subjectStyle = subjects.getSubjectStyle(goal?.subject || '');
 
   const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
-    updateTask(goalId, stepId, {
+    const updatedTask = {
       ...task,
       status,
+      challenge: challenge as number,
       completedAt: status === 'done' ? new Date().toISOString() : undefined
-    });
-    setShowStatusOptions(false);
+    };
+    updateTask(goalId, stepId, updatedTask);
     onBack();
   };
 
+  const handleSaveDescription = () => {
+    updateTask(goalId, stepId, editedTask);
+    setIsEditing(false);
+  };
+
+  const handleFlipCard = () => {
+    setIsFlipped(!isFlipped);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      setAttachments(prev => [...prev, ...Array.from(files)]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   return (
-    <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[400px] max-w-[90vw] flex flex-col h-full">
-      <div className="flex justify-between items-center mb-4 select-none" data-draggable-header>
-        <div className="flex items-center gap-2">
-          <button
-            className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            onClick={onBack}
-            aria-label="返回"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-300">任務詳情</h2>
-        </div>
-        <button
-          className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-          onClick={onClose}
-          aria-label="關閉"
+    <div className="perspective-1000">
+      <motion.div
+        key={`task-detail-${task.id}`}
+        className="relative w-[380px] max-w-[90vw] h-[520px]"
+        style={{
+          transformStyle: "preserve-3d",
+          perspective: "1000px"
+        }}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
+        {/* 正面 - 任務資訊 */}
+        <motion.div
+          className="absolute inset-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 p-6 flex flex-col overflow-hidden"
+          style={{
+            borderColor: subjectStyle.accent,
+            boxShadow: `0 20px 40px ${subjectStyle.accent}25, 0 0 0 1px ${subjectStyle.accent}20`,
+            backfaceVisibility: "hidden",
+            pointerEvents: isFlipped ? "none" : "auto"
+          }}
+          animate={{
+            rotateY: isFlipped ? 180 : 0,
+            zIndex: isFlipped ? 1 : 2
+          }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
+          initial={false}
         >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+          {/* 背景裝飾 */}
+          <div 
+            className="absolute inset-0 opacity-5"
+            style={{
+              background: `radial-gradient(circle at 20% 20%, ${subjectStyle.accent}40 0%, transparent 50%), radial-gradient(circle at 80% 80%, ${subjectStyle.accent}30 0%, transparent 50%)`,
+              pointerEvents: 'none',
+            }}
+          />
 
-      <div className="flex-1 overflow-auto">
-        {/* 任務標題和說明 */}
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold mb-2">{task.title}</h3>
-          <p className="text-gray-700">{task.description}</p>
-        </div>
-
-        <div className="border-t border-gray-200/50 mb-4" />
-
-        {/* 我的紀錄 */}
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold mb-4">我的紀錄</h3>
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 bg-gray-50/40 backdrop-blur-sm rounded-lg p-3 mb-3 overflow-y-auto min-h-[80px]">
-              {/* 這裡放歷史紀錄列表 */}
-              <p className="text-gray-500 text-center text-sm">尚無紀錄</p>
-            </div>
-            <div className="flex gap-2">
+          {/* 頂部區域 */}
+          <div className="flex justify-between items-start mb-4 relative z-10" data-draggable-header>
+            <div className="flex items-center gap-3 flex-1">
               <button
-                onClick={() => {
-                  // 上傳檔案
-                }}
-                className="p-2 text-gray-600 hover:bg-gray-100/50 rounded-lg transition-colors"
+                className="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+                onClick={onBack}
+                aria-label="返回"
               >
-                <Paperclip size={20} />
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <input
-                type="text"
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 line-clamp-2 pr-6">{task.title}</h2>
+                <div className="flex items-center gap-1 mt-1">
+                  <Star className="w-4 h-4 text-yellow-500" fill="currentColor" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">任務卡</span>
+                </div>
+              </div>
+            </div>
+            <button
+              className="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+              onClick={onClose}
+              aria-label="關閉"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-auto space-y-4">
+            {/* 任務描述卡片 */}
+            <div 
+              className="rounded-xl p-4 border-2 shadow-lg relative overflow-hidden" 
+              style={{ 
+                borderColor: subjectStyle.accent,
+                background: `linear-gradient(135deg, ${subjectStyle.accent}08 0%, ${subjectStyle.accent}15 100%)`,
+              }}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target size={16} style={{ color: subjectStyle.accent }} />
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">任務描述</h3>
+                    <button
+                      onClick={() => {
+                        setIsEditing(!isEditing);
+                        if (!isEditing) {
+                          setTimeout(() => descriptionRef.current?.focus(), 0);
+                        } else {
+                          handleSaveDescription();
+                        }
+                      }}
+                      className="p-1 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                    >
+                      {isEditing ? (
+                        <CheckCircle size={14} />
+                      ) : (
+                        <Pencil size={14} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                
+                {isEditing ? (
+                  <textarea
+                    ref={descriptionRef}
+                    value={editedTask.description}
+                    onChange={(e) => {
+                      const updatedTask = {...editedTask, description: e.target.value};
+                      setEditedTask(updatedTask);
+                    }}
+                    onBlur={handleSaveDescription}
+                    className="w-full p-3 text-sm bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700 dark:text-gray-300 resize-none backdrop-blur-sm"
+                    rows={3}
+                    placeholder="描述這個任務..."
+                    autoFocus
+                  />
+                ) : (
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                    {task.description || "點擊編輯按鈕來新增描述"}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* 參考教材 */}
+            <div
+              className="p-3 bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-200/50 dark:border-indigo-700/50"
+            >
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
+                <MessageSquare size={16} style={{ color: subjectStyle.accent }} />
+                參考資訊
+              </h3>
+              <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-1">
+                尚無參考資訊
+              </div>
+            </div>
+
+            {/* 最近活動 */}
+            <div
+              className="p-3 bg-gradient-to-br from-amber-50/80 to-orange-50/80 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50"
+            >
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
+                <PlayCircle size={16} style={{ color: subjectStyle.accent }} />
+                最近活動
+              </h3>
+              <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-1">
+                尚無活動紀錄
+              </div>
+            </div>
+          </div>
+
+          {/* 記錄一下按鈕 - 移到底部 */}
+          <button
+            onClick={handleFlipCard}
+            className="w-full mt-4 py-3 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 opacity-0 hover:opacity-100 transition-opacity duration-300" />
+            <Edit3 size={20} className="relative z-10" />
+            <span className="relative z-10">記錄一下</span>
+            <Sparkles size={16} className="relative z-10" />
+          </button>
+        </motion.div>
+
+        {/* 背面 - 學習記錄 */}
+        <motion.div
+          className="absolute inset-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 p-6 flex flex-col overflow-hidden"
+          style={{
+            borderColor: subjectStyle.accent,
+            boxShadow: `0 20px 40px ${subjectStyle.accent}25, 0 0 0 1px ${subjectStyle.accent}20`,
+            backfaceVisibility: "hidden",
+            pointerEvents: isFlipped ? "auto" : "none"
+          }}
+          animate={{
+            rotateY: isFlipped ? 0 : -180,
+            zIndex: isFlipped ? 2 : 1
+          }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
+          initial={false}
+        >
+          {/* 背景裝飾 */}
+          <div 
+            className="absolute inset-0 opacity-5"
+            style={{
+              background: `radial-gradient(circle at 80% 20%, ${subjectStyle.accent}40 0%, transparent 50%), radial-gradient(circle at 20% 80%, ${subjectStyle.accent}30 0%, transparent 50%)`,
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* 頂部區域 */}
+          <div className="flex justify-between items-center mb-4 relative z-10">
+            <div className="flex items-center gap-2">
+              <button
+                className="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+                onClick={handleFlipCard}
+                aria-label="翻回正面"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">學習記錄</h2>
+            </div>
+            <button
+              className="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+              onClick={onClose}
+              aria-label="關閉"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 flex flex-col space-y-3">
+            {/* 挑戰程度 - 可點擊星星 */}
+            <div className="p-3 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-xl">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">這個任務有多挑戰？</h4>
+              <div className="flex justify-center gap-1">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setChallenge((i + 1) as ChallengeLevel)}
+                    className="p-1.5 rounded-lg transition-all hover:scale-110"
+                  >
+                    <Star 
+                      size={20} 
+                      className={challenge && i < challenge ? 'text-yellow-500' : 'text-gray-300'} 
+                      fill={challenge && i < challenge ? 'currentColor' : 'none'}
+                    />
+                  </button>
+                ))}
+              </div>
+              {challenge && (
+                <p className="text-center text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  {challenge === 1 && "很簡單"}
+                  {challenge === 2 && "有點簡單"}
+                  {challenge === 3 && "剛剛好"}
+                  {challenge === 4 && "有點困難"}
+                  {challenge === 5 && "很有挑戰"}
+                </p>
+              )}
+            </div>
+
+            {/* 心得輸入 */}
+            <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl flex-1">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">學習心得</h4>
+              <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="紀錄一下..."
-                className="flex-1 px-3 py-1.5 text-sm border border-gray-300/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/70 backdrop-blur-sm"
+                placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？"
+                className="w-full h-16 p-2 text-sm border border-gray-300/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm resize-none"
               />
-              <button
-                onClick={() => {
-                  // 發送紀錄
-                  setComment('');
-                }}
-                className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                <MessageSquare size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-200/50 mb-4" />
-
-        {/* 心情和能量追蹤 */}
-        <div className="space-y-3 bg-gray-50/20 backdrop-blur-sm rounded-lg p-3 mb-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">今天的心情如何？</h3>
-              <div className="flex justify-between">
-                {(['very_bad', 'bad', 'neutral', 'good', 'very_good'] as MoodLevel[]).map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setMood(level)}
-                    className={`w-16 p-2 rounded-full flex flex-col items-center gap-1 transition-colors ${
-                      mood === level 
-                        ? level === 'very_bad' || level === 'bad' 
-                          ? 'bg-red-100/80 text-red-700' 
-                          : level === 'neutral'
-                          ? 'bg-yellow-100/80 text-yellow-700'
-                          : 'bg-green-100/80 text-green-700'
-                        : 'text-gray-400 hover:bg-gray-100/50'
-                    }`}
-                  >
-                    {level === 'very_bad' && <Frown size={20} />}
-                    {level === 'bad' && <Frown size={20} />}
-                    {level === 'neutral' && <Meh size={20} />}
-                    {level === 'good' && <Smile size={20} />}
-                    {level === 'very_good' && <Smile size={20} />}
-                    <span className="text-xs whitespace-nowrap">{moodLabels[level]}</span>
-                  </button>
-                ))}
-              </div>
             </div>
 
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">現在的能量如何？</h3>
-              <div className="flex justify-between">
-                {(['very_low', 'low', 'medium', 'high', 'very_high'] as EnergyLevel[]).map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setEnergy(level)}
-                    className={`w-16 p-2 rounded-full flex flex-col items-center gap-1 transition-colors ${
-                      energy === level 
-                        ? level === 'very_low' || level === 'low' 
-                          ? 'bg-red-100/80 text-red-700' 
-                          : level === 'medium'
-                          ? 'bg-yellow-100/80 text-yellow-700'
-                          : 'bg-green-100/80 text-green-700'
-                        : 'text-gray-400 hover:bg-gray-100/50'
-                    }`}
-                  >
-                    {level === 'very_low' && <BatteryLow size={20} />}
-                    {level === 'low' && <BatteryLow size={20} />}
-                    {level === 'medium' && <BatteryMedium size={20} />}
-                    {level === 'high' && <Battery size={20} />}
-                    {level === 'very_high' && <Battery size={20} />}
-                    <span className="text-xs whitespace-nowrap">{energyLabels[level]}</span>
-                  </button>
-                ))}
+            {/* 附件區域 */}
+            <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">附件</h4>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                >
+                  <Paperclip size={16} />
+                </button>
               </div>
-            </div>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFileUpload}
+                accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+              />
 
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">任務有挑戰嗎？</h3>
-              <div className="flex justify-between">
-                {(['very_low', 'low', 'medium', 'high', 'very_high'] as ChallengeLevel[]).map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setChallenge(level)}
-                    className={`w-16 p-2 rounded-full flex flex-col items-center gap-1 transition-colors ${
-                      challenge === level 
-                        ? level === 'very_low' 
-                          ? 'bg-blue-50/80 text-blue-700' 
-                          : level === 'low'
-                          ? 'bg-blue-100/80 text-blue-700'
-                          : level === 'medium'
-                          ? 'bg-indigo-100/80 text-indigo-700'
-                          : level === 'high'
-                          ? 'bg-purple-100/80 text-purple-700'
-                          : 'bg-purple-200/80 text-purple-700'
-                        : 'text-gray-400 hover:bg-gray-100/50'
-                    }`}
-                  >
-                    <Target size={20} />
-                    <span className="text-xs whitespace-nowrap">{challengeLabels[level]}</span>
-                  </button>
-                ))}
-              </div>
+              {attachments.length > 0 ? (
+                <div className="space-y-1 max-h-16 overflow-y-auto">
+                  {attachments.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-1.5 bg-white dark:bg-gray-800 rounded text-xs">
+                      <span className="truncate flex-1">{file.name}</span>
+                      <button
+                        onClick={() => removeAttachment(index)}
+                        className="p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
+                  點擊附件圖標來上傳檔案
+                </div>
+              )}
             </div>
           </div>
 
-        {/* 狀態按鈕 */}
-        <div className="flex justify-end">
-          <div className="relative" ref={statusButtonRef}>
+          {/* 按鈕組 - 移到底部 */}
+          <div className="flex gap-2 mt-3">
             <button
-              onClick={() => setShowStatusOptions(!showStatusOptions)}
-              className="px-6 py-2 rounded-full text-white transition-colors flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+              onClick={handleFlipCard}
+              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md"
             >
-              <PlayCircle size={20} />
+              返回
+            </button>
+            <button
+              onClick={() => handleStatusSelect('in_progress')}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-lg hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md"
+            >
               進行中
             </button>
-            
-            {showStatusOptions && (
-              <div className="absolute bottom-full right-0 mb-2 space-y-2">
-                <button
-                  onClick={() => handleStatusSelect('todo')}
-                  className="w-full px-6 py-2 bg-gradient-to-r from-slate-400 to-gray-500 text-white rounded-full hover:from-slate-500 hover:to-gray-600 transition-colors whitespace-nowrap flex items-center gap-2"
-                >
-                  <PauseCircle size={20} />
-                  暫停
-                </button>
-                <button
-                  onClick={() => handleStatusSelect('in_progress')}
-                  className="w-full px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full hover:from-indigo-600 hover:to-purple-600 transition-colors whitespace-nowrap flex items-center gap-2"
-                >
-                  <PlayCircle size={20} />
-                  進行中
-                </button>
-                <button
-                  onClick={() => handleStatusSelect('done')}
-                  className="w-full px-6 py-2 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 text-white rounded-full hover:from-emerald-500 hover:via-green-600 hover:to-teal-600 transition-colors whitespace-nowrap flex items-center gap-2"
-                >
-                  <CheckCircle size={20} />
-                  完成
-                </button>
-              </div>
-            )}
+            <button
+              onClick={() => handleStatusSelect('done')}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md"
+            >
+              完成
+            </button>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }; 
