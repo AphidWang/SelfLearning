@@ -28,6 +28,11 @@ interface GoalDetailsDialogProps {
   isCreating?: boolean;
 }
 
+interface TaskDetailProps {
+  taskId: string;
+  onClose: () => void;
+}
+
 export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
   goal,
   onClose,
@@ -43,6 +48,7 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
   const [currentStepIndexes, setCurrentStepIndexes] = useState<Record<string, number>>({});
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const historyScrollRef = useRef<HTMLDivElement>(null);
   const subjectStyle = subjects.getSubjectStyle(goal.subject || '');
   const { getActiveSteps, getCompletionRate, addTask } = useGoalStore();
@@ -145,6 +151,11 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
     });
     setNewTaskTitle('');
     setShowAddTask(false);
+  };
+
+  // 處理任務點擊
+  const handleTaskClick = (taskId: string) => {
+    setSelectedTaskId(taskId);
   };
 
   // Mock 週進度數據
@@ -324,16 +335,18 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
   const currentStep = currentSteps[currentIndex];
 
   return (
-    <motion.div 
-      className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 p-6 w-[380px] max-w-[90vw] flex flex-col h-[520px] relative overflow-hidden"
-      style={{ 
-        borderColor: subjectStyle.accent,
-        boxShadow: `0 20px 40px ${subjectStyle.accent}25, 0 0 0 1px ${subjectStyle.accent}20`
-      }}
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-    >
+    <div className="flex gap-4">
+      <motion.div 
+        className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 p-6 flex flex-col h-[520px] relative overflow-hidden transition-all duration-300"
+        style={{ 
+          borderColor: subjectStyle.accent,
+          boxShadow: `0 20px 40px ${subjectStyle.accent}25, 0 0 0 1px ${subjectStyle.accent}20`,
+          width: selectedTaskId ? '320px' : '380px'
+        }}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
       {/* 背景裝飾 */}
       <div 
         className="absolute inset-0 opacity-5"
@@ -558,7 +571,7 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
               <GoalDetails
                 goal={goal}
                 onBack={onBack}
-                onTaskClick={onTaskClick}
+                onTaskClick={handleTaskClick}
                 isCreating={false}
                 isEditing={isEditing}
                 onEditToggle={() => setIsEditing(!isEditing)}
@@ -701,7 +714,7 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                         key={`${currentStep.id}-${index}`}
                         className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all"
                         style={{ backgroundColor: `${subjectStyle.accent}05` }}
-                        onClick={() => onTaskClick(`${currentStep.id}-${index}`)}
+                        onClick={() => handleTaskClick(`${currentStep.id}-${index}`)}
                       >
                         <div 
                           className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
@@ -773,5 +786,96 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
         </AnimatePresence>
       </div>
     </motion.div>
+
+    {/* 任務詳情側邊面板 */}
+    <AnimatePresence>
+      {selectedTaskId && (
+        <motion.div
+          className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 p-4 w-[300px] h-[520px] flex flex-col overflow-hidden"
+          style={{ 
+            borderColor: subjectStyle.accent,
+            boxShadow: `0 20px 40px ${subjectStyle.accent}25, 0 0 0 1px ${subjectStyle.accent}20`
+          }}
+          initial={{ x: 50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: 50, opacity: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          {/* 標題列 */}
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">任務詳情</h3>
+            <button
+              onClick={() => setSelectedTaskId(null)}
+              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              aria-label="關閉任務詳情"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* 任務內容 */}
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  任務 ID
+                </label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded">
+                  {selectedTaskId}
+                </p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  狀態
+                </label>
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    進行中
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  描述
+                </label>
+                <textarea
+                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={4}
+                  placeholder="輸入任務描述..."
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  筆記
+                </label>
+                <textarea
+                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={6}
+                  placeholder="記錄學習筆記、心得或遇到的問題..."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 操作按鈕 */}
+          <div className="pt-4 border-t border-gray-200 flex gap-2">
+            <button
+              className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+            >
+              標記完成
+            </button>
+            <button
+              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              更多
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </div>
   );
 }; 
