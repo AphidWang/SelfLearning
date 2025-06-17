@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Goal } from '../../types/goal';
 import { GoalDetails } from './GoalDetails';
-import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upload, Play } from 'lucide-react';
+import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upload, Play, Menu, ArrowUpRight, Plus, X, AlertCircle, Brain, Target, Sparkles, PartyPopper, List } from 'lucide-react';
 import { subjects } from '../../styles/tokens';
+import { useGoalStore } from '../../store/goalStore';
 
 interface WeeklyActivity {
   id: string;
@@ -36,10 +37,115 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(isCreating);
   const [showHistory, setShowHistory] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [visibleWeeks, setVisibleWeeks] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [currentStepIndexes, setCurrentStepIndexes] = useState<Record<string, number>>({});
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
   const historyScrollRef = useRef<HTMLDivElement>(null);
   const subjectStyle = subjects.getSubjectStyle(goal.subject || '');
+  const { getActiveSteps, getCompletionRate, addTask } = useGoalStore();
+
+  // 獲取目標當前進行中的步驟（最多2個）
+  const getInProgressSteps = (goalId: string) => {
+    // MOCK DATA - 之後要移除
+    const mockSteps = {
+      // 一個進行中的步驟
+      single: {
+        id: 'mock-s1',
+        title: '完成微積分第三章作業',
+        tasks: [
+          { status: 'in_progress' },
+          { status: 'todo' }
+        ]
+      },
+      // 兩個進行中的步驟
+      double1: {
+        id: 'mock-d1',
+        title: '觀看向量空間概念影片',
+        tasks: [
+          { status: 'in_progress' },
+          { status: 'todo' }
+        ]
+      },
+      double2: {
+        id: 'mock-d2',
+        title: '完成線性轉換練習',
+        tasks: [
+          { status: 'todo' },
+          { status: 'todo' }
+        ]
+      }
+    };
+
+    const steps = getActiveSteps(goalId);
+    
+    // 用 goalId 的字元來產生一個簡單的 hash
+    const hash = goalId.split('').reduce((acc, char) => {
+      return acc + char.charCodeAt(0);
+    }, 0);
+    
+    // 每五個 hash 值就一個是空的
+    if (hash % 5 === 0) {
+      return [];
+    }
+    
+    // 用 hash 決定要取幾個步驟
+    const shouldGetTwo = hash % 2 === 1;
+    
+    // 如果沒有真實步驟，根據 hash 回傳假資料
+    if (steps.length === 0) {
+      if (shouldGetTwo) {
+        return [mockSteps.double1, mockSteps.double2];
+      } else {
+        return [mockSteps.single];
+      }
+    }
+
+    // 先找進行中的步驟
+    const inProgressSteps = steps.filter(step => 
+      step.tasks.some(task => task.status === 'in_progress')
+    );
+
+    // 再找待開始的步驟
+    const todoSteps = steps.filter(step => 
+      !inProgressSteps.includes(step) && 
+      step.tasks.some(task => task.status === 'todo')
+    );
+
+    // 組合步驟
+    const allSteps = [...inProgressSteps, ...todoSteps];
+    
+    // 如果沒有任何可用的步驟，回傳空陣列
+    if (allSteps.length === 0) {
+      return [];
+    }
+
+    // 根據 shouldGetTwo 決定回傳一個還是兩個步驟
+    return shouldGetTwo ? allSteps.slice(0, 2) : allSteps.slice(0, 1);
+  };
+
+  // 處理步驟切換 - 直接切換到另一個步驟
+  const handleStepToggle = (e: React.MouseEvent, goalId: string) => {
+    e.stopPropagation();
+    setCurrentStepIndexes(prev => ({
+      ...prev,
+      [goalId]: prev[goalId] === 1 ? 0 : 1 // 在 0 和 1 之間切換
+    }));
+  };
+
+  // 處理新增任務
+  const handleAddTask = () => {
+    if (!newTaskTitle.trim() || !currentStep) return;
+    addTask(goal.id, currentStep.id, {
+      id: '',
+      title: newTaskTitle,
+      status: 'todo'
+    });
+    setNewTaskTitle('');
+    setShowAddTask(false);
+  };
 
   // Mock 週進度數據
   const generateWeeklyProgress = (): WeeklyProgress[] => {
@@ -206,6 +312,17 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
     setIsAnimating(false);
   };
 
+  // 獲取當前進行中的步驟和完成的步驟
+  const currentSteps = getInProgressSteps(goal.id);
+  const steps = getActiveSteps(goal.id);
+  const totalSteps = steps.length;
+  const completedStepsCount = steps.filter(s => s.tasks.every(t => t.status === 'done')).length;
+  const progress = getCompletionRate(goal.id);
+
+  // 當前顯示的步驟索引
+  const currentIndex = currentStepIndexes[goal.id] || 0;
+  const currentStep = currentSteps[currentIndex];
+
   return (
     <motion.div 
       className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 p-6 w-[380px] max-w-[90vw] flex flex-col h-[520px] relative overflow-hidden"
@@ -227,12 +344,13 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
       />
 
       <div className="flex justify-between items-center mb-4 select-none relative z-10" data-draggable-header>
-        <div className="flex items-center gap-2">
-          {showHistory && (
+        <div className="flex items-center gap-2 relative flex-1">
+          {(showHistory || showDetails) && (
             <button
-              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 mr-1"
               onClick={() => {
                 setShowHistory(false);
+                setShowDetails(false);
                 setVisibleWeeks(0);
                 setIsAnimating(false);
               }}
@@ -241,12 +359,12 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
               <ChevronLeft className="w-4 h-4" />
             </button>
           )}
-          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 line-clamp-2 pr-6">
-            {showHistory ? '歷史回顧' : goal.title}
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 line-clamp-2">
+            {showHistory ? '歷史回顧' : showDetails ? goal.title : goal.title}
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          {!showHistory && (
+          {!showHistory && !showDetails && (
             <>
               <button
                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -256,6 +374,17 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                 <History className="w-4 h-4" />
               </button>
               <button
+                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                onClick={() => setShowDetails(true)}
+                aria-label="詳細資訊"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {showDetails && (
+            <>
+              <button
                 className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 ${
                   isEditing ? 'text-green-500 hover:bg-green-50' : ''
                 }`}
@@ -263,6 +392,16 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                 aria-label={isEditing ? '完成編輯' : '編輯'}
               >
                 {isEditing ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+              </button>
+              <button
+                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                onClick={() => {
+                  setShowDetails(false);
+                  setIsEditing(false);
+                }}
+                aria-label="返回主頁"
+              >
+                <Menu className="w-4 h-4" />
               </button>
             </>
           )}
@@ -287,7 +426,7 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="h-full"
+              className="h-full p-2"
             >
               {/* 樹葉狀時間軸 */}
               <div className="relative">
@@ -310,7 +449,6 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                       top: `${Math.min(visibleWeeks * 120, weeklyProgress.length * 120) + 120}px`
                     }}
                   >
-
                     {/* 僅圓點：絕對置中 */}
                     <div 
                       className="w-6 h-6 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center ring-2"
@@ -321,7 +459,6 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                         style={{ backgroundColor: subjectStyle.accent }}
                       />
                     </div>
-
                   </motion.div>
                 )}
                 
@@ -338,13 +475,11 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                         stiffness: 300,
                         damping: 20
                       }}
-                      className={`relative flex ${index % 2 === 0 ? 'justify-start' : 'justify-end'}`}
+                      className={`relative flex ${index % 2 === 0 ? 'justify-end pr-[52%]' : 'justify-start pl-[52%]'}`}
                     >
                       {/* 樹葉卡片 */}
                       <div 
-                        className={`w-40 p-3 rounded-2xl shadow-lg border-2 ${
-                          index % 2 === 0 ? 'mr-6' : 'ml-6'
-                        }`}
+                        className="w-40 p-3 rounded-2xl shadow-lg border-2"
                         style={{
                           backgroundColor: `${subjectStyle.accent}10`,
                           borderColor: `${subjectStyle.accent}30`,
@@ -398,7 +533,7 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                       
                       {/* 連接點 */}
                       <div 
-                        className="absolute top-1/2 left-1/2 w-3 h-3 rounded-full bg-white dark:bg-gray-800 ring-2 transform -translate-x-1/2 -translate-y-1/2"
+                        className="absolute top-1/2 left-1/2 w-3 h-3 rounded-full bg-white dark:bg-gray-800 ring-2 transform -translate-x-1/2 -translate-y-1/2 z-10"
                         style={{ ['--tw-ring-color' as string]: subjectStyle.accent }}
                       />
                     </motion.div>
@@ -412,7 +547,7 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                 </div>
               </div>
             </motion.div>
-          ) : (
+          ) : showDetails ? (
             <motion.div
               key="details"
               initial={{ opacity: 0, x: -20 }}
@@ -429,10 +564,214 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
                 onEditToggle={() => setIsEditing(!isEditing)}
               />
             </motion.div>
+          ) : (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="h-full p-2"
+            >
+              {/* 目標資訊 */}
+              <div 
+                className="mb-10 rounded-lg p-3 border-2 shadow-md" 
+                style={{ 
+                  borderColor: subjectStyle.accent,
+                  background: `linear-gradient(to right, ${subjectStyle.accent}10, ${subjectStyle.accent}10)`,
+                  boxShadow: `0 4px 12px ${subjectStyle.accent}15`
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
+                      goal.templateType === '學習目標' ? 'bg-purple-100 text-purple-800' :
+                      goal.templateType === '個人成長' ? 'bg-blue-100 text-blue-800' :
+                      goal.templateType === '專案計畫' ? 'bg-green-100 text-green-800' :
+                      'bg-orange-100 text-orange-800'
+                    }`}>
+                      {goal.templateType === '學習目標' ? <Brain className="h-3 w-3" /> :
+                       goal.templateType === '個人成長' ? <Target className="h-3 w-3" /> :
+                       goal.templateType === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
+                       <PartyPopper className="h-3 w-3" />}
+                      {goal.templateType}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                      subjects.getSubjectStyle(goal.subject || '').bg
+                    } ${subjects.getSubjectStyle(goal.subject || '').text}`}>
+                      {goal.subject || '未分類'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowDetails(true)}
+                    className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                    aria-label="步驟總覽"
+                  >
+                    <List size={16} />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{goal.description}</p>
+              </div>
+
+              {/* 當前進行 */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Play className="w-4 h-4" style={{ color: subjectStyle.accent }} />
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      當前進行
+                    </span>
+                  </div>
+                </div>
+                <div className="min-h-[76px] relative">
+                  {currentSteps.length > 0 ? (
+                    <>
+                      <div 
+                        className={`text-sm text-gray-700 dark:text-gray-300 p-3 rounded-lg transition-all duration-300 ${currentSteps.length > 1 ? 'cursor-pointer hover:shadow-md' : ''}`}
+                        style={{ backgroundColor: `${subjectStyle.accent}08` }}
+                        onClick={currentSteps.length > 1 ? (e) => handleStepToggle(e, goal.id) : undefined}
+                      >
+                        <div className="font-medium mb-1 line-clamp-2">{currentStep.title}</div>
+                        <div className="text-xs text-gray-500">
+                          {currentStep.tasks.filter(t => t.status === 'in_progress').length > 0 
+                            ? `${currentStep.tasks.filter(t => t.status === 'in_progress').length} 個進行中`
+                            : `${currentStep.tasks.filter(t => t.status === 'todo').length} 個待開始`
+                          }
+                        </div>
+                      </div>
+                      {/* 步驟指示點 */}
+                      {currentSteps.length > 1 && (
+                        <div className="absolute -bottom-2 left-0 right-0 flex justify-center items-center gap-2 mt-2">
+                          {currentSteps.map((_, index) => (
+                            <button
+                              key={index}
+                              className="w-1.5 h-1.5 rounded-full transition-all cursor-pointer hover:scale-125"
+                              style={{ 
+                                backgroundColor: index === currentIndex ? subjectStyle.accent : `${subjectStyle.accent}40`
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentStepIndexes(prev => ({
+                                  ...prev,
+                                  [goal.id]: index
+                                }));
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setShowDetails(true)}
+                      className="w-full text-sm text-gray-500 p-3 rounded-lg transition-all duration-200 hover:shadow-md flex flex-col items-center gap-2"
+                      style={{ backgroundColor: `${subjectStyle.accent}08` }}
+                    >
+                      <div className="font-medium">現在沒有進行中的步驟</div>
+                      <div className="text-xs flex items-center gap-1.5">
+                        一起挑選一個吧
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+                             {/* 當前步驟的所有任務 */}
+              {currentStep && (
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" style={{ color: subjectStyle.accent }} />
+                      <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        任務清單
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowAddTask(true)}
+                      className="p-1 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
+                      aria-label="新增任務"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {currentStep.tasks.map((task, index) => (
+                      <div 
+                        key={`${currentStep.id}-${index}`}
+                        className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all"
+                        style={{ backgroundColor: `${subjectStyle.accent}05` }}
+                        onClick={() => onTaskClick(`${currentStep.id}-${index}`)}
+                      >
+                        <div 
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            task.status === 'done' 
+                              ? 'bg-green-500 border-green-500' 
+                              : task.status === 'in_progress'
+                              ? 'border-orange-500'
+                              : 'border-gray-300'
+                          }`}
+                        >
+                          {task.status === 'done' && (
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                          )}
+                          {task.status === 'in_progress' && (
+                            <div className="w-2 h-2 rounded-full bg-orange-500" />
+                          )}
+                        </div>
+                                                 <span className={`text-sm flex-1 ${
+                           task.status === 'done' 
+                             ? 'text-gray-500 line-through' 
+                             : 'text-gray-700 dark:text-gray-300'
+                         }`}>
+                           任務 {index + 1}
+                         </span>
+                      </div>
+                                          ))}
+                      
+                      {/* 新增任務輸入框 */}
+                      {showAddTask && (
+                        <div className="flex gap-2 mt-2">
+                          <input
+                            type="text"
+                            value={newTaskTitle}
+                            onChange={(e) => setNewTaskTitle(e.target.value)}
+                            placeholder="輸入任務名稱..."
+                            className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none"
+                            autoFocus
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddTask();
+                              } else if (e.key === 'Escape') {
+                                setShowAddTask(false);
+                                setNewTaskTitle('');
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={handleAddTask}
+                            className="px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
+                          >
+                            新增
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowAddTask(false);
+                              setNewTaskTitle('');
+                            }}
+                            className="px-3 py-2 text-gray-500 text-sm hover:text-gray-700 transition-colors"
+                          >
+                            取消
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
     </motion.div>
   );
 }; 
-; 

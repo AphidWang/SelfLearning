@@ -233,7 +233,7 @@ export const GoalDetails: React.FC<GoalDetailsProps> = ({ goal, onBack, onTaskCl
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto p-4">
         {/* 目標資訊卡片 */}
         <div 
           className="mb-4 rounded-lg p-3 border-2 shadow-md" 
