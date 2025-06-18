@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from 'framer-motion';
 import { ArrowLeft, Plus, Target, ListTodo, ZoomIn, ZoomOut, CheckCircle2, Clock, Share2, Sparkles, RotateCcw, FilePlus, Power, LayoutGrid, ArrowLeftRight, RefreshCw, MessageSquare, Trash2 } from 'lucide-react';
-import { useGoalStore, isDefaultGoal } from '../../store/goalStore';
-import { Goal, Step, Task, Bubble } from '../../types/goal';
+import { useTopicStore } from '../../store/topicStore';
+import { Topic, Goal, Task, Bubble } from '../../types/goal';
 import Lottie from 'lottie-react';
 import loadingAnimation from '../../assets/lottie/mind-map-loading.json';
 import mindMapBg from '../../assets/images/mindmap-bg.jpg';
@@ -14,14 +14,14 @@ import { MindMapService } from '../../services/mindmap';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useNavigate } from 'react-router-dom';
 
-interface GoalMindMapProps {
-  goalId: string;
+interface TopicMindMapProps {
+  topicId: string;
   onBack?: () => void;
 }
 
 interface Node {
   id: string;
-  type: 'goal' | 'step' | 'task' | 'bubble';
+  type: 'topic' | 'goal' | 'task' | 'bubble';
   title: string;
   parentId?: string;
   children?: Node[];
@@ -30,8 +30,8 @@ interface Node {
   content?: string;
 }
 
-// 在 GoalMindMap 組件前添加顏色計算函數
-const getStepColors = (index: number, totalSteps: number) => {
+// 在 TopicMindMap 組件前添加顏色計算函數
+const getGoalColors = (index: number, totalGoals: number) => {
   // 使用漸層效果，從淺到深，但降低整體深度
   const colorLevels = [
     { bg: 'from-purple-50 to-purple-100', border: 'border-purple-100', icon: 'text-purple-400', text: 'text-purple-600' },
@@ -43,9 +43,9 @@ const getStepColors = (index: number, totalSteps: number) => {
     { bg: 'from-purple-50 to-purple-400', border: 'border-purple-700', icon: 'text-purple-900', text: 'text-purple-900' },
   ];
 
-  // 限制最大步驟數為7
-  const stepIndex = Math.min(index, 6);
-  const colors = colorLevels[stepIndex];
+      // 限制最大目標數為7
+    const goalIndex = Math.min(index, 6);
+    const colors = colorLevels[goalIndex];
 
   return {
     gradient: colors.bg,
@@ -114,60 +114,60 @@ const calculateContentBounds = (
   };
 };
 
-export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
-  const { goals, addGoal } = useGoalStore();
-  const goal = goals.find((g) => g.id === goalId) || null;
+export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) => {
+  const { topics } = useTopicStore();
+  const topic = topics.find((t) => t.id === topicId) || null;
   const mindMapService = React.useMemo(() => {
-    return new MindMapService(goalId);
-  }, [goalId]);
+    return new MindMapService(topicId);
+  }, [topicId]);
 
-  // 使用 state 來管理 activeSteps 和 activeTasks
-  const [activeSteps, setActiveSteps] = useState<Step[]>([]);
+  // 使用 state 來管理 activeGoals 和 activeTasks
+  const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [activeTasks, setActiveTasks] = useState<Map<string, Task[]>>(new Map());
 
   // 初始化數據
   useEffect(() => {
-    if (!goal) {
-      setActiveSteps([]);
+    if (!topic) {
+      setActiveGoals([]);
       setActiveTasks(new Map());
       return;
     }
 
-    const steps = useGoalStore.getState().getActiveSteps(goalId);
+    const goals = topic.goals.filter(goal => goal.status !== 'archived');
     const tasksMap = new Map<string, Task[]>();
-    steps.forEach(step => {
-      tasksMap.set(step.id, useGoalStore.getState().getActiveTasks(goalId, step.id));
+    goals.forEach(goal => {
+      tasksMap.set(goal.id, goal.tasks.filter(task => task.status !== 'archived'));
     });
 
-    setActiveSteps(steps);
+    setActiveGoals(goals);
     setActiveTasks(tasksMap);
-  }, [goal, goalId]);
+  }, [topic, topicId]);
 
   // 訂閱 store 更新
   useEffect(() => {
-    const unsubscribe = useGoalStore.subscribe((state) => {
-      const currentGoal = state.goals.find(g => g.id === goalId);
-      if (!currentGoal) return;
+    const unsubscribe = useTopicStore.subscribe((state) => {
+      const currentTopic = state.topics.find(t => t.id === topicId);
+      if (!currentTopic) return;
 
-      // 重新計算 activeSteps 和 activeTasks
-      const steps = state.getActiveSteps(goalId);
+      // 重新計算 activeGoals 和 activeTasks
+      const goals = currentTopic.goals.filter(goal => goal.status !== 'archived');
       const tasksMap = new Map<string, Task[]>();
-      steps.forEach(step => {
-        tasksMap.set(step.id, state.getActiveTasks(goalId, step.id));
+      goals.forEach(goal => {
+        tasksMap.set(goal.id, goal.tasks.filter(task => task.status !== 'archived'));
       });
 
       // 更新狀態
-      setActiveSteps(steps);
+      setActiveGoals(goals);
       setActiveTasks(tasksMap);
     });
 
     return () => unsubscribe();
-  }, [goalId]);
+  }, [topicId]);
 
-  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const [isGoalSelected, setIsGoalSelected] = useState(false);
-  const [editingStepId, setEditingStepId] = useState<string | null>(null);
-  const [editingStepTitle, setEditingStepTitle] = useState('');
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [isTopicSelected, setIsTopicSelected] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editingGoalTitle, setEditingGoalTitle] = useState('');
   const [zoom, setZoom] = useState(0.8);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -175,12 +175,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [initialLoad, setInitialLoad] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [stepOffsets, setStepOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
+  const [goalOffsets, setGoalOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [taskOffsets, setTaskOffsets] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [dragStartPositions, setDragStartPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
-  const [isDraggingStep, setIsDraggingStep] = useState<string | null>(null);
-  const [goalPosition, setGoalPosition] = useState<{ x: number; y: number }>({ x: 200, y: 0 });
-  const [goalOffset, setGoalOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDraggingGoal, setIsDraggingGoal] = useState<string | null>(null);
+  const [topicPosition, setTopicPosition] = useState<{ x: number; y: number }>({ x: 200, y: 0 });
+  const [topicOffset, setTopicOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [taskZIndexes, setTaskZIndexes] = useState<{ [key: string]: number }>({});
   const baseZIndex = 1;
   const [assistantMode, setAssistantMode] = useState<'floating' | 'panel'>('floating');
@@ -202,104 +202,104 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   }, []);
 
   // 初始化心智圖狀態
-  const initializeMindMap = useCallback((currentGoal: Goal | null) => {
+  const initializeMindMap = useCallback((currentTopic: Topic | null) => {
     // 重置所有狀態
     setInitialLoad(true);
     setIsLoading(true);
     setZoom(0.8);
     setPosition({ x: 0, y: 0 });
-    setActiveSteps([]);
+    setActiveGoals([]);
     setActiveTasks(new Map());
-    setSelectedStepId(null);
-    setIsGoalSelected(false);
-    setEditingStepId(null);
-    setEditingStepTitle('');
+    setSelectedGoalId(null);
+    setIsTopicSelected(false);
+    setEditingGoalId(null);
+    setEditingGoalTitle('');
     setEditingTaskId(null);
     setEditingTaskTitle('');
     setEditingBubbleId(null);
     setEditingBubbleTitle('');
-    setStepOffsets({});
+    setGoalOffsets({});
     setTaskOffsets({});
     setBubbleOffsets({});
     setBubbles([]);
-    setGoalOffset({ x: 0, y: 0 });
-    setGoalPosition({ x: 200, y: 0 });
+    setTopicOffset({ x: 0, y: 0 });
+    setTopicPosition({ x: 200, y: 0 });
 
-    // 如果有目標，初始化相關數據
-    if (currentGoal) {
-      // 初始化步驟和任務
-      const steps = useGoalStore.getState().getActiveSteps(goalId);
+    // 如果有主題，初始化相關數據
+    if (currentTopic) {
+      // 初始化目標和任務
+      const goals = currentTopic.goals.filter(goal => goal.status !== 'archived');
       const tasksMap = new Map<string, Task[]>();
-      steps.forEach(step => {
-        tasksMap.set(step.id, useGoalStore.getState().getActiveTasks(goalId, step.id));
+      goals.forEach(goal => {
+        tasksMap.set(goal.id, goal.tasks.filter(task => task.status !== 'archived'));
       });
-      setActiveSteps(steps);
+      setActiveGoals(goals);
       setActiveTasks(tasksMap);
 
       // 初始化泡泡
-      const goalBubbles = currentGoal.bubbles || [];
-      setBubbles(goalBubbles);
+      const topicBubbles = currentTopic.bubbles || [];
+      setBubbles(topicBubbles);
     }
-  }, [goalId]);
+  }, [topicId]);
 
-  // 當 goalId 改變時重置狀態
+  // 當 topicId 改變時重置狀態
   useEffect(() => {
-    initializeMindMap(goal);
-  }, [goalId, initializeMindMap]);
+    initializeMindMap(topic);
+  }, [topicId, initializeMindMap]);
+
+  // 追蹤主題節點位置
+  const topicX = useMotionValue(0);
+  const topicY = useMotionValue(0);
 
   // 追蹤目標節點位置
-  const goalX = useMotionValue(0);
-  const goalY = useMotionValue(0);
-
-  // 追蹤步驟節點位置
-  const stepPositions = useRef(new Map<string, { x: number, y: number }>());
+  const goalPositions = useRef(new Map<string, { x: number, y: number }>());
 
   // 監聽位置變化
-  useMotionValueEvent(goalX, "change", (latest) => {
-    setGoalOffset(prev => ({ ...prev, x: latest }));
+  useMotionValueEvent(topicX, "change", (latest) => {
+    setTopicOffset(prev => ({ ...prev, x: latest }));
   });
 
-  useMotionValueEvent(goalY, "change", (latest) => {
-    setGoalOffset(prev => ({ ...prev, y: latest }));
+  useMotionValueEvent(topicY, "change", (latest) => {
+    setTopicOffset(prev => ({ ...prev, y: latest }));
   });
 
   // 計算最佳視圖位置和縮放值
   const calculateOptimalView = useCallback(() => {
-    if (!containerRef.current || !goal) return;
+    if (!containerRef.current || !topic) return;
 
     const container = containerRef.current;
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
 
-    // 計算所有 step 的總高度
-    const totalStepHeight = goal.steps
-      .filter(step => step.status !== 'archived')
-      .reduce((total, step) => {
-        // 確保每個 step 至少有最小高度
-        const stepHeight = Math.max(120, (120 + 40) * Math.max(1, step.tasks.length));
-        return total + stepHeight;
+    // 計算所有 goal 的總高度
+    const totalGoalHeight = topic.goals
+      .filter(goal => goal.status !== 'archived')
+      .reduce((total, goal) => {
+        // 確保每個 goal 至少有最小高度
+        const goalHeight = Math.max(120, (120 + 40) * Math.max(1, goal.tasks.length));
+        return total + goalHeight;
       }, 0);
 
-    // 如果沒有 step，使用預設高度
-    const effectiveTotalHeight = totalStepHeight || 10;
+    // 如果沒有 goal，使用預設高度
+    const effectiveTotalHeight = totalGoalHeight || 10;
 
     // 計算整個畫布的寬度（從最左到最右）
-    const centerGoalX = 0;  // 中心目標的 x 位置
-    const hasSteps = goal.steps
-      .filter(step => step.status !== 'archived')
+    const centerTopicX = 0;  // 中心主題的 x 位置
+    const hasGoals = topic.goals
+      .filter(goal => goal.status !== 'archived')
       .length > 0;
-    const hasTasks = goal.steps
-      .filter(step => step.status !== 'archived')
-      .some(step => step.tasks.length > 0);
+    const hasTasks = topic.goals
+      .filter(goal => goal.status !== 'archived')
+      .some(goal => goal.tasks.length > 0);
     
-    // 根據是否有 step 和 task 決定最右邊的位置
-    const rightmostTaskX = hasSteps 
+    // 根據是否有 goal 和 task 決定最右邊的位置
+    const rightmostTaskX = hasGoals 
       ? (hasTasks 
-        ? 400 + 300 + 200 + 256 + 100  // 有 step 有 task
-        : 400 + 300 + 100)             // 有 step 無 task
-      : 400 + 100;                     // 無 step
+        ? 400 + 300 + 200 + 256 + 100  // 有 goal 有 task
+        : 400 + 300 + 100)             // 有 goal 無 task
+      : 400 + 100;                     // 無 goal
     
-    const leftmostX = centerGoalX;  // 中心目標左邊的空間
+    const leftmostX = centerTopicX;  // 中心主題左邊的空間
     const totalWidth = rightmostTaskX - leftmostX;  // 整個畫布的實際寬度
 
     // 計算最佳縮放值
@@ -307,11 +307,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const optimalZoomY = (containerHeight * 0.8) / effectiveTotalHeight;
     const optimalZoom = Math.min(Math.max(0.8, Math.min(optimalZoomX, optimalZoomY)), 1.2);
 
-    // 計算目標應該在的位置（螢幕的左邊）
-    const targetScreenX = hasSteps ? containerWidth * 0.1 : containerWidth * 0.35;
+    // 計算主題應該在的位置（螢幕的左邊）
+    const targetScreenX = hasGoals ? containerWidth * 0.1 : containerWidth * 0.35;
     
     // 計算需要的 translate 值
-    const optimalX = (targetScreenX - centerGoalX * optimalZoom) / optimalZoom;
+    const optimalX = (targetScreenX - centerTopicX * optimalZoom) / optimalZoom;
     // 計算 Y 軸位置
     const optimalY = (containerHeight - effectiveTotalHeight * optimalZoom) / 2 / optimalZoom;
 
@@ -319,7 +319,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       zoom: optimalZoom,
       position: { x: optimalX, y: optimalY }
     };
-  }, [goal]);
+  }, [topic]);
 
   useEffect(() => {
     if (initialLoad) {
@@ -342,23 +342,23 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
   // 初始化 offsets
   useEffect(() => {
-    if (goal && initialLoad) {
-      const initialStepOffsets: { [key: string]: { x: number; y: number } } = {};
+    if (topic && initialLoad) {
+      const initialGoalOffsets: { [key: string]: { x: number; y: number } } = {};
       const initialTaskOffsets: { [key: string]: { x: number; y: number } } = {};
 
-      goal.steps
-        .filter(step => step.status !== 'archived')
-        .forEach((step, stepIndex) => {
-          initialStepOffsets[step.id] = { x: 0, y: 0 };
-          step.tasks.forEach((task) => {
+      topic.goals
+        .filter(goal => goal.status !== 'archived')
+        .forEach((goal, goalIndex) => {
+          initialGoalOffsets[goal.id] = { x: 0, y: 0 };
+          goal.tasks.forEach((task) => {
             initialTaskOffsets[task.id] = { x: 0, y: 0 };
           });
         });
 
-      setStepOffsets(initialStepOffsets);
+      setGoalOffsets(initialGoalOffsets);
       setTaskOffsets(initialTaskOffsets);
     }
-  }, [goal]);
+  }, [topic]);
 
   // ✅ 刪除 resize 時自動 reset zoom/position 的邏輯
 // ❌ 不要再做這個
@@ -675,10 +675,10 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = useGoalStore.subscribe((state) => {
-      const currentGoal = state.goals.find(g => g.id === goalId);
-      if (currentGoal?.focusElement) {
-        const elementId = `${currentGoal.focusElement.type}-${currentGoal.focusElement.id}`;
+    const unsubscribe = useTopicStore.subscribe((state) => {
+      const currentTopic = state.topics.find(t => t.id === topicId);
+      if (currentTopic?.focusElement) {
+        const elementId = `${currentTopic.focusElement.type}-${currentTopic.focusElement.id}`;
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             flyToElement(elementId);
@@ -688,66 +688,63 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     });
 
     return () => unsubscribe();
-  }, [goalId, mindMapService, position, zoom]); // 加回 position 和 zoom 依賴
+  }, [topicId, mindMapService, position, zoom]); // 加回 position 和 zoom 依賴
 
-  const [isEditingGoal, setIsEditingGoal] = useState(false);
-  const [editingGoalTitle, setEditingGoalTitle] = useState('');
+  const [isEditingTopic, setIsEditingTopic] = useState(false);
+  const [editingTopicTitle, setEditingTopicTitle] = useState('');
 
-  const handleGoalTitleUpdate = (newTitle: string) => {
-    if (!goal || !newTitle.trim()) return;
+  const handleTopicTitleUpdate = (newTitle: string) => {
+    if (!topic || !newTitle.trim()) return;
     
-    const updatedGoal = {
-      ...goal,
+    const updatedTopic = {
+      ...topic,
       title: newTitle.trim()
     };
-    mindMapService.updateGoal(updatedGoal);
-    setIsEditingGoal(false);
+    mindMapService.updateTopic(updatedTopic);
+    setIsEditingTopic(false);
   };
 
-  const getStepPosition = useMemo(() => {
-    return (stepIndex: number, steps: Step[]) => {
+  const getGoalPosition = useMemo(() => {
+    return (goalIndex: number, goals: Goal[]) => {
       const baseX = 400 + 300;  // 基礎位置
       let baseY = 0;
       
-      // 使用 store 的 getter
-      const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
-      
-      // 計算前面所有 step 的總高度
-      for (let i = 0; i < stepIndex; i++) {
-        if (activeSteps[i]) {
-          baseY += (120 + 40) * Math.max(1, activeSteps[i].tasks.length);
+      // 計算前面所有 goal 的總高度
+      for (let i = 0; i < goalIndex; i++) {
+        if (activeGoals[i]) {
+          baseY += (120 + 40) * Math.max(1, activeGoals[i].tasks.filter(t => t.status !== 'archived').length);
         }
       }
       
-      // 計算當前 step 的起始位置
-      const currentStepHeight = (120 + 40) * Math.max(1, activeSteps[stepIndex]?.tasks.length || 1);
-      baseY += currentStepHeight / 2;
+      // 計算當前 goal 的起始位置
+      const currentGoalHeight = (120 + 40) * Math.max(1, activeGoals[goalIndex]?.tasks.filter(t => t.status !== 'archived').length || 1);
+      baseY += currentGoalHeight / 2;
 
       return {
         x: baseX,
         y: baseY
       };
     };
-  }, [goalId]);
+  }, [activeGoals]);
 
-  const centerGoalPos = useMemo(() => {
-    if (!goal) return { x: 200, y: 0 };
+  const centerTopicPos = useMemo(() => {
+    if (!topic) return { x: 200, y: 0 };
     
-    const totalTasksHeight = goal.steps
-      .filter(step => step.status !== 'archived')
+    const totalTasksHeight = topic.goals
+      .filter(goal => goal.status !== 'archived')
       .length > 0 
-      ? getStepPosition(goal.steps.length, goal.steps).y
+      ? getGoalPosition(topic.goals.length, topic.goals).y
       : 0;
 
     return {
       x: 200,
       y: totalTasksHeight / 2,
     };
-  }, [goal, getStepPosition]);
+  }, [topic, getGoalPosition]);
 
   // 移動 handleAddBubble 到這裡
   const handleAddBubble = useCallback((parentId: string, type: 'impression' | 'background') => {
-    const parentNode = goal?.id === parentId ? goal : goal?.steps.find(s => s.id === parentId);
+    const parentNode = topic?.id === parentId ? topic : topic?.goals.find(g => g.id === parentId);
     if (!parentNode) return;
 
     // 計算當前已有的 bubble 數量
@@ -755,11 +752,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const bubbleCount = existingBubbles.length;
 
     // 計算初始位置
-    const baseX = centerGoalPos.x - 200;  // 在 goal 左邊 200px
+    const baseX = centerTopicPos.x - 200;  // 在 topic 左邊 200px
     const bubbleHeight = 128;  // bubble 的高度 (w-32 h-32 = 128px)
     const spacing = 40;  // bubble 之間的間距
     const totalHeight = bubbleHeight * 3 + spacing * 2;  // 三個 bubble 的總高度（包含兩個間距）
-    const startY = centerGoalPos.y - totalHeight / 2 + bubbleHeight / 2;  // 從中心點往上偏移，並考慮第一個 bubble 的高度
+    const startY = centerTopicPos.y - totalHeight / 2 + bubbleHeight / 2;  // 從中心點往上偏移，並考慮第一個 bubble 的高度
 
     // 根據當前 bubble 數量計算 Y 位置
     const yOffset = (bubbleHeight + spacing) * bubbleCount;
@@ -779,38 +776,38 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     // 使用 MindMapService 新增 bubble
     mindMapService.addBubble(newBubble);
-  }, [goal, centerGoalPos, bubbles, mindMapService]);
+  }, [topic, centerTopicPos, bubbles, mindMapService]);
 
   // 處理刪除 bubble
   const handleDeleteBubble = useCallback((bubbleId: string) => {
-    if (!goal) return;
+    if (!topic) return;
     
     if (window.confirm('確定要刪除這個氣泡嗎？')) {
       mindMapService.deleteBubble(bubbleId);
     }
-  }, [goal, mindMapService]);
+  }, [topic, mindMapService]);
 
   // 處理更新 bubble
   const handleUpdateBubble = useCallback((bubbleId: string, updates: Partial<Bubble>) => {
-    if (!goal) return;
+    if (!topic) return;
     mindMapService.updateBubble(bubbleId, updates);
-  }, [goal, mindMapService]);
+  }, [topic, mindMapService]);
 
   // 初始化 bubbles
   useEffect(() => {
-    if (!goal) {
+    if (!topic) {
       setBubbles([]);
       return;
     }
 
-    const goalBubbles = goal.bubbles || [];
+    const topicBubbles = topic.bubbles || [];
     // 計算每個 bubble 的初始位置
-    const bubblesWithPosition = goalBubbles.map((bubble, index) => {
-      const baseX = centerGoalPos.x - 200;  // 在 goal 左邊 200px
+    const bubblesWithPosition = topicBubbles.map((bubble, index) => {
+      const baseX = centerTopicPos.x - 200;  // 在 topic 左邊 200px
       const bubbleHeight = 128;  // bubble 的高度 (w-32 h-32 = 128px)
       const spacing = 40;  // bubble 之間的間距
       const totalHeight = bubbleHeight * 3 + spacing * 2;  // 三個 bubble 的總高度（包含兩個間距）
-      const startY = centerGoalPos.y - totalHeight / 2 + bubbleHeight / 2;  // 從中心點往上偏移，並考慮第一個 bubble 的高度
+      const startY = centerTopicPos.y - totalHeight / 2 + bubbleHeight / 2;  // 從中心點往上偏移，並考慮第一個 bubble 的高度
 
       // 根據當前 bubble 數量計算 Y 位置
       const yOffset = (bubbleHeight + spacing) * index;
@@ -824,27 +821,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     });
 
     setBubbles(bubblesWithPosition);
-  }, [goal, centerGoalPos]);
+  }, [topic, centerTopicPos]);
 
   // 訂閱 store 更新
   useEffect(() => {
-    const unsubscribe = useGoalStore.subscribe((state) => {
-      const currentGoal = state.goals.find(g => g.id === goalId);
-      if (!currentGoal) return;
+    const unsubscribe = useTopicStore.subscribe((state) => {
+      const currentTopic = state.topics.find(t => t.id === topicId);
+      if (!currentTopic) return;
 
       // 更新 bubbles
-      setBubbles(currentGoal.bubbles || []);
+      setBubbles(currentTopic.bubbles || []);
     });
 
     return () => unsubscribe();
-  }, [goalId]);
+  }, [topicId]);
 
-  // 處理刪除步驟
-  const handleDeleteStep = useCallback((stepId: string) => {
-    if (!goal) return;
+  // 處理刪除目標
+  const handleDeleteGoal = useCallback((goalId: string) => {
+    if (!topic) return;
     
-    if (window.confirm('確定要刪除這個步驟嗎？這會同時刪除所有相關的任務。')) {
-      mindMapService.deleteStep(stepId);
+    if (window.confirm('確定要刪除這個目標嗎？這會同時刪除所有相關的任務。')) {
+      mindMapService.deleteGoal(goalId);
       
       // 重新計算位置
       const optimalView = calculateOptimalView();
@@ -853,37 +850,36 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         setPosition(optimalView.position);
       }
     }
-  }, [goal, mindMapService, calculateOptimalView]);
+  }, [topic, mindMapService, calculateOptimalView]);
 
   // 處理刪除任務
-  const handleDeleteTask = useCallback((stepId: string, taskId: string) => {
-    if (!goal) return;
+  const handleDeleteTask = useCallback((goalId: string, taskId: string) => {
+    if (!topic) return;
     
     if (window.confirm('確定要刪除這個任務嗎？')) {
-      mindMapService.deleteTask(stepId, taskId);
+      mindMapService.deleteTask(goalId, taskId);
       
-      // 重新計算所有 step 的位置
-      const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
-      const newStepOffsets: { [key: string]: { x: number; y: number } } = {};
+      // 重新計算所有 goal 的位置
+      const newGoalOffsets: { [key: string]: { x: number; y: number } } = {};
       
-      activeSteps.forEach((step, stepIndex) => {
+      activeGoals.forEach((goal, goalIndex) => {
         // 計算新的位置
-        const stepPos = getStepPosition(stepIndex, goal.steps);
-        const currentOffset = stepOffsets[step.id] || { x: 0, y: 0 };
+        const goalPos = getGoalPosition(goalIndex, topic.goals);
+        const currentOffset = goalOffsets[goal.id] || { x: 0, y: 0 };
         
         // 計算需要移動的距離
-        const targetY = stepPos.y;
-        const currentY = stepPos.y + currentOffset.y;
+        const targetY = goalPos.y;
+        const currentY = goalPos.y + currentOffset.y;
         const deltaY = targetY - currentY;
         
-        newStepOffsets[step.id] = {
+        newGoalOffsets[goal.id] = {
           x: currentOffset.x,
           y: deltaY
         };
       });
       
-      // 更新 step 的位置
-      setStepOffsets(newStepOffsets);
+      // 更新 goal 的位置
+      setGoalOffsets(newGoalOffsets);
       
       // 重新計算位置
       const optimalView = calculateOptimalView();
@@ -892,9 +888,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         setPosition(optimalView.position);
       }
     }
-  }, [goal, mindMapService, calculateOptimalView, goalId, stepOffsets, getStepPosition]);
+  }, [topic, mindMapService, calculateOptimalView, topicId, goalOffsets, getGoalPosition, activeGoals]);
 
-  if (goalId === 'new') {
+  if (topicId === 'new') {
     return (
       <div className="flex items-center justify-center h-full">
         <Lottie
@@ -906,41 +902,39 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     );
   }
 
-  if (!goal) {
+  if (!topic) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">找不到目標</p>
+        <p className="text-gray-500">找不到主題</p>
       </div>
     );
   }
 
   const getTaskPosition = useMemo(() => {
-    return (stepIndex: number, taskIndex: number, totalTasks: number) => {
-      const stepPos = getStepPosition(stepIndex, goal.steps);
+    return (goalIndex: number, taskIndex: number, totalTasks: number) => {
+      const goalPos = getGoalPosition(goalIndex, topic?.goals || []);
       const taskX = 200;
       const cardHeight = 120;
       const cardSpacing = 40;
 
-      // 使用 store 的 getter
-      const activeSteps = useGoalStore.getState().getActiveSteps(goalId);
-      const currentStep = activeSteps[stepIndex];
-      if (!currentStep) return { x: 0, y: 0 };
+      const currentGoal = activeGoals[goalIndex];
+      if (!currentGoal) return { x: 0, y: 0 };
 
       // 計算當前任務之前的所有卡片高度和間距
-      const currentStepPreviousHeight = (cardHeight * taskIndex) + (cardSpacing * taskIndex);
+      const currentGoalPreviousHeight = (cardHeight * taskIndex) + (cardSpacing * taskIndex);
       
-      // 計算整個 step 的總高度（所有卡片高度 + 間距）
+      // 計算整個 goal 的總高度（所有卡片高度 + 間距）
       const totalHeight = (cardHeight * totalTasks) + (cardSpacing * (totalTasks - 1));
       
-      // 從 step 中心點開始計算位置
-      const baseY = stepPos.y - (totalHeight / 2) + currentStepPreviousHeight;
+      // 從 goal 中心點開始計算位置
+      const baseY = goalPos.y - (totalHeight / 2) + currentGoalPreviousHeight;
 
       return {
-        x: stepPos.x + taskX,
+        x: goalPos.x + taskX,
         y: baseY
       };
     };
-  }, [goal, getStepPosition, goalId]);
+  }, [topic, getGoalPosition, activeGoals]);
 
   // 計算曲線控制點
   const getCurvePoints = (start: { x: number; y: number }, end: { x: number; y: number }) => {
@@ -963,84 +957,83 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     };
   };
 
-  // 新增 step 後重新計算位置並置中到新 step
-  const focusOnStep = useCallback((stepId: string) => {
-    const stepIndex = goal?.steps.findIndex(s => s.id === stepId) ?? -1;
-    if (stepIndex === -1) return;
+  // 新增 goal 後重新計算位置並置中到新 goal
+  const focusOnGoal = useCallback((goalId: string) => {
+    const goalIndex = topic?.goals.findIndex(g => g.id === goalId) ?? -1;
+    if (goalIndex === -1) return;
 
-    const stepPos = getStepPosition(stepIndex, goal.steps);
+    const goalPos = getGoalPosition(goalIndex, topic.goals);
     const container = containerRef.current;
     if (!container) return;
 
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
 
-    // 計算新的位置，使 step 位於畫面中心
-    const newX = (containerWidth / 2 / zoom) - stepPos.x;
-    const newY = (containerHeight / 2 / zoom) - stepPos.y;
+    // 計算新的位置，使 goal 位於畫面中心
+    const newX = (containerWidth / 2 / zoom) - goalPos.x;
+    const newY = (containerHeight / 2 / zoom) - goalPos.y;
 
     setPosition({ x: newX, y: newY });
-  }, [zoom, getStepPosition]);
+  }, [zoom, getGoalPosition, topic]);
 
-  // 處理新增 step
-  const handleAddStep = useCallback(() => {
-    if (!goal) return;
+  // 處理新增 goal
+  const handleAddGoal = useCallback(() => {
+    if (!topic) return;
 
-    const newStep: Partial<Step> = {
-      title: '新步驟',
-      tasks: []
+    const newGoal: Partial<Goal> = {
+      title: '新目標',
+      tasks: [],
+      status: 'active'
     };
 
-    console.log('📝 準備新增步驟', { newStep });
+    console.log('📝 準備新增目標', { newGoal });
 
     // 先新增到 store
-    const addedStep = mindMapService.addStep(newStep as Step);
-    console.log('✅ 步驟已新增到 store', { addedStep });
-    if (!addedStep) return;
+    const addedGoal = mindMapService.addGoal(newGoal as Goal);
+    console.log('✅ 目標已新增到 store', { addedGoal });
+    if (!addedGoal) return;
 
-    // 找到新增的 step
-    const updatedGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
-    if (!updatedGoal) return;
+    // 找到新增的 goal
+    const updatedTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
+    if (!updatedTopic) return;
 
-    const newAddedStep = updatedGoal.steps.find(s => s.id === addedStep.id);
-    if (!newAddedStep) return;
+    const newAddedGoal = updatedTopic.goals.find(g => g.id === addedGoal.id);
+    if (!newAddedGoal) return;
 
-    // 計算新 step 的位置
-    const newStepIndex = updatedGoal.steps.length - 1;
-    const stepPos = getStepPosition(newStepIndex, updatedGoal.steps);
+    // 計算新 goal 的位置
+    const newGoalIndex = updatedTopic.goals.length - 1;
+    const goalPos = getGoalPosition(newGoalIndex, updatedTopic.goals);
     const container = containerRef.current;
     if (!container) return;
 
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
 
-    // 計算新的位置，使 step 位於畫面中心
-    const newX = (containerWidth / 2 / zoom) - stepPos.x;
-    const newY = (containerHeight / 2 / zoom) - stepPos.y;
+    // 計算新的位置，使 goal 位於畫面中心
+    const newX = (containerWidth / 2 / zoom) - goalPos.x;
+    const newY = (containerHeight / 2 / zoom) - goalPos.y;
 
     setPosition({ x: newX, y: newY });
-  }, [goal, mindMapService, zoom, goalId, getStepPosition]);
+  }, [topic, mindMapService, zoom, topicId, getGoalPosition]);
 
-  // 處理 step 標題更新
-  const handleStepTitleUpdate = useCallback((stepId: string, newTitle: string) => {
+  // 處理 goal 標題更新
+  const handleGoalTitleUpdate = useCallback((goalId: string, newTitle: string) => {
     if (!newTitle.trim()) return;
 
-    const currentGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
-    if (!currentGoal) return;
+    const currentTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
+    if (!currentTopic) return;
 
-    const step = currentGoal.steps.find(s => s.id === stepId);
-    if (!step) return;
+    const goal = currentTopic.goals.find(g => g.id === goalId);
+    if (!goal) return;
 
-    mindMapService.updateStep(stepId, { 
-      ...step,
+    mindMapService.updateGoal(goalId, { 
+      ...goal,
       title: newTitle.trim() 
     });
 
-    setEditingStepId(null);
-    setEditingStepTitle('');
-
-    useGoalStore.getState().dump(goalId);
-  }, [goalId, mindMapService]);
+    setEditingGoalId(null);
+    setEditingGoalTitle('');
+  }, [topicId, mindMapService]);
 
   const { bringToFront, getIndex } = useElementStack(1);
 
@@ -1048,12 +1041,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   const [editingTaskTitle, setEditingTaskTitle] = useState('');
 
   // 處理新增 task
-  const handleAddTask = useCallback((stepId: string) => {
-    if (!goal) return;
-    console.log('🎯 新增任務開始', { stepId });
+  const handleAddTask = useCallback((goalId: string) => {
+    if (!topic) return;
+    console.log('🎯 新增任務開始', { goalId });
 
-    const stepIndex = goal.steps.findIndex(s => s.id === stepId);
-    if (stepIndex === -1) return;
+    const goalIndex = topic.goals.findIndex(g => g.id === goalId);
+    if (goalIndex === -1) return;
 
     const newTask: Partial<Task> = {
       title: '新任務',
@@ -1061,18 +1054,18 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     };
 
     // 先新增到 store
-    const addedTask = mindMapService.addTask(stepId, newTask as Task);
+    const addedTask = mindMapService.addTask(goalId, newTask as Task);
     console.log('✅ Store 新增結果', { addedTask });
     if (!addedTask) return;
 
     // 直接從 store 獲取最新狀態
-    const updatedGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
-    if (!updatedGoal) return;
+    const updatedTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
+    if (!updatedTopic) return;
 
-    const step = updatedGoal.steps.find(s => s.id === stepId);
-    if (!step) return;
+    const goal = updatedTopic.goals.find(g => g.id === goalId);
+    if (!goal) return;
 
-    const newAddedTask = step.tasks.find(t => t.id === addedTask.id);
+    const newAddedTask = goal.tasks.find(t => t.id === addedTask.id);
     console.log('📝 準備設置編輯狀態', { 
       newTaskId: newAddedTask?.id,
       currentEditingTaskId: editingTaskId,
@@ -1082,9 +1075,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
     // 計算新 task 的位置
     const taskPos = getTaskPosition(
-      stepIndex,
-      step.tasks.length - 1,
-      step.tasks.length
+      goalIndex,
+      goal.tasks.length - 1,
+      goal.tasks.length
     );
 
     const container = containerRef.current;
@@ -1108,9 +1101,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       title: newAddedTask.title 
     });
 
-    // Dump store 狀態
-    useGoalStore.getState().dump(goalId);
-  }, [goal, mindMapService]);
+    // 不需要 dump，store 已經自動更新
+  }, [topic, mindMapService, zoom, topicId, getTaskPosition, editingTaskId, editingTaskTitle]);
 
   // 處理 task 標題更新
   const handleTaskTitleUpdate = useCallback((taskId: string, newTitle: string) => {
@@ -1120,27 +1112,27 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       return;
     }
 
-    const currentGoal = useGoalStore.getState().goals.find(g => g.id === goalId);
-    if (!currentGoal) {
-      console.log('❌ 更新失敗：找不到目標', { goalId });
+    const currentTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
+    if (!currentTopic) {
+      console.log('❌ 更新失敗：找不到主題', { topicId });
       return;
     }
 
-    const step = currentGoal.steps.find(s => s.tasks.some(t => t.id === taskId));
-    console.log('🔍 找到的 step', { stepId: step?.id });
-    if (!step) {
-      console.log('❌ 更新失敗：找不到步驟');
+    const goal = currentTopic.goals.find(g => g.tasks.some(t => t.id === taskId));
+    console.log('🔍 找到的 goal', { goalId: goal?.id });
+    if (!goal) {
+      console.log('❌ 更新失敗：找不到目標');
       return;
     }
 
-    const task = step.tasks.find(t => t.id === taskId);
+    const task = goal.tasks.find(t => t.id === taskId);
     console.log('🔍 找到的 task', { task });
     if (!task) {
       console.log('❌ 更新失敗：找不到任務');
       return;
     }
 
-    const updatedTask = mindMapService.updateTask(step.id, taskId, { 
+    const updatedTask = mindMapService.updateTask(goal.id, taskId, { 
       ...task,
       title: newTitle.trim() 
     });
@@ -1153,21 +1145,21 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       console.log('❌ 任務更新失敗');
     }
 
-    useGoalStore.getState().dump(goalId);
-  }, [goalId, mindMapService]);
+    // 不需要 dump，store 已經自動更新
+  }, [topicId, mindMapService]);
 
   // 匯出成 Markdown
   const exportToMarkdown = useCallback(() => {
-    if (!goal) return;
+    if (!topic) return;
 
-    let markdown = `# ${goal.title}\n\n`;
+    let markdown = `# ${topic.title}\n\n`;
 
-    goal.steps
-      .filter(step => step.status !== 'archived')
-      .forEach((step, stepIndex) => {
-      markdown += `## ${stepIndex + 1}. ${step.title}\n\n`;
+    topic.goals
+      .filter(goal => goal.status !== 'archived')
+      .forEach((goal, goalIndex) => {
+      markdown += `## ${goalIndex + 1}. ${goal.title}\n\n`;
       
-      step.tasks.forEach((task, taskIndex) => {
+      goal.tasks.forEach((task, taskIndex) => {
         const status = task.status === 'done' 
           ? '✅' 
           : task.status === 'in_progress' 
@@ -1187,28 +1179,28 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${goal.title}-規劃.md`;
+    a.download = `${topic.title}-規劃.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [goal]);
+  }, [topic]);
 
   // 匯出成 JSON
   const exportToJSON = useCallback(() => {
-    if (!goal) return;
+    if (!topic) return;
 
-    const json = JSON.stringify(goal, null, 2);
+    const json = JSON.stringify(topic, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${goal.title}-規劃.json`;
+    a.download = `${topic.title}-規劃.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [goal]);
+  }, [topic]);
 
   const navigate = useNavigate();
 
@@ -1221,29 +1213,29 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
   }, [mindMapService]);
 
   // AI 分析相關函數
-  const handleAnalyzeGoal = useCallback((goalTitle: string) => {
-    if (!goal || !assistantInputHandler) return;
-    console.log('🔍 Analyzing goal:', goalTitle);
-    assistantInputHandler(`總結主題：${goalTitle}`, { mode: 'summarize' });
-  }, [goal, assistantInputHandler]);
+  const handleAnalyzeTopic = useCallback((topicTitle: string) => {
+    if (!topic || !assistantInputHandler) return;
+    console.log('🔍 Analyzing topic:', topicTitle);
+    assistantInputHandler(`總結主題：${topicTitle}`, { mode: 'summarize' });
+  }, [topic, assistantInputHandler]);
 
-  const handleAnalyzeStep = useCallback((stepTitle: string) => {
-    if (!goal || !assistantInputHandler) return;
-    console.log('🔍 Analyzing step:', stepTitle);
-    assistantInputHandler(`總結目標：${stepTitle}`, { mode: 'step_search' });
-  }, [goal, assistantInputHandler]);
+  const handleAnalyzeGoal = useCallback((goalTitle: string) => {
+    if (!topic || !assistantInputHandler) return;
+    console.log('🔍 Analyzing goal:', goalTitle);
+    assistantInputHandler(`分析目標：${goalTitle}`, { mode: 'goal_search' });
+  }, [topic, assistantInputHandler]);
 
   const handleAnalyzeTask = useCallback((taskTitle: string) => {
-    if (!goal || !assistantInputHandler) return;
+    if (!topic || !assistantInputHandler) return;
     console.log('🔍 Analyzing task:', taskTitle);
     assistantInputHandler(`分析任務：${taskTitle}`, { mode: 'mission_search' });
-  }, [goal, assistantInputHandler]);
+  }, [topic, assistantInputHandler]);
 
   const handleAnalyzeBubble = useCallback((bubbleTitle: string) => {
-    if (!goal || !assistantInputHandler) return;
+    if (!topic || !assistantInputHandler) return;
     console.log('🔍 Analyzing bubble:', bubbleTitle);
     assistantInputHandler(`分析想法：${bubbleTitle}`, { mode: 'bubble_idea_search' });
-  }, [goal, assistantInputHandler]);
+  }, [topic, assistantInputHandler]);
 
   return (
     <div 
@@ -1294,22 +1286,20 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           返回
         </motion.button>
 
-        {isDefaultGoal(goalId) && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              if (window.confirm('確定要回到預設值嗎？這會清除所有已儲存的修改。')) {
-                localStorage.removeItem('self_learning_goals');
-                window.location.reload();
-              }
-            }}
-            className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-white hover:bg-orange-50"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            回到預設值
-          </motion.button>
-        )}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            if (window.confirm('確定要重設嗎？這會清除所有已儲存的修改。')) {
+              localStorage.removeItem('self_learning_topics');
+              window.location.reload();
+            }
+          }}
+          className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-white hover:bg-orange-50"
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
+          重設
+        </motion.button>
 
         <Tooltip.Provider>
           <Tooltip.Root>
@@ -1318,18 +1308,19 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
-                  const newGoal: Goal = {
+                  const newTopic: Topic = {
                     id: '',  // store 會自動生成
                     title: '做點什麼呢?',  // 必填欄位
+                    type: '學習目標',
                     status: 'active',
-                    steps: []
+                    goals: []
                   };
-                  const mindMapService = new MindMapService();
-                  console.log('📝 準備新增目標', { newGoal });
-                  const addedGoal = mindMapService.addGoal(newGoal);
-                  console.log('✅ 目標已新增', { addedGoal });
-                  // 直接導航到新目標
-                  navigate(`/student/planning/goal/${addedGoal.id}`);
+                  const { addTopic } = useTopicStore.getState();
+                  console.log('📝 準備新增主題', { newTopic });
+                  const addedTopic = addTopic({ ...newTopic, id: Date.now().toString() });
+                  console.log('✅ 主題已新增', { addedTopic });
+                  // 直接導航到新主題
+                  navigate(`/student/planning/topic/${addedTopic.id}`);
                 }}
                 className="inline-flex items-center px-4 py-2 border border-indigo-300 rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-white hover:bg-indigo-50"
               >
@@ -1342,14 +1333,14 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 className="bg-gray-800 text-white px-3 py-2 rounded-md text-sm shadow-lg"
                 sideOffset={5}
               >
-                建立一個空白的學習目標
+                建立一個空白的學習主題
                 <Tooltip.Arrow className="fill-gray-800" />
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
         </Tooltip.Provider>
 
-        <h1 className="text-xl font-bold text-gray-900">{goal.title}</h1>
+        <h1 className="text-xl font-bold text-gray-900">{topic.title}</h1>
 
         {/* 匯出選單 */}
         <DropdownMenu.Root>
@@ -1406,19 +1397,19 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             minHeight: '20000px'
           }}
         >
-          {goal.steps
-            .filter(step => step.status !== 'archived')
-            .map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex, goal.steps);
-            const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
+          {topic.goals
+            .filter(goal => goal.status !== 'archived')
+            .map((goal, goalIndex) => {
+            const goalPos = getGoalPosition(goalIndex, topic.goals);
+            const goalOffset = goalOffsets[goal.id] || { x: 0, y: 0 };
             const curvePoints = getCurvePoints(
-              { x: centerGoalPos.x + 96 + goalOffset.x + 5000, y: centerGoalPos.y + goalOffset.y + 5000 },
-              { x: stepPos.x - 64 + stepOffset.x + 5000, y: stepPos.y + stepOffset.y + 5000 }
+              { x: centerTopicPos.x + 96 + topicOffset.x + 5000, y: centerTopicPos.y + topicOffset.y + 5000 },
+              { x: goalPos.x - 64 + goalOffset.x + 5000, y: goalPos.y + goalOffset.y + 5000 }
             );
 
             return (
               <path
-                key={`step-line-${step.id}`}
+                key={`goal-line-${goal.id}`}
                 d={`M ${curvePoints.start.x} ${curvePoints.start.y} 
                     C ${curvePoints.control1.x} ${curvePoints.control1.y},
                       ${curvePoints.control2.x} ${curvePoints.control2.y},
@@ -1432,12 +1423,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
 
           {bubbles.map(bubble => {
             const offset = bubbleOffsets[bubble.id] || { x: 0, y: 0 };
-            const parentNode = bubble.parentId === goal.id ? goal : goal?.steps.find(s => s.id === bubble.parentId);
+            const parentNode = bubble.parentId === topic.id ? topic : topic?.goals.find(g => g.id === bubble.parentId);
             if (!parentNode) return null;
-            const parentPos = bubble.parentId === goal.id 
-              ? { x: centerGoalPos.x + 96 + goalOffset.x + 5000, y: centerGoalPos.y + goalOffset.y + 5000 }
-              : { x: getStepPosition(goal.steps.findIndex(s => s.id === bubble.parentId), goal.steps).x - 64 + 5000, 
-                  y: getStepPosition(goal.steps.findIndex(s => s.id === bubble.parentId), goal.steps).y + 5000 };
+            const parentPos = bubble.parentId === topic.id 
+              ? { x: centerTopicPos.x + 96 + topicOffset.x + 5000, y: centerTopicPos.y + topicOffset.y + 5000 }
+              : { x: getGoalPosition(topic.goals.findIndex(g => g.id === bubble.parentId), topic.goals).x - 64 + 5000, 
+                  y: getGoalPosition(topic.goals.findIndex(g => g.id === bubble.parentId), topic.goals).y + 5000 };
             const bubblePos = { 
               x: (bubble.position?.x ?? 0) + offset.x + 5000, 
               y: (bubble.position?.y ?? 0) + offset.y + 5000 
@@ -1457,28 +1448,28 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             );
           })}
 
-          {activeSteps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex, goal.steps);
-            const stepOffset = stepOffsets[step.id] || { x: 0, y: 0 };
-            return activeTasks.get(step.id)?.map((task, taskIndex) => {
+          {activeGoals.map((goal, goalIndex) => {
+            const goalPos = getGoalPosition(goalIndex, topic.goals);
+            const goalOffset = goalOffsets[goal.id] || { x: 0, y: 0 };
+            return activeTasks.get(goal.id)?.map((task, taskIndex) => {
               const taskPos = getTaskPosition(
-                stepIndex,
+                goalIndex,
                 taskIndex,
-                step.tasks.length
+                goal.tasks.length
               );
               const taskOffset = taskOffsets[task.id] || { x: 0, y: 0 };
               const taskCurvePoints = getCurvePoints(
-                { x: stepPos.x + 64 + stepOffset.x + 5000, y: stepPos.y + stepOffset.y + 5000 },
+                { x: goalPos.x + 64 + goalOffset.x + 5000, y: goalPos.y + goalOffset.y + 5000 },
                 { x: taskPos.x + taskOffset.x + 5000, y: taskPos.y + 60 + taskOffset.y + 5000 }
               );
 
-              // 檢查是否為觀察步驟
-              const isObservationStep = step.title.includes('觀察');
-              const isThoughtTask = isObservationStep && task.title.includes('想法');
+              // 檢查是否為特殊任務類型
+              const isObservationGoal = goal.title.includes('觀察');
+              const isThoughtTask = isObservationGoal && task.title.includes('想法');
 
               return (
                 <path
-                  key={`task-line-${step.id}-${task.id || taskIndex}`}
+                  key={`task-line-${goal.id}-${task.id || taskIndex}`}
                   d={`M ${taskCurvePoints.start.x} ${taskCurvePoints.start.y} 
                       C ${taskCurvePoints.control1.x} ${taskCurvePoints.control1.y},
                         ${taskCurvePoints.control2.x} ${taskCurvePoints.control2.y},
@@ -1498,15 +1489,15 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </svg>
 
         <motion.div
-          id={`goal-${goal.id}`}
-          className="absolute goal-node"
+          id={`topic-${topic.id}`}
+          className="absolute topic-node"
           style={{
-            left: centerGoalPos.x - 96,
-            top: centerGoalPos.y - 96,
+            left: centerTopicPos.x - 96,
+            top: centerTopicPos.y - 96,
             transform: 'none',
-            x: goalX,
-            y: goalY,
-            zIndex: getIndex('goal')
+            x: topicX,
+            y: topicY,
+            zIndex: getIndex('topic')
           }}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -1516,8 +1507,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           dragElastic={0}
           onDragStart={(e) => {
             e.stopPropagation();
-            console.log('Goal drag start event triggered');
-            bringToFront('goal');
+            console.log('Topic drag start event triggered');
+            bringToFront('topic');
           }}
           onDrag={(e) => {
             e.stopPropagation();
@@ -1525,8 +1516,8 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           onDragEnd={(e) => {
             e.stopPropagation();
             console.log('Final position:', {
-              x: goalX.get(),
-              y: goalY.get()
+              x: topicX.get(),
+              y: topicY.get()
             });
           }}
           whileDrag={{ 
@@ -1537,12 +1528,12 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
             scale: 1.02 
           }}
           onClick={() => {
-            setIsGoalSelected(!isGoalSelected);
+            setIsTopicSelected(!isTopicSelected);
           }}
           onDoubleClick={(e) => {
             e.stopPropagation();
-            setIsEditingGoal(true);
-            setEditingGoalTitle(goal.title);
+            setIsEditingTopic(true);
+            setEditingTopicTitle(topic.title);
           }}
         >
           <div 
@@ -1550,18 +1541,18 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           >
             <div className="text-center">
               <Target className="w-12 h-12 text-purple-500 mx-auto mb-2" />
-              {isEditingGoal ? (
+              {isEditingTopic ? (
                 <input
                   type="text"
-                  value={editingGoalTitle}
-                  onChange={(e) => setEditingGoalTitle(e.target.value)}
-                  onBlur={() => handleGoalTitleUpdate(editingGoalTitle)}
+                  value={editingTopicTitle}
+                  onChange={(e) => setEditingTopicTitle(e.target.value)}
+                  onBlur={() => handleTopicTitleUpdate(editingTopicTitle)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      handleGoalTitleUpdate(editingGoalTitle);
+                      handleTopicTitleUpdate(editingTopicTitle);
                     } else if (e.key === 'Escape') {
-                      setIsEditingGoal(false);
-                      setEditingGoalTitle(goal.title);
+                      setIsEditingTopic(false);
+                      setEditingTopicTitle(topic.title);
                     }
                   }}
                   className="w-full text-center bg-transparent border-b border-purple-300 focus:outline-none focus:border-purple-500 px-1 text-lg font-bold text-purple-700"
@@ -1569,18 +1560,18 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <h2 className="text-lg font-bold text-purple-700">{goal.title || '新目標'}</h2>
+                <h2 className="text-lg font-bold text-purple-700">{topic.title || '新主題'}</h2>
               )}
             </div>
 
-            {/* 新增步驟按鈕 */}
+            {/* 新增目標按鈕 */}
             <div 
               className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-200"
               style={{
                 right: '-10px',
                 bottom: '10px',
                 transform: 'translate(50%, 50%)',
-                zIndex: getIndex('goal') + 1
+                zIndex: getIndex('topic') + 1
               }}
             >
               <div className="flex space-x-2">
@@ -1589,7 +1580,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleAddStep();
+                    handleAddGoal();
                   }}
                   className="w-8 h-8 bg-indigo-100 hover:bg-indigo-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
                 >
@@ -1600,7 +1591,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleAddBubble(goal.id, 'impression');
+                    handleAddBubble(topic.id, 'impression');
                   }}
                   className="w-8 h-8 bg-purple-100 hover:bg-purple-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
                 >
@@ -1625,7 +1616,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleAnalyzeGoal(goal.title);
+                    handleAnalyzeTopic(topic.title);
                   }}
                   className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                 >
@@ -1637,17 +1628,17 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
         </motion.div>
 
         <AnimatePresence>
-          {activeSteps.map((step, stepIndex) => {
-            const stepPos = getStepPosition(stepIndex, goal.steps);
-            const isSelected = selectedStepId === step.id;
+          {activeGoals.map((goal, goalIndex) => {
+            const goalPos = getGoalPosition(goalIndex, topic.goals);
+            const isSelected = selectedGoalId === goal.id;
 
             return (
-              <React.Fragment key={`step-group-${step.id}`}>
+              <React.Fragment key={`goal-group-${goal.id}`}>
                 <motion.div
                   className="absolute"
                   style={{
-                    left: stepPos.x - 64,
-                    top: stepPos.y - 64,
+                    left: goalPos.x - 64,
+                    top: goalPos.y - 64,
                     transform: 'none'
                   }}
                   initial={{ scale: 0 }}
@@ -1655,26 +1646,26 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                   transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                 >
                   <motion.div
-                    id={`step-${step.id}`}
-                    drag={editingStepId !== step.id}
+                    id={`goal-${goal.id}`}
+                    drag={editingGoalId !== goal.id}
                     dragMomentum={false}
                     dragElastic={0}
                     onDragStart={(event, info) => {
-                      if (editingStepId === step.id) return;
+                      if (editingGoalId === goal.id) return;
                       event.stopPropagation();
-                      setIsDraggingStep(step.id);
-                      bringToFront(step.id);
+                      setIsDraggingGoal(goal.id);
+                      bringToFront(goal.id);
                     }}
                     onDrag={(event, info) => {
-                      if (editingStepId === step.id) return;
+                      if (editingGoalId === goal.id) return;
                       const dx = info.delta.x;
                       const dy = info.delta.y;
 
-                      setStepOffsets(prev => {
-                        const currentOffset = prev[step.id] || { x: 0, y: 0 };
+                      setGoalOffsets(prev => {
+                        const currentOffset = prev[goal.id] || { x: 0, y: 0 };
                         return {
                           ...prev,
-                          [step.id]: {
+                          [goal.id]: {
                             x: currentOffset.x + dx,
                             y: currentOffset.y + dy
                           }
@@ -1682,44 +1673,44 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       });
                     }}
                     onDragEnd={() => {
-                      if (editingStepId === step.id) return;
-                      setIsDraggingStep(null);
+                      if (editingGoalId === goal.id) return;
+                      setIsDraggingGoal(null);
                     }}
                     style={{
                       position: 'relative',
-                      zIndex: getIndex(step.id)
+                      zIndex: getIndex(goal.id)
                     }}
                     onClick={() => {
-                      setSelectedStepId(isSelected ? null : step.id);
+                      setSelectedGoalId(isSelected ? null : goal.id);
                     }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
-                      setEditingStepId(step.id);
-                      setEditingStepTitle(step.title);
+                      setEditingGoalId(goal.id);
+                      setEditingGoalTitle(goal.title);
                     }}
-                    className={`step-node group w-32 h-32 rounded-full ${
+                    className={`goal-node group w-32 h-32 rounded-full ${
                       'border-4'
                     } bg-gradient-to-br ${
-                      getStepColors(stepIndex, goal.steps.length).gradient
+                      getGoalColors(goalIndex, topic.goals.length).gradient
                     } border-${
-                      getStepColors(stepIndex, goal.steps.length).border
-                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)] transition-all duration-200 ${editingStepId === step.id ? 'cursor-text' : 'cursor-move'}`}
-                    whileHover={{ scale: editingStepId === step.id ? 1 : 1.1 }}
+                      getGoalColors(goalIndex, topic.goals.length).border
+                    } flex items-center justify-center p-4 shadow-lg transition-colors duration-200 hover:scale-105 hover:border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.2)] transition-all duration-200 ${editingGoalId === goal.id ? 'cursor-text' : 'cursor-move'}`}
+                    whileHover={{ scale: editingGoalId === goal.id ? 1 : 1.1 }}
                     whileDrag={{ scale: 1.05, zIndex: 50 }}
                   >
                     <div className="text-center">
-                      {editingStepId === step.id ? (
+                      {editingGoalId === goal.id ? (
                         <input
                           type="text"
-                          value={editingStepTitle}
-                          onChange={(e) => setEditingStepTitle(e.target.value)}
-                          onBlur={() => handleStepTitleUpdate(step.id, editingStepTitle)}
+                          value={editingGoalTitle}
+                          onChange={(e) => setEditingGoalTitle(e.target.value)}
+                          onBlur={() => handleGoalTitleUpdate(goal.id, editingGoalTitle)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              handleStepTitleUpdate(step.id, editingStepTitle);
+                              handleGoalTitleUpdate(goal.id, editingGoalTitle);
                             } else if (e.key === 'Escape') {
-                              setEditingStepId(null);
-                              setEditingStepTitle('');
+                              setEditingGoalId(null);
+                              setEditingGoalTitle('');
                             }
                           }}
                           className="w-full text-center bg-transparent border-b border-purple-300 focus:outline-none focus:border-purple-500 px-1"
@@ -1729,11 +1720,11 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                       ) : (
                         <>
                           <ListTodo className={`w-8 h-8 mx-auto mb-1 ${
-                            getStepColors(stepIndex, goal.steps.length).icon
+                            getGoalColors(goalIndex, topic.goals.length).icon
                           }`} />
                           <h3 className={`text-sm font-bold ${
-                            getStepColors(stepIndex, goal.steps.length).text
-                          }`}>{step.title}</h3>
+                            getGoalColors(goalIndex, topic.goals.length).text
+                          }`}>{goal.title}</h3>
                         </>
                       )}
                     </div>
@@ -1745,7 +1736,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                         right: '-15px',
                         bottom: '0px',
                         transform: 'translate(50%, 50%)',
-                        zIndex: getIndex(step.id) + 1
+                        zIndex: getIndex(goal.id) + 1
                       }}
                     >
                       <div className="flex space-x-2">
@@ -1754,7 +1745,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           whileTap={{ scale: 0.95 }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleAddTask(step.id);
+                            handleAddTask(goal.id);
                           }}
                           className="w-8 h-8 bg-indigo-100 hover:bg-indigo-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                         >
@@ -1765,7 +1756,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           whileTap={{ scale: 0.95 }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteStep(step.id);
+                            handleDeleteGoal(goal.id);
                           }}
                           className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                         >
@@ -1781,7 +1772,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                         right: '-15px',
                         top: '-15px',
                         transform: 'translate(50%, 50%)',
-                        zIndex: getIndex(step.id) + 1
+                        zIndex: getIndex(goal.id) + 1
                       }}
                     >
                       <div className="flex space-x-2">
@@ -1790,7 +1781,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                           whileTap={{ scale: 0.95 }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleAnalyzeStep(step.title);
+                            handleAnalyzeGoal(goal.title);
                           }}
                           className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                         >
@@ -1802,20 +1793,20 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                 </motion.div>
 
                 <AnimatePresence>
-                  {activeTasks.get(step.id)?.map((task, taskIndex) => {
+                  {activeTasks.get(goal.id)?.map((task, taskIndex) => {
                     const taskPos = getTaskPosition(
-                      stepIndex,
+                      goalIndex,
                       taskIndex,
-                      step.tasks.length
+                      goal.tasks.length
                     );
 
-                    // 檢查是否為觀察步驟
-                    const isObservationStep = step.title.includes('觀察');
-                    const isThoughtTask = isObservationStep && task.title.includes('想法');
+                    // 檢查是否為特殊任務類型
+                    const isObservationGoal = goal.title.includes('觀察');
+                    const isThoughtTask = isObservationGoal && task.title.includes('想法');
 
                     return (
                       <motion.div
-                        key={`task-${step.id}-${task.id}`}
+                        key={`task-${goal.id}-${task.id}`}
                         className="absolute"
                         style={{
                           left: taskPos.x,
@@ -1948,9 +1939,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
                                 whileTap={{ scale: 0.95 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const step = goal.steps.find(s => s.tasks.some(t => t.id === task.id));
-                                  if (step) {
-                                    handleDeleteTask(step.id, task.id);
+                                  const parentGoal = topic.goals.find(g => g.tasks.some(t => t.id === task.id));
+                                  if (parentGoal) {
+                                    handleDeleteTask(parentGoal.id, task.id);
                                   }
                                 }}
                                 className="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
@@ -2202,7 +2193,7 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
           onDragEnd={handleAssistantDragEnd}
           hideCloseButton
           className="panel-assistant pointer-events-auto"
-          goalId={goalId}
+          goalId={topicId}
           onFocus={(elementId) => {
             const element = document.getElementById(elementId);
             if (element) {
@@ -2214,4 +2205,9 @@ export const GoalMindMap: React.FC<GoalMindMapProps> = ({ goalId, onBack }) => {
       </div>
     </div>
   );
-}; 
+};
+
+// 向後兼容的 GoalMindMap 組件
+export const GoalMindMap: React.FC<{ goalId: string; onBack?: () => void }> = ({ goalId, onBack }) => {
+  return <TopicMindMap topicId={goalId} onBack={onBack} />;
+};

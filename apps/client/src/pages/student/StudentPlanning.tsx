@@ -1,35 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PageLayout from '../../components/layout/PageLayout';
 import { Target, ChevronRight, Plus, Calendar, ArrowRight, Sparkles, BookOpen, Lightbulb, CheckCircle2, AlertCircle, Pencil, Trash2, ChevronDown, Brain, PartyPopper } from 'lucide-react';
-import { GoalCard } from '../../components/goals/GoalCard';
 import { AIAssistant } from '../../components/goals/AIAssistant';
 import { ActionItem } from '../../components/goals/ActionItem';
 import { goalTemplates } from '../../constants/goalTemplates';
-import { useGoalStore } from '../../store/goalStore';
-import type { Goal, Step, Task } from '../../types/goal';
+import { useTopicStore } from '../../store/topicStore';
+import type { Topic, Goal, Task } from '../../types/goal';
 import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
 import { SUBJECTS, type SubjectType } from '../../constants/subjects';
 import { subjects } from '../../styles/tokens';
-import { StepItem } from '../../components/goals/StepItem';
+import { GoalItem } from '../../components/goals/GoalItem';
 import { useNavigate } from 'react-router-dom';
 import { FloatingAssistant } from '../../components/assistant/FloatingAssistant';
 import { useAssistant } from '../../hooks/useAssistant';
 
 const StudentPlanning: React.FC = () => {
-  const { goals, updateGoal, updateTask: storeUpdateTask } = useGoalStore();
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  const [showNewGoalModal, setShowNewGoalModal] = useState(false);
+  const { topics, updateTopic, updateTask: storeUpdateTask } = useTopicStore();
+  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
+  const [showNewTopicModal, setShowNewTopicModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showActionItemModal, setShowActionItemModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedGoal, setEditedGoal] = useState<Goal | null>(null);
+  const [editedTopic, setEditedTopic] = useState<Topic | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
-  const [savedGoalIds, setSavedGoalIds] = useState<Set<string>>(new Set());
+  const [savedTopicIds, setSavedTopicIds] = useState<Set<string>>(new Set());
   const [showSubjectSelect, setShowSubjectSelect] = useState(false);
   const [showTypeSelect, setShowTypeSelect] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<string[]>([]);
+  const [expandedGoals, setExpandedGoals] = useState<string[]>([]);
   const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant } = useAssistant({
     position: { x: -120, y: 0 }
   });
@@ -38,8 +37,8 @@ const StudentPlanning: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setSavedGoalIds(new Set(goals.map(goal => goal.id)));
-  }, [goals]);
+    setSavedTopicIds(new Set(topics.map(topic => topic.id)));
+  }, [topics]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,100 +66,100 @@ const StudentPlanning: React.FC = () => {
     setShowTypeSelect(false);
   };
 
-  const handleAddToSchedule = (goalId: string, stepId: string, taskId: string) => {
-    const goal = goals.find(g => g.id === goalId);
+  const handleAddToSchedule = (topicId: string, goalId: string, taskId: string) => {
+    const topic = topics.find(t => t.id === topicId);
+    if (!topic) return;
+
+    const goal = topic.goals.find(g => g.id === goalId);
     if (!goal) return;
 
-    const step = goal.steps.find(s => s.id === stepId);
-    if (!step) return;
-
-    const task = step.tasks.find(t => t.id === taskId);
+    const task = goal.tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    storeUpdateTask(goalId, stepId, { ...task, notes: '已加入排程' });
+    storeUpdateTask(topicId, goalId, { ...task, notes: '已加入排程' });
   };
 
-  const toggleStep = (stepId: string) => {
-    setExpandedSteps(prev =>
-      prev.includes(stepId)
-        ? prev.filter(id => id !== stepId)
-        : [...prev, stepId]
+  const toggleGoal = (goalId: string) => {
+    setExpandedGoals(prev =>
+      prev.includes(goalId)
+        ? prev.filter(id => id !== goalId)
+        : [...prev, goalId]
     );
   };
 
-  const getCompletionRate = (goal: Goal) => {
-    if (!goal?.steps) return 0;
-    const totalTasks = goal.steps.reduce((acc, step) => acc + (step.tasks?.length || 0), 0);
-    const completedTasks = goal.steps.reduce(
-      (acc, step) => acc + (step.tasks?.filter(task => task.status === 'done').length || 0),
+  const getCompletionRate = (topic: Topic) => {
+    if (!topic?.goals) return 0;
+    const totalTasks = topic.goals.reduce((acc, goal) => acc + (goal.tasks?.length || 0), 0);
+    const completedTasks = topic.goals.reduce(
+      (acc, goal) => acc + (goal.tasks?.filter(task => task.status === 'done').length || 0),
       0
     );
     return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   };
 
-  const handleTaskStatusChange = (goalId: string, stepId: string, task: Task) => {
-    storeUpdateTask(goalId, stepId, task);
+  const handleTaskStatusChange = (topicId: string, goalId: string, task: Task) => {
+    storeUpdateTask(topicId, goalId, task);
   };
 
-  const handleTaskEdit = (goalId: string, stepId: string, task: Task) => {
-    storeUpdateTask(goalId, stepId, task);
+  const handleTaskEdit = (topicId: string, goalId: string, task: Task) => {
+    storeUpdateTask(topicId, goalId, task);
   };
 
-  const handleDeleteGoal = (goalId: string) => {
-    const goalToDelete = goals.find(g => g.id === goalId);
-    if (goalToDelete) {
-      const updatedGoal = { ...goalToDelete, status: GOAL_STATUSES.ARCHIVED };
-      console.log('Deleting goal:', { goalId, updatedGoal });
-      updateGoal(updatedGoal);
+  const handleDeleteTopic = (topicId: string) => {
+    const topicToDelete = topics.find(t => t.id === topicId);
+    if (topicToDelete) {
+      const updatedTopic = { ...topicToDelete, status: GOAL_STATUSES.ARCHIVED };
+      console.log('Deleting topic:', { topicId, updatedTopic });
+      updateTopic(updatedTopic);
     }
   };
 
-  const handleAddNewGoal = (newGoal: Goal) => {
-    updateGoal(newGoal);
+  const handleAddNewTopic = (newTopic: Topic) => {
+    updateTopic(newTopic);
   };
 
-  const handleSaveGoal = (goal: Goal) => {
-    updateGoal(goal);
+  const handleSaveTopic = (topic: Topic) => {
+    updateTopic(topic);
   };
 
-  const handleUpdateGoal = (goal: Goal) => {
-    updateGoal(goal);
+  const handleUpdateTopic = (topic: Topic) => {
+    updateTopic(topic);
   };
 
-  const handleGoalSelect = (goal: Goal) => {
-    if (isEditing && editedGoal) {
-      if (!savedGoalIds.has(editedGoal.id)) {
-        handleDeleteGoal(editedGoal.id);
+  const handleTopicSelect = (topic: Topic) => {
+    if (isEditing && editedTopic) {
+      if (!savedTopicIds.has(editedTopic.id)) {
+        handleDeleteTopic(editedTopic.id);
       }
       setIsEditing(false);
       setHasAttemptedSave(false);
     }
-    setSelectedGoal(goal);
-    setEditedGoal(goal);
+    setSelectedTopic(topic);
+    setEditedTopic(topic);
     setAssistantPosition({ x: -120, y: 0 });
   };
 
-  const handleGoalSave = (goal: Goal) => {
-    if (goal.title?.trim() !== '' && 
-        goal.description?.trim() !== '') {
+  const handleTopicSave = (topic: Topic) => {
+    if (topic.title?.trim() !== '' && 
+        topic.description?.trim() !== '') {
       setIsEditing(false);
-      handleUpdateGoal(goal);
-      setSelectedGoal(goal);
+      handleUpdateTopic(topic);
+      setSelectedTopic(topic);
       setHasAttemptedSave(false);
     }
   };
 
-  const handleGoalDelete = (goal: Goal) => {
+  const handleTopicDelete = (topic: Topic) => {
     if (deleteConfirmText === 'delete') {
-      handleDeleteGoal(goal.id);
-      setSelectedGoal(null);
+      handleDeleteTopic(topic.id);
+      setSelectedTopic(null);
       setShowDeleteModal(false);
     }
   };
 
-  const handleGoalFilter = (filteredGoals: Goal[]) => {
+  const handleTopicFilter = (filteredTopics: Topic[]) => {
     // 這裡不需要更新 store，因為我們只是過濾顯示
-    return filteredGoals;
+    return filteredTopics;
   };
 
   return (
@@ -187,33 +186,33 @@ const StudentPlanning: React.FC = () => {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">我的目標</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">我的學習主題</h2>
               <button
                 onClick={() => setShowTemplateModal(true)}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
               >
                 <Plus className="h-4 w-4 mr-1" />
-                新增目標
+                新增主題
               </button>
             </div>
 
             <div className="space-y-3">
-              {goals.filter(goal => goal.status !== GOAL_STATUSES.ARCHIVED).map(goal => (
+              {topics.filter(topic => topic.status !== GOAL_STATUSES.ARCHIVED).map(topic => (
                 <button
-                  key={goal.id}
+                  key={topic.id}
                   onClick={() => {
-                    if (isEditing && editedGoal) {
-                      if (!savedGoalIds.has(editedGoal.id)) {
-                        handleDeleteGoal(editedGoal.id);
+                    if (isEditing && editedTopic) {
+                      if (!savedTopicIds.has(editedTopic.id)) {
+                        handleDeleteTopic(editedTopic.id);
                       }
                       setIsEditing(false);
                       setHasAttemptedSave(false);
                     }
-                    setSelectedGoal(goal);
-                    setEditedGoal(goal);
+                    setSelectedTopic(topic);
+                    setEditedTopic(topic);
                   }}
                   className={`w-full text-left p-3 rounded-lg transition ${
-                    selectedGoal?.id === goal.id
+                    selectedTopic?.id === topic.id
                       ? 'bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-500'
                       : 'border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
@@ -222,25 +221,25 @@ const StudentPlanning: React.FC = () => {
                     <div className="flex-1 min-w-0 flex items-start gap-2">
                       <div className="flex items-center gap-2">
                         <div className={`shrink-0 ${
-                          goal.templateType === '學習目標' ? 'text-purple-500' :
-                          goal.templateType === '個人成長' ? 'text-blue-500' :
-                          goal.templateType === '專案計畫' ? 'text-green-500' :
+                          topic.type === '學習目標' ? 'text-purple-500' :
+                          topic.type === '個人成長' ? 'text-blue-500' :
+                          topic.type === '專案計畫' ? 'text-green-500' :
                           'text-orange-500'
                         }`}>
-                          {goal.templateType === '學習目標' ? <Brain className="h-4 w-4" /> :
-                           goal.templateType === '個人成長' ? <Target className="h-4 w-4" /> :
-                           goal.templateType === '專案計畫' ? <Sparkles className="h-4 w-4" /> :
+                          {topic.type === '學習目標' ? <Brain className="h-4 w-4" /> :
+                           topic.type === '個人成長' ? <Target className="h-4 w-4" /> :
+                           topic.type === '專案計畫' ? <Sparkles className="h-4 w-4" /> :
                            <PartyPopper className="h-4 w-4" />}
                         </div>
                         <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                          {goal.title}
+                          {topic.title}
                         </h3>
                       </div>
                     </div>
                     <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
-                      subjects.getSubjectStyle(goal.subject || '').bg
-                    } ${subjects.getSubjectStyle(goal.subject || '').text}`}>
-                      {goal.subject || '未分類'}
+                      subjects.getSubjectStyle(topic.subject || '').bg
+                    } ${subjects.getSubjectStyle(topic.subject || '').text}`}>
+                      {topic.subject || '未分類'}
                     </span>
                   </div>
 
@@ -248,24 +247,24 @@ const StudentPlanning: React.FC = () => {
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-gray-500 dark:text-gray-400">進度</span>
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {getCompletionRate(goal)}%
+                        {getCompletionRate(topic)}%
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-indigo-600 h-2 rounded-full"
-                        style={{ width: `${getCompletionRate(goal)}%` }}
+                        style={{ width: `${getCompletionRate(topic)}%` }}
                       />
                     </div>
                   </div>
 
-                  {goal.dueDate && (
+                  {topic.dueDate && (
                     <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
                       <Calendar className="h-4 w-4 mr-1" />
                       {new Intl.DateTimeFormat('zh-TW', {
                         month: 'long',
                         day: 'numeric'
-                      }).format(new Date(goal.dueDate))}
+                      }).format(new Date(topic.dueDate))}
                     </div>
                   )}
                 </button>
@@ -322,11 +321,11 @@ const StudentPlanning: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column - Goal Details & Action Items */}
+        {/* Right Column - Topic Details & Action Items */}
         <div className="lg:col-span-2">
-          {selectedGoal ? (
+          {selectedTopic ? (
             <div className="space-y-6">
-              {/* Goal Details */}
+              {/* Topic Details */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex-1">
@@ -334,27 +333,27 @@ const StudentPlanning: React.FC = () => {
                       <div className="space-y-3">
                         <input
                           type="text"
-                          value={editedGoal?.title}
+                          value={editedTopic?.title}
                           onChange={(e) => {
-                            if (editedGoal) {
-                              setEditedGoal({...editedGoal, title: e.target.value});
+                            if (editedTopic) {
+                              setEditedTopic({...editedTopic, title: e.target.value});
                             }
                           }}
-                          placeholder="輸入目標標題（例如：完成科學探索專案）"
+                          placeholder="輸入主題標題（例如：完成科學探索專案）"
                           className={`w-full text-2xl font-bold bg-gray-50 dark:bg-gray-700 border ${
-                            hasAttemptedSave && editedGoal?.title === '' ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                            hasAttemptedSave && editedTopic?.title === '' ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                           } rounded-md px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500`}
                         />
                         <textarea
-                          value={editedGoal?.description}
+                          value={editedTopic?.description}
                           onChange={(e) => {
-                            if (editedGoal) {
-                              setEditedGoal({...editedGoal, description: e.target.value});
+                            if (editedTopic) {
+                              setEditedTopic({...editedTopic, description: e.target.value});
                             }
                           }}
-                          placeholder="描述你的目標內容和期望達成的結果（例如：透過觀察、實驗和記錄，探索自然現象並培養科學思維）"
+                          placeholder="描述你的學習主題內容和期望達成的結果（例如：透過觀察、實驗和記錄，探索自然現象並培養科學思維）"
                           className={`w-full text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border ${
-                            hasAttemptedSave && editedGoal?.description === '' ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                            hasAttemptedSave && editedTopic?.description === '' ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                           } rounded-md px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500`}
                           rows={3}
                         />
@@ -363,17 +362,17 @@ const StudentPlanning: React.FC = () => {
                             <button
                               onClick={handleTypeSelectClick}
                               className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md text-sm font-medium type-select ${
-                                editedGoal?.templateType === '學習目標' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-                                editedGoal?.templateType === '個人成長' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                                editedGoal?.templateType === '專案計畫' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                editedTopic?.type === '學習目標' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                editedTopic?.type === '個人成長' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                editedTopic?.type === '專案計畫' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
                                 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
                               }`}
                             >
-                              {editedGoal?.templateType === '學習目標' ? <Brain className="h-4 w-4" /> :
-                               editedGoal?.templateType === '個人成長' ? <Target className="h-4 w-4" /> :
-                               editedGoal?.templateType === '專案計畫' ? <Sparkles className="h-4 w-4" /> :
+                              {editedTopic?.type === '學習目標' ? <Brain className="h-4 w-4" /> :
+                               editedTopic?.type === '個人成長' ? <Target className="h-4 w-4" /> :
+                               editedTopic?.type === '專案計畫' ? <Sparkles className="h-4 w-4" /> :
                                <PartyPopper className="h-4 w-4" />}
-                              {editedGoal?.templateType}
+                              {editedTopic?.type}
                               <ChevronDown className="h-4 w-4" />
                             </button>
                             
@@ -384,8 +383,8 @@ const StudentPlanning: React.FC = () => {
                                     key={template.title}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (editedGoal) {
-                                        setEditedGoal({...editedGoal, templateType: template.title});
+                                      if (editedTopic) {
+                                        setEditedTopic({...editedTopic, type: template.title});
                                         setShowTypeSelect(false);
                                       }
                                     }}
@@ -408,10 +407,10 @@ const StudentPlanning: React.FC = () => {
                             <button
                               onClick={handleSubjectSelectClick}
                               className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md text-sm font-medium subject-select ${
-                                subjects.getSubjectStyle(editedGoal?.subject || '').bg
-                              } ${subjects.getSubjectStyle(editedGoal?.subject || '').text}`}
+                                subjects.getSubjectStyle(editedTopic?.subject || '').bg
+                              } ${subjects.getSubjectStyle(editedTopic?.subject || '').text}`}
                             >
-                              {editedGoal?.subject || '未分類'}
+                              {editedTopic?.subject || '未分類'}
                               <ChevronDown className="h-4 w-4" />
                             </button>
                             
@@ -422,8 +421,8 @@ const StudentPlanning: React.FC = () => {
                                     key={subject}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (editedGoal) {
-                                        setEditedGoal({...editedGoal, subject});
+                                      if (editedTopic) {
+                                        setEditedTopic({...editedTopic, subject});
                                         setShowSubjectSelect(false);
                                       }
                                     }}
@@ -442,17 +441,17 @@ const StudentPlanning: React.FC = () => {
                           <button
                             onClick={() => {
                               setHasAttemptedSave(true);
-                              if (editedGoal && selectedGoal && 
-                                  editedGoal.title.trim() !== '' && 
-                                  editedGoal.description?.trim() !== '') {
+                              if (editedTopic && selectedTopic && 
+                                  editedTopic.title.trim() !== '' && 
+                                  editedTopic.description?.trim() !== '') {
                                 setIsEditing(false);
-                                updateGoal(editedGoal);
-                                setSelectedGoal(editedGoal);
+                                updateTopic(editedTopic);
+                                setSelectedTopic(editedTopic);
                                 setHasAttemptedSave(false);
-                                setSavedGoalIds(prev => new Set(prev).add(editedGoal.id));
+                                setSavedTopicIds(prev => new Set(prev).add(editedTopic.id));
                               }
                             }}
-                            disabled={!editedGoal?.title || !editedGoal?.description}
+                            disabled={!editedTopic?.title || !editedTopic?.description}
                             className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             保存
@@ -460,7 +459,7 @@ const StudentPlanning: React.FC = () => {
                           <button
                             onClick={() => {
                               setIsEditing(false);
-                              setEditedGoal(selectedGoal);
+                              setEditedTopic(selectedTopic);
                             }}
                             className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
                           >
@@ -471,28 +470,28 @@ const StudentPlanning: React.FC = () => {
                     ) : (
                       <>
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {selectedGoal.title}
+                          {selectedTopic.title}
                         </h2>
                         <p className="mt-1 text-gray-600 dark:text-gray-300">
-                          {selectedGoal.description}
+                          {selectedTopic.description}
                         </p>
                         <div className="mt-2 flex gap-2">
                           <span className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md text-sm font-medium ${
-                            selectedGoal.templateType === '學習目標' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-                            selectedGoal.templateType === '個人成長' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                            selectedGoal.templateType === '專案計畫' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                            selectedTopic.type === '學習目標' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                            selectedTopic.type === '個人成長' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                            selectedTopic.type === '專案計畫' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
                             'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
                           }`}>
-                            {selectedGoal.templateType === '學習目標' ? <Brain className="h-4 w-4" /> :
-                             selectedGoal.templateType === '個人成長' ? <Target className="h-4 w-4" /> :
-                             selectedGoal.templateType === '專案計畫' ? <Sparkles className="h-4 w-4" /> :
+                            {selectedTopic.type === '學習目標' ? <Brain className="h-4 w-4" /> :
+                             selectedTopic.type === '個人成長' ? <Target className="h-4 w-4" /> :
+                             selectedTopic.type === '專案計畫' ? <Sparkles className="h-4 w-4" /> :
                              <PartyPopper className="h-4 w-4" />}
-                            {selectedGoal.templateType}
+                            {selectedTopic.type}
                           </span>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium ${
-                            subjects.getSubjectStyle(selectedGoal.subject || '').bg
-                          } ${subjects.getSubjectStyle(selectedGoal.subject || '').text}`}>
-                            {selectedGoal.subject || '未分類'}
+                            subjects.getSubjectStyle(selectedTopic.subject || '').bg
+                          } ${subjects.getSubjectStyle(selectedTopic.subject || '').text}`}>
+                            {selectedTopic.subject || '未分類'}
                           </span>
                         </div>
                       </>
@@ -503,14 +502,14 @@ const StudentPlanning: React.FC = () => {
                       <button
                         onClick={() => {
                           setIsEditing(true);
-                          setEditedGoal(selectedGoal);
+                          setEditedTopic(selectedTopic);
                         }}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       >
                         <Pencil className="h-5 w-5" />
                       </button>
                       <button
-                        onClick={() => navigate(`/student/planning/goal/${selectedGoal.id}`)}
+                        onClick={() => navigate(`/student/planning/topic/${selectedTopic.id}`)}
                         className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
                       >
                         <Brain className="h-5 w-5" />
@@ -535,51 +534,51 @@ const StudentPlanning: React.FC = () => {
                   <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">總進度</p>
                     <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                      {getCompletionRate(selectedGoal)}%
+                      {getCompletionRate(selectedTopic)}%
                     </p>
                   </div>
                   <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">已完成項目</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {selectedGoal.steps.reduce((acc, step) => 
-                        acc + step.tasks.filter(task => task.status === 'done').length, 0
+                      {selectedTopic.goals.reduce((acc, goal) => 
+                        acc + goal.tasks.filter(task => task.status === 'done').length, 0
                       )}
                     </p>
                   </div>
                   <div className="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">待辦項目</p>
                     <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                      {selectedGoal.steps.reduce((acc, step) => 
-                        acc + step.tasks.filter(task => task.status === 'todo').length, 0
+                      {selectedTopic.goals.reduce((acc, goal) => 
+                        acc + goal.tasks.filter(task => task.status === 'todo').length, 0
                       )}
                     </p>
                   </div>
                 </div>
 
-                {/* Steps List */}
+                {/* Goals List */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      學習步驟
+                      學習目標
                     </h3>
                     <button
-                      onClick={() => {/* 添加步驟的邏輯 */}}
+                      onClick={() => {/* 添加目標的邏輯 */}}
                       className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50"
                     >
                       <Plus className="h-4 w-4 mr-1" />
-                      新增步驟
+                      新增目標
                     </button>
                   </div>
 
                   <div className="space-y-3">
-                    {selectedGoal.steps.map(step => (
-                      <StepItem
-                        key={step.id}
-                        step={step}
-                        isExpanded={expandedSteps.includes(step.id)}
-                        onToggle={() => toggleStep(step.id)}
-                        onTaskStatusChange={(task) => handleTaskStatusChange(selectedGoal.id, step.id, task)}
-                        onTaskEdit={(task) => handleTaskEdit(selectedGoal.id, step.id, task)}
+                    {selectedTopic.goals.map(goal => (
+                      <GoalItem
+                        key={goal.id}
+                        goal={goal}
+                        isExpanded={expandedGoals.includes(goal.id)}
+                        onToggle={() => toggleGoal(goal.id)}
+                        onTaskStatusChange={(task) => handleTaskStatusChange(selectedTopic.id, goal.id, task)}
+                        onTaskEdit={(task) => handleTaskEdit(selectedTopic.id, goal.id, task)}
                         onAddTask={() => {/* 添加任務的邏輯 */}}
                       />
                     ))}
@@ -613,10 +612,10 @@ const StudentPlanning: React.FC = () => {
               <div className="max-w-sm mx-auto">
                 <Target className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  選擇一個目標開始
+                  選擇一個學習主題開始
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400">
-                  從左側選擇一個目標，或點擊「新增目標」來開始規劃你的學習之旅。
+                  從左側選擇一個學習主題，或點擊「新增主題」來開始規劃你的學習之旅。
                 </p>
               </div>
             </div>
@@ -630,7 +629,7 @@ const StudentPlanning: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full">
             <div className="p-6">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                選擇目標類型
+                選擇學習主題類型
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -638,22 +637,22 @@ const StudentPlanning: React.FC = () => {
                   <button
                     key={index}
                     onClick={() => {
-                      const newGoal: Goal = {
+                      const newTopic: Topic = {
                         id: crypto.randomUUID(),
                         title: '',
                         description: '',
-                        templateType: template.title,
+                        type: template.title,
                         subject: SUBJECTS.CUSTOM,
                         dueDate: new Date().toISOString(),
                         progress: 0,
-                        steps: [],
+                        goals: [],
                         status: 'active'
                       };
                       
                       setShowTemplateModal(false);
-                      updateGoal(newGoal);
-                      setSelectedGoal(newGoal);
-                      setEditedGoal(newGoal);
+                      updateTopic(newTopic);
+                      setSelectedTopic(newTopic);
+                      setEditedTopic(newTopic);
                       setIsEditing(true);
                     }}
                     className="p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-indigo-500 dark:hover:border-indigo-500 transition text-left"
@@ -689,10 +688,10 @@ const StudentPlanning: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              確認刪除目標
+              確認刪除學習主題
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              確定要刪除此目標嗎？此操作無法復原。
+              確定要刪除此學習主題嗎？此操作無法復原。
             </p>
             <div className="flex justify-end space-x-2">
               <button
@@ -706,9 +705,9 @@ const StudentPlanning: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  if (selectedGoal) {
-                    handleDeleteGoal(selectedGoal.id);
-                    setSelectedGoal(null);
+                  if (selectedTopic) {
+                    handleDeleteTopic(selectedTopic.id);
+                    setSelectedTopic(null);
                     setShowDeleteModal(false);
                     setDeleteConfirmText('');
                   }

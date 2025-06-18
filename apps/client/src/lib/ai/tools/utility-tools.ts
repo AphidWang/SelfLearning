@@ -1,4 +1,4 @@
-import { useGoalStore } from '../../../store/goalStore';
+import { useTopicStore } from '../../../store/topicStore';
 import type { Tool } from './types';
 import { ActionValidator } from '../utils/actionValidator';
 
@@ -9,16 +9,16 @@ export const summarizeProgressTool: Tool<void, { progress: number; summary: stri
   name: 'summarize_progress',
   description: '顯示目前進度',
   handler: async () => {
-    const goalStore = useGoalStore.getState();
-    const selectedGoalId = goalStore.selectedGoalId;
-    if (!selectedGoalId) return { progress: 0, summary: '' };
+    const topicStore = useTopicStore.getState();
+    const selectedTopicId = topicStore.selectedTopicId;
+    if (!selectedTopicId) return { progress: 0, summary: '' };
 
-    const goal = goalStore.goals.find(g => g.id === selectedGoalId);
-    if (!goal) return { progress: 0, summary: '' };
+    const topic = topicStore.topics.find(t => t.id === selectedTopicId);
+    if (!topic) return { progress: 0, summary: '' };
 
-    const totalTasks = goal.steps.reduce((sum, step) => sum + step.tasks.length, 0);
-    const completedTasks = goal.steps.reduce((sum, step) => 
-      sum + step.tasks.filter(task => task.status === 'done').length, 0
+    const totalTasks = topic.goals.reduce((sum, goal) => sum + goal.tasks.length, 0);
+    const completedTasks = topic.goals.reduce((sum, goal) => 
+      sum + goal.tasks.filter(task => task.status === 'done').length, 0
     );
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 

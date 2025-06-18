@@ -18,6 +18,7 @@ import CourseBluePrint from './pages/mentor/CourseBluePrint';
 import { CurriculumProvider } from './context/CurriculumContext';
 import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
+import TopicMindMapPage from './pages/student/TopicMindMapPage.tsx';
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
 // import { initGA } from './utils/analytics';
@@ -41,6 +42,7 @@ function App() {
             <Route path="/student/tasks" element={<StudentTasks />} />
             <Route path="/student/planning" element={<StudentPlanning />} />
             <Route path="/student/planning/goal/:goalId" element={<GoalMindMapPage />} />
+            <Route path="/student/planning/topic/:topicId" element={<TopicMindMapPage />} />
             <Route path="/student/journal" element={<StudentJournal />} />
             <Route path="/student/goals" element={<StudentGoals />} />
             <Route path="/student/learning-map" element={<StudentLearningMap />} />

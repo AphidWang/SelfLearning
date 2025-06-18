@@ -1,15 +1,15 @@
-import { createTopicTool, createStepTool, createTaskTool, useTemplateStepsTool, completeTopicTool, markAsBookmarkTool } from './goal-tools';
+import { createTopicTool, createGoalTool, createTaskTool, useTemplateGoalsTool, completeTopicTool, markAsBookmarkTool } from './goal-tools';
 import { suggestTopicsTool, suggestStepsTool, suggestTasksTool, exploreMoreTool } from './suggestion-tools';
 import { summarizeProgressTool, askForInputTool } from './utility-tools';
 
 export const tools = [
   createTopicTool,
-  createStepTool,
+  createGoalTool,
   createTaskTool,
   suggestTopicsTool,
   suggestStepsTool,
   suggestTasksTool,
-  useTemplateStepsTool,
+  useTemplateGoalsTool,
   summarizeProgressTool,
   markAsBookmarkTool,
   completeTopicTool,

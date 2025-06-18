@@ -1,84 +1,84 @@
-import { useGoalStore } from '../../../store/goalStore';
+import { useTopicStore } from '../../../store/topicStore';
 import type { Tool } from './types';
-import type { Goal, Step, Task, GoalStatus } from '../../../types/goal';
+import type { Topic, Goal, Task } from '../../../types/goal';
 
 // 建立主題
-export const createTopicTool: Tool<{ topic: string }, Goal> = {
+export const createTopicTool: Tool<{ topic: string }, Topic> = {
   name: 'create_topic',
   description: '建立新的學習主題',
   handler: async (params) => {
-    const goalStore = useGoalStore.getState();
-    const newGoal: Goal = {
+    const topicStore = useTopicStore.getState();
+    const newTopic: Topic = {
       id: Date.now().toString(),
       title: params.topic,
       description: '',
       status: 'active',
-      steps: []
+      goals: []
     };
-    goalStore.addGoal(newGoal);
+    topicStore.addTopic(newTopic);
+    return newTopic;
+  }
+};
+
+// 建立目標
+export const createGoalTool: Tool<{ goal_name: string }, Goal> = {
+  name: 'create_goal',
+  description: '建立新的學習目標',
+  handler: async (params) => {
+    const topicStore = useTopicStore.getState();
+    const selectedTopicId = topicStore.selectedTopicId;
+    if (!selectedTopicId) throw new Error('No topic selected');
+
+    const newGoal: Goal = {
+      id: `${selectedTopicId}-${Date.now()}`,
+      title: params.goal_name,
+      tasks: []
+    };
+    topicStore.addGoal(selectedTopicId, newGoal);
     return newGoal;
   }
 };
 
-// 建立步驟
-export const createStepTool: Tool<{ step_name: string }, Step> = {
-  name: 'create_step',
-  description: '建立新的學習步驟',
-  handler: async (params) => {
-    const goalStore = useGoalStore.getState();
-    const selectedGoalId = goalStore.selectedGoalId;
-    if (!selectedGoalId) throw new Error('No goal selected');
-
-    const newStep: Step = {
-      id: `${selectedGoalId}-${Date.now()}`,
-      title: params.step_name,
-      tasks: []
-    };
-    goalStore.addStep(selectedGoalId, newStep);
-    return newStep;
-  }
-};
-
 // 建立任務
-export const createTaskTool: Tool<{ task_name: string; step_tag: string }, Task> = {
+export const createTaskTool: Tool<{ task_name: string; goal_id: string }, Task> = {
   name: 'create_task',
   description: '建立新的學習任務',
   handler: async (params) => {
-    const goalStore = useGoalStore.getState();
-    const selectedGoalId = goalStore.selectedGoalId;
-    if (!selectedGoalId) throw new Error('No goal selected');
+    const topicStore = useTopicStore.getState();
+    const selectedTopicId = topicStore.selectedTopicId;
+    if (!selectedTopicId) throw new Error('No topic selected');
 
     const newTask: Task = {
-      id: `${params.step_tag}-${Date.now()}`,
+      id: `${params.goal_id}-${Date.now()}`,
       title: params.task_name,
       status: 'todo'
     };
-    goalStore.addTask(selectedGoalId, params.step_tag, newTask);
+    topicStore.addTask(selectedTopicId, params.goal_id, newTask);
     return newTask;
   }
 };
 
-// 使用模板步驟
-export const useTemplateStepsTool: Tool<void, string[]> = {
-  name: 'use_template_steps',
+// 使用模板目標
+export const useTemplateGoalsTool: Tool<void, string[]> = {
+  name: 'use_template_goals',
   description: '建立觀察/行動/紀錄/分享',
   handler: async () => {
-    const goalStore = useGoalStore.getState();
-    const selectedGoalId = goalStore.selectedGoalId;
-    if (!selectedGoalId) throw new Error('No goal selected');
+    const topicStore = useTopicStore.getState();
+    const selectedTopicId = topicStore.selectedTopicId;
+    if (!selectedTopicId) throw new Error('No topic selected');
 
-    const templateSteps = ['觀察', '行動', '紀錄', '分享'];
-    const steps = templateSteps.map(stepName => {
-      const step: Step = {
-        id: `${selectedGoalId}-${Date.now()}-${stepName}`,
-        title: stepName,
+    const templateGoals = ['觀察', '行動', '紀錄', '分享'];
+    const goals = templateGoals.map(goalName => {
+      const goal: Goal = {
+        id: `${selectedTopicId}-${Date.now()}-${goalName}`,
+        title: goalName,
         tasks: []
       };
-      goalStore.addStep(selectedGoalId, step);
-      return step;
+      topicStore.addGoal(selectedTopicId, goal);
+      return goal;
     });
 
-    return steps.map(step => step.title);
+    return goals.map(goal => goal.title);
   }
 };
 
@@ -87,15 +87,15 @@ export const completeTopicTool: Tool<void, boolean> = {
   name: 'complete_topic',
   description: '結束主題',
   handler: async () => {
-    const goalStore = useGoalStore.getState();
-    const selectedGoalId = goalStore.selectedGoalId;
-    if (!selectedGoalId) return false;
+    const topicStore = useTopicStore.getState();
+    const selectedTopicId = topicStore.selectedTopicId;
+    if (!selectedTopicId) return false;
 
-    const goal = goalStore.goals.find(g => g.id === selectedGoalId);
-    if (!goal) return false;
+    const topic = topicStore.topics.find(t => t.id === selectedTopicId);
+    if (!topic) return false;
 
-    goalStore.updateGoal({
-      ...goal,
+    topicStore.updateTopic({
+      ...topic,
       status: 'completed'
     });
     return true;
@@ -107,15 +107,15 @@ export const markAsBookmarkTool: Tool<void, boolean> = {
   name: 'mark_as_bookmark',
   description: '收藏主題',
   handler: async () => {
-    const goalStore = useGoalStore.getState();
-    const selectedGoalId = goalStore.selectedGoalId;
-    if (!selectedGoalId) return false;
+    const topicStore = useTopicStore.getState();
+    const selectedTopicId = topicStore.selectedTopicId;
+    if (!selectedTopicId) return false;
 
-    const goal = goalStore.goals.find(g => g.id === selectedGoalId);
-    if (!goal) return false;
+    const topic = topicStore.topics.find(t => t.id === selectedTopicId);
+    if (!topic) return false;
 
-    goalStore.updateGoal({
-      ...goal,
+    topicStore.updateTopic({
+      ...topic,
       status: 'archived'
     });
     return true;
