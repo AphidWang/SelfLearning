@@ -2,9 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Goal } from '../../types/goal';
 import { GoalDetails } from './GoalDetails';
-import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upload, Play, Menu, ArrowUpRight, Plus, X, AlertCircle, Brain, Target, Sparkles, PartyPopper, List } from 'lucide-react';
+import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upload, Play, Menu, ArrowUpRight, Plus, X, AlertCircle, Brain, Target, Sparkles, PartyPopper, List, LayoutTemplate, Network } from 'lucide-react';
 import { subjects } from '../../styles/tokens';
 import { useGoalStore } from '../../store/goalStore';
+import { GoalOverviewDialog } from './GoalOverviewDialog';
+import { GoalReviewPage } from './GoalReviewPage';
 
 interface WeeklyActivity {
   id: string;
@@ -49,6 +51,8 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showOverview, setShowOverview] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const historyScrollRef = useRef<HTMLDivElement>(null);
   const subjectStyle = subjects.getSubjectStyle(goal.subject || '');
   const { getActiveSteps, getCompletionRate, addTask } = useGoalStore();
@@ -379,6 +383,20 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
         <div className="flex items-center gap-2">
           {!showHistory && !showDetails && (
             <>
+              <button
+                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                onClick={() => setShowOverview(true)}
+                aria-label="目標概覽"
+              >
+                <LayoutTemplate className="w-4 h-4" />
+              </button>
+              <button
+                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                onClick={() => setShowReview(true)}
+                aria-label="學習回顧"
+              >
+                <Network className="w-4 h-4" />
+              </button>
               <button
                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
                 onClick={handleShowHistory}
@@ -874,6 +892,28 @@ export const GoalDetailsDialog: React.FC<GoalDetailsDialogProps> = ({
             </button>
           </div>
         </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* GoalReviewPage */}
+    <AnimatePresence>
+      {showReview && (
+        <GoalReviewPage
+          goalId={goal.id}
+          onClose={() => setShowReview(false)}
+          onTaskClick={onTaskClick}
+          onStepClick={(stepId) => console.log('Step clicked:', stepId)}
+        />
+      )}
+    </AnimatePresence>
+
+    {/* GoalOverviewDialog */}
+    <AnimatePresence>
+      {showOverview && (
+        <GoalOverviewDialog
+          goalId={goal.id}
+          onClose={() => setShowOverview(false)}
+        />
       )}
     </AnimatePresence>
     </div>
