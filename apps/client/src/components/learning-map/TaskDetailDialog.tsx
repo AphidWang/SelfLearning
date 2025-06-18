@@ -6,13 +6,13 @@ import {
   HelpCircle, CheckCircle, PlayCircle,
   Target, Upload, PauseCircle, X, Pencil, Star, Sparkles, Edit3
 } from 'lucide-react';
-import { useGoalStore } from '../../store/goalStore';
+import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 
 interface TaskDetailDialogProps {
   task: Task;
-  stepId: string;
   goalId: string;
+  topicId: string;
   onClose: () => void;
   onBack: () => void;
   onHelpRequest: (taskId: string) => void;
@@ -23,13 +23,13 @@ type ChallengeLevel = 1 | 2 | 3 | 4 | 5;
 
 export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   task,
-  stepId,
   goalId,
+  topicId,
   onClose,
   onBack,
   onHelpRequest
 }) => {
-  const { updateTask, getGoal } = useGoalStore();
+  const { updateTask, getTopic } = useTopicStore();
   const [comment, setComment] = useState('');
   const [challenge, setChallenge] = useState<ChallengeLevel | undefined>(task.challenge as ChallengeLevel | undefined);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -39,8 +39,8 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const goal = getGoal(goalId);
-  const subjectStyle = subjects.getSubjectStyle(goal?.subject || '');
+  const topic = getTopic(topicId);
+  const subjectStyle = subjects.getSubjectStyle(topic?.subject || '');
 
   const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
     const updatedTask = {
@@ -49,12 +49,12 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
       challenge: challenge as number,
       completedAt: status === 'done' ? new Date().toISOString() : undefined
     };
-    updateTask(goalId, stepId, updatedTask);
+    updateTask(topicId, goalId, updatedTask);
     onBack();
   };
 
   const handleSaveDescription = () => {
-    updateTask(goalId, stepId, editedTask);
+    updateTask(topicId, goalId, editedTask);
     setIsEditing(false);
   };
 

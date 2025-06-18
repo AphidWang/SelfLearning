@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useGoalStore } from '../../store/goalStore';
+import { useTopicStore } from '../../store/topicStore';
 import { subjectColors } from '../../styles/tokens';
-import { GoalRadialMap, useGoalRadialMapStats } from './GoalRadialMap';
-import type { Step, Task } from '../../types/goal';
+import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
+import type { Goal, Task } from '../../types/goal';
 import { 
   Brain, TrendingUp, Calendar, Trophy, Star, Clock, 
   CheckCircle2, Target, BookOpen, Zap, Award, 
@@ -11,55 +11,55 @@ import {
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare
 } from 'lucide-react';
 
-interface GoalReviewPageProps {
-  goalId: string;
-  onTaskClick?: (taskId: string, stepId: string) => void;
-  onStepClick?: (stepId: string) => void;
+interface TopicReviewPageProps {
+  topicId: string;
+  onTaskClick?: (taskId: string, goalId: string) => void;
+  onGoalClick?: (goalId: string) => void;
   onClose: () => void;
 }
 
-export const GoalReviewPage: React.FC<GoalReviewPageProps> = ({
-  goalId,
+export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
+  topicId,
   onTaskClick,
-  onStepClick,
+  onGoalClick,
   onClose
 }) => {
-  const { getGoal, getCompletionRate } = useGoalStore();
-  const goal = getGoal(goalId);
-  const weeklyStats = useGoalRadialMapStats(goalId);
+  const { getTopic, getCompletionRate } = useTopicStore();
+  const topic = getTopic(topicId);
+  const weeklyStats = useTopicRadialMapStats(topicId);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'week' | 'month' | 'all'>('week');
-  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
-  if (!goal) {
+  if (!topic) {
     return null;
   }
 
-  const subjectColor = subjectColors[goal.subject || '未分類'];
-  const progress = getCompletionRate(goal.id);
+  const subjectColor = subjectColors[topic.subject || '未分類'];
+  const progress = getCompletionRate(topic.id);
 
   // 處理 RadialMap 的點擊事件
-  const handleRadialMapStepClick = (stepId: string) => {
-    setSelectedStepId(stepId);
+  const handleRadialMapGoalClick = (goalId: string) => {
+    setSelectedGoalId(goalId);
     setSelectedTaskId(null); // 清除任務選擇
-    onStepClick?.(stepId);
+    onGoalClick?.(goalId);
   };
 
-  const handleRadialMapTaskClick = (taskId: string, stepId: string) => {
-    setSelectedStepId(stepId);
+  const handleRadialMapTaskClick = (taskId: string, goalId: string) => {
+    setSelectedGoalId(goalId);
     setSelectedTaskId(taskId);
-    onTaskClick?.(taskId, stepId);
+    onTaskClick?.(taskId, goalId);
   };
 
   // 處理右側面板的任務點擊（用於詳細編輯）
-  const handleInfoPanelTaskClick = (taskId: string, stepId: string) => {
+  const handleInfoPanelTaskClick = (taskId: string, goalId: string) => {
     // 如果是要詳細編輯，保持選中狀態並調用原始回調
-    onTaskClick?.(taskId, stepId);
+    onTaskClick?.(taskId, goalId);
   };
 
   // 處理右側面板中任務項目的點擊（用於選擇）
-  const handleInfoPanelTaskSelect = (taskId: string, stepId: string) => {
-    setSelectedStepId(stepId);
+  const handleInfoPanelTaskSelect = (taskId: string, goalId: string) => {
+    setSelectedGoalId(goalId);
     setSelectedTaskId(taskId);
   };
 
@@ -95,9 +95,9 @@ export const GoalReviewPage: React.FC<GoalReviewPageProps> = ({
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                    {goal.title} - 學習回顧
+                    {topic.title} - 主題回顧
                   </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{goal.description}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{topic.description}</p>
                 </div>
               </div>
             
@@ -295,15 +295,15 @@ export const GoalReviewPage: React.FC<GoalReviewPageProps> = ({
                 
                 <div className="flex-1 p-4 flex items-center justify-center">
                   <div className="w-full h-full max-w-[760px] max-h-[460px] flex items-center justify-center">
-                    <GoalRadialMap
-                      goalId={goalId}
+                    <TopicRadialMap
+                      topicId={topicId}
                       width={760}
                       height={460}
                       showAnimations={true}
-                      selectedStepId={selectedStepId}
+                      selectedGoalId={selectedGoalId}
                       selectedTaskId={selectedTaskId}
                       onTaskClick={handleRadialMapTaskClick}
-                      onStepClick={handleRadialMapStepClick}
+                      onGoalClick={handleRadialMapGoalClick}
                       className="w-full h-full"
                     />
                   </div>
@@ -313,14 +313,14 @@ export const GoalReviewPage: React.FC<GoalReviewPageProps> = ({
 
             {/* 右側資訊面板 */}
             <div className="col-span-3 h-full">
-              <StepTaskInfoPanel
-                goalId={goalId}
-                selectedStepId={selectedStepId}
+              <GoalTaskInfoPanel
+                topicId={topicId}
+                selectedGoalId={selectedGoalId}
                 selectedTaskId={selectedTaskId}
                 subjectColor={subjectColor}
                 onTaskClick={handleInfoPanelTaskClick}
                 onTaskSelect={handleInfoPanelTaskSelect}
-                onStepClick={onStepClick}
+                onGoalClick={onGoalClick}
               />
             </div>
         </div>
@@ -330,35 +330,35 @@ export const GoalReviewPage: React.FC<GoalReviewPageProps> = ({
   );
 };
 
-// StepTaskInfoPanel 組件
-interface StepTaskInfoPanelProps {
-  goalId: string;
-  selectedStepId: string | null;
+// GoalTaskInfoPanel 組件
+interface GoalTaskInfoPanelProps {
+  topicId: string;
+  selectedGoalId: string | null;
   selectedTaskId: string | null;
   subjectColor: string;
-  onTaskClick?: (taskId: string, stepId: string) => void;
-  onTaskSelect?: (taskId: string, stepId: string) => void;
-  onStepClick?: (stepId: string) => void;
+  onTaskClick?: (taskId: string, goalId: string) => void;
+  onTaskSelect?: (taskId: string, goalId: string) => void;
+  onGoalClick?: (goalId: string) => void;
 }
 
-const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
-  goalId,
-  selectedStepId,
+const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
+  topicId,
+  selectedGoalId,
   selectedTaskId,
   subjectColor,
   onTaskClick,
   onTaskSelect,
-  onStepClick
+  onGoalClick
 }) => {
-  const { getGoal } = useGoalStore();
-  const goal = getGoal(goalId);
+  const { getTopic } = useTopicStore();
+  const topic = getTopic(topicId);
   
   // 根據選擇顯示不同內容
-  const selectedStep = selectedStepId ? goal?.steps.find(step => step.id === selectedStepId) : null;
-  const selectedTask = selectedTaskId && selectedStep ? 
-    selectedStep.tasks.find(task => task.id === selectedTaskId) : null;
+  const selectedGoal = selectedGoalId ? topic?.goals.find(goal => goal.id === selectedGoalId) : null;
+  const selectedTask = selectedTaskId && selectedGoal ? 
+    selectedGoal.tasks.find(task => task.id === selectedTaskId) : null;
 
-  if (selectedTask && selectedStep) {
+  if (selectedTask && selectedGoal) {
     // 顯示任務詳情
     return (
       <motion.div
@@ -389,7 +389,7 @@ const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
             {selectedTask.title}
           </h4>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-gray-500">來自步驟: {selectedStep.title}</span>
+            <span className="text-xs text-gray-500">來自目標: {selectedGoal.title}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
               selectedTask.status === 'done' ? 'bg-green-100 text-green-700' :
               selectedTask.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :
@@ -443,7 +443,7 @@ const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
         {/* 操作按鈕 */}
         <div className="mt-3 relative z-10">
           <button
-            onClick={() => onTaskClick?.(selectedTask.id, selectedStep.id)}
+            onClick={() => onTaskClick?.(selectedTask.id, selectedGoal.id)}
             className="w-full py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-300"
           >
             詳細編輯
@@ -453,11 +453,11 @@ const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
     );
   }
 
-  if (selectedStep) {
-    // 顯示步驟詳情
-    const totalTasks = selectedStep.tasks.length;
-    const completedTasks = selectedStep.tasks.filter(task => task.status === 'done').length;
-    const inProgressTasks = selectedStep.tasks.filter(task => task.status === 'in_progress').length;
+  if (selectedGoal) {
+    // 顯示目標詳情
+    const totalTasks = selectedGoal.tasks.length;
+    const completedTasks = selectedGoal.tasks.filter(task => task.status === 'done').length;
+    const inProgressTasks = selectedGoal.tasks.filter(task => task.status === 'in_progress').length;
     const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
     return (
@@ -486,7 +486,7 @@ const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
         {/* 步驟標題和進度 */}
         <div className="mb-4 relative z-10">
           <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-2">
-            {selectedStep.title}
+            {selectedGoal.title}
           </h4>
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -512,19 +512,19 @@ const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
         {/* 任務列表 */}
         <div className="flex-1 overflow-auto relative z-10">
           <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">任務列表</h5>
-          <div className="space-y-2">
-                         {selectedStep.tasks.slice(0, 5).map((task) => {
-               const isSelected = selectedTaskId === task.id;
-               return (
-                 <div
-                   key={task.id}
-                   className={`p-2 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${
-                     isSelected ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-300' :
-                     task.status === 'done' ? 'bg-green-50 border-green-200' : 
-                     task.status === 'in_progress' ? 'bg-purple-50 border-purple-200' : 
-                     'bg-gray-50 border-gray-200'
-                   }`}
-                   onClick={() => onTaskSelect?.(task.id, selectedStep.id)}
+                    <div className="space-y-2">
+            {selectedGoal.tasks.slice(0, 5).map((task) => {
+              const isSelected = selectedTaskId === task.id;
+              return (
+                <div
+                  key={task.id}
+                  className={`p-2 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${
+                    isSelected ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-300' :
+                    task.status === 'done' ? 'bg-green-50 border-green-200' : 
+                    task.status === 'in_progress' ? 'bg-purple-50 border-purple-200' : 
+                    'bg-gray-50 border-gray-200'
+                  }`}
+                  onClick={() => onTaskSelect?.(task.id, selectedGoal.id)}
                  >
                 <div className="flex items-center gap-2">
                   {task.status === 'done' ? (
@@ -544,12 +544,12 @@ const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
                </div>
                  );
                })}
-            {selectedStep.tasks.length > 5 && (
+            {selectedGoal.tasks.length > 5 && (
               <div className="text-center text-xs text-gray-500 py-1">
-                還有 {selectedStep.tasks.length - 5} 個任務...
+                還有 {selectedGoal.tasks.length - 5} 個任務...
               </div>
             )}
-            {selectedStep.tasks.length === 0 && (
+            {selectedGoal.tasks.length === 0 && (
               <div className="text-center text-xs text-gray-500 py-4">
                 此步驟還沒有任務
               </div>
@@ -591,4 +591,6 @@ const StepTaskInfoPanel: React.FC<StepTaskInfoPanelProps> = ({
   );
 };
 
-export type { GoalReviewPageProps }; 
+// 兼容性導出
+export const GoalReviewPage = TopicReviewPage;
+export type { TopicReviewPageProps, TopicReviewPageProps as GoalReviewPageProps }; 

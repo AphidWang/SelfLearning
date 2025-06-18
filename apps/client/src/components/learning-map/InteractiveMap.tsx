@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapIcon } from './MapIcon';
-import { Goal } from '../../types/goal';
+import { Topic } from '../../types/goal';
 import mapImage from '../../assets/maps/sep-twtour/map-sep.png';
 import heyaImg from '../../assets/maps/sep-twtour/buildings/heya.png';
 import jinImg from '../../assets/maps/sep-twtour/character/jin.png';
@@ -10,16 +10,16 @@ import mailboxImg from '../../assets/maps/sep-twtour/buildings/mailbox.png';
 import { Sparkles } from 'lucide-react';
 
 interface InteractiveMapProps {
-  goals: Goal[];
-  onGoalClick: (goalId: string) => void;
+  topics: Topic[];
+  onTopicClick: (topicId: string) => void;
   onCampfireClick: () => void;
   onMailboxClick: () => void;
   onHouseClick: () => void;
 }
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
-  goals,
-  onGoalClick,
+  topics,
+  onTopicClick,
   onCampfireClick,
   onMailboxClick,
   onHouseClick,
@@ -39,7 +39,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [scale, setScale] = useState(1);
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
   const [isMoving, setIsMoving] = useState(false);
-  const [showGoalOrbs, setShowGoalOrbs] = useState(false);
+  const [showTopicOrbs, setShowTopicOrbs] = useState(false);
   const [hoveredMailbox, setHoveredMailbox] = useState(false);
   const [hoveredOrbArea, setHoveredOrbArea] = useState(false);
 
@@ -142,8 +142,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 transformOrigin: 'top left'
               }}
             >
-              {/* 固定位置的小人 - 第一個 goal */}
-              {goals[0] && mapSize.width > 0 && (
+              {/* 固定位置的小人 - 第一個 topic */}
+              {topics.length > 0 && mapSize.width > 0 && (
                 <div 
                   className="absolute transition-all duration-[1500ms] linear"
                   style={{
@@ -155,17 +155,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   }}
                 >
                   <MapIcon
-                    goal={goals[0]}
+                    topic={topics[0]}
                     src={jinImg}
                     left={0}
                     top={0}
-                    onGoalClick={onGoalClick}
+                    onTopicClick={onTopicClick}
                   />
                 </div>
               )}
 
-              {/* 固定位置的房子 - 第二個 goal */}
-              {goals[1] && mapSize.width > 0 && (
+              {/* 固定位置的房子 - 第二個 topic */}
+              {topics.length > 1 && mapSize.width > 0 && (
                 <div className="absolute" style={{
                   left: `${(8 / 100) * mapSize.width / scale}px`,
                   top: `${(26 / 100) * mapSize.height / scale}px`,
@@ -176,18 +176,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onClick={onHouseClick}
                 >
                   <MapIcon
-                    goal={goals[1]}
+                    topic={topics[1]}
                     src={heyaImg}
                     left={0}
                     top={0}
-                    onGoalClick={onHouseClick}
+                    onTopicClick={onHouseClick}
                     flip={true}
                   />
                 </div>
               )}
 
-              {/* 固定位置的火 - 第三個 goal */}
-              {goals[2] && mapSize.width > 0 && (
+              {/* 固定位置的火 - 營火永遠可點，顯示複習功能 */}
+              {mapSize.width > 0 && (
                 <div className="absolute" style={{
                   left: `${(34 / 100) * mapSize.width / scale}px`,
                   top: `${(74 / 100) * mapSize.height / scale}px`,
@@ -199,17 +199,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onClick={onCampfireClick}
                 >
                   <MapIcon
-                    goal={goals[2]}
+                    topic={topics[2]}
                     src={fireImg}
                     left={0}
                     top={0}
-                    onGoalClick={onGoalClick}
+                    onTopicClick={onTopicClick}
                   />
                 </div>
               )}
 
-              {/* 固定位置的信箱 - 第四個 goal */}
-              {goals[3] && mapSize.width > 0 && (
+              {/* 固定位置的信箱 - 第四個 topic */}
+              {topics[3] && mapSize.width > 0 && (
                 <div 
                   className="absolute"
                   style={{
@@ -223,13 +223,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   onClick={onMailboxClick}
                 >
                   <MapIcon
-                    goal={goals[3]}
+                    topic={topics[3]}
                     src={mailboxImg}
                     left={0}
                     top={0}
-                    onGoalClick={onGoalClick}
+                    onTopicClick={onTopicClick}
                     showOrbs={true}
-                    orbGoals={[goals[0], goals[1], goals[2]]}
+                    orbTopics={[topics[0], topics[1], topics[2]]}
                   />
                 </div>
               )}

@@ -1,26 +1,26 @@
 import React from 'react';
-import { Goal } from '../../types/goal';
-import { GoalDashboardCard } from './GoalDashboardCard';
-import { useGoalStore } from '../../store/goalStore';
+import { Topic } from '../../types/goal';
+import { TopicDashboardCard } from './TopicDashboardCard';
+import { useTopicStore } from '../../store/topicStore';
 
-interface GoalDashboardDialogProps {
+interface TopicDashboardDialogProps {
   onClose: () => void;
-  onGoalClick: (goalId: string) => void;
-  onAddGoal: () => void;
+  onTopicClick: (topicId: string) => void;
+  onAddTopic: () => void;
 }
 
-export const GoalDashboardDialog: React.FC<GoalDashboardDialogProps> = ({
+export const TopicDashboardDialog: React.FC<TopicDashboardDialogProps> = ({
   onClose,
-  onGoalClick,
-  onAddGoal,
+  onTopicClick,
+  onAddTopic,
 }) => {
-  const { getActiveGoals, getCompletionRate } = useGoalStore();
-  const goals = getActiveGoals();
+  const { getActiveTopics, getCompletionRate } = useTopicStore();
+  const activeTopics = getActiveTopics();
   
   return (
     <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[400px] max-w-[90vw] flex flex-col h-full">
       <div className="flex justify-between items-center mb-4 select-none" data-draggable-header>
-        <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-300">學習目標概覽</h2>
+        <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-300">學習主題概覽</h2>
         <button
           className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
           onClick={onClose}
@@ -33,31 +33,35 @@ export const GoalDashboardDialog: React.FC<GoalDashboardDialogProps> = ({
       </div>
       <div className="flex-1 overflow-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {goals.map(goal => (
-            <GoalDashboardCard
-              key={goal.id}
-              title={goal.title}
-              subject={goal.subject || '未分類'}
-              progress={getCompletionRate(goal.id)}
+          {activeTopics.map(topic => (
+            <TopicDashboardCard
+              key={topic.id}
+              title={topic.title}
+              subject={topic.subject || '未分類'}
+              progress={getCompletionRate(topic.id)}
               onClick={() => {
                 onClose();
-                onGoalClick(goal.id);
+                onTopicClick(topic.id);
               }}
             />
           ))}
-          {/* 新增目標卡片 */}
+          {/* 新增主題卡片 */}
           <button
             onClick={() => {
               onClose();
-              onAddGoal();
+              onAddTopic();
             }}
             className="w-full h-[80px] bg-white/60 dark:bg-gray-800/60 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition flex flex-col items-center justify-center gap-1"
           >
             <span className="text-2xl text-blue-400 dark:text-blue-500">+</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">新增目標</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">新增主題</span>
           </button>
         </div>
       </div>
     </div>
   );
-}; 
+};
+
+// 兼容性導出
+export const GoalDashboardDialog = TopicDashboardDialog;
+export type { TopicDashboardDialogProps, TopicDashboardDialogProps as GoalDashboardDialogProps }; 

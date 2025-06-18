@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Goal } from '../../types/goal';
+import { Topic } from '../../types/goal';
 import { Compass, Book, Target } from 'lucide-react';
 
 interface MapIconProps {
-  goal: Goal;
+  topic: Topic;
   src: string;
   left: number;
   top: number;
-  onGoalClick: (goalId: string) => void;
+  onTopicClick: (topicId: string) => void;
   flip?: boolean;
   showOrbs?: boolean;
-  orbGoals?: Goal[];
+  orbTopics?: Topic[];
 }
 
 const RADIUS = 120;
@@ -21,14 +21,14 @@ const ORB_SIZE = 56; // 水晶球的大小 (w-14 = 56px)
 const ORB_ANGLES = [150, 30, -90];
 
 export const MapIcon: React.FC<MapIconProps> = ({ 
-  goal, 
+  topic, 
   src, 
   left, 
   top, 
-  onGoalClick, 
+  onTopicClick, 
   flip,
   showOrbs = false,
-  orbGoals = []
+  orbTopics = []
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [hoveredOrbArea, setHoveredOrbArea] = useState(false);
@@ -71,7 +71,7 @@ export const MapIcon: React.FC<MapIconProps> = ({
     >
       <img 
         src={src} 
-        alt={goal.title} 
+        alt={topic.title} 
         className="w-32 h-32 drop-shadow-lg object-contain"
         style={{
           transform: flip ? 'scaleX(-1)' : 'none',
@@ -110,8 +110,8 @@ export const MapIcon: React.FC<MapIconProps> = ({
             }}
           >
             {ORB_ANGLES.map((angle, index) => {
-              const orbGoal = orbGoals[index];
-              if (!orbGoal) return null;
+              const orbTopic = orbTopics[index];
+              if (!orbTopic) return null;
 
               const pos = getOrbPosition(angle);
               const icons = [
@@ -140,7 +140,7 @@ export const MapIcon: React.FC<MapIconProps> = ({
                     className="w-14 h-14 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-lg border-2 border-purple-300 dark:border-purple-600 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-xl hover:border-purple-400 dark:hover:border-purple-500 z-50"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onGoalClick(orbGoal.id);
+                      onTopicClick(orbTopic.id);
                     }}
                     whileHover={{ y: -5 }}
                     animate={{ y: [0, -5, 0] }}
@@ -161,7 +161,7 @@ export const MapIcon: React.FC<MapIconProps> = ({
                     transition={{ delay: index * 0.1 + 0.2 }}
                   >
                     <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-sm text-purple-600 dark:text-purple-400 whitespace-nowrap">
-                      {orbGoal.title}
+                      {orbTopic.title}
                     </span>
                   </motion.div>
                 </motion.div>

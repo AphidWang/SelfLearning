@@ -1,10 +1,11 @@
-export { GoalProgressDialog } from './GoalProgressDialog';
-export { GoalDetailsDialog } from './GoalDetailsDialog';
+export { TopicProgressDialog, GoalProgressDialog } from './TopicProgressDialog';
+export { TopicDetailsDialog, GoalDetailsDialog } from './TopicDetailsDialog';
 export { TaskDetailDialog } from './TaskDetailDialog';
-export { GoalDashboardDialog } from './GoalDashboardDialog';
-export { GoalOverviewDialog } from './GoalOverviewDialog';
-export { GoalMindmapOverviewDialog } from './GoalMindmapOverviewDialog';
-export { GoalRadialMap, useGoalRadialMapStats } from './GoalRadialMap';
-export { GoalReviewPage } from './GoalReviewPage';
+export { TopicDashboardDialog, GoalDashboardDialog } from './TopicDashboardDialog';
+export { TopicDashboardCard, GoalDashboardCard } from './TopicDashboardCard';
+export { TopicOverviewDialog, GoalOverviewDialog } from './TopicOverviewDialog';
+export { TopicMindmapOverviewDialog } from './TopicMindmapOverviewDialog';
+export { TopicRadialMap, useTopicRadialMapStats, GoalRadialMap, useGoalRadialMapStats } from './TopicRadialMap';
+export { TopicReviewPage, GoalReviewPage } from './TopicReviewPage';
 export { CircularProgress } from './CircularProgress';
 export { DraggableDialog } from './DraggableDialog'; 

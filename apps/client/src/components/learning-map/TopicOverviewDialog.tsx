@@ -1,17 +1,17 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useGoalStore } from '../../store/goalStore';
-import { subjectColors } from '../../styles/tokens';
+import { useTopicStore } from '../../store/topicStore';
+import { subjects } from '../../styles/tokens';
 import { CircularProgress } from './CircularProgress';
 import { 
   X, Target, Calendar, CheckCircle2, Clock, 
   Play, Flag, TrendingUp, BookOpen, ArrowRight
 } from 'lucide-react';
 
-interface GoalOverviewDialogProps {
-  goalId: string;
+interface TopicOverviewDialogProps {
+  topicId: string;
   onClose: () => void;
-  onGoalClick?: (goalId: string) => void;
+  onTopicClick?: (topicId: string) => void;
 }
 
 // 檢查日期是否在本週
@@ -73,21 +73,21 @@ const getTaskStatusStyle = (status: string, isNewlyCompleted: boolean) => {
   }
 };
 
-export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
-  goalId,
+export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
+  topicId,
   onClose,
-  onGoalClick
+  onTopicClick
 }) => {
-  const { getGoal, getActiveSteps, getCompletionRate } = useGoalStore();
-  const goal = getGoal(goalId);
+  const { getTopic, getActiveGoals, getCompletionRate } = useTopicStore();
+  const topic = getTopic(topicId);
   
-  if (!goal) {
+  if (!topic) {
     return null;
   }
 
-  const subjectColor = subjectColors[goal.subject || '未分類'];
-  const progress = getCompletionRate(goal.id);
-  const steps = getActiveSteps(goal.id);
+  const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+  const progress = getCompletionRate(topic.id);
+  const goals = getActiveGoals(topic.id);
   
   // 計算週進度統計
   const weeklyStats = useMemo(() => {
@@ -96,8 +96,8 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
     let completedTasks = 0;
     let inProgressTasks = 0;
     
-    steps.forEach(step => {
-      step.tasks.forEach(task => {
+    goals.forEach(goal => {
+      goal.tasks.forEach(task => {
         totalTasks++;
         if (task.status === 'done') {
           completedTasks++;
@@ -111,7 +111,7 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
     });
     
     return { newlyCompleted, totalTasks, completedTasks, inProgressTasks };
-  }, [steps]);
+  }, [goals]);
 
   return (
     <motion.div
@@ -123,19 +123,19 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
       <motion.div
         className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 w-full max-w-7xl h-[90vh] flex overflow-hidden"
         style={{ 
-          borderColor: subjectColor,
-          boxShadow: `0 20px 40px ${subjectColor}25`
+          borderColor: subjectStyle.accent,
+          boxShadow: `0 20px 40px ${subjectStyle.accent}25`
         }}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
-        {/* 左側 - 目標資訊 */}
+        {/* 左側 - 主題資訊 */}
         <div className="w-80 border-r border-gray-200 dark:border-gray-700 p-6 flex flex-col">
           {/* 標題列 */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200">目標概覽</h2>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200">主題概覽</h2>
             <button
               onClick={onClose}
               className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -145,28 +145,28 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
             </button>
           </div>
 
-          {/* 目標基本信息 */}
+          {/* 主題基本信息 */}
           <div 
             className="rounded-xl p-4 mb-6 border-2"
             style={{ 
-              borderColor: subjectColor,
-              background: `linear-gradient(135deg, ${subjectColor}08 0%, ${subjectColor}15 100%)`
+              borderColor: subjectStyle.accent,
+              background: `linear-gradient(135deg, ${subjectStyle.accent}08 0%, ${subjectStyle.accent}15 100%)`
             }}
           >
             <div className="flex items-center gap-2 mb-3">
-              <Target className="w-5 h-5" style={{ color: subjectColor }} />
+              <Target className="w-5 h-5" style={{ color: subjectStyle.accent }} />
               <span 
                 className="text-xs px-2 py-1 rounded-md font-medium"
-                style={{ backgroundColor: subjectColor + '20', color: subjectColor }}
+                style={{ backgroundColor: subjectStyle.accent + '20', color: subjectStyle.accent }}
               >
-                {goal.subject || '未分類'}
+                {topic.subject || '未分類'}
               </span>
             </div>
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
-              {goal.title}
+              {topic.title}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              {goal.description}
+              {topic.description}
             </p>
           </div>
 
@@ -194,48 +194,19 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
             </div>
           </div>
 
-          {/* 背景氣泡 */}
-          {goal.bubbles && goal.bubbles.length > 0 && (
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-3">
-                <BookOpen className="w-5 h-5" style={{ color: subjectColor }} />
-                <h4 className="font-semibold text-gray-800 dark:text-gray-200">背景想法</h4>
-              </div>
-              <div className="space-y-2">
-                {goal.bubbles.map(bubble => (
-                  <div 
-                    key={bubble.id}
-                    className="p-3 rounded-lg border"
-                    style={{ 
-                      backgroundColor: `${subjectColor}05`,
-                      borderColor: `${subjectColor}20`
-                    }}
-                  >
-                    <div className="font-medium text-sm text-gray-800 dark:text-gray-200 mb-1">
-                      {bubble.title}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      {bubble.content}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* 進度圓圈 */}
           <div className="text-center mt-6">
             <CircularProgress 
               value={progress} 
               size={80} 
               strokeWidth={6}
-              color={subjectColor}
+              color={subjectStyle.accent}
             />
             <div className="text-xs text-gray-500 mt-2">總完成度</div>
           </div>
         </div>
 
-        {/* 右側 - 步驟和任務視覺化 */}
+        {/* 右側 - 目標和任務視覺化 */}
         <div className="flex-1 p-6 overflow-auto">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">學習路徑</h3>
@@ -251,59 +222,59 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
             </div>
           </div>
 
-          {/* 步驟時間軸 */}
+          {/* 目標時間軸 */}
           <div className="space-y-8">
-            {steps.map((step, stepIndex) => {
-              const stepCompletedTasks = step.tasks.filter(t => t.status === 'done').length;
-              const stepProgress = step.tasks.length > 0 ? (stepCompletedTasks / step.tasks.length) * 100 : 0;
+            {goals.map((goal, goalIndex) => {
+              const goalCompletedTasks = goal.tasks.filter(t => t.status === 'done').length;
+              const goalProgress = goal.tasks.length > 0 ? (goalCompletedTasks / goal.tasks.length) * 100 : 0;
               
               return (
-                <div key={step.id} className="relative">
-                  {/* 步驟連接線 */}
-                  {stepIndex < steps.length - 1 && (
+                <div key={goal.id} className="relative">
+                  {/* 目標連接線 */}
+                  {goalIndex < goals.length - 1 && (
                     <div 
                       className="absolute left-6 top-16 w-0.5 h-8 bg-gradient-to-b from-gray-300 to-transparent"
                     />
                   )}
 
                   <div className="flex gap-4">
-                    {/* 步驟指示器 */}
+                    {/* 目標指示器 */}
                     <div className="relative flex-shrink-0">
                       <div 
                         className="w-12 h-12 rounded-full border-4 flex items-center justify-center"
                         style={{ 
-                          borderColor: stepProgress === 100 ? subjectColor : `${subjectColor}40`,
-                          backgroundColor: stepProgress === 100 ? `${subjectColor}20` : 'white'
+                          borderColor: goalProgress === 100 ? subjectStyle.accent : `${subjectStyle.accent}40`,
+                          backgroundColor: goalProgress === 100 ? `${subjectStyle.accent}20` : 'white'
                         }}
                       >
-                        {stepProgress === 100 ? (
-                          <CheckCircle2 className="w-6 h-6" style={{ color: subjectColor }} />
+                        {goalProgress === 100 ? (
+                          <CheckCircle2 className="w-6 h-6" style={{ color: subjectStyle.accent }} />
                         ) : (
-                          <Flag className="w-5 h-5" style={{ color: subjectColor }} />
+                          <Flag className="w-5 h-5" style={{ color: subjectStyle.accent }} />
                         )}
                       </div>
                       <div className="absolute -bottom-2 -left-2 -right-2 text-center">
                         <div className="text-xs font-medium text-gray-600">
-                          {Math.round(stepProgress)}%
+                          {Math.round(goalProgress)}%
                         </div>
                       </div>
                     </div>
 
-                    {/* 步驟內容 */}
+                    {/* 目標內容 */}
                     <div className="flex-1">
                       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-semibold text-gray-800 dark:text-gray-200">
-                            {step.title}
+                            {goal.title}
                           </h4>
                           <span className="text-sm text-gray-500">
-                            {stepCompletedTasks}/{step.tasks.length} 完成
+                            {goalCompletedTasks}/{goal.tasks.length} 完成
                           </span>
                         </div>
 
                         {/* 任務列表 */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {step.tasks.map(task => {
+                          {goal.tasks.map(task => {
                             const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completedAt);
                             const statusStyle = getTaskStatusStyle(task.status, isNewlyCompleted);
                             
@@ -354,15 +325,15 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
           {/* 底部操作區 */}
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
             <div className="flex justify-center">
-              {onGoalClick && (
+              {onTopicClick && (
                 <button
-                  onClick={() => onGoalClick(goalId)}
+                  onClick={() => onTopicClick(topicId)}
                   className="px-6 py-3 bg-gradient-to-r text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
                   style={{ 
-                    background: `linear-gradient(135deg, ${subjectColor} 0%, ${subjectColor}dd 100%)`
+                    background: `linear-gradient(135deg, ${subjectStyle.accent} 0%, ${subjectStyle.accent}dd 100%)`
                   }}
                 >
-                  <span>進入目標詳情</span>
+                  <span>進入主題詳情</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
               )}
@@ -374,5 +345,6 @@ export const GoalOverviewDialog: React.FC<GoalOverviewDialogProps> = ({
   );
 };
 
-// 導出類型以供其他組件使用
-export type { GoalOverviewDialogProps }; 
+// 兼容性導出
+export const GoalOverviewDialog = TopicOverviewDialog;
+export type { TopicOverviewDialogProps, TopicOverviewDialogProps as GoalOverviewDialogProps }; 

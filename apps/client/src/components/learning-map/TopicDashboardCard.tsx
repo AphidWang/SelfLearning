@@ -1,14 +1,14 @@
 import React from 'react';
 import { subjects } from '../../styles/tokens';
 
-interface GoalDashboardCardProps {
+interface TopicDashboardCardProps {
   title: string;
   subject: string;
   progress: number;
   onClick?: () => void;
 }
 
-export const GoalDashboardCard: React.FC<GoalDashboardCardProps> = ({ title, subject, progress, onClick }) => {
+export const TopicDashboardCard: React.FC<TopicDashboardCardProps> = ({ title, subject, progress, onClick }) => {
   const style = subjects.getSubjectStyle(subject);
   return (
     <button
@@ -50,4 +50,8 @@ export const GoalDashboardCard: React.FC<GoalDashboardCardProps> = ({ title, sub
       </div>
     </button>
   );
-}; 
+};
+
+// 兼容性導出
+export const GoalDashboardCard = TopicDashboardCard;
+export type { TopicDashboardCardProps, TopicDashboardCardProps as GoalDashboardCardProps }; 

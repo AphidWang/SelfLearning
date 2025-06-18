@@ -1,28 +1,28 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
-import { GoalDashboard } from '../../components/learning-map/GoalDashboard';
+import { TopicDashboard } from '../../components/learning-map/TopicDashboard';
 import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
 import { TaskDetailDialog } from '../../components/learning-map/TaskDetailDialog';
-import { GoalDetails } from '../../components/learning-map/GoalDetails';
-import { useGoalStore } from '../../store/goalStore';
+import { TopicDetails } from '../../components/learning-map/TopicDetails';
+import { useTopicStore } from '../../store/topicStore';
 import PageLayout from '../../components/layout/PageLayout';
-import { Goal, Task, GoalStatus } from '../../types/goal';
+import { Topic, Task, TopicStatus } from '../../types/goal';
 import { SUBJECTS } from '../../constants/subjects';
 import { DailyReviewCarousel } from '../../components/learning-map/DailyReviewCarousel';
-import { GoalDashboardCard } from '../../components/learning-map/GoalDashboardCard';
-import { GoalDashboardDialog } from '../../components/learning-map/GoalDashboardDialog';
-import { GoalDetailsDialog } from '../../components/learning-map/GoalDetailsDialog';
+import { TopicDashboardCard } from '../../components/learning-map/TopicDashboardCard';
+import { TopicDashboardDialog } from '../../components/learning-map/TopicDashboardDialog';
+import { TopicDetailsDialog } from '../../components/learning-map/TopicDetailsDialog';
 import { DraggableDialog } from '../../components/learning-map/DraggableDialog';
-import { GoalProgressDialog } from '../../components/learning-map/GoalProgressDialog';
+import { TopicProgressDialog } from '../../components/learning-map/TopicProgressDialog';
 
 export const StudentLearningMap: React.FC = () => {
-  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [isCreatingNewGoal, setIsCreatingNewGoal] = useState(false);
+  const [isCreatingNewTopic, setIsCreatingNewTopic] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  const [showGoalCards, setShowGoalCards] = useState(false);
+  const [showTopicCards, setShowTopicCards] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [openedFromDashboard, setOpenedFromDashboard] = useState(false);
-  const { goals, addGoal, getCompletionRate } = useGoalStore();
+  const { topics, addTopic, getCompletionRate } = useTopicStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
   
@@ -30,20 +30,20 @@ export const StudentLearningMap: React.FC = () => {
   const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
 
   useLayoutEffect(() => {
-    if ((showReview || showGoalCards || selectedGoalId || showProgress) && mapRef.current) {
+    if ((showReview || showTopicCards || selectedTopicId || showProgress) && mapRef.current) {
       const rect = mapRef.current.getBoundingClientRect();
       setMapRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
-  }, [showReview, showGoalCards, selectedGoalId, showProgress]);
+  }, [showReview, showTopicCards, selectedTopicId, showProgress]);
 
-  const selectedGoal = goals.find(g => g.id === selectedGoalId);
-  // 當有 selectedTaskId 時，從所有目標中尋找該任務
+  const selectedTopic = topics.find(t => t.id === selectedTopicId);
+  // 當有 selectedTaskId 時，從所有主題中尋找該任務
   const taskInfo = selectedTaskId ? (() => {
-    for (const goal of goals) {
-      for (const step of goal.steps) {
-        const task = step.tasks.find(t => t.id === selectedTaskId);
+    for (const topic of topics) {
+      for (const goal of topic.goals) {
+        const task = goal.tasks.find(t => t.id === selectedTaskId);
         if (task) {
-          return { task, step, goal };
+          return { task, goal, topic };
         }
       }
     }
@@ -51,65 +51,65 @@ export const StudentLearningMap: React.FC = () => {
   })() : null;
   
   const selectedTask = taskInfo?.task;
-  const selectedStep = taskInfo?.step;
-  const taskGoal = taskInfo?.goal;
+  const selectedGoal = taskInfo?.goal;
+  const taskTopic = taskInfo?.topic;
 
-  const handleGoalClick = (goalId: string, fromDashboard = false) => {
-    setSelectedGoalId(goalId);
+  const handleTopicClick = (topicId: string, fromDashboard = false) => {
+    setSelectedTopicId(topicId);
     setSelectedTaskId(null);
-    setIsCreatingNewGoal(false);
+    setIsCreatingNewTopic(false);
     setOpenedFromDashboard(fromDashboard);
     if (!fromDashboard) {
-      setShowGoalCards(false);
+      setShowTopicCards(false);
     }
   };
 
-  const handleAddGoal = () => {
-    const newGoal = {
+  const handleAddTopic = () => {
+    const newTopic = {
       id: '',
-      title: '新目標',
+      title: '新主題',
       description: '',
-      steps: [],
+      goals: [],
       subject: SUBJECTS.CUSTOM,
-      templateType: '學習目標',
-      status: 'in_progress' as GoalStatus
+      templateType: '學習主題',
+      status: 'in-progress' as TopicStatus
     };
-    addGoal(newGoal);
-    setSelectedGoalId(newGoal.id);
-    setIsCreatingNewGoal(true);
+    const addedTopic = addTopic(newTopic);
+    setSelectedTopicId(addedTopic.id);
+    setIsCreatingNewTopic(true);
   };
 
   const handleTaskClick = (taskId: string) => {
     setSelectedTaskId(taskId);
-    // 保留 selectedGoalId，這樣在關閉任務詳情時可以回到目標詳情
+    // 保留 selectedTopicId，這樣在關閉任務詳情時可以回到主題詳情
   };
 
   const handleCloseAll = () => {
-    setSelectedGoalId(null);
+    setSelectedTopicId(null);
     setSelectedTaskId(null);
-    setIsCreatingNewGoal(false);
+    setIsCreatingNewTopic(false);
   };
 
-  const handleBackToGoals = () => {
+  const handleBackToTopics = () => {
     if (openedFromDashboard) {
       // 如果是從 dashboard 打開的，回到 dashboard
-      setSelectedGoalId(null);
+      setSelectedTopicId(null);
       setSelectedTaskId(null);
-      setIsCreatingNewGoal(false);
+      setIsCreatingNewTopic(false);
       setOpenedFromDashboard(false);
-      setShowGoalCards(true);
+      setShowTopicCards(true);
     } else {
       // 如果是從地圖直接打開的，直接關掉
-      setSelectedGoalId(null);
+      setSelectedTopicId(null);
       setSelectedTaskId(null);
-      setIsCreatingNewGoal(false);
+      setIsCreatingNewTopic(false);
       setOpenedFromDashboard(false);
     }
   };
 
-  const handleBackToGoal = () => {
+  const handleBackToTopic = () => {
     setSelectedTaskId(null);
-    // selectedGoalId 保持不變，這樣會顯示 GoalDetailsDialog
+    // selectedTopicId 保持不變，這樣會顯示 TopicDetailsDialog
   };
 
   const handleTaskStatusChange = (taskId: string, status: 'in_progress' | 'completed') => {
@@ -123,25 +123,27 @@ export const StudentLearningMap: React.FC = () => {
   };
 
   // 過濾出有任務的目標，並轉換為地圖點
-  const tasks = goals
-    .filter(goal => goal.steps.some(step => step.tasks.length > 0))
-    .map((goal, index, filteredGoals) => {
+  const tasks = topics
+    .filter(topic => topic.goals.some(goal => goal.tasks.length > 0))
+    .map((topic, index, filteredTopics) => {
       // 計算位置：將目標均勻分布在地圖上
-      const totalGoals = filteredGoals.length;
-      const x = (index / totalGoals) * 80 + 10; // 10-90% 的範圍
+      const totalTopics = filteredTopics.length;
+      const x = (index / totalTopics) * 80 + 10; // 10-90% 的範圍
       const y = 50; // 固定在中間高度
       
       return {
-        id: goal.id,
-        label: goal.title,
-        subject: goal.subject || '未分類',
-        completed: goal.steps.every(step => 
-          step.tasks.every(task => task.status === 'done')
+        id: topic.id,
+        label: topic.title,
+        subject: topic.subject || '未分類',
+        completed: topic.goals.every(goal => 
+          goal.tasks.every(task => task.status === 'done')
         ),
         position: { x, y },
-        goalId: goal.id
+        topicId: topic.id
       };
     });
+
+  const activeTopic = topics.find(topic => topic.status === 'active');
 
   return (
     <PageLayout title="學習地圖">
@@ -174,11 +176,11 @@ export const StudentLearningMap: React.FC = () => {
               }}
               onClick={e => e.stopPropagation()}
             >
-              <GoalProgressDialog
+              <TopicProgressDialog
                 onClose={() => setShowProgress(false)}
-                onGoalClick={(goalId) => {
+                onTopicClick={(topicId) => {
                   setShowProgress(false);
-                  setSelectedGoalId(goalId);
+                  setSelectedTopicId(topicId);
                 }}
               />
             </div>
@@ -227,39 +229,47 @@ export const StudentLearningMap: React.FC = () => {
         </>
       )}
 
-      {showGoalCards && mapRect && (
-        <DraggableDialog
-          mapRect={mapRect}
-          position={dialogPosition}
-          onPositionChange={setDialogPosition}
-          headerSelector="[data-draggable-header]"
-        >
-          <GoalDashboardDialog
-            onClose={() => setShowGoalCards(false)}
-            onGoalClick={(goalId) => handleGoalClick(goalId, true)}
-            onAddGoal={handleAddGoal}
+      {showTopicCards && mapRect && (
+        <>
+          {/* 遮罩只覆蓋地圖區域 */}
+          <div
+            className="fixed z-40 bg-black/10 cursor-pointer"
+            style={{ left: mapRect.left, top: mapRect.top, width: mapRect.width, height: mapRect.height }}
+            onClick={() => setShowTopicCards(false)}
           />
-        </DraggableDialog>
+          <DraggableDialog
+            mapRect={mapRect}
+            position={dialogPosition}
+            onPositionChange={setDialogPosition}
+            headerSelector="[data-draggable-header]"
+          >
+            <TopicDashboardDialog
+              onClose={() => setShowTopicCards(false)}
+              onTopicClick={(topicId) => handleTopicClick(topicId, true)}
+              onAddTopic={handleAddTopic}
+            />
+          </DraggableDialog>
+        </>
       )}
 
-      {selectedGoalId && selectedGoal && mapRect && !selectedTaskId && (
+      {selectedTopicId && selectedTopic && mapRect && !selectedTaskId && (
         <DraggableDialog
           mapRect={mapRect}
           position={dialogPosition}
           onPositionChange={setDialogPosition}
           headerSelector="[data-draggable-header]"
         >
-          <GoalDetailsDialog
-            goal={selectedGoal}
+          <TopicDetailsDialog
+            topic={selectedTopic}
             onClose={handleCloseAll}
-            onBack={handleBackToGoals}
+            onBack={handleBackToTopics}
             onTaskClick={handleTaskClick}
-            isCreating={isCreatingNewGoal}
+            isCreating={isCreatingNewTopic}
           />
         </DraggableDialog>
       )}
 
-      {selectedTaskId && selectedTask && selectedStep && taskGoal && mapRect && (
+      {selectedTaskId && selectedTask && selectedGoal && taskTopic && mapRect && (
         <DraggableDialog
           mapRect={mapRect}
           position={dialogPosition}
@@ -268,10 +278,10 @@ export const StudentLearningMap: React.FC = () => {
         >
           <TaskDetailDialog
             task={selectedTask}
-            stepId={selectedStep.id}
-            goalId={taskGoal.id}
+            goalId={selectedGoal.id}
+            topicId={taskTopic.id}
             onClose={handleCloseAll}
-            onBack={handleBackToGoal}
+            onBack={handleBackToTopic}
             onHelpRequest={handleHelpRequest}
           />
         </DraggableDialog>
@@ -285,29 +295,29 @@ export const StudentLearningMap: React.FC = () => {
               : ''
           }`}>
             <InteractiveMap
-              goals={goals}
-              onGoalClick={handleGoalClick}
+              topics={topics}
+              onTopicClick={handleTopicClick}
               onCampfireClick={() => {
                 setShowReview(true);
-                setShowGoalCards(false);
-                setSelectedGoalId(null);
+                setShowTopicCards(false);
+                setSelectedTopicId(null);
                 setSelectedTaskId(null);
-                setIsCreatingNewGoal(false);
+                setIsCreatingNewTopic(false);
               }}
               onMailboxClick={() => {
-                setShowGoalCards(true);
+                setShowTopicCards(true);
                 setShowReview(false);
-                setSelectedGoalId(null);
+                setSelectedTopicId(null);
                 setSelectedTaskId(null);
-                setIsCreatingNewGoal(false);
+                setIsCreatingNewTopic(false);
               }}
               onHouseClick={() => {
                 setShowProgress(true);
-                setShowGoalCards(false);
+                setShowTopicCards(false);
                 setShowReview(false);
-                setSelectedGoalId(null);
+                setSelectedTopicId(null);
                 setSelectedTaskId(null);
-                setIsCreatingNewGoal(false);
+                setIsCreatingNewTopic(false);
                 setOpenedFromDashboard(false);
                 console.log('onHouseClick');
               }}
