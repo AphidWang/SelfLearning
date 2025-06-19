@@ -419,12 +419,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.4 }}
               >
-                <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <Brain className="w-4 h-4" style={{ color: subjectStyle.accent }} />
-                    學習路徑圖
-                  </h3>
-                </div>
+
                 
                 <div className="flex-1 p-4 flex items-center justify-center">
                   <div className="w-full h-full max-w-[760px] max-h-[460px] flex items-center justify-center">

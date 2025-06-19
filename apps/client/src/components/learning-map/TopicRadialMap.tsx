@@ -150,7 +150,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   const taskRadius = Math.min(100, goalRadius * 0.9); // 增加任務距離避免重疊
 
   return (
-    <div className={`relative ${className} flex items-center justify-center overflow-hidden`}>
+    <div className={`relative ${className} flex items-center justify-center`} style={{ overflow: 'visible' }}>
       {/* 縮放比例指示器 */}
       <div className="absolute top-4 left-4 bg-white/90 rounded-lg px-3 py-1 shadow-md z-10">
         <span className="text-xs text-gray-600">
@@ -193,6 +193,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         className={`w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="xMidYMid meet"
+        style={{ overflow: 'visible' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
