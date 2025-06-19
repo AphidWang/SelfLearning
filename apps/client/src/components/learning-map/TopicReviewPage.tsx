@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
-import { subjectColors } from '../../styles/tokens';
+import { subjects } from '../../styles/tokens';
 import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
 import type { Goal, Task } from '../../types/goal';
 import { 
@@ -9,7 +9,7 @@ import {
   CheckCircle2, Target, BookOpen, Zap, Award, 
   BarChart3, PieChart, TrendingDown, ArrowUp,
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare,
-  ChevronLeft, Pencil, Sparkles
+  ChevronLeft, Pencil, Sparkles, Check
 } from 'lucide-react';
 
 interface TopicReviewPageProps {
@@ -25,18 +25,43 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   onGoalClick,
   onClose
 }) => {
-  const { getTopic, getCompletionRate } = useTopicStore();
+  const { getTopic, getCompletionRate, updateTopic } = useTopicStore();
   const topic = getTopic(topicId);
   const weeklyStats = useTopicRadialMapStats(topicId);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<'week' | 'month' | 'all'>('week');
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTopic, setEditedTopic] = useState(topic);
+  const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
   
   if (!topic) {
     return null;
   }
+  
+  // 當 topic 更新時同步 editedTopic
+  useEffect(() => {
+    setEditedTopic(topic);
+  }, [topic]);
 
-  const subjectColor = subjectColors[topic.subject || '未分類'];
+  // 處理點擊外部關閉下拉選單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSubjectDropdown && !target.closest('.subject-dropdown')) {
+        setShowSubjectDropdown(false);
+      }
+    };
+
+    if (showSubjectDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSubjectDropdown]);
+
+  const subjectStyle = subjects.getSubjectStyle((isEditingTitle ? editedTopic?.subject : topic.subject) || '');
   const progress = getCompletionRate(topic.id);
 
   // 處理 RadialMap 的點擊事件
@@ -50,12 +75,6 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     setSelectedGoalId(goalId);
     setSelectedTaskId(taskId);
     // 不調用外部 onTaskClick，只更新選中狀態顯示在右側面板
-  };
-
-  // 處理右側面板的任務點擊（用於詳細編輯）
-  const handleInfoPanelTaskClick = (taskId: string, goalId: string) => {
-    // 如果是要詳細編輯，保持選中狀態並調用原始回調
-    onTaskClick?.(taskId, goalId);
   };
 
   // 處理右側面板中任務項目的點擊（用於選擇）
@@ -76,8 +95,8 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
       <motion.div
         className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 w-full max-w-[1280px] h-[85vh] flex flex-col overflow-hidden"
         style={{ 
-          borderColor: subjectColor,
-          boxShadow: `0 20px 40px ${subjectColor}25`
+          borderColor: subjectStyle.accent,
+          boxShadow: `0 20px 40px ${subjectStyle.accent}25`
         }}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -86,47 +105,164 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
       >
         {/* 頂部標題區 */}
         <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 p-3">
-          <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-3">
-                <div 
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: `${subjectColor}20` }}
-                >
-                  <Brain className="w-5 h-5" style={{ color: subjectColor }} />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                    {topic.title} - 主題回顧
-                  </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{topic.description}</p>
-                </div>
+          <div className="flex justify-between items-start">
+            <div className="flex items-start gap-3 flex-1">
+              <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center mt-1 flex-shrink-0"
+                style={{ backgroundColor: `${subjectStyle.accent}20` }}
+              >
+                <Brain className="w-5 h-5" style={{ color: subjectStyle.accent }} />
               </div>
+                            <div className="flex-1 min-w-0">
+                <div className="mb-2">
+                  <div className="flex items-center gap-3 mb-2">
+                    {isEditingTitle ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="text"
+                          value={editedTopic?.title || ''}
+                          onChange={(e) => setEditedTopic(prev => prev ? {...prev, title: e.target.value} : prev)}
+                          className="text-xl font-bold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 focus:ring-2 focus:ring-blue-400 focus:border-transparent flex-1"
+                          autoFocus
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              if (editedTopic) {
+                                updateTopic(editedTopic);
+                              }
+                              setIsEditingTitle(false);
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="relative flex-shrink-0 subject-dropdown">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowSubjectDropdown(!showSubjectDropdown);
+                            }}
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium ${subjects.getSubjectStyle(editedTopic?.subject || '').bg} ${subjects.getSubjectStyle(editedTopic?.subject || '').text} hover:opacity-80 transition-opacity`}
+                          >
+                            {editedTopic?.subject || '未分類'}
+                            <svg className="w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          
+                          {showSubjectDropdown && (
+                            <div 
+                              className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-50 min-w-[120px]"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {Object.keys(subjects.colors).map((subject) => {
+                                const subjectStyles = subjects.getSubjectStyle(subject);
+                                return (
+                                  <button
+                                    key={subject}
+                                                                        onClick={(e) => {
+                                      e.stopPropagation();
+                                      console.log('Subject clicked:', subject);
+                                      setEditedTopic(prev => prev ? {...prev, subject: subject as any} : prev);
+                                      setShowSubjectDropdown(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg flex items-center gap-2 ${
+                                      (editedTopic?.subject || '') === subject ? 'bg-gray-100 dark:bg-gray-700' : ''
+                                    }`}
+                                  >
+                                    <span 
+                                      className="inline-block w-3 h-3 rounded-full"
+                                      style={{ backgroundColor: subjectStyles.accent }}
+                                    />
+                                    {subject}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 flex-1">
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 line-clamp-2">
+                          {topic.title}
+                        </h1>
+                        <span 
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium ${subjectStyle.bg} ${subjectStyle.text} flex-shrink-0`}
+                        >
+                          {topic.subject || '未分類'}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isEditingTitle ? (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (editedTopic) {
+                                updateTopic(editedTopic);
+                              }
+                              setIsEditingTitle(false);
+                              setShowSubjectDropdown(false);
+                            }}
+                            className="p-1.5 rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                            aria-label="完成編輯"
+                          >
+                            <Check className="w-4 h-4 text-green-600" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditedTopic(topic); // 恢復原始數據
+                              setIsEditingTitle(false);
+                              setShowSubjectDropdown(false);
+                            }}
+                            className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                            aria-label="取消編輯"
+                          >
+                            <X className="w-4 h-4 text-red-600" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditedTopic(topic);
+                            setIsEditingTitle(true);
+                          }}
+                          className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                          aria-label="編輯標題"
+                        >
+                          <Pencil className="w-4 h-4 text-gray-500" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                                {isEditingTitle ? (
+                  <textarea
+                    value={editedTopic?.description || ''}
+                    onChange={(e) => setEditedTopic(prev => prev ? {...prev, description: e.target.value} : prev)}
+                    className="text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-full resize-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                    rows={2}
+                    placeholder="輸入主題描述..."
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{topic.description}</p>
+                )}
+              </div>
+            </div>
             
             <div className="flex items-center gap-4">
-              {/* 時間範圍選擇器 */}
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                {(['week', 'month', 'all'] as const).map((timeframe) => (
-                  <button
-                    key={timeframe}
-                    onClick={() => setSelectedTimeframe(timeframe)}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                      selectedTimeframe === timeframe
-                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                    }`}
-                  >
-                    {timeframe === 'week' ? '本週' : timeframe === 'month' ? '本月' : '全部'}
-                  </button>
-                ))}
-              </div>
-              
               {/* 關閉按鈕 */}
               <button
                 onClick={onClose}
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 aria-label="關閉"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
                     </div>
@@ -145,9 +281,9 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               transition={{ delay: 0.1 }}
             >
               <div className="flex items-center gap-2 mb-2">
-                <Target className="w-4 h-4" style={{ color: subjectColor }} />
+                <Target className="w-4 h-4" style={{ color: subjectStyle.accent }} />
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">總體進度</h3>
-                <div className="ml-auto text-2xl font-bold" style={{ color: subjectColor }}>
+                <div className="ml-auto text-2xl font-bold" style={{ color: subjectStyle.accent }}>
                   {Math.round(progress)}%
                 </div>
               </div>
@@ -157,7 +293,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               >
                 <motion.div
                   className="h-2 rounded-full"
-                  style={{ backgroundColor: subjectColor }}
+                  style={{ backgroundColor: subjectStyle.accent }}
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ delay: 0.5, duration: 1 }}
@@ -183,7 +319,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               </div>
               
               {/* 本週統計 */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="grid grid-cols-3 gap-2 mb-3">
                 <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                   <div className="text-lg font-bold text-green-600">{weeklyStats.newlyCompleted}</div>
                   <div className="text-xs text-green-700 dark:text-green-300">新完成</div>
@@ -192,31 +328,14 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                   <div className="text-lg font-bold text-blue-600">{weeklyStats.inProgressTasks}</div>
                   <div className="text-xs text-blue-700 dark:text-blue-300">進行中</div>
                 </div>
-              </div>
-
-              {/* 學習洞察小卡片 - 只保留兩個 */}
-              <div className="space-y-1.5">
-                <div className="p-1.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-center gap-1.5">
-                    <ArrowUp className="w-3 h-3 text-blue-600" />
-                    <span className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                      效率提升：本週完成 {weeklyStats.newlyCompleted} 任務
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="p-1.5 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800">
-                  <div className="flex items-center gap-1.5">
-                    <Flame className="w-3 h-3 text-green-600" />
-                    <span className="text-xs font-medium text-green-800 dark:text-green-200">
-                      連續學習：已連續 3 天
-                    </span>
-                  </div>
+                <div className="text-center p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="text-lg font-bold text-orange-600">2</div>
+                  <div className="text-xs text-orange-700 dark:text-orange-300">需要幫忙</div>
                 </div>
               </div>
             </motion.div>
 
-            {/* 成就徽章 */}
+            {/* 心情小屋 */}
             <motion.div
               className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl p-2.5 shadow-lg border border-gray-200 dark:border-gray-700"
               initial={{ opacity: 0, y: 20 }}
@@ -224,38 +343,45 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               transition={{ delay: 0.3 }}
             >
               <div className="flex items-center gap-2 mb-3">
-                <Award className="w-4 h-4 text-yellow-600" />
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">成就徽章</h3>
+                <Star className="w-4 h-4 text-amber-600" />
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">心情小屋</h3>
               </div>
               
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 1, title: '學習新手', icon: Star, earned: true },
-                  { id: 2, title: '持續進步', icon: Flame, earned: true },
-                ].map((achievement) => {
-                  const IconComponent = achievement.icon;
-                  return (
-                    <div
-                      key={achievement.id}
-                      className={`p-2 rounded-lg border text-center transition-all ${
-                        achievement.earned
-                          ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20'
-                          : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+              <div className="space-y-2">
+                <div className="text-center text-xs text-gray-600 dark:text-gray-400 mb-2">
+                  本週對這個主題的感覺
+                </div>
+                
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { emoji: '😊', label: '開心', selected: true },
+                    { emoji: '🤔', label: '思考', selected: false },
+                    { emoji: '😤', label: '困難', selected: false },
+                    { emoji: '🎉', label: '興奮', selected: false },
+                  ].map((mood, index) => (
+                    <button
+                      key={index}
+                      className={`p-1.5 rounded-lg text-center transition-all hover:scale-105 ${
+                        mood.selected
+                          ? 'bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700'
+                          : 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700/50'
                       }`}
                     >
-                      <IconComponent 
-                        className={`w-4 h-4 mx-auto mb-1 ${
-                          achievement.earned ? 'text-yellow-600' : 'text-gray-400'
-                        }`} 
-                      />
-                      <div className={`text-xs font-medium ${
-                        achievement.earned ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-500'
+                      <div className="text-lg mb-1">{mood.emoji}</div>
+                      <div className={`text-xs ${
+                        mood.selected 
+                          ? 'text-amber-800 dark:text-amber-200 font-medium' 
+                          : 'text-gray-600 dark:text-gray-400'
                       }`}>
-                        {achievement.title}
+                        {mood.label}
                       </div>
-                    </div>
-                  );
-                })}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="text-center text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  點擊記錄心情
+                </div>
               </div>
             </motion.div>
 
@@ -289,7 +415,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               >
                 <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <Brain className="w-4 h-4" style={{ color: subjectColor }} />
+                    <Brain className="w-4 h-4" style={{ color: subjectStyle.accent }} />
                     學習路徑圖
                   </h3>
                 </div>
@@ -318,8 +444,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                 topicId={topicId}
                 selectedGoalId={selectedGoalId}
                 selectedTaskId={selectedTaskId}
-                subjectColor={subjectColor}
-                onTaskClick={handleInfoPanelTaskClick}
+                subjectColor={subjectStyle.accent}
                 onTaskSelect={handleInfoPanelTaskSelect}
                 onGoalClick={onGoalClick}
               />
@@ -337,7 +462,6 @@ interface GoalTaskInfoPanelProps {
   selectedGoalId: string | null;
   selectedTaskId: string | null;
   subjectColor: string;
-  onTaskClick?: (taskId: string, goalId: string) => void;
   onTaskSelect?: (taskId: string, goalId: string) => void;
   onGoalClick?: (goalId: string) => void;
 }
@@ -347,7 +471,6 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   selectedGoalId,
   selectedTaskId,
   subjectColor,
-  onTaskClick,
   onTaskSelect,
   onGoalClick
 }) => {
@@ -367,7 +490,6 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         goal={selectedGoal}
         topicId={topicId}
         subjectColor={subjectColor}
-        onTaskClick={onTaskClick}
       />
     );
   }
@@ -516,15 +638,13 @@ interface TaskDetailPanelProps {
   goal: Goal;
   topicId: string;
   subjectColor: string;
-  onTaskClick?: (taskId: string, goalId: string) => void;
 }
 
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   task,
   goal,
   topicId,
-  subjectColor,
-  onTaskClick
+  subjectColor
 }) => {
   const { updateTask } = useTopicStore();
   const [isFlipped, setIsFlipped] = useState(false);
@@ -675,16 +795,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           <div className="flex gap-2 mt-3">
             <button
               onClick={() => setIsFlipped(true)}
-              className="flex-1 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
+              className="w-full py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
             >
               <Sparkles size={14} />
               記錄一下
-            </button>
-            <button
-              onClick={() => onTaskClick?.(task.id, goal.id)}
-              className="px-3 py-2 bg-gradient-to-r from-blue-400 to-indigo-500 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              詳細編輯
             </button>
           </div>
         </motion.div>
