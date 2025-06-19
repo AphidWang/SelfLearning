@@ -11,7 +11,7 @@ import {
   BarChart3, PieChart, TrendingDown, ArrowUp,
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare,
   ChevronLeft, Pencil, Sparkles, Check, HelpCircle,
-  Save, AlertTriangle
+  Save, AlertTriangle, Plus
 } from 'lucide-react';
 
 interface TopicReviewPageProps {
@@ -113,6 +113,11 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   const handleInfoPanelTaskSelect = (taskId: string, goalId: string) => {
     setSelectedGoalId(goalId);
     setSelectedTaskId(taskId);
+  };
+
+  // 處理從任務詳情返回到目標
+  const handleBackToGoal = () => {
+    setSelectedTaskId(null); // 清除任務選擇，保留目標選擇
   };
 
 
@@ -512,6 +517,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         goal={selectedGoal}
         topicId={topicId}
         subjectColor={subjectColor}
+        onBackToGoal={handleBackToGoal}
       />
     );
   }
@@ -577,15 +583,17 @@ interface TaskDetailPanelProps {
   goal: Goal;
   topicId: string;
   subjectColor: string;
+  onBackToGoal?: () => void;
 }
 
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   task,
   goal,
   topicId,
-  subjectColor
+  subjectColor,
+  onBackToGoal
 }) => {
-  const { updateTask, updateTaskHelp } = useTopicStore();
+  const { updateTask, updateTaskHelp, deleteTask } = useTopicStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
@@ -619,6 +627,13 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     setShowHelpDialog(false);
   };
 
+  const handleDeleteTask = () => {
+    if (confirm('確定要刪除這個任務嗎？')) {
+      deleteTask(topicId, goal.id, task.id);
+      onBackToGoal?.(); // 刪除後回到目標視圖
+    }
+  };
+
   return (
     <motion.div
       className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col relative overflow-hidden"
@@ -649,11 +664,21 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             {/* 標題區 */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
+                {onBackToGoal && (
+                  <button
+                    onClick={onBackToGoal}
+                    className="p-1 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+                    aria-label="返回目標"
+                    title="返回目標"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                )}
                 <Star className="w-4 h-4 text-yellow-500" fill="currentColor" />
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">任務詳情</h3>
               </div>
               
-              {/* 幫助按鈕 */}
+              {/* 操作按鈕 */}
               <div className="flex items-center gap-2">
                 {task.needHelp && (
                   <motion.div
@@ -675,6 +700,13 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                   title={task.needHelp ? '查看/更新求助訊息' : '請求幫助'}
                 >
                   <HelpCircle className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleDeleteTask}
+                  className="p-1.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                  title="刪除任務"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -979,8 +1011,11 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   completedTasks,
   inProgressTasks
 }) => {
+  const { addTask, deleteTask } = useTopicStore();
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
+  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
   
   const handleHelpSubmit = () => {
     updateGoalHelp(topicId, goal.id, true, helpMessage);
@@ -990,6 +1025,28 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   const handleHelpResolve = () => {
     updateGoalHelp(topicId, goal.id, false);
     setShowHelpDialog(false);
+  };
+
+  const handleAddTask = () => {
+    if (newTaskTitle.trim()) {
+      const newTask = {
+        id: `task-${Date.now()}`,
+        title: newTaskTitle.trim(),
+        description: '',
+        status: 'todo' as const,
+        order: goal.tasks.length
+      };
+      addTask(topicId, goal.id, newTask);
+      setNewTaskTitle('');
+      setShowAddTaskDialog(false);
+    }
+  };
+
+  const handleDeleteTaskFromList = (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // 防止觸發選擇任務
+    if (confirm('確定要刪除這個任務嗎？')) {
+      deleteTask(topicId, goal.id, taskId);
+    }
   };
 
   return (
@@ -1085,13 +1142,22 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
 
         {/* 任務列表 */}
         <div>
-        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">任務列表</h5>
+        <div className="flex items-center justify-between mb-2">
+          <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300">任務列表</h5>
+          <button
+            onClick={() => setShowAddTaskDialog(true)}
+            className="p-1 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+            title="新增任務"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        </div>
         <div className="space-y-2">
           {goal.tasks.slice(0, 5).map((task) => {
             return (
               <div
                 key={task.id}
-                className={`p-2 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${
+                className={`group p-2 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${
                   task.status === 'done' ? 'bg-green-50 border-green-200' : 
                   task.status === 'in_progress' ? 'bg-purple-50 border-purple-200' : 
                   'bg-gray-50 border-gray-200'
@@ -1130,6 +1196,13 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
                       )}
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => handleDeleteTaskFromList(task.id, e)}
+                    className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors opacity-0 group-hover:opacity-100"
+                    title="刪除任務"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             );
@@ -1204,6 +1277,59 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
                 className="px-3 py-1 text-sm bg-orange-600 text-white hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
                 {goal.needHelp ? '更新' : '求助'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* 新增任務對話框 */}
+      {showAddTaskDialog && (
+        <motion.div
+          className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center p-4 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 w-full max-w-sm shadow-xl"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Plus className="w-5 h-5 text-blue-600" />
+              <h4 className="font-medium text-gray-900 dark:text-gray-100">新增任務</h4>
+            </div>
+
+            <input
+              type="text"
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              placeholder="輸入任務標題..."
+              className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+              autoFocus
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddTask();
+                }
+              }}
+            />
+
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => {
+                  setShowAddTaskDialog(false);
+                  setNewTaskTitle('');
+                }}
+                className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleAddTask}
+                disabled={!newTaskTitle.trim()}
+                className="px-3 py-1 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+              >
+                新增
               </button>
             </div>
           </motion.div>
