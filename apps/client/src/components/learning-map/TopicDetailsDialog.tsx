@@ -86,7 +86,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   const handleAddTask = () => {
     if (!newTaskTitle.trim() || !currentGoal) return;
     addTask(topic.id, currentGoal.id, {
-      id: '',
+      id: crypto.randomUUID(), // 生成唯一 ID
       title: newTaskTitle,
       status: 'todo'
     });
@@ -736,10 +736,10 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                   <div className="space-y-2">
                     {currentGoal?.tasks.map((task, index) => (
                         <div 
-                          key={`${currentGoal?.id}-${index}`}
+                          key={task.id || `${currentGoal?.id}-${index}`}
                           className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all"
                           style={{ backgroundColor: `${subjectStyle.accent}05` }}
-                          onClick={() => handleTaskClick(`${currentGoal?.id}-${index}`)}
+                          onClick={() => handleTaskClick(task.id || `${currentGoal?.id}-${index}`)}
                         >
                           <div 
                             className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
