@@ -217,7 +217,7 @@ export const StudentLearningMap: React.FC = () => {
               }}
               onClick={e => e.stopPropagation()}
             >
-              <DailyReviewCarousel className="max-h-[80vh] overflow-y-auto w-full max-w-[440px]" onClose={() => setShowReview(false)} />
+              <DailyReviewCarousel className="max-h-[80vh] overflow-y-auto" onClose={() => setShowReview(false)} />
             </div>
           </div>
           <button

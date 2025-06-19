@@ -75,12 +75,12 @@ function getRandomFact() {
   return funFacts[Math.floor(Math.random() * funFacts.length)];
 }
 
-export const DailyReviewCarousel: React.FC<{ className?: string; onClose?: () => void }> = ({ className = "fixed top-8 left-1/2 -translate-x-1/2 z-50 w-[440px] max-w-full", onClose }) => {
+export const DailyReviewCarousel: React.FC<{ className?: string; onClose?: () => void }> = ({ className = "fixed top-8 left-1/2 -translate-x-1/2 z-50", onClose }) => {
   const [index, setIndex] = useState(0);
   const day = mockData[index];
 
   return (
-    <div className={`${className} w-[440px] max-w-full`}>
+    <div className={`${className} w-[480px] max-w-[90vw]`}>
       <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-8">
         {/* 右上角 X 按鈕 */}
         {onClose && (
@@ -102,7 +102,7 @@ export const DailyReviewCarousel: React.FC<{ className?: string; onClose?: () =>
           >
             <ChevronLeft size={28} />
           </button>
-          <span className="text-xl font-bold text-indigo-700 dark:text-indigo-300 select-none">
+          <span className="text-xl font-bold text-indigo-700 dark:text-indigo-300 select-none min-w-[200px] text-center">
             {day.date}（週{day.weekday}）
           </span>
           <button
@@ -132,7 +132,7 @@ export const DailyReviewCarousel: React.FC<{ className?: string; onClose?: () =>
             {day.tasks.map(task => {
               const style = subjects.getSubjectStyle(task.subject);
               return (
-                <li key={task.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg leading-relaxed shadow-sm`} style={{ background: `${style.gradient}10` }}>
+                <li key={task.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg leading-relaxed`} style={{ background: `${style.gradient}10` }}>
                   <span className={`w-2 h-2 rounded-full`} style={{ background: style.accent }} />
                   <span className="text-base font-medium text-gray-900 dark:text-white flex-1">{task.name}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${style.bg} ${style.text}`}>{task.subject}</span>
