@@ -86,10 +86,9 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   const handleAddTask = () => {
     if (!newTaskTitle.trim() || !currentGoal) return;
     addTask(topic.id, currentGoal.id, {
-      id: crypto.randomUUID(), // 生成唯一 ID
       title: newTaskTitle,
       status: 'todo'
-    });
+    } as Task);
     setNewTaskTitle('');
     setShowAddTask(false);
   };
