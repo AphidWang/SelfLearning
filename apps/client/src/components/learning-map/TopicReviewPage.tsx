@@ -226,22 +226,6 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                     )}
                     
                                 <div className="flex items-center gap-2 flex-shrink-0">
-              {/* 開發用：測試老師回覆功能 */}
-              {import.meta.env.DEV && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const { setGoalReply, setTaskReply } = useTopicStore.getState();
-                    // 為當前主題的某些目標和任務添加測試回覆
-                    setGoalReply(topicId, '2-3', '分數運算是數學的基礎，不用擔心！我們可以用圖形和實例來幫助理解。');
-                    setTaskReply(topicId, '2-3', '2-3-2', '分數減法其實和加法很相似，主要是記住先通分，然後分子相減。試著畫圖看看！');
-                  }}
-                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
-                  title="測試老師回覆功能"
-                >
-                  測試回覆
-                </button>
-              )}
               {isEditingTitle ? (
                         <>
                           <button
