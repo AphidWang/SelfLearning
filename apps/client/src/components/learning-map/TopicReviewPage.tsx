@@ -43,13 +43,13 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   const handleRadialMapGoalClick = (goalId: string) => {
     setSelectedGoalId(goalId);
     setSelectedTaskId(null); // 清除任務選擇
-    onGoalClick?.(goalId);
+    // 不調用外部 onGoalClick，只更新選中狀態顯示在右側面板
   };
 
   const handleRadialMapTaskClick = (taskId: string, goalId: string) => {
     setSelectedGoalId(goalId);
     setSelectedTaskId(taskId);
-    onTaskClick?.(taskId, goalId);
+    // 不調用外部 onTaskClick，只更新選中狀態顯示在右側面板
   };
 
   // 處理右側面板的任務點擊（用於詳細編輯）
