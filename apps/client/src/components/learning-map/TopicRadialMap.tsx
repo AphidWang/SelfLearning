@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { 
-  Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw
+  Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,
+  Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon
 } from 'lucide-react';
 
 interface TopicRadialMapProps {
@@ -149,6 +150,29 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   const goalRadius = Math.min(width, height) * 0.46; // 減少半徑避免重疊
   const taskRadius = Math.min(100, goalRadius * 0.9); // 增加任務距離避免重疊
 
+  // 定義裝飾圖示的位置和類型
+  const decorativeIcons = useMemo(() => {
+    return [
+      // 天空區域 - 上方
+      { icon: Sun, x: centerX + 280, y: centerY - 280, size: 70, color: '#fcd34d', opacity: 0.7 },
+      { icon: Cloud, x: centerX + 250, y: centerY - 200, size: 50, color: '#93c5fd', opacity: 0.7 },
+      { icon: Cloud, x: centerX - 220, y: centerY - 240, size: 50, color: '#ddd6fe', opacity: 0.7 },
+      { icon: Star, x: centerX - 330, y: centerY - 130, size: 30, color: '#fbbf24', opacity: 0.7 },
+      //{ icon: Star, x: centerX + 320, y: centerY - 150, size: 45, color: '#fbbf24', opacity: 0.4 },
+      { icon: Moon, x: centerX - 300, y: centerY - 180, size: 70, color: '#cbd5e1', opacity: 0.7 },
+      
+      // 地面區域 - 下方
+      { icon: TreePine, x: centerX + 280, y: centerY + 220, size: 70, color: '#86efac', opacity: 0.7 },
+      { icon: TreePine, x: centerX - 250, y: centerY + 200, size: 70, color: '#65a30d', opacity: 0.7 },
+      { icon: Car, x: centerX - 200, y: centerY + 280, size: 70, color: '#fbbf24', opacity: 0.7 },
+      //{ icon: Car, x: centerX + 220, y: centerY + 120, size: 30, color: '#f97316', opacity: 0.5 },
+      
+      // 中間區域裝飾
+      // { icon: Heart, x: centerX - 160, y: centerY + 80, size: 30, color: '#fb7185', opacity: 0.4 },
+      //{ icon: Flower2, x: centerX + 100, y: centerY + 60, size: 25, color: '#c084fc', opacity: 0.5 },
+    ];
+  }, [centerX, centerY]);
+
   return (
     <div className={`relative ${className} flex items-center justify-center`} style={{ overflow: 'visible' }}>
       {/* 縮放比例指示器 */}
@@ -217,6 +241,39 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
         {/* 主要內容組，應用縮放和平移變換 */}
         <g transform={`translate(${translateX}, ${translateY}) scale(${scale})`}>
+          {/* 裝飾圖示 - 放在最底層 */}
+          {decorativeIcons.map((decoration, index) => {
+            const IconComponent = decoration.icon;
+            return (
+              <motion.g
+                key={`decoration-${index}`}
+                initial={showAnimations ? { opacity: 0, scale: 0 } : { opacity: decoration.opacity, scale: 1 }}
+                animate={{ opacity: decoration.opacity, scale: 1 }}
+                transition={showAnimations ? { delay: 0.5 + index * 0.1, duration: 0.4 } : undefined}
+              >
+                <foreignObject
+                  x={decoration.x - decoration.size / 2}
+                  y={decoration.y - decoration.size / 2}
+                  width={decoration.size}
+                  height={decoration.size}
+                  className="pointer-events-none"
+                  style={{ overflow: 'visible' }}
+                >
+                  <div className="w-full h-full flex items-center justify-center">
+                    <IconComponent 
+                      size={decoration.size} 
+                      style={{ 
+                        color: decoration.color,
+                        fill: ['Sun', 'Star', 'Heart', 'Moon'].includes(decoration.icon.name) ? decoration.color : 'none',
+                        strokeWidth: 2
+                      }}
+                    />
+                  </div>
+                </foreignObject>
+              </motion.g>
+            );
+          })}
+
           {/* 透明背景區域用於捕捉點擊事件 */}
           <rect
             x={0}
