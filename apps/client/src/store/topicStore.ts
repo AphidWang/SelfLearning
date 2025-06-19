@@ -4,6 +4,7 @@ import { TOPIC_STATUSES } from '../constants/topics';
 import { SUBJECTS } from '../constants/subjects';
 
 const STORAGE_KEY = 'self_learning_topics';
+const STORAGE_VERSION = '2.3'; // 增加版本號來強制重新載入
 
 // 檢查是否為預設主題
 export const isDefaultTopic = (topicId: string): boolean => {
@@ -17,6 +18,7 @@ const initialTopics: Topic[] = [
     description: '透過詩歌感受唐代文人的情感與智慧',
     status: 'in-progress',
     subject: SUBJECTS.CHINESE,
+    focusedGoalIds: ['1-2'], // 目前專注於感受詩的意境
     bubbles: [
       {
         id: 'bubble-1-1',
@@ -106,6 +108,7 @@ const initialTopics: Topic[] = [
     description: '透過生活情境理解分數的概念',
     status: 'active',
     subject: SUBJECTS.MATH,
+    focusedGoalIds: ['2-2', '2-3'], // 專注於分數比較和運算
     bubbles: [
       {
         id: 'bubble-2-1',
@@ -206,6 +209,7 @@ const initialTopics: Topic[] = [
     description: '透過故事學習英語表達',
     status: 'active',
     subject: SUBJECTS.ENGLISH,
+    focusedGoalIds: ['3-1', '3-2', '3-3'], // 專注於故事元素、結構和詞彙
     bubbles: [
       {
         id: 'bubble-3-1',
@@ -295,6 +299,7 @@ const initialTopics: Topic[] = [
     description: '透過觀察了解植物的生命週期',
     status: 'active',
     subject: SUBJECTS.SCIENCE,
+    // 沒有設定 focusedGoalIds - 代表沒有特別專注的目標
     bubbles: [
       {
         id: 'bubble-4-1',
@@ -384,6 +389,7 @@ const initialTopics: Topic[] = [
     description: '透過色彩認識藝術表現',
     status: 'active',
     subject: SUBJECTS.ARTS,
+    focusedGoalIds: ['5-2'], // 專注於色彩情感
     bubbles: [
       {
         id: 'bubble-5-1',
@@ -473,6 +479,7 @@ const initialTopics: Topic[] = [
     description: '透過運動了解身體機能',
     status: 'active',
     subject: SUBJECTS.PE,
+    focusedGoalIds: ['6-2', '6-3'], // 專注於基礎運動和運動技能
     bubbles: [
       {
         id: 'bubble-6-1',
@@ -562,6 +569,7 @@ const initialTopics: Topic[] = [
     description: '探索讀書的意義與價值',
     status: 'active',
     subject: SUBJECTS.SOCIAL,
+    focusedGoalIds: ['7-1', '7-2', '7-3', '7-4'], // 專注於多個目標
     bubbles: [
       {
         id: 'bubble-7-1',
@@ -661,6 +669,7 @@ const initialTopics: Topic[] = [
     description: '透過觀察、行動、學習和分享，探索火箭飛行的原理',
     status: 'active',
     subject: SUBJECTS.SCIENCE,
+    focusedGoalIds: ['8-1', '8-2'], // 專注於觀察和實驗
     bubbles: [
       {
         id: 'bubble-8-1',
@@ -750,6 +759,7 @@ const initialTopics: Topic[] = [
     description: "探索火箭能飛多高與太空邊界",
     status: "active",
     subject: SUBJECTS.SCIENCE,
+    focusedGoalIds: ["9-1", "9-2", "9-3"], // 專注於前三個目標
     bubbles: [
       {
         id: "bubble-9-1",
@@ -828,10 +838,27 @@ const getInitialTopics = (): Topic[] => {
   if (typeof window === 'undefined') return initialTopics;
   
   try {
-    const storedTopics = localStorage.getItem(STORAGE_KEY);
-    if (!storedTopics) return initialTopics;
+    const storedData = localStorage.getItem(STORAGE_KEY);
+    const storedVersion = localStorage.getItem(STORAGE_KEY + '_version');
     
-    const parsedTopics = JSON.parse(storedTopics);
+    console.log('LocalStorage check:', {
+      hasStoredData: !!storedData,
+      storedVersion,
+      currentVersion: STORAGE_VERSION,
+      versionMatch: storedVersion === STORAGE_VERSION
+    });
+    
+    // 檢查版本，如果版本不匹配則使用初始數據
+    if (!storedData || storedVersion !== STORAGE_VERSION) {
+      // 儲存新版本號
+      localStorage.setItem(STORAGE_KEY + '_version', STORAGE_VERSION);
+      // 強制保存新的初始數據
+      const topicsToSave = initialTopics;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(topicsToSave));
+      return topicsToSave;
+    }
+    
+    const parsedTopics = JSON.parse(storedData);
     return parsedTopics.map((topic: Topic) => ({
       ...topic,
       goals: topic.goals.map(goal => ({
@@ -852,6 +879,7 @@ const saveTopics = (topics: Topic[]) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(topics));
+    localStorage.setItem(STORAGE_KEY + '_version', STORAGE_VERSION);
   } catch (error) {
     console.error('Failed to save topics to localStorage:', error);
   }
@@ -881,6 +909,9 @@ interface TopicStore {
   reorderTasks: (topicId: string, goalId: string, sourceIndex: number, destinationIndex: number) => void;
   getActiveTopics: () => Topic[];
   getTopic: (topicId: string) => Topic | undefined;
+  setFocusedGoals: (topicId: string, goalIds: string[]) => void;
+  getFocusedGoals: (topicId: string) => Goal[];
+  toggleGoalFocus: (topicId: string, goalId: string) => void;
 }
 
 export const useTopicStore = create<TopicStore>((set, get) => ({
@@ -1280,4 +1311,56 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   getTopic: (topicId: string) => get().topics.find(t => t.id === topicId),
+
+  setFocusedGoals: (topicId: string, goalIds: string[]) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? { ...t, focusedGoalIds: goalIds.slice(0, 5) } // 限制最多5個
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  getFocusedGoals: (topicId: string) => {
+    const topic = get().topics.find(t => t.id === topicId);
+    if (!topic || !topic.focusedGoalIds) return [];
+    
+    const activeGoals = get().getActiveGoals(topicId);
+    return topic.focusedGoalIds
+      .map(goalId => activeGoals.find(g => g.id === goalId))
+      .filter(Boolean) as Goal[];
+  },
+
+  toggleGoalFocus: (topicId: string, goalId: string) => {
+    set((state) => {
+      const topic = state.topics.find(t => t.id === topicId);
+      if (!topic) return state;
+
+      const currentFocused = topic.focusedGoalIds || [];
+      let newFocused: string[];
+
+      if (currentFocused.includes(goalId)) {
+        // 移除焦點
+        newFocused = currentFocused.filter(id => id !== goalId);
+      } else {
+        // 添加焦點（最多5個）
+        newFocused = [...currentFocused, goalId].slice(0, 5);
+      }
+
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? { ...t, focusedGoalIds: newFocused }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
 })); 

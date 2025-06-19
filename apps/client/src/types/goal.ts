@@ -21,6 +21,7 @@ export interface Topic {
   progress?: number;
   focusElement?: { type: 'goal' | 'task', id: string };
   bubbles?: Bubble[];
+  focusedGoalIds?: string[]; // 當前進行的目標 IDs
 }
 
 export interface Goal {

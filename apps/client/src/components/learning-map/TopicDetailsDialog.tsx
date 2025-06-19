@@ -49,99 +49,37 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   const [currentGoalIndexes, setCurrentGoalIndexes] = useState<Record<string, number>>({});
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const [hasReachedBottom, setHasReachedBottom] = useState(false);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
 
   const [showOverview, setShowOverview] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const historyScrollRef = useRef<HTMLDivElement>(null);
   const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
-  const { getActiveGoals, getCompletionRate, addTask } = useTopicStore();
+  const { getActiveGoals, getCompletionRate, addTask, getFocusedGoals } = useTopicStore();
 
-  // 獲取主題當前進行中的目標（最多2個）
-  const getInProgressGoals = (topicId: string) => {
-    // MOCK DATA - 之後要移除
-    const mockGoals = {
-      // 一個進行中的目標
-      single: {
-        id: 'mock-g1',
-        title: '完成微積分第三章作業',
-        tasks: [
-          { status: 'in_progress' },
-          { status: 'todo' }
-        ]
-      },
-      // 兩個進行中的目標
-      double1: {
-        id: 'mock-d1',
-        title: '觀看向量空間概念影片',
-        tasks: [
-          { status: 'in_progress' },
-          { status: 'todo' }
-        ]
-      },
-      double2: {
-        id: 'mock-d2',
-        title: '完成線性轉換練習',
-        tasks: [
-          { status: 'todo' },
-          { status: 'todo' }
-        ]
-      }
-    };
-
-    const goals = getActiveGoals(topicId);
-    
-    // 用 topicId 的字元來產生一個簡單的 hash
-    const hash = topicId.split('').reduce((acc, char) => {
-      return acc + char.charCodeAt(0);
-    }, 0);
-    
-    // 每五個 hash 值就一個是空的
-    if (hash % 5 === 0) {
-      return [];
-    }
-    
-    // 用 hash 決定要取幾個目標
-    const shouldGetTwo = hash % 2 === 1;
-    
-    // 如果沒有真實目標，根據 hash 回傳假資料
-    if (goals.length === 0) {
-      if (shouldGetTwo) {
-        return [mockGoals.double1, mockGoals.double2];
-      } else {
-        return [mockGoals.single];
-      }
-    }
-
-    // 先找進行中的目標
-    const inProgressGoals = goals.filter(goal => 
-      goal.tasks.some(task => task.status === 'in_progress')
-    );
-
-    // 再找待開始的目標
-    const todoGoals = goals.filter(goal => 
-      !inProgressGoals.includes(goal) && 
-      goal.tasks.some(task => task.status === 'todo')
-    );
-
-    // 組合目標
-    const allGoals = [...inProgressGoals, ...todoGoals];
-    
-    // 如果沒有任何可用的目標，回傳空陣列
-    if (allGoals.length === 0) {
-      return [];
-    }
-
-    // 根據 shouldGetTwo 決定回傳一個還是兩個目標
-    return shouldGetTwo ? allGoals.slice(0, 2) : allGoals.slice(0, 1);
+  // 獲取主題當前專注的目標
+  const getFocusedGoalsForTopic = (topicId: string) => {
+    return getFocusedGoals(topicId);
   };
 
-  // 處理目標切換 - 直接切換到另一個目標
+  // 處理目標切換 - 循環切換到下一個目標
   const handleGoalToggle = (e: React.MouseEvent, topicId: string) => {
     e.stopPropagation();
+    const focusedGoalsCount = getFocusedGoalsForTopic(topicId).length;
+    if (focusedGoalsCount <= 1) return;
+    
     setCurrentGoalIndexes(prev => ({
       ...prev,
-      [topicId]: prev[topicId] === 1 ? 0 : 1 // 在 0 和 1 之間切換
+      [topicId]: ((prev[topicId] || 0) + 1) % focusedGoalsCount // 循環切換
     }));
+    
+    // 切換目標時重置滾動位置到頂部，並重置底部狀態
+    if (dialogContentRef.current) {
+      dialogContentRef.current.scrollTop = 0;
+    }
+    setHasReachedBottom(false);
   };
 
   // 處理新增任務
@@ -159,6 +97,82 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   // 處理任務點擊
   const handleTaskClick = (taskId: string) => {
     onTaskClick(taskId);
+  };
+
+  // 檢測對話框內容是否可滾動
+  const checkScrollability = () => {
+    if (dialogContentRef.current) {
+      const element = dialogContentRef.current;
+      const scrollTop = element.scrollTop;
+      const scrollHeight = element.scrollHeight;
+      const clientHeight = element.clientHeight;
+      
+      const hasScrollableContent = scrollHeight > clientHeight;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight <= 20;
+      
+      // 只有在有可滾動內容、不在底部附近、且未曾到達過底部時才顯示指示器
+      setShowScrollIndicator(hasScrollableContent && !isNearBottom && !hasReachedBottom);
+    }
+  };
+
+  // 獲取當前專注的目標和完成的目標
+  const focusedGoals = getFocusedGoalsForTopic(topic.id);
+  const goals = getActiveGoals(topic.id);
+  const totalGoals = goals.length;
+  const completedGoalsCount = goals.filter(g => g.tasks.every(t => t.status === 'done')).length;
+  const progress = getCompletionRate(topic.id);
+
+  // 當前顯示的目標索引
+  const currentIndex = focusedGoals.length > 0 ? Math.min(currentGoalIndexes[topic.id] || 0, focusedGoals.length - 1) : 0;
+  const currentGoal = focusedGoals[currentIndex];
+
+  // 監聽內容變化和組件掛載
+  useEffect(() => {
+    // 延遲檢查，確保 DOM 已經更新
+    const timer = setTimeout(() => {
+      checkScrollability();
+    }, 100);
+    
+    // 監聽窗口大小變化
+    const handleResize = () => {
+      setTimeout(checkScrollability, 100);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [currentGoal?.tasks, showAddTask, focusedGoals.length, currentIndex]);
+
+  // 當視圖模式改變時也檢查
+  useEffect(() => {
+    if (!showHistory && !showDetails) {
+      const timer = setTimeout(() => {
+        checkScrollability();
+      }, 300); // 等待動畫完成
+      return () => clearTimeout(timer);
+    } else {
+      setShowScrollIndicator(false); // 其他視圖不顯示滾動指示器
+      setHasReachedBottom(false); // 重置底部狀態
+    }
+  }, [showHistory, showDetails]);
+
+  // 當用戶滾動時檢查是否接近底部
+  const handleDialogScroll = () => {
+    if (dialogContentRef.current) {
+      const element = dialogContentRef.current;
+      const scrollTop = element.scrollTop;
+      const scrollHeight = element.scrollHeight;
+      const clientHeight = element.clientHeight;
+      
+      // 當滾動到底部 20px 範圍內時記錄已到達底部並隱藏指示器
+      const isNearBottom = scrollHeight - scrollTop - clientHeight <= 20;
+      
+      if (isNearBottom) {
+        setHasReachedBottom(true);
+        setShowScrollIndicator(false);
+      }
+    }
   };
 
   // Mock 週進度數據
@@ -325,17 +339,6 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
     setIsAnimating(false);
   };
 
-  // 獲取當前進行中的目標和完成的目標
-  const currentGoals = getInProgressGoals(topic.id);
-  const goals = getActiveGoals(topic.id);
-  const totalGoals = goals.length;
-  const completedGoalsCount = goals.filter(g => g.tasks.every(t => t.status === 'done')).length;
-  const progress = getCompletionRate(topic.id);
-
-  // 當前顯示的目標索引
-  const currentIndex = currentGoalIndexes[topic.id] || 0;
-  const currentGoal = currentGoals[currentIndex];
-
   return (
     <>
       <motion.div 
@@ -379,37 +382,15 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          {/* Review Page 按鈕 */}
           {!showHistory && !showDetails && (
-            <>
-              <button
-                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                onClick={() => setShowOverview(true)}
-                aria-label="目標概覽"
-              >
-                <LayoutTemplate className="w-4 h-4" />
-              </button>
-              <button
-                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                onClick={() => setShowReview(true)}
-                aria-label="學習回顧"
-              >
-                <Network className="w-4 h-4" />
-              </button>
-              <button
-                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                onClick={handleShowHistory}
-                aria-label="歷史回顧"
-              >
-                <History className="w-4 h-4" />
-              </button>
-              <button
-                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                onClick={() => setShowDetails(true)}
-                aria-label="詳細資訊"
-              >
-                <Menu className="w-4 h-4" />
-              </button>
-            </>
+            <button
+              className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+              onClick={() => setShowReview(true)}
+              aria-label="詳細回顧"
+            >
+              <LayoutTemplate className="w-4 h-4" />
+            </button>
           )}
           {showDetails && (
             <>
@@ -446,7 +427,11 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto relative z-10" ref={historyScrollRef}>
+      <div 
+        className="flex-1 overflow-auto relative z-10" 
+        ref={showHistory ? historyScrollRef : dialogContentRef}
+        onScroll={showHistory ? undefined : handleDialogScroll}
+      >
         <AnimatePresence mode="wait">
           {showHistory ? (
             <motion.div
@@ -643,7 +628,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
               </div>
 
               {/* 當前進行 */}
-              <div className="mb-8">
+              <div className="group mb-8">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Play className="w-4 h-4" style={{ color: subjectStyle.accent }} />
@@ -653,25 +638,37 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                   </div>
                 </div>
                 <div className="min-h-[76px] relative">
-                  {currentGoals.length > 0 ? (
+                  {focusedGoals.length > 0 ? (
                     <>
                       <div 
-                        className={`text-sm text-gray-700 dark:text-gray-300 p-3 rounded-lg transition-all duration-300 ${currentGoals.length > 1 ? 'cursor-pointer hover:shadow-md' : ''}`}
-                        style={{ backgroundColor: `${subjectStyle.accent}08` }}
-                        onClick={currentGoals.length > 1 ? (e) => handleGoalToggle(e, topic.id) : undefined}
+                        className={`text-sm text-gray-700 dark:text-gray-300 p-3 rounded-lg transition-all duration-300 ${focusedGoals.length > 1 ? 'cursor-pointer hover:shadow-md' : ''} flex items-start justify-between gap-3`}
+                        style={{ backgroundColor: `${subjectStyle.accent}15` }}
+                        onClick={focusedGoals.length > 1 ? (e) => handleGoalToggle(e, topic.id) : undefined}
                       >
-                        <div className="font-medium mb-1 line-clamp-2">{currentGoal.title}</div>
-                        <div className="text-xs text-gray-500">
-                          {currentGoal.tasks.filter(t => t.status === 'in_progress').length > 0 
-                            ? `${currentGoal.tasks.filter(t => t.status === 'in_progress').length} 個進行中`
-                            : `${currentGoal.tasks.filter(t => t.status === 'todo').length} 個待開始`
-                          }
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium mb-1 line-clamp-2">{currentGoal?.title}</div>
+                          <div className="text-xs text-gray-500">
+                            {currentGoal?.tasks.filter(t => t.status === 'in_progress').length > 0 
+                              ? `${currentGoal?.tasks.filter(t => t.status === 'in_progress').length} 個進行中`
+                              : `${currentGoal?.tasks.filter(t => t.status === 'todo').length || 0} 個待開始`
+                            }
+                          </div>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowReview(true);
+                          }}
+                          className="p-1.5 rounded-lg transition-all duration-200 flex-shrink-0 bg-white/80 hover:bg-white text-gray-600 hover:text-gray-800 shadow-sm hover:shadow-md opacity-0 group-hover:opacity-100"
+                          aria-label="展開詳細回顧"
+                        >
+                          <ArrowUpRight className="w-4 h-4" />
+                        </button>
                       </div>
                       {/* 步驟指示點 */}
-                      {currentGoals.length > 1 && (
+                      {focusedGoals.length > 1 && (
                         <div className="absolute -bottom-2 left-0 right-0 flex justify-center items-center gap-2 mt-2">
-                          {currentGoals.map((_, index) => (
+                          {focusedGoals.map((_, index) => (
                             <button
                               key={index}
                               className="w-1.5 h-1.5 rounded-full transition-all cursor-pointer hover:scale-125"
@@ -684,6 +681,11 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                                   ...prev,
                                   [topic.id]: index
                                 }));
+                                // 切換目標時重置滾動位置到頂部，並重置底部狀態
+                                if (dialogContentRef.current) {
+                                  dialogContentRef.current.scrollTop = 0;
+                                }
+                                setHasReachedBottom(false);
                               }}
                             />
                           ))}
@@ -691,22 +693,27 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                       )}
                     </>
                   ) : (
-                    <button
-                      onClick={() => setShowDetails(true)}
-                      className="w-full text-sm text-gray-500 p-3 rounded-lg transition-all duration-200 hover:shadow-md flex flex-col items-center gap-2"
-                      style={{ backgroundColor: `${subjectStyle.accent}08` }}
+                    <div
+                      className="w-full text-sm text-gray-500 p-3 rounded-lg transition-all duration-200 hover:shadow-md flex items-center justify-between gap-3"
+                      style={{ backgroundColor: `${subjectStyle.accent}15` }}
                     >
-                      <div className="font-medium">現在沒有進行中的步驟</div>
-                      <div className="text-xs flex items-center gap-1.5">
-                        一起挑選一個吧
-                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      <div className="flex flex-col">
+                        <div className="font-medium">現在沒有進行中的步驟</div>
+                        <div className="text-xs">一起挑選一個吧</div>
                       </div>
-                    </button>
+                      <button
+                        onClick={() => setShowDetails(true)}
+                        className="p-1.5 rounded-lg transition-all duration-200 flex-shrink-0 bg-white/80 hover:bg-white text-gray-600 hover:text-gray-800 shadow-sm hover:shadow-md opacity-0 group-hover:opacity-100"
+                        aria-label="挑選步驟"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
 
-                             {/* 當前步驟的所有任務 */}
+                                           {/* 當前步驟的所有任務 */}
               {currentGoal && (
                 <div className="mb-5">
                   <div className="flex items-center justify-between mb-3">
@@ -724,39 +731,41 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
+                  
+                  {/* 任務列表 */}
                   <div className="space-y-2">
-                    {currentGoal.tasks.map((task, index) => (
-                      <div 
-                        key={`${currentGoal.id}-${index}`}
-                        className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all"
-                        style={{ backgroundColor: `${subjectStyle.accent}05` }}
-                        onClick={() => handleTaskClick(`${currentGoal.id}-${index}`)}
-                      >
+                    {currentGoal?.tasks.map((task, index) => (
                         <div 
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            task.status === 'done' 
-                              ? 'bg-green-500 border-green-500' 
-                              : task.status === 'in_progress'
-                              ? 'border-orange-500'
-                              : 'border-gray-300'
-                          }`}
+                          key={`${currentGoal?.id}-${index}`}
+                          className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all"
+                          style={{ backgroundColor: `${subjectStyle.accent}05` }}
+                          onClick={() => handleTaskClick(`${currentGoal?.id}-${index}`)}
                         >
-                          {task.status === 'done' && (
-                            <CheckCircle2 className="w-3 h-3 text-white" />
-                          )}
-                          {task.status === 'in_progress' && (
-                            <div className="w-2 h-2 rounded-full bg-orange-500" />
-                          )}
+                          <div 
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              task.status === 'done' 
+                                ? 'bg-green-500 border-green-500' 
+                                : task.status === 'in_progress'
+                                ? 'border-orange-500'
+                                : 'border-gray-300'
+                            }`}
+                          >
+                            {task.status === 'done' && (
+                              <CheckCircle2 className="w-3 h-3 text-white" />
+                            )}
+                            {task.status === 'in_progress' && (
+                              <div className="w-2 h-2 rounded-full bg-orange-500" />
+                            )}
+                          </div>
+                           <span className={`text-sm flex-1 ${
+                             task.status === 'done' 
+                               ? 'text-gray-500 line-through' 
+                               : 'text-gray-700 dark:text-gray-300'
+                           }`}>
+                             {task.title || `任務 ${index + 1}`}
+                           </span>
                         </div>
-                                                 <span className={`text-sm flex-1 ${
-                           task.status === 'done' 
-                             ? 'text-gray-500 line-through' 
-                             : 'text-gray-700 dark:text-gray-300'
-                         }`}>
-                           任務 {index + 1}
-                         </span>
-                      </div>
-                                          ))}
+                      )) || []}
                       
                       {/* 新增任務輸入框 */}
                       {showAddTask && (
@@ -795,12 +804,27 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+      
+      {/* 整個對話框的滾動指示器 */}
+      {!showHistory && !showDetails && showScrollIndicator && (
+        <div className="absolute bottom-0 right-0 h-8 w-24 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none flex items-end justify-center pb-1 z-20">
+          <div 
+            className="flex items-center gap-1 text-xs text-gray-400 animate-bounce"
+            style={{ color: subjectStyle.accent }}
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+            <span>還有更多</span>
+          </div>
+        </div>
+      )}
     </motion.div>
 
     {/* TopicReviewPage - 只在 showReview 為 true 時顯示 */}
