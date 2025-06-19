@@ -1040,7 +1040,7 @@ export const useGoalStore = create<GoalStore>((set, get) => ({
 
       const step = goal.steps.find(s => s.id === stepId);
       if (!step) {
-        console.log('❌ goalStore.updateTask 失敗：找不到步驟', { stepId });
+        console.log('❌ goalStore.updateTask 失敗：找不到目標', { stepId });
         return state;
       }
 

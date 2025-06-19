@@ -37,7 +37,7 @@ const getRadialPosition = (index: number, total: number, radius: number, centerX
   return { x, y, angle };
 };
 
-// 計算任務在步驟周圍的位置
+// 計算任務在目標周圍的位置
 const getTaskPosition = (taskIndex: number, totalTasks: number, stepX: number, stepY: number, taskRadius: number) => {
   const angle = (taskIndex * 2 * Math.PI) / totalTasks;
   const x = stepX + taskRadius * Math.cos(angle);

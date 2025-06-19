@@ -407,7 +407,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
           </div>
         </div>
 
-        {/* 目標網格視圖 - 類似 GoalDetails 的步驟網格 */}
+        {/* 目標網格視圖 - 類似 GoalDetails 的目標網格 */}
         <div className="mb-3">
           <div className="grid grid-cols-2 gap-3">
             {activeGoals.map((goal, index) => {

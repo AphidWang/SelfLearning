@@ -579,8 +579,8 @@ export class MindMapService {
           try {
             console.log('📝 準備新增任務', { params });
             if (!params.step_id) {
-              console.log('❌ 新增失敗：缺少步驟 ID');
-              throw new LLMRetryError('哎呀！我需要知道要把任務加到哪個步驟。讓我想想看...');
+                    console.log('❌ 新增失敗：缺少目標 ID');
+      throw new LLMRetryError('哎呀！我需要知道要把任務加到哪個目標。讓我想想看...');
             }
             
             const task: Partial<Task> = {
@@ -588,7 +588,7 @@ export class MindMapService {
               status: 'todo'
             };
 
-            // 確認步驟存在
+            // 確認目標存在
             const currentTopic = this.getTopic();
             if (!currentTopic) {
               console.log('❌ 新增失敗：找不到當前主題');

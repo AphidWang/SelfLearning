@@ -618,7 +618,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                   <button
                     onClick={() => setShowDetails(true)}
                     className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                    aria-label="步驟總覽"
+                    aria-label="目標總覽"
                   >
                     <List size={16} />
                   </button>
@@ -664,7 +664,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                           <ArrowUpRight className="w-4 h-4" />
                         </button>
                       </div>
-                      {/* 步驟指示點 */}
+                      {/* 目標指示點 */}
                       {focusedGoals.length > 1 && (
                         <div className="absolute -bottom-2 left-0 right-0 flex justify-center items-center gap-2 mt-2">
                           {focusedGoals.map((_, index) => (
@@ -697,13 +697,13 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                       style={{ backgroundColor: `${subjectStyle.accent}15` }}
                     >
                       <div className="flex flex-col">
-                        <div className="font-medium">現在沒有進行中的步驟</div>
+                        <div className="font-medium">現在沒有進行中的目標</div>
                         <div className="text-xs">一起挑選一個吧</div>
                       </div>
                       <button
                         onClick={() => setShowDetails(true)}
                         className="p-1.5 rounded-lg transition-all duration-200 flex-shrink-0 bg-white/80 hover:bg-white text-gray-600 hover:text-gray-800 shadow-sm hover:shadow-md opacity-0 group-hover:opacity-100"
-                        aria-label="挑選步驟"
+                        aria-label="挑選目標"
                       >
                         <ArrowUpRight className="w-4 h-4" />
                       </button>
@@ -712,7 +712,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                 </div>
               </div>
 
-                                           {/* 當前步驟的所有任務 */}
+                                           {/* 當前目標的所有任務 */}
               {currentGoal && (
                 <div className="mb-5">
                   <div className="flex items-center justify-between mb-3">
