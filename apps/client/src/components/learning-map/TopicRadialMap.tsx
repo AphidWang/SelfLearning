@@ -52,13 +52,13 @@ const getTaskPosition = (taskIndex: number, totalTasks: number, stepX: number, s
   
   // 不再計算均勻分佈，而是讓任務更靠近延伸線
   // 使用較小的角度範圍，讓所有任務都集中在延伸線附近
-  const maxSpread = Math.PI / 6; // 最大散佈角度（30度）
-  const angleStep = totalTasks > 1 ? maxSpread / (totalTasks - 1) : 0;
+  const maxSpread = Math.PI * 2; // 最大散佈角度（30度）
+  const angleStep = (totalTasks > 1 ? maxSpread / (totalTasks+1) : 0) * 0.9;
   
   // 計算對稱分佈：以延伸線為中心，左右對稱排列
-  const centerIndex = (totalTasks - 1) / 2; // 中心索引
-  const offsetFromCenter = taskIndex - centerIndex; // 相對於中心的偏移
-  const taskAngle = extensionAngle + offsetFromCenter * angleStep;
+  const centerIndex = (totalTasks+1) / 2; // 中心索引
+  const offsetFromCenter = taskIndex+1 - centerIndex; // 相對於中心的偏移
+  const taskAngle = goalAngle + offsetFromCenter * angleStep;
   
   const x = stepX + taskRadius * Math.cos(taskAngle);
   const y = stepY + taskRadius * Math.sin(taskAngle);
