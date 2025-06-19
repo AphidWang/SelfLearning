@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePlanner } from '../../context/PlannerContext';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { Task, Resource } from '../../types/task';
+import { Task, Resource } from '../../../../../packages/types/src/task';
 
 interface TaskEditDrawerProps {
   isOpen: boolean;
@@ -39,8 +39,8 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({ isOpen, onClose, task }
       description: formData.get('description') as string,
       subject: formData.get('subject') as string,
       priority: formData.get('priority') as Task['priority'],
-      startDate: new Date(formData.get('startDate') as string),
-      endDate: new Date(formData.get('endDate') as string),
+      startDate: formData.get('startDate') as string,
+      endDate: formData.get('endDate') as string,
       resources
     };
 
@@ -145,7 +145,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({ isOpen, onClose, task }
                   <input
                     type="date"
                     name="startDate"
-                    defaultValue={editedTask.startDate.toISOString().split('T')[0]}
+                    defaultValue={editedTask.startDate}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
                   />
                 </div>
@@ -157,7 +157,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({ isOpen, onClose, task }
                   <input
                     type="date"
                     name="endDate"
-                    defaultValue={editedTask.endDate.toISOString().split('T')[0]}
+                    defaultValue={editedTask.endDate}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
                   />
                 </div>

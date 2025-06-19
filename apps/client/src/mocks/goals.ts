@@ -1,8 +1,8 @@
-import { Goal } from '../types/goal';
+import { Topic } from '../types/goal';
 import { GOAL_STATUSES } from '../constants/goals';
 import { SUBJECTS } from '../constants/subjects';
 
-export const mockGoals: Goal[] = [
+export const mockGoals: Topic[] = [
   {
     id: '1',
     title: '科學探究：水的三態變化實驗',
@@ -13,7 +13,7 @@ export const mockGoals: Goal[] = [
     dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString(),
     progress: 35,
     subject: SUBJECTS.SCIENCE,
-    steps: [
+    goals: [
       {
         id: 's1',
         title: '準備階段',
@@ -116,7 +116,7 @@ export const mockGoals: Goal[] = [
     dueDate: new Date(new Date().setDate(new Date().getDate() + 21)).toISOString(),
     progress: 20,
     subject: SUBJECTS.CHINESE,
-    steps: [
+    goals: [
       {
         id: 's1',
         title: '構思與規劃',

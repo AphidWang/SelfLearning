@@ -62,3 +62,12 @@ export interface Bubble {
 export type Step = Goal;
 export type GoalStatus = TopicStatus;
 export type { Topic as Goal_New, Goal as Step_New };
+
+export interface ActionItem {
+  id: string;
+  description: string;
+  status: 'todo' | 'in-progress' | 'done';
+  estimatedTime?: string;
+  priority: 'low' | 'medium' | 'high';
+  addedToSchedule?: boolean;
+}

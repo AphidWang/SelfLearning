@@ -7,7 +7,7 @@ interface ActionConfig {
     description: string;
     required?: boolean;
   }>;
-  returns: {
+  returns?: {
     type: string;
     properties?: Record<string, any>;
     items?: {
@@ -52,8 +52,8 @@ export class ActionValidator {
 
   validateReturn(action: string, result: any): boolean {
     const actionConfig = this.config.actions[action];
-    if (!actionConfig) {
-      console.error(`Unknown action: ${action}`);
+    if (!actionConfig || !actionConfig.returns) {
+      console.error(`Unknown action or no return config: ${action}`);
       return false;
     }
 

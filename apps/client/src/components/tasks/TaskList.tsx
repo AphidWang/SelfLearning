@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle, Circle, ChevronDown, ChevronRight, AlertCircle, Clock } from 'lucide-react';
-import { Task, TaskStatus, TaskPriority } from '../../types/task';
+import { Task, TaskStatus, TaskPriority } from '../../../../../packages/types/src/task';
 
 interface TaskListProps {
   tasks: Task[];

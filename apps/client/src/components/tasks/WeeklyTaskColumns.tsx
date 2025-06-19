@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Task } from '../../types/task';
-import { WeekPlan } from '../../types/planner';
+import { Task } from '../../../../../packages/types/src/task';
+import { WeekPlan } from '../../../../../packages/types/src/planner';
 import { usePlanner } from '../../context/PlannerContext';
 import { useCurriculum } from '../../context/CurriculumContext';
 

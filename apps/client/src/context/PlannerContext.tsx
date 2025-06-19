@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
-import { Task, TaskStatus } from '../types/task';
-import { WeekPlan, TaskAssignment } from '../types/planner';
+import { Task, TaskStatus } from '../../../../packages/types/src/task';
+import { WeekPlan, TaskAssignment } from '../../../../packages/types/src/planner';
 import { useCurriculum } from './CurriculumContext';
 
 interface PlannerContextType {

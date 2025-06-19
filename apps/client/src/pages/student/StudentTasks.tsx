@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PageLayout from '../../components/layout/PageLayout';
-import TaskList, { Task } from '../../components/tasks/TaskList';
+import TaskList from '../../components/tasks/TaskList';
+import { Task } from '../../../../../packages/types/src/task';
 import { Plus, Filter } from 'lucide-react';
 
 const mockTasks: Task[] = [
@@ -8,51 +9,76 @@ const mockTasks: Task[] = [
     id: '1',
     title: '寫一篇遊記',
     description: '選擇一個最近去過的地方，寫一篇遊記',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 1)),
-    completed: false,
+    endDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
+    status: 'pending',
     subject: '國語',
     priority: 'high',
-    assignedBy: '陳老師'
+    assignedBy: '陳老師',
+    progress: 0,
+    subjectId: 'chinese',
+    creatorId: 'teacher1',
+    required: true,
+    students: []
   },
   {
     id: '2',
     title: '水三態的科學實驗',
     description: '準備水三態實驗的報告',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 3)),
-    completed: false,
+    endDate: new Date(new Date().setDate(new Date().getDate() + 3)).toISOString(),
+    status: 'pending',
     subject: '自然',
     priority: 'medium',
-    assignedBy: '林老師'
+    assignedBy: '林老師',
+    progress: 0,
+    subjectId: 'science',
+    creatorId: 'teacher2',
+    required: true,
+    students: []
   },
   {
     id: '3',
     title: '閱讀課外讀物 - 科學家',
     description: '閱讀科學家的傳記並做筆記',
-    dueDate: new Date(),
-    completed: true,
+    endDate: new Date().toISOString(),
+    status: 'completed',
     subject: '自然',
     priority: 'low',
-    assignedBy: '林老師'
+    assignedBy: '林老師',
+    progress: 100,
+    subjectId: 'science',
+    creatorId: 'teacher2',
+    required: false,
+    students: []
   },
   {
     id: '4',
     title: '英語單字測驗準備',
     description: '準備下週的英語單字測驗，範圍：Unit 5-7',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 5)),
-    completed: false,
+    endDate: new Date(new Date().setDate(new Date().getDate() + 5)).toISOString(),
+    status: 'pending',
     subject: '英語',
     priority: 'high',
-    assignedBy: '王老師'
+    assignedBy: '王老師',
+    progress: 0,
+    subjectId: 'english',
+    creatorId: 'teacher3',
+    required: true,
+    students: []
   },
   {
     id: '5',
     title: '數學練習題',
     description: '完成分數除法練習題',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 2)),
-    completed: false,
+    endDate: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString(),
+    status: 'pending',
     subject: '數學',
     priority: 'medium',
-    assignedBy: '李老師'
+    assignedBy: '李老師',
+    progress: 0,
+    subjectId: 'math',
+    creatorId: 'teacher4',
+    required: true,
+    students: []
   }
 ];
 
@@ -62,10 +88,10 @@ const StudentTasks: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleTaskToggle = (taskId: string) => {
+  const handleTaskToggle = (taskId: string, status: any) => {
     setTasks(tasks.map(task => 
       task.id === taskId 
-        ? { ...task, completed: !task.completed }
+        ? { ...task, status }
         : task
     ));
   };
@@ -109,7 +135,7 @@ const StudentTasks: React.FC = () => {
 
         <TaskList
           tasks={tasks}
-          onTaskToggle={handleTaskToggle}
+          onStatusChange={handleTaskToggle}
           onTaskSelect={handleTaskSelect}
           groupBy={groupBy}
         />

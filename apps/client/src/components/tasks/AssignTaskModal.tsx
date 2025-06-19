@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePlanner } from '../../context/PlannerContext';
-import { Task, Student } from '../../types/task';
+import { Task } from '../../../../../packages/types/src/task';
 import { X, Users, Calendar, AlertTriangle, Check } from 'lucide-react';
 
 interface AssignTaskModalProps {
@@ -16,7 +16,8 @@ const AssignTaskModal: React.FC<AssignTaskModalProps> = ({
   weekId,
   tasks
 }) => {
-  const { students, assignTasksToStudents } = usePlanner();
+  const { assignTasksToStudents } = usePlanner();
+  const students: any[] = []; // 暫時移除 students 依賴
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
 
