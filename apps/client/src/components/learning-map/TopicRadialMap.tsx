@@ -38,12 +38,35 @@ const getRadialPosition = (index: number, total: number, radius: number, centerX
   return { x, y, angle };
 };
 
-// 計算任務在目標周圍的位置
-const getTaskPosition = (taskIndex: number, totalTasks: number, stepX: number, stepY: number, taskRadius: number) => {
-  const angle = (taskIndex * 2 * Math.PI) / totalTasks;
-  const x = stepX + taskRadius * Math.cos(angle);
-  const y = stepY + taskRadius * Math.sin(angle);
-  return { x, y };
+// 計算任務在目標周圍的位置，與 topic-goal 連線形成均勻角度，但偏向延伸線
+const getTaskPosition = (taskIndex: number, totalTasks: number, stepX: number, stepY: number, taskRadius: number, goalAngle: number, centerX: number, centerY: number) => {
+  // topic-goal 線的延伸線角度（goal 指向中心相反方向）
+  const extensionAngle = goalAngle + Math.PI;
+  
+  if (totalTasks === 1) {
+    // 單個任務時，放在延伸線方向
+    const x = stepX + taskRadius * Math.cos(extensionAngle);
+    const y = stepY + taskRadius * Math.sin(extensionAngle);
+    return { x, y, angle: extensionAngle };
+  }
+  
+  // 計算均勻分佈的角度
+  // 總共有 (totalTasks + 1) 條線：1條 topic-goal 線 + totalTasks 條 goal-task 線
+  const totalLines = totalTasks + 1;
+  const baseAngleStep = (2 * Math.PI) / totalLines; // 基礎角度步長
+  
+  // 縮小非延伸線的角度分佈，讓它們更靠近延伸線
+  const compressionFactor = 0.7; // 壓縮係數，讓角度更集中
+  const angleStep = baseAngleStep * compressionFactor;
+  
+  // 計算對稱分佈：以延伸線為中心，左右對稱排列
+  const centerIndex = (totalTasks - 1) / 2; // 中心索引
+  const offsetFromCenter = taskIndex - centerIndex; // 相對於中心的偏移
+  const taskAngle = extensionAngle + offsetFromCenter * angleStep;
+  
+  const x = stepX + taskRadius * Math.cos(taskAngle);
+  const y = stepY + taskRadius * Math.sin(taskAngle);
+  return { x, y, angle: taskAngle };
 };
 
 export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
@@ -147,8 +170,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
   const centerX = width / 2;
   const centerY = height / 2;
-  const goalRadius = Math.min(width, height) * 0.46; // 減少半徑避免重疊
-  const taskRadius = Math.min(100, goalRadius * 0.9); // 增加任務距離避免重疊
+  const goalRadius = Math.min(width, height) * 0.46; // 縮短 topic-goal 距離
+  const taskRadius = goalRadius * 0.6; // 讓 goal-task 距離與 topic-goal 成比例
 
   // 定義裝飾圖示的位置和類型
   const decorativeIcons = useMemo(() => {
@@ -331,28 +354,75 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               
               {/* 目標到任務的連接線 */}
               {goal.tasks.map((task, taskIndex) => {
-                const taskPos = getTaskPosition(taskIndex, goal.tasks.length, goalPos.x, goalPos.y, taskRadius);
+                const taskPos = getTaskPosition(taskIndex, goal.tasks.length, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
                 const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completedAt);
                 
-                return (
-                  <motion.line
-                    key={`task-line-${task.id}`}
-                    x1={goalPos.x}
-                    y1={goalPos.y}
-                    x2={taskPos.x}
-                    y2={taskPos.y}
-                    stroke={
-                      isNewlyCompleted ? '#10b981' :
-                      task.status === 'done' ? '#6b7280' :
-                      task.status === 'in_progress' ? '#3b82f6' :
-                      '#d1d5db'
-                    }
-                    strokeWidth="3"
-                    initial={showAnimations ? { pathLength: 0 } : undefined}
-                    animate={showAnimations ? { pathLength: 1 } : undefined}
-                    transition={showAnimations ? { delay: 1 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.4 } : undefined}
-                  />
-                );
+                // 檢查是否在主延伸線上（topic-goal 的延長線）
+                const extensionAngle = goalPos.angle + Math.PI;
+                
+                // 計算任務角度與延伸線的角度差（標準化到 -π 到 π）
+                let angleDiff = taskPos.angle - extensionAngle;
+                while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                
+                // 如果角度差很小（在延伸線上），使用直線
+                const isOnExtensionLine = Math.abs(angleDiff) < 0.1; // 約 5.7 度的容忍範圍
+                
+                if (isOnExtensionLine) {
+                  return (
+                    <motion.line
+                      key={`task-line-${task.id}`}
+                      x1={goalPos.x}
+                      y1={goalPos.y}
+                      x2={taskPos.x}
+                      y2={taskPos.y}
+                      stroke={
+                        isNewlyCompleted ? '#10b981' :
+                        task.status === 'done' ? '#6b7280' :
+                        task.status === 'in_progress' ? '#3b82f6' :
+                        '#d1d5db'
+                      }
+                      strokeWidth="3"
+                      initial={showAnimations ? { pathLength: 0 } : undefined}
+                      animate={showAnimations ? { pathLength: 1 } : undefined}
+                      transition={showAnimations ? { delay: 1 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.4 } : undefined}
+                    />
+                  );
+                } else {
+                  // 不在延伸線上，使用曲線，彎曲程度根據角度差決定
+                  const midX = (goalPos.x + taskPos.x) / 2;
+                  const midY = (goalPos.y + taskPos.y) / 2;
+                  
+                  // 彎曲強度基於角度差，最大彎曲在 90 度時
+                  const maxBend = 25;
+                  const bendIntensity = maxBend * Math.sin(Math.abs(angleDiff));
+                  
+                  // 彎曲方向：根據角度差的正負決定左右
+                  const bendDirection = angleDiff > 0 ? 1 : -1;
+                  
+                  // 計算控制點：垂直於連線方向（加上 π 讓彎曲方向完全相反）
+                  const perpAngle = Math.atan2(taskPos.y - goalPos.y, taskPos.x - goalPos.x) + Math.PI / 2 + Math.PI;
+                  const controlX = midX + bendIntensity * bendDirection * Math.cos(perpAngle);
+                  const controlY = midY + bendIntensity * bendDirection * Math.sin(perpAngle);
+                  
+                  return (
+                    <motion.path
+                      key={`task-line-${task.id}`}
+                      d={`M ${goalPos.x} ${goalPos.y} Q ${controlX} ${controlY} ${taskPos.x} ${taskPos.y}`}
+                      stroke={
+                        isNewlyCompleted ? '#10b981' :
+                        task.status === 'done' ? '#6b7280' :
+                        task.status === 'in_progress' ? '#3b82f6' :
+                        '#d1d5db'
+                      }
+                      strokeWidth="3"
+                      fill="none"
+                      initial={showAnimations ? { pathLength: 0 } : undefined}
+                      animate={showAnimations ? { pathLength: 1 } : undefined}
+                      transition={showAnimations ? { delay: 1 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.4 } : undefined}
+                    />
+                  );
+                }
               })}
             </g>
           );
@@ -513,7 +583,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           const goalPos = getRadialPosition(goalIndex, goals.length, goalRadius, centerX, centerY);
           
           return goal.tasks.map((task, taskIndex) => {
-            const { x, y } = getTaskPosition(taskIndex, goal.tasks.length, goalPos.x, goalPos.y, taskRadius);
+            const { x, y } = getTaskPosition(taskIndex, goal.tasks.length, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
             const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completedAt);
             const isSelected = selectedTaskId === task.id;
             
