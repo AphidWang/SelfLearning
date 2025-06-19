@@ -50,14 +50,10 @@ const getTaskPosition = (taskIndex: number, totalTasks: number, stepX: number, s
     return { x, y, angle: extensionAngle };
   }
   
-  // 計算均勻分佈的角度
-  // 總共有 (totalTasks + 1) 條線：1條 topic-goal 線 + totalTasks 條 goal-task 線
-  const totalLines = totalTasks + 1;
-  const baseAngleStep = (2 * Math.PI) / totalLines; // 基礎角度步長
-  
-  // 縮小非延伸線的角度分佈，讓它們更靠近延伸線
-  const compressionFactor = 0.7; // 壓縮係數，讓角度更集中
-  const angleStep = baseAngleStep * compressionFactor;
+  // 不再計算均勻分佈，而是讓任務更靠近延伸線
+  // 使用較小的角度範圍，讓所有任務都集中在延伸線附近
+  const maxSpread = Math.PI / 6; // 最大散佈角度（30度）
+  const angleStep = totalTasks > 1 ? maxSpread / (totalTasks - 1) : 0;
   
   // 計算對稱分佈：以延伸線為中心，左右對稱排列
   const centerIndex = (totalTasks - 1) / 2; // 中心索引
