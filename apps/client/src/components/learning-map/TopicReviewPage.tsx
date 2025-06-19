@@ -66,8 +66,14 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 
   // 處理 RadialMap 的點擊事件
   const handleRadialMapGoalClick = (goalId: string) => {
-    setSelectedGoalId(goalId);
-    setSelectedTaskId(null); // 清除任務選擇
+    if (goalId === '') {
+      // 空字串表示取消選擇
+      setSelectedGoalId(null);
+      setSelectedTaskId(null);
+    } else {
+      setSelectedGoalId(goalId);
+      setSelectedTaskId(null); // 清除任務選擇
+    }
     // 不調用外部 onGoalClick，只更新選中狀態顯示在右側面板
   };
 
@@ -486,6 +492,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
     // 顯示任務詳情
     return (
       <TaskDetailPanel 
+        key={`task-${selectedTask.id}`}
         task={selectedTask}
         goal={selectedGoal}
         topicId={topicId}
@@ -503,11 +510,12 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
 
     return (
       <motion.div
+        key={`goal-${selectedGoal.id}`}
         className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col p-4"
         style={{ borderColor: `${subjectColor}50` }}
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
       >
         {/* 背景裝飾 */}
         <div 
@@ -521,10 +529,10 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         {/* 標題區 */}
         <div className="flex items-center gap-2 mb-4 relative z-10">
           <Target className="w-4 h-4" style={{ color: subjectColor }} />
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">步驟詳情</h3>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">目標詳情</h3>
         </div>
 
-        {/* 步驟標題和進度 */}
+        {/* 目標標題和進度 */}
         <div className="mb-4 relative z-10">
           <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-2">
             {selectedGoal.title}
@@ -592,7 +600,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
             )}
             {selectedGoal.tasks.length === 0 && (
               <div className="text-center text-xs text-gray-500 py-4">
-                此步驟還沒有任務
+                此目標還沒有任務
               </div>
             )}
           </div>
@@ -604,11 +612,12 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   // 預設狀態：顯示提示訊息
   return (
     <motion.div
+      key="default-state"
       className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col items-center justify-center p-6"
       style={{ borderColor: `${subjectColor}50` }}
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.5 }}
+      transition={{ delay: 0.1, duration: 0.3 }}
     >
       {/* 背景裝飾 */}
       <div 
@@ -623,7 +632,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         <Eye className="w-12 h-12 mx-auto mb-3 text-gray-300" />
         <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">選擇要查看的內容</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          點擊左側路徑圖中的步驟或任務
+          點擊左側路徑圖中的目標或任務
           <br />
           來查看詳細資訊
         </p>
@@ -674,7 +683,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       style={{ borderColor: `${subjectColor}50` }}
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.5 }}
+      transition={{ delay: 0.1, duration: 0.3 }}
     >
       {/* 背景裝飾 */}
       <div 
@@ -705,7 +714,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               {task.title}
             </h4>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-gray-500">來自步驟: {goal.title}</span>
+              <span className="text-xs text-gray-500">來自目標: {goal.title}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full ${
                 task.status === 'done' ? 'bg-green-100 text-green-700' :
                 task.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :

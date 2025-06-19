@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
-import { subjectColors } from '../../styles/tokens';
+import { subjects } from '../../styles/tokens';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw
 } from 'lucide-react';
@@ -71,7 +71,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     return null;
   }
 
-  const subjectColor = subjectColors[topic.subject || '未分類'];
+  const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+  const subjectColor = subjectStyle.accent;
   const progress = getCompletionRate(topic.id);
   const goals = getActiveGoals(topic.id);
   
@@ -215,6 +216,22 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
         {/* 主要內容組，應用縮放和平移變換 */}
         <g transform={`translate(${translateX}, ${translateY}) scale(${scale})`}>
+          {/* 透明背景區域用於捕捉點擊事件 */}
+          <rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            fill="transparent"
+            onClick={(e) => {
+              // 點擊空白區域取消選擇
+              if (!isDragging && (selectedGoalId || selectedTaskId)) {
+                e.stopPropagation();
+                onGoalClick?.(''); // 傳遞空字串來取消選擇
+              }
+            }}
+            style={{ cursor: 'default' }}
+          />
           {/* 背景放射線 */}
           {goals.map((_, index) => {
           const { x, y } = getRadialPosition(index, goals.length, goalRadius, centerX, centerY);
