@@ -7,6 +7,9 @@ export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'idea' | 'archived';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type TaskRole = 'explore' | 'work' | 'present';
 
+// 添加目標狀態類型
+export type GoalStatus = 'todo' | 'pause' | 'focus' | 'finish' | 'complete' | 'archived';
+
 export interface Topic {
   id: string;
   title: string;
@@ -21,7 +24,7 @@ export interface Topic {
   progress?: number;
   focusElement?: { type: 'goal' | 'task', id: string };
   bubbles?: Bubble[];
-  focusedGoalIds?: string[]; // 當前進行的目標 IDs
+  // 移除 focusedGoalIds，改用目標的 status 字段來管理
 }
 
 export interface Goal {
@@ -30,7 +33,12 @@ export interface Goal {
   description?: string;
   tasks: Task[];
   order?: number;
-  status?: 'active' | 'archived';
+  status?: GoalStatus; // 改為 GoalStatus 類型
+  needHelp?: boolean; // 是否需要幫助
+  helpMessage?: string; // 幫助訊息
+  helpResolvedAt?: string; // 幫助解決時間
+  replyMessage?: string; // 老師回覆訊息
+  replyAt?: string; // 老師回覆時間
 }
 
 export interface Task {
@@ -48,6 +56,11 @@ export interface Task {
   notes?: string;
   order?: number;
   challenge?: number;
+  needHelp?: boolean; // 是否需要幫助
+  helpMessage?: string; // 幫助訊息
+  helpResolvedAt?: string; // 幫助解決時間
+  replyMessage?: string; // 老師回覆訊息
+  replyAt?: string; // 老師回覆時間
 }
 
 export interface Bubble {
@@ -61,7 +74,6 @@ export interface Bubble {
 
 // 保持向後兼容的別名（過渡期使用）
 export type Step = Goal;
-export type GoalStatus = TopicStatus;
 export type { Topic as Goal_New, Goal as Step_New };
 
 export interface ActionItem {

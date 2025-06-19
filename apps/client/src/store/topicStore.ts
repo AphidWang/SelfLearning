@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import type { Topic, Goal, Task, Bubble } from '../types/goal';
+import type { Topic, Goal, Task, Bubble, GoalStatus } from '../types/goal';
 import { TOPIC_STATUSES } from '../constants/topics';
 import { SUBJECTS } from '../constants/subjects';
 
 const STORAGE_KEY = 'self_learning_topics';
-const STORAGE_VERSION = '2.3'; // 增加版本號來強制重新載入
+const STORAGE_VERSION = '2.5'; // 增加版本號來強制重新載入
 
 // 檢查是否為預設主題
 export const isDefaultTopic = (topicId: string): boolean => {
@@ -18,7 +18,6 @@ const initialTopics: Topic[] = [
     description: '透過詩歌感受唐代文人的情感與智慧',
     status: 'in-progress',
     subject: SUBJECTS.CHINESE,
-    focusedGoalIds: ['1-2'], // 目前專注於感受詩的意境
     bubbles: [
       {
         id: 'bubble-1-1',
@@ -39,6 +38,7 @@ const initialTopics: Topic[] = [
       {
         id: '1-1',
         title: '認識詩的韻律',
+        status: 'todo',
         tasks: [
           {
             id: '1-1-1',
@@ -55,6 +55,7 @@ const initialTopics: Topic[] = [
       {
         id: '1-2',
         title: '感受詩的意境',
+        status: 'focus', // 當前專注的目標
         tasks: [
           {
             id: '1-2-1',
@@ -71,6 +72,7 @@ const initialTopics: Topic[] = [
       {
         id: '1-3',
         title: '探索詩的典故',
+        status: 'todo',
         tasks: [
           {
             id: '1-3-1',
@@ -87,6 +89,7 @@ const initialTopics: Topic[] = [
       {
         id: '1-4',
         title: '創作詩的想像',
+        status: 'todo',
         tasks: [
           {
             id: '1-4-1',
@@ -108,7 +111,6 @@ const initialTopics: Topic[] = [
     description: '透過生活情境理解分數的概念',
     status: 'active',
     subject: SUBJECTS.MATH,
-    focusedGoalIds: ['2-2', '2-3'], // 專注於分數比較和運算
     bubbles: [
       {
         id: 'bubble-2-1',
@@ -129,6 +131,7 @@ const initialTopics: Topic[] = [
       {
         id: '2-1',
         title: '生活中的分數',
+        status: 'complete', // 已完成
         tasks: [
           {
             id: '2-1-1',
@@ -145,6 +148,7 @@ const initialTopics: Topic[] = [
       {
         id: '2-2',
         title: '分數的比較',
+        status: 'focus', // 當前專注
         tasks: [
           {
             id: '2-2-1',
@@ -162,6 +166,11 @@ const initialTopics: Topic[] = [
       {
         id: '2-3',
         title: '分數的運算',
+        status: 'focus', // 當前專注
+        needHelp: true, // 這個目標需要幫助
+        helpMessage: '我不太懂分數加法的通分步驟，可以請老師幫忙解釋嗎？',
+        replyMessage: '分數加法時，首先要找到兩個分數的最小公倍數作為通分母，然後把分子相加。我們可以用圖形來理解這個過程。',
+        replyAt: new Date('2024-03-18').toISOString(),
         tasks: [
           {
             id: '2-3-1',
@@ -172,6 +181,10 @@ const initialTopics: Topic[] = [
             id: '2-3-2',
             title: '學習分數減法',
             status: 'todo',
+            needHelp: true, // 這個任務需要幫助
+            helpMessage: '分數減法和加法有什麼不同嗎？我總是搞混。',
+            replyMessage: '分數減法的原理和加法很相似，都需要先通分，然後分子相減。關鍵是要記住只有分母相同的分數才能直接相減。',
+            replyAt: new Date('2024-03-17').toISOString(),
           },
           {
             id: '2-3-3',
@@ -188,6 +201,7 @@ const initialTopics: Topic[] = [
       {
         id: '2-4',
         title: '分數的應用',
+        status: 'todo',
         tasks: [
           {
             id: '2-4-1',
@@ -209,7 +223,6 @@ const initialTopics: Topic[] = [
     description: '透過故事學習英語表達',
     status: 'active',
     subject: SUBJECTS.ENGLISH,
-    focusedGoalIds: ['3-1', '3-2', '3-3'], // 專注於故事元素、結構和詞彙
     bubbles: [
       {
         id: 'bubble-3-1',
@@ -230,6 +243,7 @@ const initialTopics: Topic[] = [
       {
         id: '3-1',
         title: '故事元素探索',
+        status: 'focus',
         tasks: [
           {
             id: '3-1-1',
@@ -246,6 +260,7 @@ const initialTopics: Topic[] = [
       {
         id: '3-2',
         title: '故事結構理解',
+        status: 'focus',
         tasks: [
           {
             id: '3-2-1',
@@ -262,6 +277,7 @@ const initialTopics: Topic[] = [
       {
         id: '3-3',
         title: '故事詞彙收集',
+        status: 'focus',
         tasks: [
           {
             id: '3-3-1',
@@ -278,6 +294,7 @@ const initialTopics: Topic[] = [
       {
         id: '3-4',
         title: '故事創作實踐',
+        status: 'todo',
         tasks: [
           {
             id: '3-4-1',
@@ -299,7 +316,6 @@ const initialTopics: Topic[] = [
     description: '透過觀察了解植物的生命週期',
     status: 'active',
     subject: SUBJECTS.SCIENCE,
-    // 沒有設定 focusedGoalIds - 代表沒有特別專注的目標
     bubbles: [
       {
         id: 'bubble-4-1',
@@ -320,6 +336,7 @@ const initialTopics: Topic[] = [
       {
         id: '4-1',
         title: '種子探索',
+        status: 'todo',
         tasks: [
           {
             id: '4-1-1',
@@ -336,6 +353,7 @@ const initialTopics: Topic[] = [
       {
         id: '4-2',
         title: '發芽過程',
+        status: 'todo',
         tasks: [
           {
             id: '4-2-1',
@@ -352,6 +370,7 @@ const initialTopics: Topic[] = [
       {
         id: '4-3',
         title: '葉子研究',
+        status: 'todo',
         tasks: [
           {
             id: '4-3-1',
@@ -368,6 +387,7 @@ const initialTopics: Topic[] = [
       {
         id: '4-4',
         title: '開花結果',
+        status: 'todo',
         tasks: [
           {
             id: '4-4-1',
@@ -389,7 +409,6 @@ const initialTopics: Topic[] = [
     description: '透過色彩認識藝術表現',
     status: 'active',
     subject: SUBJECTS.ARTS,
-    focusedGoalIds: ['5-2'], // 專注於色彩情感
     bubbles: [
       {
         id: 'bubble-5-1',
@@ -410,6 +429,7 @@ const initialTopics: Topic[] = [
       {
         id: '5-1',
         title: '色彩探索',
+        status: 'todo',
         tasks: [
           {
             id: '5-1-1',
@@ -426,11 +446,16 @@ const initialTopics: Topic[] = [
       {
         id: '5-2',
         title: '色彩情感',
+        status: 'focus', // 專注於色彩情感
         tasks: [
           {
             id: '5-2-1',
             title: '試著用溫暖的顏色畫出快樂的場景',
             status: 'in_progress',
+            needHelp: true, // 這個任務需要幫助
+            helpMessage: '我不知道什麼顏色算是溫暖的顏色，可以給我一些例子嗎？',
+            replyMessage: '溫暖的顏色包括紅色、橙色、黃色等，這些顏色會讓人感到溫馨和愉快。你可以試著用夕陽的顏色來畫一個開心的場景。',
+            replyAt: new Date('2024-03-16').toISOString(),
           },
           {
             id: '5-2-2',
@@ -442,6 +467,7 @@ const initialTopics: Topic[] = [
       {
         id: '5-3',
         title: '色彩構圖',
+        status: 'todo',
         tasks: [
           {
             id: '5-3-1',
@@ -458,6 +484,7 @@ const initialTopics: Topic[] = [
       {
         id: '5-4',
         title: '色彩故事',
+        status: 'todo',
         tasks: [
           {
             id: '5-4-1',
@@ -479,7 +506,6 @@ const initialTopics: Topic[] = [
     description: '透過運動了解身體機能',
     status: 'active',
     subject: SUBJECTS.PE,
-    focusedGoalIds: ['6-2', '6-3'], // 專注於基礎運動和運動技能
     bubbles: [
       {
         id: 'bubble-6-1',
@@ -500,6 +526,7 @@ const initialTopics: Topic[] = [
       {
         id: '6-1',
         title: '身體探索',
+        status: 'todo',
         tasks: [
           {
             id: '6-1-1',
@@ -516,6 +543,7 @@ const initialTopics: Topic[] = [
       {
         id: '6-2',
         title: '基礎運動',
+        status: 'focus', // 專注於基礎運動
         tasks: [
           {
             id: '6-2-1',
@@ -532,6 +560,7 @@ const initialTopics: Topic[] = [
       {
         id: '6-3',
         title: '運動技能',
+        status: 'focus', // 專注於運動技能
         tasks: [
           {
             id: '6-3-1',
@@ -548,6 +577,7 @@ const initialTopics: Topic[] = [
       {
         id: '6-4',
         title: '運動應用',
+        status: 'todo',
         tasks: [
           {
             id: '6-4-1',
@@ -569,7 +599,6 @@ const initialTopics: Topic[] = [
     description: '探索讀書的意義與價值',
     status: 'active',
     subject: SUBJECTS.SOCIAL,
-    focusedGoalIds: ['7-1', '7-2', '7-3', '7-4'], // 專注於多個目標
     bubbles: [
       {
         id: 'bubble-7-1',
@@ -590,6 +619,7 @@ const initialTopics: Topic[] = [
       {
         id: '7-1',
         title: '讀書的現況',
+        status: 'focus',
         tasks: [
           {
             id: '7-1-1',
@@ -611,6 +641,7 @@ const initialTopics: Topic[] = [
       {
         id: '7-2',
         title: '體驗讀書',
+        status: 'focus',
         tasks: [
           {
             id: '7-2-1',
@@ -627,6 +658,7 @@ const initialTopics: Topic[] = [
       {
         id: '7-3',
         title: '讀書的收穫',
+        status: 'focus',
         tasks: [
           {
             id: '7-3-1',
@@ -648,6 +680,7 @@ const initialTopics: Topic[] = [
       {
         id: '7-4',
         title: '讀書的價值',
+        status: 'focus',
         tasks: [
           {
             id: '7-4-1',
@@ -669,7 +702,6 @@ const initialTopics: Topic[] = [
     description: '透過觀察、行動、學習和分享，探索火箭飛行的原理',
     status: 'active',
     subject: SUBJECTS.SCIENCE,
-    focusedGoalIds: ['8-1', '8-2'], // 專注於觀察和實驗
     bubbles: [
       {
         id: 'bubble-8-1',
@@ -690,6 +722,7 @@ const initialTopics: Topic[] = [
       {
         id: '8-1',
         title: '觀察火箭',
+        status: 'focus',
         tasks: [
           {
             id: '8-1-1',
@@ -706,6 +739,7 @@ const initialTopics: Topic[] = [
       {
         id: '8-2',
         title: '動手實驗',
+        status: 'focus',
         tasks: [
           {
             id: '8-2-1',
@@ -722,6 +756,7 @@ const initialTopics: Topic[] = [
       {
         id: '8-3',
         title: '學習原理',
+        status: 'todo',
         tasks: [
           {
             id: '8-3-1',
@@ -738,6 +773,7 @@ const initialTopics: Topic[] = [
       {
         id: '8-4',
         title: '分享發現',
+        status: 'todo',
         tasks: [
           {
             id: '8-4-1',
@@ -759,7 +795,6 @@ const initialTopics: Topic[] = [
     description: "探索火箭能飛多高與太空邊界",
     status: "active",
     subject: SUBJECTS.SCIENCE,
-    focusedGoalIds: ["9-1", "9-2", "9-3"], // 專注於前三個目標
     bubbles: [
       {
         id: "bubble-9-1",
@@ -780,6 +815,7 @@ const initialTopics: Topic[] = [
       {
         id: "9-1",
         title: "火箭飛到哪裡去？",
+        status: 'focus',
         tasks: [
           {
             id: "9-1-1",
@@ -801,6 +837,7 @@ const initialTopics: Topic[] = [
       {
         id: "9-2",
         title: "和其他飛行器比較",
+        status: 'focus',
         tasks: [
           {
             id: "9-2-1",
@@ -817,6 +854,7 @@ const initialTopics: Topic[] = [
       {
         id: "9-3",
         title: "創作與分享你的發現",
+        status: 'focus',
         tasks: [
           {
             id: "9-3-1",
@@ -909,9 +947,13 @@ interface TopicStore {
   reorderTasks: (topicId: string, goalId: string, sourceIndex: number, destinationIndex: number) => void;
   getActiveTopics: () => Topic[];
   getTopic: (topicId: string) => Topic | undefined;
-  setFocusedGoals: (topicId: string, goalIds: string[]) => void;
+  setGoalStatus: (topicId: string, goalId: string, status: GoalStatus) => void;
+  getGoalsByStatus: (topicId: string, status: GoalStatus) => Goal[];
   getFocusedGoals: (topicId: string) => Goal[];
-  toggleGoalFocus: (topicId: string, goalId: string) => void;
+  updateGoalHelp: (topicId: string, goalId: string, needHelp: boolean, helpMessage?: string) => void;
+  updateTaskHelp: (topicId: string, goalId: string, taskId: string, needHelp: boolean, helpMessage?: string) => void;
+  setGoalReply: (topicId: string, goalId: string, replyMessage: string) => void;
+  setTaskReply: (topicId: string, goalId: string, taskId: string, replyMessage: string) => void;
 }
 
 export const useTopicStore = create<TopicStore>((set, get) => ({
@@ -1185,6 +1227,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       .filter(goal => !goal.status || goal.status !== 'archived')
       .map(goal => ({
         ...goal,
+        // 如果沒有設置狀態，默認為 'todo'
+        status: goal.status || 'todo',
         tasks: goal.tasks.filter(task => !task.status || task.status !== 'archived')
       }));
   },
@@ -1312,12 +1356,17 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
   getTopic: (topicId: string) => get().topics.find(t => t.id === topicId),
 
-  setFocusedGoals: (topicId: string, goalIds: string[]) => {
+  setGoalStatus: (topicId: string, goalId: string, status: GoalStatus) => {
     set((state) => {
       const newState = {
         topics: state.topics.map((t) =>
           t.id === topicId
-            ? { ...t, focusedGoalIds: goalIds.slice(0, 5) } // 限制最多5個
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId ? { ...g, status } : g
+                )
+              }
             : t
         )
       };
@@ -1326,36 +1375,123 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     });
   },
 
-  getFocusedGoals: (topicId: string) => {
-    const topic = get().topics.find(t => t.id === topicId);
-    if (!topic || !topic.focusedGoalIds) return [];
-    
+  getGoalsByStatus: (topicId: string, status: GoalStatus) => {
     const activeGoals = get().getActiveGoals(topicId);
-    return topic.focusedGoalIds
-      .map(goalId => activeGoals.find(g => g.id === goalId))
-      .filter(Boolean) as Goal[];
+    return activeGoals.filter(goal => goal.status === status);
   },
 
-  toggleGoalFocus: (topicId: string, goalId: string) => {
+  getFocusedGoals: (topicId: string) => {
+    return get().getGoalsByStatus(topicId, 'focus');
+  },
+
+  updateGoalHelp: (topicId: string, goalId: string, needHelp: boolean, helpMessage?: string) => {
     set((state) => {
-      const topic = state.topics.find(t => t.id === topicId);
-      if (!topic) return state;
-
-      const currentFocused = topic.focusedGoalIds || [];
-      let newFocused: string[];
-
-      if (currentFocused.includes(goalId)) {
-        // 移除焦點
-        newFocused = currentFocused.filter(id => id !== goalId);
-      } else {
-        // 添加焦點（最多5個）
-        newFocused = [...currentFocused, goalId].slice(0, 5);
-      }
-
       const newState = {
         topics: state.topics.map((t) =>
           t.id === topicId
-            ? { ...t, focusedGoalIds: newFocused }
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        needHelp,
+                        helpMessage: needHelp ? helpMessage : undefined,
+                        helpResolvedAt: !needHelp ? new Date().toISOString() : undefined,
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  updateTaskHelp: (topicId: string, goalId: string, taskId: string, needHelp: boolean, helpMessage?: string) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        tasks: g.tasks.map((tk) =>
+                          tk.id === taskId
+                            ? {
+                                ...tk,
+                                needHelp,
+                                helpMessage: needHelp ? helpMessage : undefined,
+                                helpResolvedAt: !needHelp ? new Date().toISOString() : undefined,
+                              }
+                            : tk
+                        )
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  setGoalReply: (topicId: string, goalId: string, replyMessage: string) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        replyMessage,
+                        replyAt: new Date().toISOString(),
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  setTaskReply: (topicId: string, goalId: string, taskId: string, replyMessage: string) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        tasks: g.tasks.map((tk) =>
+                          tk.id === taskId
+                            ? {
+                                ...tk,
+                                replyMessage,
+                                replyAt: new Date().toISOString(),
+                              }
+                            : tk
+                        )
+                      }
+                    : g
+                )
+              }
             : t
         )
       };

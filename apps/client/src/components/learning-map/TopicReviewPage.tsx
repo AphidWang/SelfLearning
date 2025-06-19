@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
+import { HelpMessageDisplay } from './HelpMessageDisplay';
 import type { Goal, Task } from '../../types/goal';
 import { 
   Brain, TrendingUp, Calendar, Trophy, Star, Clock, 
   CheckCircle2, Target, BookOpen, Zap, Award, 
   BarChart3, PieChart, TrendingDown, ArrowUp,
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare,
-  ChevronLeft, Pencil, Sparkles, Check
+  ChevronLeft, Pencil, Sparkles, Check, HelpCircle,
+  Save, AlertTriangle
 } from 'lucide-react';
 
 interface TopicReviewPageProps {
@@ -63,6 +65,30 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 
   const subjectStyle = subjects.getSubjectStyle((isEditingTitle ? editedTopic?.subject : topic.subject) || '');
   const progress = getCompletionRate(topic.id);
+
+  // 計算需要幫助的項目數量
+  const needHelpCount = useMemo(() => {
+    const { getActiveGoals } = useTopicStore.getState();
+    const activeGoals = getActiveGoals(topicId);
+    
+    let count = 0;
+    
+    // 計算需要幫助的目標數量
+    activeGoals.forEach(goal => {
+      if (goal.needHelp) {
+        count++;
+      }
+      
+      // 計算需要幫助的任務數量
+      goal.tasks.forEach(task => {
+        if (task.needHelp) {
+          count++;
+        }
+      });
+    });
+    
+    return count;
+  }, [topicId]);
 
   // 處理 RadialMap 的點擊事件
   const handleRadialMapGoalClick = (goalId: string) => {
@@ -199,8 +225,24 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {isEditingTitle ? (
+                                <div className="flex items-center gap-2 flex-shrink-0">
+              {/* 開發用：測試老師回覆功能 */}
+              {import.meta.env.DEV && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const { setGoalReply, setTaskReply } = useTopicStore.getState();
+                    // 為當前主題的某些目標和任務添加測試回覆
+                    setGoalReply(topicId, '2-3', '分數運算是數學的基礎，不用擔心！我們可以用圖形和實例來幫助理解。');
+                    setTaskReply(topicId, '2-3', '2-3-2', '分數減法其實和加法很相似，主要是記住先通分，然後分子相減。試著畫圖看看！');
+                  }}
+                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                  title="測試老師回覆功能"
+                >
+                  測試回覆
+                </button>
+              )}
+              {isEditingTitle ? (
                         <>
                           <button
                             onClick={(e) => {
@@ -275,10 +317,10 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
         </div>
 
         {/* 主要內容區 */}
-                <div className="flex-1 p-3">
+                <div className="flex-1 p-3 overflow-hidden">
           <div className="grid grid-cols-12 gap-3 h-full">
             {/* 左側統計面板 */}
-            <div className="col-span-3 flex flex-col gap-2 h-full">
+            <div className="col-span-3 flex flex-col gap-2 overflow-y-auto">
             {/* 總體進度 */}
             <motion.div
               className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl p-2.5 shadow-lg border border-gray-200 dark:border-gray-700"
@@ -335,7 +377,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                   <div className="text-xs text-blue-700 dark:text-blue-300">進行中</div>
                 </div>
                 <div className="text-center p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                  <div className="text-lg font-bold text-orange-600">2</div>
+                  <div className="text-lg font-bold text-orange-600">{needHelpCount}</div>
                   <div className="text-xs text-orange-700 dark:text-orange-300">需要幫忙</div>
                 </div>
               </div>
@@ -434,7 +476,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
             </div>
 
             {/* 右側資訊面板 */}
-            <div className="col-span-3 h-full">
+            <div className="col-span-3 h-full min-h-0">
               <GoalTaskInfoPanel
                 topicId={topicId}
                 selectedGoalId={selectedGoalId}
@@ -469,7 +511,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   onTaskSelect,
   onGoalClick
 }) => {
-  const { getTopic } = useTopicStore();
+  const { getTopic, updateGoalHelp, updateTaskHelp } = useTopicStore();
   const topic = getTopic(topicId);
   
   // 根據選擇顯示不同內容
@@ -498,103 +540,18 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
     const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
     return (
-      <motion.div
+      <GoalDetailPanel
         key={`goal-${selectedGoal.id}`}
-        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col p-4"
-        style={{ borderColor: `${subjectColor}50` }}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        {/* 背景裝飾 */}
-        <div 
-          className="absolute inset-0 opacity-5 rounded-xl"
-          style={{
-            background: `radial-gradient(circle at 20% 20%, ${subjectColor}40 0%, transparent 50%)`,
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* 標題區 */}
-        <div className="flex items-center gap-2 mb-4 relative z-10">
-          <Target className="w-4 h-4" style={{ color: subjectColor }} />
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">目標詳情</h3>
-        </div>
-
-        {/* 目標標題和進度 */}
-        <div className="mb-4 relative z-10">
-          <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-2">
-            {selectedGoal.title}
-          </h4>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div 
-                className="h-2 rounded-full transition-all duration-300"
-                style={{ 
-                  width: `${progress}%`,
-                  backgroundColor: progress === 100 ? '#22c55e' : subjectColor
-                }}
-              />
-            </div>
-            <span className="text-xs text-gray-500 min-w-[40px]">
-              {progress}%
-            </span>
-          </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>已完成: {completedTasks}</span>
-            <span>進行中: {inProgressTasks}</span>
-            <span>總計: {totalTasks}</span>
-          </div>
-        </div>
-
-        {/* 任務列表 */}
-        <div className="flex-1 overflow-auto relative z-10">
-          <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">任務列表</h5>
-                    <div className="space-y-2">
-            {selectedGoal.tasks.slice(0, 5).map((task) => {
-              const isSelected = selectedTaskId === task.id;
-              return (
-                <div
-                  key={task.id}
-                  className={`p-2 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${
-                    isSelected ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-300' :
-                    task.status === 'done' ? 'bg-green-50 border-green-200' : 
-                    task.status === 'in_progress' ? 'bg-purple-50 border-purple-200' : 
-                    'bg-gray-50 border-gray-200'
-                  }`}
-                  onClick={() => onTaskSelect?.(task.id, selectedGoal.id)}
-                 >
-                <div className="flex items-center gap-2">
-                  {task.status === 'done' ? (
-                    <CheckCircle2 className="w-3 h-3 text-green-500" />
-                  ) : task.status === 'in_progress' ? (
-                    <AlertCircle className="w-3 h-3 text-purple-500" />
-                  ) : (
-                    <AlertCircle className="w-3 h-3 text-gray-400" />
-                  )}
-                  <span className={`text-xs flex-1 ${
-                    task.status === 'done' ? 'text-gray-500 line-through' : 
-                    task.status === 'in_progress' ? 'text-purple-700 font-medium' : 'text-gray-700'
-                  }`}>
-                    {task.title}
-                                     </span>
-                 </div>
-               </div>
-                 );
-               })}
-            {selectedGoal.tasks.length > 5 && (
-              <div className="text-center text-xs text-gray-500 py-1">
-                還有 {selectedGoal.tasks.length - 5} 個任務...
-              </div>
-            )}
-            {selectedGoal.tasks.length === 0 && (
-              <div className="text-center text-xs text-gray-500 py-4">
-                此目標還沒有任務
-              </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
+        goal={selectedGoal}
+        topicId={topicId}
+        subjectColor={subjectColor}
+        onTaskSelect={onTaskSelect}
+        updateGoalHelp={updateGoalHelp}
+        progress={progress}
+        totalTasks={totalTasks}
+        completedTasks={completedTasks}
+        inProgressTasks={inProgressTasks}
+      />
     );
   }
 
@@ -644,12 +601,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   topicId,
   subjectColor
 }) => {
-  const { updateTask } = useTopicStore();
+  const { updateTask, updateTaskHelp } = useTopicStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
   const [comment, setComment] = useState('');
   const [challenge, setChallenge] = useState<1 | 2 | 3 | 4 | 5 | undefined>(task.challenge as 1 | 2 | 3 | 4 | 5 | undefined);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [helpMessage, setHelpMessage] = useState(task.helpMessage || '');
 
   const handleSaveDescription = () => {
     updateTask(topicId, goal.id, editedTask);
@@ -664,6 +623,16 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       completedAt: status === 'done' ? new Date().toISOString() : undefined
     };
     updateTask(topicId, goal.id, updatedTask);
+  };
+
+  const handleHelpSubmit = () => {
+    updateTaskHelp(topicId, goal.id, task.id, true, helpMessage);
+    setShowHelpDialog(false);
+  };
+
+  const handleHelpResolve = () => {
+    updateTaskHelp(topicId, goal.id, task.id, false);
+    setShowHelpDialog(false);
   };
 
   return (
@@ -686,16 +655,49 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       {/* 正面 - 任務資訊 */}
       {!isFlipped ? (
         <motion.div 
-          className="flex flex-col h-full p-4 relative z-10"
+          className="flex flex-col h-full relative z-10"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          {/* 標題區 */}
-          <div className="flex items-center gap-2 mb-4">
-            <Star className="w-4 h-4 text-yellow-500" fill="currentColor" />
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">任務詳情</h3>
+          {/* 固定標題區 */}
+          <div className="flex-shrink-0 p-4 pb-2">
+            {/* 標題區 */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-yellow-500" fill="currentColor" />
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">任務詳情</h3>
+              </div>
+              
+              {/* 幫助按鈕 */}
+              <div className="flex items-center gap-2">
+                {task.needHelp && (
+                  <motion.div
+                    className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                    需要幫助
+                  </motion.div>
+                )}
+                <button
+                  onClick={() => setShowHelpDialog(true)}
+                  className={`p-1.5 rounded-full transition-colors ${
+                    task.needHelp 
+                      ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title={task.needHelp ? '查看/更新求助訊息' : '請求幫助'}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
+
+          {/* 可滾動內容區 */}
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
 
           {/* 任務標題 */}
           <div className="mb-3">
@@ -714,6 +716,16 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               </span>
             </div>
           </div>
+
+          {/* 幫助狀態顯示 */}
+          <HelpMessageDisplay
+            needHelp={task.needHelp}
+            helpMessage={task.helpMessage}
+            replyMessage={task.replyMessage}
+            replyAt={task.replyAt}
+            className="mb-3"
+            compact={true}
+          />
 
           {/* 任務描述 */}
           <div 
@@ -778,19 +790,20 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             </div>
           </div>
 
-          {/* 最近活動 */}
-          <div className="p-3 bg-gradient-to-br from-amber-50/80 to-orange-50/80 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50 flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <PlayCircle size={12} style={{ color: subjectColor }} />
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">最近活動</span>
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
-              尚無活動紀錄
+            {/* 最近活動 */}
+            <div className="p-3 bg-gradient-to-br from-amber-50/80 to-orange-50/80 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
+              <div className="flex items-center gap-2 mb-2">
+                <PlayCircle size={12} style={{ color: subjectColor }} />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">最近活動</span>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
+                尚無活動紀錄
+              </div>
             </div>
           </div>
 
-          {/* 底部按鈕組 */}
-          <div className="flex gap-2 mt-3">
+          {/* 固定底部按鈕 */}
+          <div className="flex-shrink-0 p-4 pt-2">
             <button
               onClick={() => setIsFlipped(true)}
               className="w-full py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
@@ -803,22 +816,28 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       ) : (
         /* 背面 - 學習記錄 */
         <motion.div 
-          className="flex flex-col h-full p-4 relative z-10"
+          className="flex flex-col h-full relative z-10"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          {/* 標題區 */}
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              className="p-1 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
-              onClick={() => setIsFlipped(false)}
-              aria-label="返回任務詳情"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">學習記錄</h3>
+          {/* 固定標題區 */}
+          <div className="flex-shrink-0 p-4 pb-2">
+            {/* 標題區 */}
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                className="p-1 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+                onClick={() => setIsFlipped(false)}
+                aria-label="返回任務詳情"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">學習記錄</h3>
+            </div>
           </div>
+
+          {/* 可滾動內容區 */}
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
 
           {/* 挑戰程度 */}
           <div className="p-3 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-xl mb-3">
@@ -849,38 +868,361 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             )}
           </div>
 
-          {/* 心得輸入 */}
-          <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl flex-1">
-            <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">學習心得</h4>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？"
-              className="w-full h-16 p-2 text-xs border border-gray-300/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm resize-none"
-            />
+            {/* 心得輸入 */}
+            <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl">
+              <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">學習心得</h4>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？"
+                className="w-full h-16 p-2 text-xs border border-gray-300/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm resize-none"
+              />
+            </div>
           </div>
 
-          {/* 底部按鈕組 */}
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={() => setIsFlipped(false)}
-              className="flex-1 px-3 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md text-sm"
-            >
-              返回
-            </button>
-            <button
-              onClick={() => handleStatusSelect('in_progress')}
-              className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-lg hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md text-sm"
-            >
-              進行中
-            </button>
-            <button
-              onClick={() => handleStatusSelect('done')}
-              className="flex-1 px-3 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md text-sm"
-            >
-              完成
-            </button>
+          {/* 固定底部按鈕 */}
+          <div className="flex-shrink-0 p-4 pt-2">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsFlipped(false)}
+                className="flex-1 px-3 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md text-sm"
+              >
+                返回
+              </button>
+              <button
+                onClick={() => handleStatusSelect('in_progress')}
+                className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-lg hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md text-sm"
+              >
+                進行中
+              </button>
+              <button
+                onClick={() => handleStatusSelect('done')}
+                className="flex-1 px-3 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md text-sm"
+              >
+                完成
+              </button>
+            </div>
           </div>
+        </motion.div>
+      )}
+
+      {/* 幫助對話框 */}
+      {showHelpDialog && (
+        <motion.div
+          className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center p-4 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 w-full max-w-sm shadow-xl"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <HelpCircle className="w-5 h-5 text-orange-600" />
+              <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                {task.needHelp ? '更新求助訊息' : '請求幫助'}
+              </h4>
+            </div>
+
+            {task.needHelp && task.helpResolvedAt && (
+              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-700">
+                  上次解決時間: {new Date(task.helpResolvedAt).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+
+            <textarea
+              value={helpMessage}
+              onChange={(e) => setHelpMessage(e.target.value)}
+              placeholder="描述你遇到的困難或需要的幫助..."
+              className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
+              rows={3}
+            />
+
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => setShowHelpDialog(false)}
+                className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              {task.needHelp && (
+                <button
+                  onClick={handleHelpResolve}
+                  className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors"
+                >
+                  標記已解決
+                </button>
+              )}
+              <button
+                onClick={handleHelpSubmit}
+                disabled={!helpMessage.trim()}
+                className="px-3 py-1 text-sm bg-orange-600 text-white hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+              >
+                {task.needHelp ? '更新' : '求助'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+};
+
+// GoalDetailPanel 組件 - 顯示目標詳情和幫助功能
+interface GoalDetailPanelProps {
+  goal: Goal;
+  topicId: string;
+  subjectColor: string;
+  onTaskSelect?: (taskId: string, goalId: string) => void;
+  updateGoalHelp: (topicId: string, goalId: string, needHelp: boolean, helpMessage?: string) => void;
+  progress: number;
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+}
+
+const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
+  goal,
+  topicId,
+  subjectColor,
+  onTaskSelect,
+  updateGoalHelp,
+  progress,
+  totalTasks,
+  completedTasks,
+  inProgressTasks
+}) => {
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
+  
+  const handleHelpSubmit = () => {
+    updateGoalHelp(topicId, goal.id, true, helpMessage);
+    setShowHelpDialog(false);
+  };
+
+  const handleHelpResolve = () => {
+    updateGoalHelp(topicId, goal.id, false);
+    setShowHelpDialog(false);
+  };
+
+  return (
+    <motion.div
+      className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col overflow-hidden"
+      style={{ borderColor: `${subjectColor}50` }}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.1, duration: 0.3 }}
+    >
+      {/* 背景裝飾 */}
+      <div 
+        className="absolute inset-0 opacity-5 rounded-xl"
+        style={{
+          background: `radial-gradient(circle at 20% 20%, ${subjectColor}40 0%, transparent 50%)`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* 固定標題區 */}
+      <div className="flex-shrink-0 p-4 pb-2 relative z-10">
+        {/* 標題區 */}
+        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Target className="w-4 h-4" style={{ color: subjectColor }} />
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">目標詳情</h3>
+        </div>
+        
+        {/* 幫助按鈕 */}
+        <div className="flex items-center gap-2">
+          {goal.needHelp && (
+            <motion.div
+              className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+            >
+              <AlertTriangle className="w-3 h-3" />
+              需要幫助
+            </motion.div>
+          )}
+          <button
+            onClick={() => setShowHelpDialog(true)}
+            className={`p-1.5 rounded-full transition-colors ${
+              goal.needHelp 
+                ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            title={goal.needHelp ? '查看/更新求助訊息' : '請求幫助'}
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
+        </div>
+      </div>
+
+      {/* 可滾動內容區 */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-10">
+        {/* 目標標題和進度 */}
+        <div className="mb-4">
+        <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-2">
+          {goal.title}
+        </h4>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div 
+              className="h-2 rounded-full transition-all duration-300"
+              style={{ 
+                width: `${progress}%`,
+                backgroundColor: progress === 100 ? '#22c55e' : subjectColor
+              }}
+            />
+          </div>
+          <span className="text-xs text-gray-500 min-w-[40px]">
+            {progress}%
+          </span>
+        </div>
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>已完成: {completedTasks}</span>
+          <span>進行中: {inProgressTasks}</span>
+          <span>總計: {totalTasks}</span>
+        </div>
+      </div>
+
+        {/* 幫助狀態顯示 */}
+        <HelpMessageDisplay
+          needHelp={goal.needHelp}
+          helpMessage={goal.helpMessage}
+          replyMessage={goal.replyMessage}
+          replyAt={goal.replyAt}
+          className="mb-4"
+          compact={true}
+        />
+
+        {/* 任務列表 */}
+        <div>
+        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">任務列表</h5>
+        <div className="space-y-2">
+          {goal.tasks.slice(0, 5).map((task) => {
+            return (
+              <div
+                key={task.id}
+                className={`p-2 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${
+                  task.status === 'done' ? 'bg-green-50 border-green-200' : 
+                  task.status === 'in_progress' ? 'bg-purple-50 border-purple-200' : 
+                  'bg-gray-50 border-gray-200'
+                }`}
+                onClick={() => onTaskSelect?.(task.id, goal.id)}
+              >
+                <div className="flex items-center gap-2">
+                  {task.status === 'done' ? (
+                    <CheckCircle2 className="w-3 h-3 text-green-500" />
+                  ) : task.status === 'in_progress' ? (
+                    <AlertCircle className="w-3 h-3 text-purple-500" />
+                  ) : (
+                    <AlertCircle className="w-3 h-3 text-gray-400" />
+                  )}
+                  <div className="flex-1">
+                    <span className={`text-xs ${
+                      task.status === 'done' ? 'text-gray-500 line-through' : 
+                      task.status === 'in_progress' ? 'text-purple-700 font-medium' : 'text-gray-700'
+                    }`}>
+                      {task.title}
+                    </span>
+                    
+                    {/* 顯示幫助和回覆狀態 */}
+                    <div className="flex items-center gap-1 mt-1">
+                      {task.needHelp && (
+                        <span className="inline-flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          求助
+                        </span>
+                      )}
+                      {task.replyMessage && (
+                        <span className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                          <MessageSquare className="w-2.5 h-2.5" />
+                          已回覆
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {goal.tasks.length > 5 && (
+            <div className="text-center text-xs text-gray-500 py-1">
+              還有 {goal.tasks.length - 5} 個任務...
+            </div>
+          )}
+          {goal.tasks.length === 0 && (
+            <div className="text-center text-xs text-gray-500 py-4">
+              此目標還沒有任務
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+
+      {/* 幫助對話框 */}
+      {showHelpDialog && (
+        <motion.div
+          className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center p-4 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 w-full max-w-sm shadow-xl"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <HelpCircle className="w-5 h-5 text-orange-600" />
+              <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                {goal.needHelp ? '更新求助訊息' : '請求幫助'}
+              </h4>
+            </div>
+
+            {goal.needHelp && goal.helpResolvedAt && (
+              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-700">
+                  上次解決時間: {new Date(goal.helpResolvedAt).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+
+            <textarea
+              value={helpMessage}
+              onChange={(e) => setHelpMessage(e.target.value)}
+              placeholder="描述你遇到的困難或需要的幫助..."
+              className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
+              rows={3}
+            />
+
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => setShowHelpDialog(false)}
+                className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              {goal.needHelp && (
+                <button
+                  onClick={handleHelpResolve}
+                  className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors"
+                >
+                  標記已解決
+                </button>
+              )}
+              <button
+                onClick={handleHelpSubmit}
+                disabled={!helpMessage.trim()}
+                className="px-3 py-1 text-sm bg-orange-600 text-white hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+              >
+                {goal.needHelp ? '更新' : '求助'}
+              </button>
+            </div>
+          </motion.div>
         </motion.div>
       )}
     </motion.div>

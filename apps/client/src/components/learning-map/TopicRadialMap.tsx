@@ -4,7 +4,8 @@ import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,
-  Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon
+  Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon, AlertTriangle,
+  Pause, Award, Trophy, FlagOff
 } from 'lucide-react';
 
 interface TopicRadialMapProps {
@@ -309,6 +310,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
             }}
             style={{ cursor: 'default' }}
           />
+          
           {/* 背景放射線 */}
           {goals.map((_, index) => {
           const { x, y } = getRadialPosition(index, goals.length, goalRadius, centerX, centerY);
@@ -329,7 +331,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           );
         })}
 
-        {/* 目標和任務的連接線 */}
+        {/* 目標和任務的連接線 - 在背景之後，節點之前 */}
         {goals.map((goal, goalIndex) => {
           const goalPos = getRadialPosition(goalIndex, goals.length, goalRadius, centerX, centerY);
           
@@ -503,7 +505,61 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           const { x, y } = getRadialPosition(goalIndex, goals.length, goalRadius, centerX, centerY);
           const goalCompletedTasks = goal.tasks.filter(t => t.status === 'done').length;
           const goalProgress = goal.tasks.length > 0 ? (goalCompletedTasks / goal.tasks.length) * 100 : 0;
-          const isSelected = selectedGoalId === goal.id;
+          const isSelected = selectedGoalId === goal.id && !selectedTaskId; // 只有在沒有選中任務時才顯示目標選中
+          
+          // 根據目標狀態決定圖標、顏色和樣式
+          let goalIcon = Flag;
+          let goalColor = subjectColor;
+          let goalBgColor = 'white';
+          let strokeColor = `${subjectColor}60`;
+          let strokeWidth = "4";
+          
+          switch (goal.status) {
+            case 'todo':
+              goalIcon = Target;
+              goalColor = '#6b7280';
+              goalBgColor = 'white';
+              strokeColor = '#6b7280';
+              strokeWidth = "3";
+              break;
+            case 'pause':
+              goalIcon = Pause;
+              goalColor = '#6b7280';
+              goalBgColor = 'white';
+              strokeColor = '#6b7280';
+              strokeWidth = "3";
+              break;
+            case 'focus':
+              goalIcon = Play;
+              goalColor = subjectColor;
+              goalBgColor = `color-mix(in srgb, ${subjectColor} 5%, white 95%)`;
+              strokeColor = subjectColor;
+              strokeWidth = "5";
+              break;
+            case 'finish':
+              goalIcon = CheckCircle2;
+              goalColor = subjectColor;
+              goalBgColor = `color-mix(in srgb, ${subjectColor} 10%, white 90%)`;
+              strokeColor = subjectColor;
+              strokeWidth = "5";
+              break;
+            case 'complete':
+              goalIcon = Trophy;
+              goalColor = subjectColor;
+              goalBgColor = `color-mix(in srgb, ${subjectColor} 15%, white 85%)`;
+              strokeColor = subjectColor;
+              strokeWidth = "6";
+              break;
+            default:
+              if (goalProgress === 100) {
+                goalIcon = CheckCircle2;
+                goalColor = subjectColor;
+                goalBgColor = `color-mix(in srgb, ${subjectColor} 15%, white 85%)`;
+                strokeColor = subjectColor;
+                strokeWidth = "5";
+              }
+              break;
+          }
           
           return (
             <motion.g
@@ -525,17 +581,40 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                   cx={x}
                   cy={y}
                   r={Math.min(68, Math.min(width, height) * 0.15)}
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="4"
-                  strokeDasharray="5,5"
-                  opacity="0.8"
+                  fill="#3b82f6"
+                  fillOpacity="0.15"
+                  stroke="none"
                 >
-                  <animateTransform
-                    attributeName="transform"
-                    type="rotate"
-                    values={`0 ${x} ${y};360 ${x} ${y}`}
-                    dur="3s"
+                  <animate
+                    attributeName="fill-opacity"
+                    values="0.05;0.25;0.05"
+                    dur="2s"
+                    repeatCount="indefinite"
+                  />
+                </circle>
+              )}
+              
+              {/* 專注狀態的脈動效果 */}
+              {goal.status === 'focus' && (
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={Math.min(70, Math.min(width, height) * 0.14)}
+                  fill="none"
+                  stroke={`color-mix(in srgb, ${subjectColor} 75%, white 25%)`}
+                  strokeWidth="2"
+                  opacity="0.4"
+                >
+                  <animate
+                    attributeName="r"
+                    values={`${Math.min(60, Math.min(width, height) * 0.13)};${Math.min(75, Math.min(width, height) * 0.16)};${Math.min(60, Math.min(width, height) * 0.13)}`}
+                    dur="2s"
+                    repeatCount="indefinite"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    values="0.6;0;0.6"
+                    dur="2s"
                     repeatCount="indefinite"
                   />
                 </circle>
@@ -545,9 +624,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                 cx={x}
                 cy={y}
                 r={Math.min(60, Math.min(width, height) * 0.13)}
-                fill={goalProgress === 100 ? `${subjectColor}20` : 'white'}
-                stroke={isSelected ? '#3b82f6' : (goalProgress === 100 ? subjectColor : `${subjectColor}60`)}
-                strokeWidth={isSelected ? "5" : "4"}
+                fill={goalBgColor}
+                stroke={isSelected ? '#3b82f6' : strokeColor}
+                strokeWidth={isSelected ? "5" : strokeWidth}
               />
               
               <foreignObject
@@ -557,12 +636,11 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                 height={Math.min(110, Math.min(width, height) * 0.24)}
                 className="pointer-events-none"
               >
-                <div className="w-full h-full flex flex-col items-center justify-center text-center p-1">
-                  {goalProgress === 100 ? (
-                    <CheckCircle2 className="w-6 h-6 mb-2" style={{ color: subjectColor }} />
-                  ) : (
-                    <Flag className="w-6 h-6 mb-2" style={{ color: subjectColor }} />
-                  )}
+                                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-1">
+                    {React.createElement(goalIcon, { 
+                      className: "w-6 h-6 mb-2", 
+                      style: { color: goalColor } 
+                    })}
                   <div className="text-sm font-medium text-gray-800 leading-tight max-w-[90px] overflow-hidden">
                     <div className="truncate">
                       {goal.title}
@@ -570,6 +648,48 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                   </div>
                 </div>
               </foreignObject>
+              
+              {/* 目標的需要幫助指示器 */}
+              {goal.needHelp && (
+                <motion.circle
+                  cx={x + Math.min(45, Math.min(width, height) * 0.10)}
+                  cy={y + Math.min(45, Math.min(width, height) * 0.10)}
+                  r={Math.min(15, Math.min(width, height) * 0.035)}
+                  fill="#f97316"
+                  stroke="white"
+                  strokeWidth="2"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.8 + goalIndex * 0.1, duration: 0.3 }}
+                >
+                  <animate
+                    attributeName="fill"
+                    values="#f97316;#fb923c;#f97316"
+                    dur="2s"
+                    repeatCount="indefinite"
+                  />
+                </motion.circle>
+              )}
+              
+              {goal.needHelp && (
+                <foreignObject
+                  x={x + Math.min(45, Math.min(width, height) * 0.10) - Math.min(10, Math.min(width, height) * 0.025)}
+                  y={y + Math.min(45, Math.min(width, height) * 0.10) - Math.min(10, Math.min(width, height) * 0.025)}
+                  width={Math.min(20, Math.min(width, height) * 0.05)}
+                  height={Math.min(20, Math.min(width, height) * 0.05)}
+                  className="pointer-events-none"
+                  style={{ overflow: 'visible' }}
+                >
+                  <motion.div 
+                    className="w-full h-full flex items-center justify-center"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.8 + goalIndex * 0.1, duration: 0.3 }}
+                  >
+                    <AlertTriangle className="w-4 h-4 text-white" />
+                  </motion.div>
+                </foreignObject>
+              )}
             </motion.g>
           );
         })}
@@ -592,8 +712,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               taskBg = '#d1fae5';
               TaskIcon = Sparkles;
             } else if (task.status === 'done') {
-              taskColor = '#6b7280';
-              taskBg = '#f3f4f6';
+              taskColor = '#10b981'; // 完成任務用綠色
+              taskBg = '#d1fae5'; // 淡綠色背景
               TaskIcon = CheckCircle2;
             } else if (task.status === 'in_progress') {
               taskColor = '#3b82f6';
@@ -625,16 +745,39 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                     cx={x}
                     cy={y}
                     r={Math.min(32, Math.min(width, height) * 0.08)}
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="3"
-                    strokeDasharray="4,4"
-                    opacity="0.8"
+                    fill="#3b82f6"
+                    fillOpacity="0.15"
+                    stroke="none"
                   >
-                    <animateTransform
-                      attributeName="transform"
-                      type="rotate"
-                      values={`0 ${x} ${y};360 ${x} ${y}`}
+                    <animate
+                      attributeName="fill-opacity"
+                      values="0.05;0.25;0.05"
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                )}
+                
+                {/* 進行中任務的脈動效果 */}
+                {task.status === 'in_progress' && (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={Math.min(30, Math.min(width, height) * 0.075)}
+                    fill="none"
+                    stroke="#dbeafe"
+                    strokeWidth="2"
+                    opacity="0.4"
+                  >
+                    <animate
+                      attributeName="r"
+                      values={`${Math.min(24, Math.min(width, height) * 0.06)};${Math.min(32, Math.min(width, height) * 0.08)};${Math.min(24, Math.min(width, height) * 0.06)}`}
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.6;0;0.6"
                       dur="2s"
                       repeatCount="indefinite"
                     />
@@ -648,10 +791,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                   fill={taskBg}
                   stroke={isSelected ? '#3b82f6' : taskColor}
                   strokeWidth={isSelected ? "4" : "3"}
-                  filter={isNewlyCompleted ? `url(#glow-${topicId})` : undefined}
                 />
                 
-                {/* 新完成任務的閃爍效果 */}
+                {/* 只有本週新完成的任務才有閃爍效果 */}
                 {isNewlyCompleted && (
                   <circle
                     cx={x}
@@ -688,6 +830,48 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                     <TaskIcon className="w-4 h-4" style={{ color: taskColor }} />
                   </div>
                 </foreignObject>
+                
+                {/* 任務的需要幫助指示器 */}
+                {task.needHelp && (
+                  <motion.circle
+                    cx={x + Math.min(18, Math.min(width, height) * 0.045)}
+                    cy={y + Math.min(18, Math.min(width, height) * 0.045)}
+                    r={Math.min(8, Math.min(width, height) * 0.02)}
+                    fill="#f97316"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 1.2 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.3 }}
+                  >
+                    <animate
+                      attributeName="fill"
+                      values="#f97316;#fb923c;#f97316"
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                  </motion.circle>
+                )}
+                
+                {task.needHelp && (
+                  <foreignObject
+                    x={x + Math.min(18, Math.min(width, height) * 0.045) - Math.min(6, Math.min(width, height) * 0.015)}
+                    y={y + Math.min(18, Math.min(width, height) * 0.045) - Math.min(6, Math.min(width, height) * 0.015)}
+                    width={Math.min(12, Math.min(width, height) * 0.03)}
+                    height={Math.min(12, Math.min(width, height) * 0.03)}
+                    className="pointer-events-none"
+                    style={{ overflow: 'visible' }}
+                  >
+                    <motion.div 
+                      className="w-full h-full flex items-center justify-center"
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 1.2 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.3 }}
+                    >
+                      <AlertTriangle className="w-2.5 h-2.5 text-white" />
+                    </motion.div>
+                  </foreignObject>
+                )}
               </motion.g>
             );
           });
