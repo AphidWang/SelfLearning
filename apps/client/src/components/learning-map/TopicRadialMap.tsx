@@ -193,7 +193,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   }, [centerX, centerY]);
 
   return (
-    <div className={`relative ${className} flex items-center justify-center`} style={{ overflow: 'visible' }}>
+    <div className={`relative ${className}`} style={{ overflow: 'visible' }}>
       {/* 縮放比例指示器 */}
       <div className="absolute top-4 left-4 bg-white/90 rounded-lg px-3 py-1 shadow-md z-10">
         <span className="text-xs text-gray-600">
@@ -233,7 +233,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         ref={svgRef}
         width={width}
         height={height}
-        className={`w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`absolute inset-0 w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="xMidYMid meet"
         style={{ overflow: 'visible' }}

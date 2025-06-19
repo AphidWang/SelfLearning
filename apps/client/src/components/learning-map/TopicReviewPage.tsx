@@ -414,28 +414,22 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                       {/* 中央心智圖 */}
             <div className="col-span-6 h-full">
               <motion.div
-                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden h-full flex flex-col"
+                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden h-full relative"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.4 }}
               >
-
-                
-                <div className="flex-1 p-4 flex items-center justify-center">
-                  <div className="w-full h-full max-w-[760px] max-h-[460px] flex items-center justify-center">
-                    <TopicRadialMap
-                      topicId={topicId}
-                      width={760}
-                      height={460}
-                      showAnimations={true}
-                      selectedGoalId={selectedGoalId}
-                      selectedTaskId={selectedTaskId}
-                      onTaskClick={handleRadialMapTaskClick}
-                      onGoalClick={handleRadialMapGoalClick}
-                      className="w-full h-full"
-                    />
-                  </div>
-                </div>
+                <TopicRadialMap
+                  topicId={topicId}
+                  width={760}
+                  height={460}
+                  showAnimations={true}
+                  selectedGoalId={selectedGoalId}
+                  selectedTaskId={selectedTaskId}
+                  onTaskClick={handleRadialMapTaskClick}
+                  onGoalClick={handleRadialMapGoalClick}
+                  className="w-full h-full"
+                />
               </motion.div>
             </div>
 
