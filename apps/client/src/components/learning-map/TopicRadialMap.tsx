@@ -364,39 +364,69 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           animate={showAnimations ? { scale: 1, opacity: 1 } : undefined}
           transition={showAnimations ? { delay: 0.2, duration: 0.5 } : undefined}
         >
+          {/* 主要圓圈 */}
           <circle
             cx={centerX}
             cy={centerY}
-            r={Math.min(80, Math.min(width, height) * 0.16)}
-            fill={`url(#centerGradient-${topicId})`}
-            stroke={subjectColor}
-            strokeWidth="5"
-            filter={`url(#glow-${topicId})`}
-          />
-          <circle
-            cx={centerX}
-            cy={centerY}
-            r={Math.min(62, Math.min(width, height) * 0.125)}
+            r={Math.min(70, Math.min(width, height) * 0.14)}
             fill="white"
             stroke={subjectColor}
             strokeWidth="4"
-            opacity="0.95"
+            filter={`url(#glow-${topicId})`}
           />
           
-          {/* 主題圖標 */}
+          {/* 簡單的虛線外圈 */}
+          <circle
+            cx={centerX}
+            cy={centerY}
+            r={Math.min(82, Math.min(width, height) * 0.155)}
+            fill="none"
+            stroke={subjectColor}
+            strokeWidth="2"
+            strokeOpacity="0.4"
+            strokeDasharray="6,4"
+          />
+          
+          {/* 主題標題 */}
           <foreignObject
-            x={centerX - Math.min(50, Math.min(width, height) * 0.1)}
-            y={centerY - Math.min(50, Math.min(width, height) * 0.1)}
-            width={Math.min(100, Math.min(width, height) * 0.2)}
-            height={Math.min(100, Math.min(width, height) * 0.2)}
+            x={centerX - Math.min(60, Math.min(width, height) * 0.12)}
+            y={centerY - Math.min(35, Math.min(width, height) * 0.07)}
+            width={Math.min(120, Math.min(width, height) * 0.24)}
+            height={Math.min(70, Math.min(width, height) * 0.14)}
             className="pointer-events-none"
           >
-            <div className="w-full h-full flex flex-col items-center justify-center text-center">
-              <Target className="w-8 h-8 mb-2" style={{ color: subjectColor }} />
-              <div className="text-base font-bold text-gray-800 leading-tight max-w-[100px] overflow-hidden">
-                <div className="truncate">
-                  {topic.title}
-                </div>
+            <div className="w-full h-full flex items-center justify-center text-center">
+              <div className="text-base font-bold text-gray-800 leading-tight">
+                {(() => {
+                  const title = topic.title;
+                  const length = title.length;
+                  
+                  // 如果標題很短，直接顯示
+                  if (length <= 4) {
+                    return <div>{title}</div>;
+                  }
+                  
+                  // 如果標題較長，嘗試平均分行
+                  if (length <= 8) {
+                    const mid = Math.ceil(length / 2);
+                    return (
+                      <div>
+                        <div>{title.substring(0, mid)}</div>
+                        <div>{title.substring(mid)}</div>
+                      </div>
+                    );
+                  }
+                  
+                  // 更長的標題分三行
+                  const third = Math.ceil(length / 3);
+                  return (
+                    <div>
+                      <div>{title.substring(0, third)}</div>
+                      <div>{title.substring(third, third * 2)}</div>
+                      <div>{title.substring(third * 2)}</div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </foreignObject>
