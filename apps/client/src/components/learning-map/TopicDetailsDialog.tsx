@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Topic } from '../../types/goal';
+import { Topic, Task } from '../../types/goal';
 import { TopicDetails } from './TopicDetails';
 import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upload, Play, Menu, ArrowUpRight, Plus, X, AlertCircle, Brain, Target, Sparkles, PartyPopper, List, LayoutTemplate, Network } from 'lucide-react';
 import { subjects } from '../../styles/tokens';
