@@ -11,7 +11,7 @@ import {
   BarChart3, PieChart, TrendingDown, ArrowUp,
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare,
   ChevronLeft, Pencil, Sparkles, Check, HelpCircle,
-  Save, AlertTriangle, Plus
+  Save, AlertTriangle, Plus, Trash2, PenTool, Mic
 } from 'lucide-react';
 
 interface TopicReviewPageProps {
@@ -118,6 +118,12 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   // 處理從任務詳情返回到目標
   const handleBackToGoal = () => {
     setSelectedTaskId(null); // 清除任務選擇，保留目標選擇
+  };
+
+  // 處理目標刪除後的狀態清理
+  const handleGoalDeleted = () => {
+    setSelectedGoalId(null);
+    setSelectedTaskId(null);
   };
 
 
@@ -473,6 +479,8 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                 subjectColor={subjectStyle.accent}
                 onTaskSelect={handleInfoPanelTaskSelect}
                 onGoalClick={onGoalClick}
+                onBackToGoal={handleBackToGoal}
+                onGoalDeleted={handleGoalDeleted}
               />
             </div>
         </div>
@@ -490,6 +498,8 @@ interface GoalTaskInfoPanelProps {
   subjectColor: string;
   onTaskSelect?: (taskId: string, goalId: string) => void;
   onGoalClick?: (goalId: string) => void;
+  onBackToGoal?: () => void;
+  onGoalDeleted?: () => void;
 }
 
 const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
@@ -498,7 +508,9 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   selectedTaskId,
   subjectColor,
   onTaskSelect,
-  onGoalClick
+  onGoalClick,
+  onBackToGoal,
+  onGoalDeleted
 }) => {
   const { getTopic, updateGoalHelp, updateTaskHelp } = useTopicStore();
   const topic = getTopic(topicId);
@@ -517,7 +529,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         goal={selectedGoal}
         topicId={topicId}
         subjectColor={subjectColor}
-        onBackToGoal={handleBackToGoal}
+        onBackToGoal={onBackToGoal}
       />
     );
   }
@@ -541,6 +553,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         totalTasks={totalTasks}
         completedTasks={completedTasks}
         inProgressTasks={inProgressTasks}
+        onGoalDeleted={onGoalDeleted}
       />
     );
   }
@@ -692,21 +705,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 )}
                 <button
                   onClick={() => setShowHelpDialog(true)}
-                  className={`p-1.5 rounded-full transition-colors ${
-                    task.needHelp 
-                      ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  className="p-1.5 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
                   title={task.needHelp ? '查看/更新求助訊息' : '請求幫助'}
                 >
-                  <HelpCircle className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleDeleteTask}
-                  className="p-1.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                  title="刪除任務"
-                >
-                  <X className="w-4 h-4" />
+                  <HelpCircle className="w-3 h-3" />
                 </button>
               </div>
             </div>
@@ -715,12 +717,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           {/* 可滾動內容區 */}
           <div className="flex-1 overflow-y-auto px-4 pb-4">
 
-          {/* 任務標題 */}
+          {/* 任務狀態信息 */}
           <div className="mb-3">
-            <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm line-clamp-2">
-              {task.title}
-            </h4>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">來自目標: {goal.title}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full ${
                 task.status === 'done' ? 'bg-green-100 text-green-700' :
@@ -739,87 +738,135 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             helpMessage={task.helpMessage}
             replyMessage={task.replyMessage}
             replyAt={task.replyAt}
-            className="mb-3"
+            className="mb-3 opacity-90"
             compact={true}
           />
 
-          {/* 任務描述 */}
+          {/* 主要編輯區 */}
           <div 
-            className="rounded-xl p-3 border mb-3" 
+            className="rounded-xl p-4 border-2 mb-4 shadow-sm" 
             style={{ 
-              borderColor: `${subjectColor}30`,
-              background: `linear-gradient(135deg, ${subjectColor}08 0%, ${subjectColor}15 100%)`,
+              borderColor: `${subjectColor}40`,
+              background: `linear-gradient(135deg, ${subjectColor}10 0%, ${subjectColor}20 100%)`,
+              boxShadow: `0 2px 8px ${subjectColor}15`
             }}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Target size={12} style={{ color: subjectColor }} />
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">任務描述</span>
-              </div>
-              <button
-                onClick={() => {
-                  setIsEditing(!isEditing);
-                  if (!isEditing) {
-                    setTimeout(() => {}, 0);
-                  } else {
-                    handleSaveDescription();
-                  }
-                }}
-                className="p-1 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-              >
-                {isEditing ? (
-                  <CheckCircle2 size={12} />
-                ) : (
-                  <Pencil size={12} />
-                )}
-              </button>
-            </div>
-            
             {isEditing ? (
-              <textarea
-                value={editedTask.description}
-                onChange={(e) => {
-                  const updatedTask = {...editedTask, description: e.target.value};
-                  setEditedTask(updatedTask);
-                }}
-                onBlur={handleSaveDescription}
-                className="w-full p-2 text-xs bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700 dark:text-gray-300 resize-none backdrop-blur-sm"
-                rows={3}
-                placeholder="描述這個任務..."
-                autoFocus
-              />
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">編輯任務</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleSaveDescription}
+                      className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                      title="保存"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditedTask(task);
+                        setIsEditing(false);
+                      }}
+                      className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                      title="取消"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={editedTask.title}
+                    onChange={(e) => {
+                      const updatedTask = {...editedTask, title: e.target.value};
+                      setEditedTask(updatedTask);
+                    }}
+                    className="w-full p-2 text-sm font-medium bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700 dark:text-gray-300 backdrop-blur-sm"
+                    placeholder="任務標題..."
+                    autoFocus
+                  />
+                  <textarea
+                    value={editedTask.description || ''}
+                    onChange={(e) => {
+                      const updatedTask = {...editedTask, description: e.target.value};
+                      setEditedTask(updatedTask);
+                    }}
+                    className="w-full p-2 text-xs bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700 dark:text-gray-300 resize-none backdrop-blur-sm"
+                    rows={3}
+                    placeholder="任務描述..."
+                  />
+                </div>
+              </>
             ) : (
-              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                {task.description || "點擊編輯按鈕來新增描述"}
-              </p>
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm">
+                    {task.title}
+                  </h4>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                    title="編輯"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                  {task.description || "點擊編輯按鈕來新增描述"}
+                </p>
+              </>
             )}
           </div>
 
           {/* 參考資訊 */}
-          <div className="p-3 bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-200/50 dark:border-indigo-700/50 mb-3">
+          <div className="p-3 bg-gradient-to-br from-indigo-50/90 to-purple-50/90 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl border border-indigo-200/50 dark:border-indigo-700/50 mb-3">
             <div className="flex items-center gap-2 mb-2">
-              <MessageSquare size={12} style={{ color: subjectColor }} />
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">參考資訊</span>
+              <MessageSquare size={14} className="text-indigo-600 dark:text-indigo-400" />
+              <span className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">參考資訊</span>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
-              尚無參考資訊
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-2 italic">
+                尚無參考資訊
+              </div>
+              {/* 未來可以添加實際內容：
+              <div className="flex items-start gap-2 p-2 bg-white/60 dark:bg-gray-800/40 rounded-lg">
+                <BookOpen size={12} className="text-indigo-500 mt-0.5 flex-shrink-0" />
+                <div className="text-xs">
+                  <div className="font-medium text-gray-800 dark:text-gray-200">教學影片</div>
+                  <div className="text-gray-600 dark:text-gray-400">基礎概念講解</div>
+                </div>
+              </div>
+              */}
             </div>
           </div>
 
-            {/* 最近活動 */}
-            <div className="p-3 bg-gradient-to-br from-amber-50/80 to-orange-50/80 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
-              <div className="flex items-center gap-2 mb-2">
-                <PlayCircle size={12} style={{ color: subjectColor }} />
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">最近活動</span>
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
+          {/* 最近活動 */}
+          <div className="p-3 bg-gradient-to-br from-green-50/90 to-emerald-50/90 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl border border-green-200/50 dark:border-green-700/50">
+            <div className="flex items-center gap-2 mb-2">
+              <PlayCircle size={14} className="text-green-600 dark:text-green-400" />
+              <span className="text-sm font-semibold text-green-800 dark:text-green-300">最近活動</span>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-2 italic">
                 尚無活動紀錄
               </div>
+              {/* 未來可以添加實際內容：
+              <div className="flex items-center gap-2 p-2 bg-white/60 dark:bg-gray-800/40 rounded-lg">
+                <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                <div className="text-xs flex-1">
+                  <div className="font-medium text-gray-800 dark:text-gray-200">開始任務</div>
+                  <div className="text-gray-500 dark:text-gray-400">2 小時前</div>
+                </div>
+              </div>
+              */}
             </div>
+          </div>
           </div>
 
           {/* 固定底部按鈕 */}
-          <div className="flex-shrink-0 p-4 pt-2">
+          <div className="flex-shrink-0 p-4 pt-2 space-y-2">
             <button
               onClick={() => setIsFlipped(true)}
               className="w-full py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
@@ -827,6 +874,18 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               <Sparkles size={14} />
               記錄一下
             </button>
+            
+            {/* 刪除按鈕 */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
+              <button
+                onClick={handleDeleteTask}
+                className="w-full py-2 bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                title="刪除任務"
+              >
+                <Trash2 className="w-4 h-4" />
+                刪除任務
+              </button>
+            </div>
           </div>
         </motion.div>
       ) : (
@@ -856,25 +915,28 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           <div className="flex-1 overflow-y-auto px-4 pb-4">
 
           {/* 挑戰程度 */}
-          <div className="p-3 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-xl mb-3">
-            <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">這個任務有多挑戰？</h4>
+          <div className="p-3 bg-gradient-to-br from-orange-50/90 to-red-50/90 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl border border-orange-200/50 dark:border-orange-700/50 mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap size={14} className="text-orange-600 dark:text-orange-400" />
+              <h4 className="text-sm font-semibold text-orange-800 dark:text-orange-300">挑戰程度</h4>
+            </div>
             <div className="flex justify-center gap-1">
               {Array.from({ length: 5 }, (_, i) => (
                 <button
                   key={i}
                   onClick={() => setChallenge((i + 1) as 1 | 2 | 3 | 4 | 5)}
-                  className="p-1 rounded-lg transition-all hover:scale-110"
+                  className="p-1 rounded-lg transition-all hover:scale-110 hover:bg-white/40 dark:hover:bg-gray-800/40"
                 >
                   <Star 
                     size={16} 
-                    className={challenge && i < challenge ? 'text-yellow-500' : 'text-gray-300'} 
+                    className={challenge && i < challenge ? 'text-orange-500' : 'text-gray-300'} 
                     fill={challenge && i < challenge ? 'currentColor' : 'none'}
                   />
                 </button>
               ))}
             </div>
             {challenge && (
-              <p className="text-center text-xs text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-center text-xs text-orange-700 dark:text-orange-300 mt-1 font-medium">
                 {challenge === 1 && "很簡單"}
                 {challenge === 2 && "有點簡單"}
                 {challenge === 3 && "剛剛好"}
@@ -884,16 +946,30 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             )}
           </div>
 
-            {/* 心得輸入 */}
-            <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl">
-              <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">學習心得</h4>
+          {/* 心得輸入 - 改為更開放的設計 */}
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center gap-2 px-1">
+              <PenTool size={14} className="text-purple-600 dark:text-purple-400" />
+              <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-300">學習心得</h4>
+            </div>
+            <div className="relative">
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？"
-                className="w-full h-16 p-2 text-xs border border-gray-300/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm resize-none"
+                placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？✨"
+                className="w-full h-24 p-3 text-xs border-2 border-purple-200/60 dark:border-purple-700/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 backdrop-blur-sm resize-none transition-all hover:border-purple-300 dark:hover:border-purple-600"
+                style={{
+                  backgroundImage: 'linear-gradient(135deg, rgba(168, 85, 247, 0.02) 0%, rgba(236, 72, 153, 0.02) 100%)'
+                }}
               />
+              <button 
+                className="absolute bottom-2 right-0 p-1.5 rounded-lg hover:bg-purple-100/80 dark:hover:bg-purple-800/40 transition-colors"
+                title="語音輸入 (即將推出)"
+              >
+                <Mic size={16} className="text-purple-500/70 hover:text-purple-600 dark:hover:text-purple-400" />
+              </button>
             </div>
+          </div>
           </div>
 
           {/* 固定底部按鈕 */}
@@ -998,6 +1074,7 @@ interface GoalDetailPanelProps {
   totalTasks: number;
   completedTasks: number;
   inProgressTasks: number;
+  onGoalDeleted?: () => void;
 }
 
 const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
@@ -1009,13 +1086,21 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   progress,
   totalTasks,
   completedTasks,
-  inProgressTasks
+  inProgressTasks,
+  onGoalDeleted
 }) => {
-  const { addTask, deleteTask } = useTopicStore();
+  const { addTask, deleteTask, deleteGoal, updateGoal } = useTopicStore();
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [editedGoal, setEditedGoal] = useState(goal);
+
+  // 當 goal 更新時同步 editedGoal
+  useEffect(() => {
+    setEditedGoal(goal);
+  }, [goal]);
   
   const handleHelpSubmit = () => {
     updateGoalHelp(topicId, goal.id, true, helpMessage);
@@ -1049,6 +1134,23 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
     }
   };
 
+  const handleDeleteGoal = () => {
+    if (confirm('確定要刪除這個目標嗎？這將會同時刪除所有相關任務。')) {
+      deleteGoal(topicId, goal.id);
+      onGoalDeleted?.(); // 刪除後清除選擇狀態
+    }
+  };
+
+  const handleSaveGoalEdit = () => {
+    updateGoal(topicId, editedGoal);
+    setIsEditingGoal(false);
+  };
+
+  const handleCancelGoalEdit = () => {
+    setEditedGoal(goal); // 恢復原始數據
+    setIsEditingGoal(false);
+  };
+
   return (
     <motion.div
       className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col overflow-hidden"
@@ -1075,7 +1177,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">目標詳情</h3>
         </div>
         
-        {/* 幫助按鈕 */}
+        {/* 操作按鈕 */}
         <div className="flex items-center gap-2">
           {goal.needHelp && (
             <motion.div
@@ -1089,14 +1191,10 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           )}
           <button
             onClick={() => setShowHelpDialog(true)}
-            className={`p-1.5 rounded-full transition-colors ${
-              goal.needHelp 
-                ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className="p-1.5 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
             title={goal.needHelp ? '查看/更新求助訊息' : '請求幫助'}
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="w-3 h-3" />
           </button>
         </div>
         </div>
@@ -1104,11 +1202,8 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
 
       {/* 可滾動內容區 */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-10">
-        {/* 目標標題和進度 */}
+        {/* 目標進度 */}
         <div className="mb-4">
-        <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-2">
-          {goal.title}
-        </h4>
         <div className="flex items-center gap-2">
           <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
             <div 
@@ -1128,7 +1223,76 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           <span>進行中: {inProgressTasks}</span>
           <span>總計: {totalTasks}</span>
         </div>
-      </div>
+        </div>
+
+        {/* 主要編輯區 */}
+        <div 
+          className="rounded-xl p-4 border-2 mb-4 shadow-sm" 
+          style={{ 
+            borderColor: `${subjectColor}40`,
+            background: `linear-gradient(135deg, ${subjectColor}10 0%, ${subjectColor}20 100%)`,
+            boxShadow: `0 2px 8px ${subjectColor}15`
+          }}
+        >
+          {isEditingGoal ? (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">編輯目標</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleSaveGoalEdit}
+                    className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                    title="保存"
+                  >
+                    <Check size={14} />
+                  </button>
+                  <button
+                    onClick={handleCancelGoalEdit}
+                    className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                    title="取消"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={editedGoal.title}
+                  onChange={(e) => setEditedGoal(prev => ({...prev, title: e.target.value}))}
+                  className="w-full p-2 text-sm font-medium bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700 dark:text-gray-300 backdrop-blur-sm"
+                  placeholder="目標標題..."
+                  autoFocus
+                />
+                <textarea
+                  value={editedGoal.description || ''}
+                  onChange={(e) => setEditedGoal(prev => ({...prev, description: e.target.value}))}
+                  className="w-full p-2 text-xs bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700 dark:text-gray-300 resize-none backdrop-blur-sm"
+                  rows={3}
+                  placeholder="目標說明..."
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm">
+                  {goal.title}
+                </h4>
+                <button
+                  onClick={() => setIsEditingGoal(true)}
+                  className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                  title="編輯"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                {goal.description || "點擊編輯按鈕來新增目標說明"}
+              </p>
+            </>
+          )}
+        </div>
 
         {/* 幫助狀態顯示 */}
         <HelpMessageDisplay
@@ -1136,7 +1300,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           helpMessage={goal.helpMessage}
           replyMessage={goal.replyMessage}
           replyAt={goal.replyAt}
-          className="mb-4"
+          className="mb-4 opacity-90"
           compact={true}
         />
 
@@ -1201,7 +1365,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
                     className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors opacity-0 group-hover:opacity-100"
                     title="刪除任務"
                   >
-                    <X className="w-3 h-3" />
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -1219,6 +1383,18 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           )}
         </div>
         </div>
+      </div>
+
+      {/* 底部刪除按鈕 */}
+      <div className="flex-shrink-0 p-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+        <button
+          onClick={handleDeleteGoal}
+          className="w-full py-2 bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+          title="刪除目標"
+        >
+          <Trash2 className="w-4 h-4" />
+          刪除目標
+        </button>
       </div>
 
       {/* 幫助對話框 */}
@@ -1282,6 +1458,8 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           </motion.div>
         </motion.div>
       )}
+
+
 
       {/* 新增任務對話框 */}
       {showAddTaskDialog && (

@@ -4,7 +4,7 @@ import { Task } from '../../types/goal';
 import { 
   ChevronLeft, MessageSquare, Paperclip, 
   HelpCircle, CheckCircle, PlayCircle,
-  Target, Upload, PauseCircle, X, Pencil, Star, Sparkles, Edit3
+  Target, Upload, PauseCircle, X, Pencil, Star, Sparkles, Edit3, Zap, PenTool, Mic
 } from 'lucide-react';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
@@ -197,27 +197,49 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
 
             {/* 參考教材 */}
             <div
-              className="p-3 bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-200/50 dark:border-indigo-700/50"
+              className="p-3 bg-gradient-to-br from-indigo-50/90 to-purple-50/90 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl border border-indigo-200/50 dark:border-indigo-700/50"
             >
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
-                <MessageSquare size={16} style={{ color: subjectStyle.accent }} />
+              <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300 mb-2 flex items-center gap-2">
+                <MessageSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
                 參考資訊
               </h3>
-              <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-1">
-                尚無參考資訊
+              <div className="space-y-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-2 italic">
+                  尚無參考資訊
+                </div>
+                {/* 未來可以添加實際內容：
+                <div className="flex items-start gap-3 p-3 bg-white/60 dark:bg-gray-800/40 rounded-lg hover:bg-white/80 dark:hover:bg-gray-800/60 transition-colors cursor-pointer">
+                  <BookOpen size={16} className="text-indigo-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm">教學影片</div>
+                    <div className="text-gray-600 dark:text-gray-400 text-xs">基礎概念講解 - 15分鐘</div>
+                  </div>
+                </div>
+                */}
               </div>
             </div>
 
             {/* 最近活動 */}
             <div
-              className="p-3 bg-gradient-to-br from-amber-50/80 to-orange-50/80 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50"
+              className="p-3 bg-gradient-to-br from-green-50/90 to-emerald-50/90 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl border border-green-200/50 dark:border-green-700/50"
             >
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
-                <PlayCircle size={16} style={{ color: subjectStyle.accent }} />
+              <h3 className="text-sm font-semibold text-green-800 dark:text-green-300 mb-2 flex items-center gap-2">
+                <PlayCircle size={16} className="text-green-600 dark:text-green-400" />
                 最近活動
               </h3>
-              <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-1">
-                尚無活動紀錄
+              <div className="space-y-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-2 italic">
+                  尚無活動紀錄
+                </div>
+                {/* 未來可以添加實際內容：
+                <div className="flex items-center gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded-lg">
+                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm">開始任務</div>
+                    <div className="text-gray-500 dark:text-gray-400 text-xs">2 小時前</div>
+                  </div>
+                </div>
+                */}
               </div>
             </div>
           </div>
@@ -281,26 +303,29 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
           </div>
 
           <div className="flex-1 flex flex-col space-y-3">
-            {/* 挑戰程度 - 可點擊星星 */}
-            <div className="p-3 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-xl">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">這個任務有多挑戰？</h4>
-              <div className="flex justify-center gap-1">
+            {/* 挑戰程度 - 重新設計為色彩豐富的樣式 */}
+            <div className="p-3 bg-gradient-to-br from-orange-50/90 to-red-50/90 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl border border-orange-200/50 dark:border-orange-700/50">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap size={16} className="text-orange-600 dark:text-orange-400" />
+                <h4 className="text-sm font-semibold text-orange-800 dark:text-orange-300">挑戰程度</h4>
+              </div>
+              <div className="flex justify-center gap-1.5">
                 {Array.from({ length: 5 }, (_, i) => (
                   <button
                     key={i}
                     onClick={() => setChallenge((i + 1) as ChallengeLevel)}
-                    className="p-1.5 rounded-lg transition-all hover:scale-110"
+                    className="p-1.5 rounded-lg transition-all hover:scale-110 hover:bg-white/40 dark:hover:bg-gray-800/40"
                   >
                     <Star 
                       size={20} 
-                      className={challenge && i < challenge ? 'text-yellow-500' : 'text-gray-300'} 
+                      className={challenge && i < challenge ? 'text-orange-500' : 'text-gray-300'} 
                       fill={challenge && i < challenge ? 'currentColor' : 'none'}
                     />
                   </button>
                 ))}
               </div>
               {challenge && (
-                <p className="text-center text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-center text-xs text-orange-700 dark:text-orange-300 mt-2 font-medium">
                   {challenge === 1 && "很簡單"}
                   {challenge === 2 && "有點簡單"}
                   {challenge === 3 && "剛剛好"}
@@ -310,15 +335,29 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
               )}
             </div>
 
-            {/* 心得輸入 */}
-            <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl flex-1">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">學習心得</h4>
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？"
-                className="w-full h-16 p-2 text-sm border border-gray-300/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm resize-none"
-              />
+            {/* 學習心得 - 改為更開放的設計 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <PenTool size={16} className="text-purple-600 dark:text-purple-400" />
+                <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-300">學習心得</h4>
+              </div>
+              <div className="relative">
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？✨"
+                  className="w-full min-h-[120px] p-4 text-sm border-2 border-purple-200/60 dark:border-purple-700/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 backdrop-blur-sm resize-none transition-all hover:border-purple-300 dark:hover:border-purple-600"
+                  style={{
+                    backgroundImage: 'linear-gradient(135deg, rgba(168, 85, 247, 0.02) 0%, rgba(236, 72, 153, 0.02) 100%)'
+                  }}
+                />
+                <button 
+                  className="absolute bottom-3 right-3 p-2 rounded-lg hover:bg-purple-100/80 dark:hover:bg-purple-800/40 transition-colors"
+                  title="語音輸入 (即將推出)"
+                >
+                  <Mic size={18} className="text-purple-500/70 hover:text-purple-600 dark:hover:text-purple-400" />
+                </button>
+              </div>
             </div>
 
             {/* 附件區域 */}
