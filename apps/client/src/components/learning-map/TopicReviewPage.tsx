@@ -4,7 +4,9 @@ import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
 import { HelpMessageDisplay } from './HelpMessageDisplay';
-import type { Goal, Task } from '../../types/goal';
+import { UserAvatar, UserAvatarGroup } from './UserAvatar';
+import { CollaborationManager } from './CollaborationManager';
+import type { Goal, Task, User } from '../../types/goal';
 import { 
   Brain, TrendingUp, Calendar, Trophy, Star, Clock, 
   CheckCircle2, Target, BookOpen, Zap, Award, 
@@ -27,7 +29,15 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   onGoalClick,
   onClose
 }) => {
-  const { getTopic, getCompletionRate, updateTopic } = useTopicStore();
+  const { 
+    getTopic, 
+    getCompletionRate, 
+    updateTopic,
+    getAvailableUsers,
+    setGoalOwner,
+    addGoalCollaborator,
+    removeGoalCollaborator
+  } = useTopicStore();
   const topic = getTopic(topicId);
   const weeklyStats = useTopicRadialMapStats(topicId);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -606,7 +616,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   subjectColor,
   onBackToGoal
 }) => {
-  const { updateTask, updateTaskHelp, deleteTask } = useTopicStore();
+  const { 
+    updateTask, 
+    updateTaskHelp, 
+    deleteTask,
+    getAvailableUsers,
+    setTaskOwner,
+    addTaskCollaborator,
+    removeTaskCollaborator
+  } = useTopicStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
@@ -841,6 +859,24 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               */}
             </div>
           </div>
+
+          {/* 協作管理 - 只在協作模式下顯示 */}
+          {(() => {
+            const { getTopic } = useTopicStore();
+            const topic = getTopic(topicId);
+            return topic?.isCollaborative ? (
+              <CollaborationManager
+                title="任務協作"
+                owner={task.owner}
+                collaborators={task.collaborators}
+                availableUsers={getAvailableUsers()}
+                onSetOwner={(user) => setTaskOwner(topicId, goal.id, task.id, user)}
+                onAddCollaborator={(user) => addTaskCollaborator(topicId, goal.id, task.id, user)}
+                onRemoveCollaborator={(userId) => removeTaskCollaborator(topicId, goal.id, task.id, userId)}
+                className="mb-3"
+              />
+            ) : null;
+          })()}
 
           {/* 最近活動 */}
           <div className="p-3 bg-gradient-to-br from-green-50/90 to-emerald-50/90 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl border border-green-200/50 dark:border-green-700/50">
@@ -1089,13 +1125,26 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   inProgressTasks,
   onGoalDeleted
 }) => {
-  const { addTask, deleteTask, deleteGoal, updateGoal } = useTopicStore();
+  const { 
+    addTask, 
+    deleteTask, 
+    deleteGoal, 
+    updateGoal,
+    getAvailableUsers,
+    setGoalOwner,
+    addGoalCollaborator,
+    removeGoalCollaborator
+  } = useTopicStore();
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [editedGoal, setEditedGoal] = useState(goal);
+  
+  // 獲取主題資訊來檢查協作模式
+  const { getTopic } = useTopicStore();
+  const topic = getTopic(topicId);
 
   // 當 goal 更新時同步 editedGoal
   useEffect(() => {
@@ -1303,6 +1352,20 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           className="mb-4 opacity-90"
           compact={true}
         />
+
+        {/* 協作管理 - 只在協作模式下顯示 */}
+        {topic?.isCollaborative && (
+          <CollaborationManager
+            title="目標協作"
+            owner={goal.owner}
+            collaborators={goal.collaborators}
+            availableUsers={getAvailableUsers()}
+            onSetOwner={(user) => setGoalOwner(topicId, goal.id, user)}
+            onAddCollaborator={(user) => addGoalCollaborator(topicId, goal.id, user)}
+            onRemoveCollaborator={(userId) => removeGoalCollaborator(topicId, goal.id, userId)}
+            className="mb-4"
+          />
+        )}
 
         {/* 任務列表 */}
         <div>

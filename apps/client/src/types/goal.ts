@@ -10,6 +10,16 @@ export type TaskRole = 'explore' | 'work' | 'present';
 // 添加目標狀態類型
 export type GoalStatus = 'todo' | 'pause' | 'focus' | 'finish' | 'complete' | 'archived';
 
+// 用戶類型定義
+export interface User {
+  id: string;
+  name: string;
+  avatar?: string; // 頭像 URL 或 emoji
+  color?: string; // 代表顏色
+  email?: string;
+  role?: 'student' | 'teacher' | 'mentor' | 'parent';
+}
+
 export interface Topic {
   id: string;
   title: string;
@@ -24,6 +34,11 @@ export interface Topic {
   progress?: number;
   focusElement?: { type: 'goal' | 'task', id: string };
   bubbles?: Bubble[];
+  // 協作相關字段
+  isCollaborative?: boolean; // 是否為協作主題
+  owner?: User; // 主要擁有者
+  collaborators?: User[]; // 協作人列表
+  showAvatars?: boolean; // 是否在 Radial 中顯示頭像
   // 移除 focusedGoalIds，改用目標的 status 字段來管理
 }
 
@@ -39,6 +54,9 @@ export interface Goal {
   helpResolvedAt?: string; // 幫助解決時間
   replyMessage?: string; // 老師回覆訊息
   replyAt?: string; // 老師回覆時間
+  // 協作相關字段
+  owner?: User; // 主要負責人
+  collaborators?: User[]; // 協作人列表
 }
 
 export interface Task {
@@ -61,6 +79,9 @@ export interface Task {
   helpResolvedAt?: string; // 幫助解決時間
   replyMessage?: string; // 老師回覆訊息
   replyAt?: string; // 老師回覆時間
+  // 協作相關字段
+  owner?: User; // 主要負責人
+  collaborators?: User[]; // 協作人列表
 }
 
 export interface Bubble {

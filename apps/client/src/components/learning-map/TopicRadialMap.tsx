@@ -1,11 +1,13 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
+import { UserAvatar, UserAvatarGroup } from './UserAvatar';
+import type { User } from '../../types/goal';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,
   Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon, AlertTriangle,
-  Pause, Award, Trophy, FlagOff
+  Pause, Award, Trophy, FlagOff, Users, Eye, EyeOff
 } from 'lucide-react';
 
 interface TopicRadialMapProps {
@@ -77,8 +79,22 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   onGoalClick,
   className = ""
 }) => {
-  const { getTopic, getActiveGoals, getCompletionRate } = useTopicStore();
+  const { getTopic, getActiveGoals, getCompletionRate, toggleAvatarDisplay } = useTopicStore();
   const topic = getTopic(topicId);
+  
+  // 調試信息
+  useEffect(() => {
+    if (topic?.isCollaborative) {
+      console.log('🔍 RadialMap Debug:', {
+        topicId,
+        topicTitle: topic.title,
+        isCollaborative: topic.isCollaborative,
+        showAvatars: topic.showAvatars,
+        owner: topic.owner,
+        collaborators: topic.collaborators
+      });
+    }
+  }, [topic?.isCollaborative, topic?.showAvatars, topicId, topic?.title]);
   
   // 縮放和拖拽狀態
   const [scale, setScale] = useState(1);
@@ -169,6 +185,10 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   const centerY = height / 2;
   const goalRadius = Math.min(width, height) * 0.46; // 縮短 topic-goal 距離
   const taskRadius = goalRadius * 0.6; // 讓 goal-task 距離與 topic-goal 成比例
+  
+  // 節點圓圈大小
+  const goalNodeSize = Math.min(60, Math.min(width, height) * 0.13);
+  const taskNodeSize = Math.min(24, Math.min(width, height) * 0.06);
 
   // 定義裝飾圖示的位置和類型
   const decorativeIcons = useMemo(() => {
@@ -204,6 +224,23 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
       {/* 控制按鈕 */}
       <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+        {/* 協作頭像開關 - 只在協作模式下顯示 */}
+        {topic.isCollaborative && (
+          <motion.button
+            onClick={() => toggleAvatarDisplay(topicId)}
+            className={`w-8 h-8 rounded-lg shadow-md flex items-center justify-center transition-colors ${
+              topic.showAvatars 
+                ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                : 'bg-white/90 hover:bg-white text-gray-700'
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={topic.showAvatars ? '隱藏頭像' : '顯示頭像'}
+          >
+            {topic.showAvatars ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </motion.button>
+        )}
+        
         <motion.button
           onClick={handleZoomIn}
           className="w-8 h-8 bg-white/90 hover:bg-white rounded-lg shadow-md flex items-center justify-center"
@@ -623,7 +660,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               <circle
                 cx={x}
                 cy={y}
-                r={Math.min(60, Math.min(width, height) * 0.13)}
+                r={goalNodeSize}
                 fill={goalBgColor}
                 stroke={isSelected ? '#3b82f6' : strokeColor}
                 strokeWidth={isSelected ? "5" : strokeWidth}
@@ -687,6 +724,49 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                     transition={{ delay: 0.8 + goalIndex * 0.1, duration: 0.3 }}
                   >
                     <AlertTriangle className="w-4 h-4 text-white" />
+                  </motion.div>
+                </foreignObject>
+              )}
+
+              {/* 協作頭像 - 只在協作模式且開啟頭像顯示時顯示 */}
+              {topic.isCollaborative && topic.showAvatars && goal.owner && (
+                <foreignObject
+                  x={x + goalNodeSize * 0}
+                  y={y - goalNodeSize * 1.5}
+                  width={goalNodeSize * 1.2}
+                  height={goalNodeSize * 1.2}
+                  className="pointer-events-none"
+                  style={{ overflow: 'visible' }}
+                >
+                  <motion.div 
+                    className="w-full h-full flex items-start justify-start"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 1.2 + goalIndex * 0.1, duration: 0.3 }}
+                  >
+                    <div className="flex items-center relative">
+                      {goal.owner && (
+                        <>
+                          <div className="w-full h-full">
+                            <UserAvatar 
+                              user={goal.owner} 
+                              size="sm" 
+                              showTooltip={true}
+                              style={{ width: '100%', height: '100%' }}
+                            />
+                          </div>
+                          {goal.collaborators && goal.collaborators.length > 0 && (
+                            <div 
+                              className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold border-2 border-white shadow-lg cursor-help hover:bg-blue-600 transition-colors"
+                              title={`協作者: ${goal.collaborators.map(c => c.name).join(', ')}`}
+                              style={{ zIndex: 1000 }}
+                            >
+                              +{goal.collaborators.length}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </motion.div>
                 </foreignObject>
               )}
@@ -787,7 +867,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                 <circle
                   cx={x}
                   cy={y}
-                  r={Math.min(24, Math.min(width, height) * 0.06)}
+                  r={taskNodeSize}
                   fill={taskBg}
                   stroke={isSelected ? '#3b82f6' : taskColor}
                   strokeWidth={isSelected ? "4" : "3"}
@@ -869,6 +949,38 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                       transition={{ delay: 1.2 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.3 }}
                     >
                       <AlertTriangle className="w-2.5 h-2.5 text-white" />
+                    </motion.div>
+                  </foreignObject>
+                )}
+
+                {/* 任務協作頭像 - 只在協作模式且開啟頭像顯示時顯示 */}
+                {topic.isCollaborative && topic.showAvatars && task.owner && (
+                  <foreignObject
+                    x={x + taskNodeSize * 0.1}
+                    y={y - taskNodeSize * 1.9}
+                    width={taskNodeSize * 1.8}
+                    height={taskNodeSize * 1.8}
+                    className="pointer-events-none"
+                    style={{ overflow: 'visible' }}
+                  >
+                    <motion.div 
+                      className="w-full h-full flex items-center justify-center"
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 1.5 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.3 }}
+                    >
+                      <div className="flex items-center relative">
+                        {task.owner && (
+                          <div className="w-full h-full">
+                            <UserAvatar 
+                              user={task.owner} 
+                              size="xs" 
+                              showTooltip={true}
+                              style={{ width: '100%', height: '100%' }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </motion.div>
                   </foreignObject>
                 )}

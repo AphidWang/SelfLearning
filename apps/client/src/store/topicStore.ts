@@ -1,10 +1,49 @@
 import { create } from 'zustand';
-import type { Topic, Goal, Task, Bubble, GoalStatus } from '../types/goal';
+import type { Topic, Goal, Task, Bubble, GoalStatus, User } from '../types/goal';
 import { TOPIC_STATUSES } from '../constants/topics';
 import { SUBJECTS } from '../constants/subjects';
 
 const STORAGE_KEY = 'self_learning_topics';
-const STORAGE_VERSION = '2.5'; // 增加版本號來強制重新載入
+const STORAGE_VERSION = '2.8'; // 增加版本號來強制重新載入 - 修復頭像顯示問題
+
+// 示例用戶數據
+const EXAMPLE_USERS: User[] = [
+  {
+    id: 'user-1',
+    name: '小明',
+    avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=xiaoming&backgroundColor=ffd5dc&clothing=hoodie',
+    color: '#FF6B6B',
+    role: 'student'
+  },
+  {
+    id: 'user-2', 
+    name: '小美',
+    avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=xiaomei&backgroundColor=e0f2fe&clothing=dress',
+    color: '#4ECDC4',
+    role: 'student'
+  },
+  {
+    id: 'user-3',
+    name: '王老師',
+    avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=teacher&backgroundColor=fff3e0&clothing=shirt&accessories=glasses',
+    color: '#45B7D1',
+    role: 'teacher'
+  },
+  {
+    id: 'user-4',
+    name: '李同學',
+    avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=lixue&backgroundColor=f3e5f5&clothing=sweater',
+    color: '#96CEB4',
+    role: 'student'
+  },
+  {
+    id: 'user-5',
+    name: '張爸爸',
+    avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=papa&backgroundColor=fff8e1&clothing=polo',
+    color: '#FFEAA7',
+    role: 'parent'
+  }
+];
 
 // 檢查是否為預設主題
 export const isDefaultTopic = (topicId: string): boolean => {
@@ -111,6 +150,11 @@ const initialTopics: Topic[] = [
     description: '透過生活情境理解分數的概念',
     status: 'active',
     subject: SUBJECTS.MATH,
+    // 協作模式示例
+    isCollaborative: true,
+    owner: EXAMPLE_USERS[0], // 小明
+    collaborators: [EXAMPLE_USERS[1], EXAMPLE_USERS[3]], // 小美、李同學
+    showAvatars: true, // 默認顯示頭像
     bubbles: [
       {
         id: 'bubble-2-1',
@@ -149,12 +193,15 @@ const initialTopics: Topic[] = [
         id: '2-2',
         title: '分數的比較',
         status: 'focus', // 當前專注
+        owner: EXAMPLE_USERS[1], // 小美負責
+        collaborators: [EXAMPLE_USERS[0]], // 小明協作
         tasks: [
           {
             id: '2-2-1',
             title: '比較不同分數的大小',
             status: 'done',
             completedAt: new Date('2024-03-15').toISOString(),
+            owner: EXAMPLE_USERS[1], // 小美負責
           },
           {
             id: '2-2-2',
@@ -167,6 +214,8 @@ const initialTopics: Topic[] = [
         id: '2-3',
         title: '分數的運算',
         status: 'focus', // 當前專注
+        owner: EXAMPLE_USERS[3], // 李同學負責
+        collaborators: [EXAMPLE_USERS[0], EXAMPLE_USERS[1]], // 小明、小美協作
         needHelp: true, // 這個目標需要幫助
         helpMessage: '我不太懂分數加法的通分步驟，可以請老師幫忙解釋嗎？',
         replyMessage: '分數加法時，首先要找到兩個分數的最小公倍數作為通分母，然後把分子相加。我們可以用圖形來理解這個過程。',
@@ -176,11 +225,15 @@ const initialTopics: Topic[] = [
             id: '2-3-1',
             title: '學習分數加法',
             status: 'in_progress',
+            owner: EXAMPLE_USERS[3], // 李同學
+            collaborators: [EXAMPLE_USERS[0]], // 小明協作
           },
           {
             id: '2-3-2',
             title: '學習分數減法',
             status: 'todo',
+            owner: EXAMPLE_USERS[0], // 小明負責
+            collaborators: [EXAMPLE_USERS[1]], // 小美協作
             needHelp: true, // 這個任務需要幫助
             helpMessage: '分數減法和加法有什麼不同嗎？我總是搞混。',
             replyMessage: '分數減法的原理和加法很相似，都需要先通分，然後分子相減。關鍵是要記住只有分母相同的分數才能直接相減。',
@@ -954,6 +1007,18 @@ interface TopicStore {
   updateTaskHelp: (topicId: string, goalId: string, taskId: string, needHelp: boolean, helpMessage?: string) => void;
   setGoalReply: (topicId: string, goalId: string, replyMessage: string) => void;
   setTaskReply: (topicId: string, goalId: string, taskId: string, replyMessage: string) => void;
+  // 協作相關方法
+  toggleTopicCollaborative: (topicId: string) => void;
+  toggleAvatarDisplay: (topicId: string) => void;
+  setGoalOwner: (topicId: string, goalId: string, owner: User) => void;
+  setTaskOwner: (topicId: string, goalId: string, taskId: string, owner: User) => void;
+  addGoalCollaborator: (topicId: string, goalId: string, collaborator: User) => void;
+  removeGoalCollaborator: (topicId: string, goalId: string, collaboratorId: string) => void;
+  addTaskCollaborator: (topicId: string, goalId: string, taskId: string, collaborator: User) => void;
+  removeTaskCollaborator: (topicId: string, goalId: string, taskId: string, collaboratorId: string) => void;
+  getAvailableUsers: () => User[];
+  // 調試方法：強制重置為協作模式
+  forceCollaborationMode: () => void;
 }
 
 export const useTopicStore = create<TopicStore>((set, get) => ({
@@ -1498,5 +1563,211 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       saveTopics(newState.topics);
       return newState;
     });
+  },
+
+  // 協作相關方法實現
+  toggleTopicCollaborative: (topicId: string) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? { ...t, isCollaborative: !t.isCollaborative }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  toggleAvatarDisplay: (topicId: string) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? { ...t, showAvatars: !t.showAvatars }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  setGoalOwner: (topicId: string, goalId: string, owner: User) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId ? { ...g, owner } : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  setTaskOwner: (topicId: string, goalId: string, taskId: string, owner: User) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        tasks: g.tasks.map((tk) =>
+                          tk.id === taskId ? { ...tk, owner } : tk
+                        )
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  addGoalCollaborator: (topicId: string, goalId: string, collaborator: User) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        collaborators: [...(g.collaborators || []), collaborator]
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  removeGoalCollaborator: (topicId: string, goalId: string, collaboratorId: string) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        collaborators: (g.collaborators || []).filter(c => c.id !== collaboratorId)
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  addTaskCollaborator: (topicId: string, goalId: string, taskId: string, collaborator: User) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        tasks: g.tasks.map((tk) =>
+                          tk.id === taskId
+                            ? {
+                                ...tk,
+                                collaborators: [...(tk.collaborators || []), collaborator]
+                              }
+                            : tk
+                        )
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  removeTaskCollaborator: (topicId: string, goalId: string, taskId: string, collaboratorId: string) => {
+    set((state) => {
+      const newState = {
+        topics: state.topics.map((t) =>
+          t.id === topicId
+            ? {
+                ...t,
+                goals: t.goals.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        tasks: g.tasks.map((tk) =>
+                          tk.id === taskId
+                            ? {
+                                ...tk,
+                                collaborators: (tk.collaborators || []).filter(c => c.id !== collaboratorId)
+                              }
+                            : tk
+                        )
+                      }
+                    : g
+                )
+              }
+            : t
+        )
+      };
+      saveTopics(newState.topics);
+      return newState;
+    });
+  },
+
+  getAvailableUsers: () => EXAMPLE_USERS,
+
+  // 調試方法：強制重置為協作模式
+  forceCollaborationMode: () => {
+    if (typeof window === 'undefined') return;
+    
+    // 清除 localStorage
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY + '_version');
+    
+    // 重新載入初始數據
+    const topics = getInitialTopics();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(topics));
+    localStorage.setItem(STORAGE_KEY + '_version', STORAGE_VERSION);
+    
+    // 更新 store 狀態
+    set({ topics });
+    
+    console.log('🎉 協作模式已強制啟用！請刷新頁面查看效果。');
+    console.log('協作主題：', topics.find(t => t.id === '2'));
   },
 })); 
