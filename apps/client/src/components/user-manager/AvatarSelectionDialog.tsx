@@ -39,7 +39,12 @@ export const AvatarSelectionDialog: React.FC<AvatarSelectionDialogProps> = ({
   selectedColor = 'ffd5dc',
   onSelect
 }) => {
-  const [currentColor, setCurrentColor] = useState(selectedColor);
+  // 檢查 selectedColor 是否在 backgroundColors 中，如果不在就使用第一個
+  const validColor = backgroundColors.find(bg => bg.value === selectedColor) 
+    ? selectedColor 
+    : backgroundColors[0].value;
+  
+  const [currentColor, setCurrentColor] = useState(validColor);
   const [currentAvatar, setCurrentAvatar] = useState(selectedAvatar || '');
   const [avatars, setAvatars] = useState<string[]>([]);
 
@@ -102,7 +107,7 @@ export const AvatarSelectionDialog: React.FC<AvatarSelectionDialogProps> = ({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -128,15 +133,18 @@ export const AvatarSelectionDialog: React.FC<AvatarSelectionDialogProps> = ({
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-160px)]">
+          <div className="flex-1 p-6 overflow-y-auto">
             {/* 當前選擇預覽 */}
             {currentAvatar && (
-              <div className="flex items-center justify-center mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <img
-                  src={currentAvatar}
-                  alt="預覽頭像"
-                  className="w-20 h-20 rounded-full border-2 border-white shadow-lg"
-                />
+              <div className="flex items-center justify-center mb-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                <div className="text-center">
+                  <img
+                    src={currentAvatar}
+                    alt="預覽頭像"
+                    className="w-24 h-24 rounded-full border-3 border-white shadow-lg mx-auto mb-2"
+                  />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">預覽</p>
+                </div>
               </div>
             )}
 
@@ -161,7 +169,7 @@ export const AvatarSelectionDialog: React.FC<AvatarSelectionDialogProps> = ({
                     onClick={() => handleColorChange(color.value)}
                     className={`relative w-full h-10 rounded-lg border-2 transition-all hover:scale-105 ${
                       currentColor === color.value 
-                        ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-50' 
+                        ? 'border-green-500 ring-2 ring-green-500 ring-opacity-50' 
                         : 'border-gray-200 dark:border-gray-600'
                     }`}
                     style={{ backgroundColor: color.hex }}
@@ -189,8 +197,8 @@ export const AvatarSelectionDialog: React.FC<AvatarSelectionDialogProps> = ({
                     onClick={() => handleAvatarSelect(avatar)}
                     className={`relative w-full h-16 rounded-lg border-2 overflow-hidden transition-all hover:scale-105 ${
                       currentAvatar === avatar 
-                        ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-50' 
-                        : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
+                        ? 'border-green-500 ring-2 ring-green-500 ring-opacity-50' 
+                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300'
                     }`}
                   >
                     <img
@@ -199,8 +207,10 @@ export const AvatarSelectionDialog: React.FC<AvatarSelectionDialogProps> = ({
                       className="w-full h-full object-cover"
                     />
                     {currentAvatar === avatar && (
-                      <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
-                        <Check className="w-4 h-4 text-blue-600" />
+                      <div className="absolute top-1 right-1">
+                        <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center shadow-lg">
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
                       </div>
                     )}
                   </button>
@@ -210,20 +220,22 @@ export const AvatarSelectionDialog: React.FC<AvatarSelectionDialogProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={!currentAvatar}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-            >
-              確認選擇
-            </button>
+          <div className="flex-shrink-0 p-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={!currentAvatar}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                確認選擇
+              </button>
+            </div>
           </div>
         </motion.div>
       </motion.div>

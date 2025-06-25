@@ -112,20 +112,9 @@ export const CreateUserForm: React.FC<CreateUserFormProps> = ({ onClose, onSucce
   };
 
   const handleAvatarSelect = (avatar: string, color: string) => {
-    // 從頭像 URL 中提取背景色，並轉換為 hex
-    const bgColorMatch = avatar.match(/backgroundColor=([^&]+)/);
-    let finalColor = formData.color; // 保持當前顏色作為預設
-    
-    if (bgColorMatch) {
-      const bgColor = `#${bgColorMatch[1].replace(/^#/, '').toUpperCase()}`;
-      // 檢查提取的顏色是否在 colorOptions 中
-      if (colorOptions.includes(bgColor)) {
-        finalColor = bgColor;
-      }
-      // 如果不在 colorOptions 中，保持當前的顏色不變
-    }
-    
-    setFormData(prev => ({ ...prev, avatar, color: finalColor }));
+    // AvatarSelectionDialog 的顏色系統和主表單不一致，
+    // 所以選擇頭像時不更改顏色，只更新頭像
+    setFormData(prev => ({ ...prev, avatar }));
   };
 
   return (
@@ -273,19 +262,26 @@ export const CreateUserForm: React.FC<CreateUserFormProps> = ({ onClose, onSucce
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               代表顏色
             </label>
+            {/* Debug 資訊 */}
+            <div className="text-xs text-gray-500 mb-2">
+              當前顏色: {formData.color} | 選項: {colorOptions.join(', ')}
+            </div>
             <div className="flex flex-wrap gap-2">
-              {colorOptions.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => handleInputChange('color', color)}
-                  className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
-                    formData.color === color ? 'border-gray-800 dark:border-white scale-110' : 'border-gray-300'
-                  }`}
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
-              ))}
+              {colorOptions.map((color) => {
+                const isSelected = formData.color === color;
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => handleInputChange('color', color)}
+                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                      isSelected ? 'border-gray-800 dark:border-white scale-110' : 'border-gray-300'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={`${color} ${isSelected ? '(選中)' : ''}`}
+                  />
+                );
+              })}
             </div>
           </div>
 
