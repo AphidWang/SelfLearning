@@ -1,85 +1,89 @@
 import express from 'express';
-import type { User, LoginCredentials } from '@self-learning/types';
-import { generateToken, verifyToken } from '../utils/jwt';
-import { JwtPayload } from 'jsonwebtoken';
+import { supabaseAdmin } from '../services/supabase';
 
 const router = express.Router();
 
-// 驗證 token 的中間件
-const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+// 驗證 Supabase token 的中間件
+const authenticateSupabaseToken = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
-  console.log('Auth middleware:', { authHeader, token });
   
   if (!token) {
     return res.status(401).json({ message: '未提供 token' });
   }
 
-  const decoded = verifyToken(token);
-  console.log('Token verification:', { decoded });
-  
-  if (!decoded) {
-    return res.status(401).json({ message: '無效的 token' });
-  }
+  try {
+    // 使用 Supabase 驗證 token
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ message: '無效的 token' });
+    }
 
-  next();
+    // 將用戶信息添加到 req 中
+    (req as any).user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: 'Token 驗證失敗' });
+  }
 };
 
-router.post('/login', (req, res) => {
-  const { email, password }: LoginCredentials = req.body;
+// 檢查管理員權限的中間件
+const requireAdmin = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const user = (req as any).user;
   
-  // Demo 帳號處理
-  if (email.includes('demo')) {
-    const user: User = email.includes('student')
-      ? {
-          id: '1',
-          name: 'Alex Student',
-          role: 'student',
-          avatar: 'https://images.pexels.com/photos/1462630/pexels-photo-1462630.jpeg?auto=compress&cs=tinysrgb&w=150'
-        }
-      : {
-          id: '2',
-          name: 'Sam Mentor',
-          role: 'mentor',
-          avatar: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=150'
-        };
+  if (!user) {
+    return res.status(401).json({ message: '未認證' });
+  }
+
+  try {
+    // 從 user_metadata 獲取用戶角色
+    const role = user.user_metadata?.role || 'student';
+
+    if (role !== 'admin') {
+      return res.status(403).json({ message: '需要管理員權限' });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({ message: '權限檢查失敗' });
+  }
+};
+
+// 獲取當前用戶信息
+router.get('/me', authenticateSupabaseToken, async (req, res) => {
+  try {
+    const supabaseUser = (req as any).user;
     
-    const token = generateToken(user);
-    return res.json({ user, token });
+    // 從 user_metadata 獲取用戶資料
+    const userData = {
+      id: supabaseUser.id,
+      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+      email: supabaseUser.email,
+      avatar: supabaseUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
+      color: supabaseUser.user_metadata?.color || '#FF6B6B',
+      role: supabaseUser.user_metadata?.role || 'student'
+    };
+
+    res.json(userData);
+  } catch (error) {
+    res.status(500).json({ message: '獲取用戶信息失敗' });
   }
-
-  // TODO: 實作真正的登入邏輯
-  res.status(401).json({ message: '無效的帳號或密碼' });
 });
 
-router.get('/me', authenticateToken, (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  const decoded = verifyToken(token!);
+// 驗證 token 狀態的路由
+router.get('/verify-token', authenticateSupabaseToken, (req, res) => {
+  const user = (req as any).user;
   
-  console.log('GET /me:', { decoded });
-  
-  if (!decoded || typeof decoded === 'string') {
-    return res.status(401).json({ message: '無效的 token' });
-  }
-
-  // 這裡 decoded 一定是 JwtPayload
-  const user: User = {
-    id: decoded.userId as string,
-    name: decoded.role === 'student' ? 'Alex Student' : 'Sam Mentor',
-    role: decoded.role as 'student' | 'mentor',
-    avatar: decoded.role === 'student' 
-      ? 'https://images.pexels.com/photos/1462630/pexels-photo-1462630.jpeg?auto=compress&cs=tinysrgb&w=150'
-      : 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=150'
-  };
-
-  res.json(user);
+  res.json({ 
+    valid: true, 
+    user: {
+      id: user.id,
+      email: user.email
+    },
+    message: 'Token 有效'
+  });
 });
 
-router.post('/logout', (req, res) => {
-  // 在這裡可以添加 token 黑名單等邏輯
-  res.json({ message: '登出成功' });
-});
-
+export { authenticateSupabaseToken, requireAdmin };
 export default router; 

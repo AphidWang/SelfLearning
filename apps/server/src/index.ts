@@ -1,11 +1,14 @@
+import dotenv from 'dotenv';
+
+// 必須在所有其他 import 之前載入環境變數
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
+import usersRouter from './routes/users';
 import path from 'path';
-
-dotenv.config();
 
 export const app = express();
 const port = process.env.PORT || 3000;
@@ -34,6 +37,7 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/users', usersRouter);
 
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 

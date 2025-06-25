@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { authService, User } from '../services/auth';
+import { authService } from '../services/auth';
+import type { User } from '../types/goal';
 import { trackEvent } from '../utils/analytics';
 
 interface UserContextType {
@@ -14,13 +15,13 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-function useUser() {
+export const useUser = () => {
   const context = useContext(UserContext);
   if (context === undefined) {
     throw new Error('useUser must be used within a UserProvider');
   }
   return context;
-}
+};
 
 function UserProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -28,26 +29,48 @@ function UserProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    console.log('Initial auth check:', { storedUser, token });
+    let isMounted = true;
     
-    if (storedUser && token) {
-      setCurrentUser(JSON.parse(storedUser));
-      authService.getCurrentUser().then(user => {
-        console.log('Token validation result:', { user });
-        if (!user) {
-          console.log('Token invalid, clearing storage');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+    const initializeAuth = async () => {
+      try {
+        const user = await authService.getCurrentUser();
+        if (isMounted) {
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        console.error('Failed to initialize auth:', error);
+        if (isMounted) {
           setCurrentUser(null);
         }
-      }).finally(() => {
-        setIsLoading(false);
-      });
-    } else {
-      setIsLoading(false);
-    }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // 監聽認證狀態變化
+    const { data: { subscription } } = authService.onAuthStateChange((user) => {
+      if (isMounted) {
+        setCurrentUser(user);
+        // 儲存到 localStorage 供初始化使用
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+        } else {
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -56,13 +79,17 @@ function UserProvider({ children }: { children: ReactNode }) {
       setError(null);
       
       const { user, token } = await authService.login({ email, password });
+      
+      // 儲存到 localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
+      
       setCurrentUser(user);
       trackEvent('login_success', 'auth');
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登入失敗');
+      const errorMessage = err instanceof Error ? err.message : '登入失敗';
+      setError(errorMessage);
       trackEvent('login_failed', 'auth');
       return false;
     } finally {
@@ -73,7 +100,6 @@ function UserProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await authService.logout();
-      localStorage.removeItem('user');
       setCurrentUser(null);
       trackEvent('logout', 'auth');
     } catch (err) {
@@ -95,8 +121,12 @@ function UserProvider({ children }: { children: ReactNode }) {
     return null;
   }
 
-  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
+  return (
+    <UserContext.Provider value={value}>
+      {children}
+    </UserContext.Provider>
+  );
 }
 
-export { UserProvider, useUser };
+export { UserProvider };
 export type { User as UserRole };

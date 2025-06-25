@@ -109,8 +109,9 @@ export const CollaborationManager: React.FC<CollaborationManagerProps> = ({
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {owner.role === 'student' ? '學生' :
-                         owner.role === 'teacher' ? '老師' :
-                         owner.role === 'mentor' ? '導師' : '家長'}
+                         owner.role === 'mentor' ? '導師' :
+                         owner.role === 'parent' ? '家長' : 
+                         owner.role === 'admin' ? '管理員' : '其他'}
                       </div>
                     </div>
                   </div>
@@ -144,8 +145,9 @@ export const CollaborationManager: React.FC<CollaborationManagerProps> = ({
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {user.role === 'student' ? '學生' :
-                             user.role === 'teacher' ? '老師' :
-                             user.role === 'mentor' ? '導師' : '家長'}
+                             user.role === 'mentor' ? '導師' :
+                             user.role === 'parent' ? '家長' : 
+                             user.role === 'admin' ? '管理員' : '其他'}
                           </div>
                         </div>
                       </button>
@@ -191,8 +193,9 @@ export const CollaborationManager: React.FC<CollaborationManagerProps> = ({
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {collaborator.role === 'student' ? '學生' :
-                           collaborator.role === 'teacher' ? '老師' :
-                           collaborator.role === 'mentor' ? '導師' : '家長'}
+                           collaborator.role === 'mentor' ? '導師' :
+                           collaborator.role === 'parent' ? '家長' : 
+                           collaborator.role === 'admin' ? '管理員' : '其他'}
                         </div>
                       </div>
                       <button
@@ -239,8 +242,9 @@ export const CollaborationManager: React.FC<CollaborationManagerProps> = ({
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {user.role === 'student' ? '學生' :
-                             user.role === 'teacher' ? '老師' :
-                             user.role === 'mentor' ? '導師' : '家長'}
+                             user.role === 'mentor' ? '導師' :
+                             user.role === 'parent' ? '家長' : 
+                             user.role === 'admin' ? '管理員' : '其他'}
                           </div>
                         </div>
                       </button>

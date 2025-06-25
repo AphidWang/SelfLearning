@@ -10,5 +10,9 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// 暫時禁用 Firebase，避免連接錯誤
+// const app = initializeApp(firebaseConfig);
+// export const db = getFirestore(app);
+
+// 暫時的 mock export，避免 import 錯誤
+export const db = null as any;

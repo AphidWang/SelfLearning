@@ -17,7 +17,7 @@ export interface User {
   avatar?: string; // 頭像 URL 或 emoji
   color?: string; // 代表顏色
   email?: string;
-  role?: 'student' | 'teacher' | 'mentor' | 'parent';
+  role?: 'student' | 'mentor' | 'parent' | 'admin';
 }
 
 export interface Topic {

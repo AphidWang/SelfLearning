@@ -1,11 +1,12 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { 
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, ListTodo, Users, BookMarked, 
   Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight, Target 
 } from 'lucide-react';
 import { useUser, UserRole } from '../../context/UserContext';
+import { UserProfileDialog } from '../user-manager';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -16,26 +17,90 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) => {
   const { currentUser, logout } = useUser();
-  const role = currentUser?.role as 'student' | 'mentor' | undefined;
-
-  const sidebarItems = {
-    student: [
-      { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
-      { name: '儀表板', path: '/student', icon: <BookOpen size={20} /> },
-      { name: '學習規劃', path: '/student/planning', icon: <Target size={20} /> },
-      { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-      { name: '學習日誌', path: '/student/journal', icon: <BookMarked size={20} /> },
-    ],
-    mentor: [
-      { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
-      { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
-      { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
-      { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
-      { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
-    ]
+  const location = useLocation();
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  
+  // 根據當前路由決定顯示的導航項目
+  const getNavigationItems = () => {
+    const pathname = location.pathname;
+    
+    if (pathname.startsWith('/student')) {
+      return {
+        items: [
+          { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
+          { name: '儀表板', path: '/student', icon: <BookOpen size={20} /> },
+          { name: '學習規劃', path: '/student/planning', icon: <Target size={20} /> },
+          { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
+          { name: '學習日誌', path: '/student/journal', icon: <BookMarked size={20} /> },
+        ],
+        viewType: 'student'
+      };
+    }
+    
+    if (pathname.startsWith('/admin')) {
+      return {
+        items: [
+          { name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> },
+          { name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> },
+          { name: '導師視圖', path: '/mentor', icon: <Target size={20} /> },
+        ],
+        viewType: 'admin'
+      };
+    }
+    
+    if (pathname.startsWith('/mentor')) {
+      return {
+        items: [
+          { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
+          { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
+          { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
+          { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
+          { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
+        ],
+        viewType: 'mentor'
+      };
+    }
+    
+    // 如果路由不匹配，根據用戶角色決定預設顯示
+    const role = currentUser?.role;
+    if (role === 'admin') {
+      return {
+        items: [
+          { name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> },
+          { name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> },
+          { name: '導師視圖', path: '/mentor', icon: <Target size={20} /> },
+        ],
+        viewType: 'admin'
+      };
+    }
+    
+    if (role === 'mentor') {
+      return {
+        items: [
+          { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
+          { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
+          { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
+          { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
+          { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
+        ],
+        viewType: 'mentor'
+      };
+    }
+    
+    // 預設為學生視圖 (student, parent, admin 都可以看)
+    return {
+      items: [
+        { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
+        { name: '儀表板', path: '/student', icon: <BookOpen size={20} /> },
+        { name: '學習規劃', path: '/student/planning', icon: <Target size={20} /> },
+        { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
+        { name: '學習日誌', path: '/student/journal', icon: <BookMarked size={20} /> },
+      ],
+      viewType: 'student'
+    };
   };
 
-  const items = role ? sidebarItems[role] : [];
+  const { items, viewType } = getNavigationItems();
 
   const toggleSidebar = () => setIsOpen(!isOpen);
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
@@ -84,7 +149,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
             </h1>
             {!isCollapsed && (
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {role === 'student' ? '學生版' : '指導老師版'}
+                {viewType === 'student' ? '學生版' : 
+                 viewType === 'mentor' ? '指導老師版' :
+                 viewType === 'admin' ? '管理員版' : '學生版'}
               </p>
             )}
           </div>
@@ -117,23 +184,42 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           {/* User profile and logout */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center">
-              {currentUser?.avatar && (
-                <img 
-                  src={currentUser.avatar} 
-                  alt={currentUser.name}
-                  className={`w-10 h-10 rounded-full object-cover ${
-                    isCollapsed ? 'mx-auto' : 'mr-3'
+              {/* 可點擊的頭像區域 */}
+              {currentUser && (
+                <button
+                  onClick={() => setShowProfileDialog(true)}
+                  className={`rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                    isCollapsed ? 'w-full flex justify-center p-2' : 'flex items-center mr-3'
                   }`}
-                />
+                  title={isCollapsed ? `編輯 ${currentUser.name} 的個人資料` : '編輯個人資料'}
+                >
+                  {currentUser.avatar ? (
+                    <img 
+                      src={currentUser.avatar} 
+                      alt={currentUser.name}
+                      className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                    />
+                  ) : (
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium border border-gray-200 dark:border-gray-600"
+                      style={{ backgroundColor: currentUser.color || '#FF6B6B' }}
+                    >
+                      {currentUser.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </button>
               )}
-              {!isCollapsed && (
+              
+              {!isCollapsed && currentUser && (
                 <>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {currentUser?.name}
+                      {currentUser.name}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {role === 'student' ? '學生' : '指導老師'}
+                      {viewType === 'student' ? '學生' : 
+                       viewType === 'mentor' ? '指導老師' :
+                       viewType === 'admin' ? '管理員' : '學生'}
                     </p>
                   </div>
                   <button 
@@ -149,6 +235,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           </div>
         </div>
       </div>
+      
+      {/* User Profile Dialog */}
+      {currentUser && (
+        <UserProfileDialog
+          isOpen={showProfileDialog}
+          onClose={() => setShowProfileDialog(false)}
+          user={currentUser}
+        />
+      )}
     </>
   );
 };

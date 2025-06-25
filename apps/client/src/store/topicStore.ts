@@ -6,11 +6,12 @@ import { SUBJECTS } from '../constants/subjects';
 const STORAGE_KEY = 'self_learning_topics';
 const STORAGE_VERSION = '2.8'; // 增加版本號來強制重新載入 - 修復頭像顯示問題
 
-// 示例用戶數據
+// 示例用戶數據 (與 userStore 保持一致)
 const EXAMPLE_USERS: User[] = [
   {
     id: 'user-1',
     name: '小明',
+    email: 'xiaoming@example.com',
     avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=xiaoming&backgroundColor=ffd5dc&clothing=hoodie',
     color: '#FF6B6B',
     role: 'student'
@@ -18,6 +19,7 @@ const EXAMPLE_USERS: User[] = [
   {
     id: 'user-2', 
     name: '小美',
+    email: 'xiaomei@example.com',
     avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=xiaomei&backgroundColor=e0f2fe&clothing=dress',
     color: '#4ECDC4',
     role: 'student'
@@ -25,6 +27,7 @@ const EXAMPLE_USERS: User[] = [
   {
     id: 'user-3',
     name: '王老師',
+    email: 'teacher.wang@example.com',
     avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=teacher&backgroundColor=fff3e0&clothing=shirt&accessories=glasses',
     color: '#45B7D1',
     role: 'teacher'
@@ -32,6 +35,7 @@ const EXAMPLE_USERS: User[] = [
   {
     id: 'user-4',
     name: '李同學',
+    email: 'lixue@example.com',
     avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=lixue&backgroundColor=f3e5f5&clothing=sweater',
     color: '#96CEB4',
     role: 'student'
@@ -39,6 +43,7 @@ const EXAMPLE_USERS: User[] = [
   {
     id: 'user-5',
     name: '張爸爸',
+    email: 'papa.zhang@example.com',
     avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=papa&backgroundColor=fff8e1&clothing=polo',
     color: '#FFEAA7',
     role: 'parent'
@@ -1749,7 +1754,19 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     });
   },
 
-  getAvailableUsers: () => EXAMPLE_USERS,
+  getAvailableUsers: () => {
+    // 嘗試從 userStore 獲取用戶，如果失敗則使用範例用戶
+    try {
+      // 動態導入 userStore 避免循環依賴
+      const userStore = (window as any).__userStore__;
+      if (userStore && userStore.users && userStore.users.length > 0) {
+        return userStore.users;
+      }
+    } catch (error) {
+      console.warn('無法從 userStore 獲取用戶，使用範例用戶:', error);
+    }
+    return EXAMPLE_USERS;
+  },
 
   // 調試方法：強制重置為協作模式
   forceCollaborationMode: () => {

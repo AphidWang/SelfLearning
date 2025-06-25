@@ -1,8 +1,10 @@
 export interface User {
   id: string;
   name: string;
-  role: 'student' | 'mentor';
+  role: 'student' | 'teacher' | 'mentor' | 'parent' | 'admin';
   avatar?: string;
+  email?: string;
+  color?: string;
 }
 
 export interface LoginCredentials {

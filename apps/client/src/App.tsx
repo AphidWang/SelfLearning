@@ -21,6 +21,8 @@ import GoalMindMapPage from './pages/student/GoalMindMapPage';
 import TopicMindMapPage from './pages/student/TopicMindMapPage.tsx';
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
+import { UserAdminPage } from './pages/admin/UserAdminPage';
+import { AuthCallback } from './pages/AuthCallback.tsx';
 // import { initGA } from './utils/analytics';
 
 // initGA();
@@ -32,6 +34,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             
             {/* Preview Routes */}
             <Route path="/preview/lottie" element={<LottiePreview />} />
@@ -55,6 +58,9 @@ function App() {
             <Route path="/mentor/subject/:subjectId" element={<SubjectPage isMentor={true} />} />
             <Route path="/mentor/curriculum" element={<MentorCurriculum />} />
             <Route path="/mentor/course-blueprint" element={<CourseBluePrint />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/users" element={<UserAdminPage />} />
             
             {/* Default and Not Found Routes */}
             <Route path="/" element={<Navigate to="/login" replace />} />
