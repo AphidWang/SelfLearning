@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Topic, Task } from '../../types/goal';
 import { TopicDetails } from './TopicDetails';
-import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upload, Play, Menu, ArrowUpRight, Plus, X, AlertCircle, Brain, Target, Sparkles, PartyPopper, List, LayoutTemplate, Network } from 'lucide-react';
+import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upload, Play, Menu, ArrowUpRight, Plus, X, AlertCircle, Brain, Target, Sparkles, PartyPopper, List, LayoutTemplate, Network, Eye } from 'lucide-react';
 import { subjects } from '../../styles/tokens';
 import { useTopicStore } from '../../store/topicStore';
 import { GoalOverviewDialog } from './TopicOverviewDialog';
@@ -23,10 +23,11 @@ interface WeeklyProgress {
 
 interface TopicDetailsDialogProps {
   topic: Topic;
+  open: boolean;
   onClose: () => void;
-  onBack: () => void;
-  onTaskClick: (taskId: string) => void;
-  isCreating?: boolean;
+  onTaskClick?: (taskId: string, goalId?: string) => void;
+  onGoalClick?: (goalId: string) => void;
+  onShowReview?: (topicId: string) => void;
 }
 
 interface TaskDetailProps {
@@ -36,12 +37,13 @@ interface TaskDetailProps {
 
 export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   topic,
+  open,
   onClose,
-  onBack,
   onTaskClick,
-  isCreating = false
+  onGoalClick,
+  onShowReview
 }) => {
-  const [isEditing, setIsEditing] = useState(isCreating);
+  const [isEditing, setIsEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [visibleWeeks, setVisibleWeeks] = useState<number>(0);
@@ -94,8 +96,8 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   };
 
   // 處理任務點擊
-  const handleTaskClick = (taskId: string) => {
-    onTaskClick(taskId);
+  const handleTaskClick = (taskId: string, goalId?: string) => {
+    onTaskClick?.(taskId, goalId || topic.id);
   };
 
   // 檢測對話框內容是否可滾動
@@ -338,6 +340,12 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
     setIsAnimating(false);
   };
 
+  // 添加數據初始化
+  useEffect(() => {
+    // 這裡可能需要初始化數據，但由於這是一個 Dialog 組件，
+    // 通常父組件已經處理了數據載入
+  }, []);
+
   return (
     <>
       <motion.div 
@@ -385,7 +393,10 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
           {!showHistory && !showDetails && (
             <button
               className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-              onClick={() => setShowReview(true)}
+              onClick={() => {
+                onShowReview?.(topic.id);
+                onClose();
+              }}
               aria-label="詳細回顧"
             >
               <LayoutTemplate className="w-4 h-4" />
@@ -415,22 +426,18 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
             </>
           )}
           {/* 協作模式按鈕 - 檢查是否為協作主題 */}
-          {(() => {
-            const { getTopic } = useTopicStore();
-            const currentTopic = getTopic(topic.id);
-            return currentTopic?.isCollaborative ? (
-              <button
-                className="px-3 py-1 rounded-full bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-all flex items-center gap-1"
-                onClick={() => setShowReview(true)}
-                aria-label="進入協作模式"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                </svg>
-                協作模式
-              </button>
-            ) : null;
-          })()}
+          {topic?.is_collaborative && (
+            <button
+              className="px-3 py-1 rounded-full bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-all flex items-center gap-1"
+              onClick={() => setShowReview(true)}
+              aria-label="進入協作模式"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+              </svg>
+              協作模式
+            </button>
+          )}
           
           <button
             className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -588,7 +595,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
             >
               <TopicDetails
                 topic={topic}
-                onBack={onBack}
+                onBack={() => setShowDetails(false)}
                 onTaskClick={onTaskClick}
                 isCreating={false}
                 isEditing={isEditing}
@@ -616,16 +623,16 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex gap-2">
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
-                      topic.templateType === '學習目標' ? 'bg-purple-100 text-purple-800' :
-                      topic.templateType === '個人成長' ? 'bg-blue-100 text-blue-800' :
-                      topic.templateType === '專案計畫' ? 'bg-green-100 text-green-800' :
+                      topic.template_type === '學習目標' ? 'bg-purple-100 text-purple-800' :
+                      topic.template_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
+                      topic.template_type === '專案計畫' ? 'bg-green-100 text-green-800' :
                       'bg-orange-100 text-orange-800'
                     }`}>
-                      {topic.templateType === '學習目標' ? <Brain className="h-3 w-3" /> :
-                       topic.templateType === '個人成長' ? <Target className="h-3 w-3" /> :
-                       topic.templateType === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
+                      {topic.template_type === '學習目標' ? <Brain className="h-3 w-3" /> :
+                       topic.template_type === '個人成長' ? <Target className="h-3 w-3" /> :
+                       topic.template_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
                        <PartyPopper className="h-3 w-3" />}
-                      {topic.templateType}
+                      {topic.template_type}
                     </span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
                       subjects.getSubjectStyle(topic.subject || '').bg
@@ -756,7 +763,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                           key={task.id || `${currentGoal?.id}-${index}`}
                           className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all"
                           style={{ backgroundColor: `${subjectStyle.accent}05` }}
-                          onClick={() => handleTaskClick(task.id || `${currentGoal?.id}-${index}`)}
+                          onClick={() => handleTaskClick(task.id || `${currentGoal?.id}-${index}`, currentGoal?.id)}
                         >
                           <div 
                             className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
@@ -764,6 +771,10 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                                 ? 'bg-green-500 border-green-500' 
                                 : task.status === 'in_progress'
                                 ? 'border-orange-500'
+                                : task.status === 'idea'
+                                ? 'border-purple-500'
+                                : task.status === 'archived'
+                                ? 'border-gray-500'
                                 : 'border-gray-300'
                             }`}
                           >
@@ -772,6 +783,9 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                             )}
                             {task.status === 'in_progress' && (
                               <div className="w-2 h-2 rounded-full bg-orange-500" />
+                            )}
+                            {task.status === 'idea' && (
+                              <div className="w-2 h-2 rounded-full bg-purple-500" />
                             )}
                           </div>
                            <span className={`text-sm flex-1 ${
@@ -843,18 +857,6 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
         </div>
       )}
     </motion.div>
-
-    {/* TopicReviewPage - 只在 showReview 為 true 時顯示 */}
-    <AnimatePresence>
-      {showReview && (
-        <TopicReviewPage
-          topicId={topic.id}
-          onClose={() => setShowReview(false)}
-          onTaskClick={onTaskClick}
-          onGoalClick={(goalId) => console.log('Goal clicked:', goalId)}
-        />
-      )}
-    </AnimatePresence>
 
     {/* GoalOverviewDialog */}
     <AnimatePresence>

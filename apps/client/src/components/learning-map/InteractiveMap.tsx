@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapIcon } from './MapIcon';
 import { Topic } from '../../types/goal';
@@ -8,6 +8,7 @@ import jinImg from '../../assets/maps/sep-twtour/character/jin.png';
 import fireImg from '../../assets/maps/sep-twtour/buildings/fire.png';
 import mailboxImg from '../../assets/maps/sep-twtour/buildings/mailbox.png';
 import { Sparkles } from 'lucide-react';
+import { useTopicStore } from '../../store/topicStore';
 
 interface InteractiveMapProps {
   topics: Topic[];
@@ -24,13 +25,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMailboxClick,
   onHouseClick,
 }) => {
+  const { getActiveTopics } = useTopicStore();
+  const activeTopics = useMemo(() => getActiveTopics(), [topics]);
+
   // 根據 subject 決定圖示
-  const getIcon = (subject: string) => {
+  const getIcon = useCallback((subject: string) => {
     if (subject.includes('地標') || subject.includes('房')) return heyaImg;
     if (subject.includes('火')) return fireImg;
     if (subject.includes('信箱')) return mailboxImg;
     return jinImg;
-  };
+  }, []);
 
   // 初始角色位置，可依需求調整
   const [characterPos, setCharacterPos] = useState({ left: 26, top: 34 });
@@ -43,9 +47,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [hoveredMailbox, setHoveredMailbox] = useState(false);
   const [hoveredOrbArea, setHoveredOrbArea] = useState(false);
 
-
   // 更新地圖尺寸
-  const updateMapSize = () => {
+  const updateMapSize = useCallback(() => {
     if (!mapRef.current) return;
     const container = mapRef.current;
     const img = container.querySelector('img');
@@ -82,7 +85,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     // 計算縮放比例，增加 1.5 倍
     setScale((displayWidth / img.naturalWidth) * 1.5);
-  };
+  }, []);
 
   // 監聽容器大小變化
   useEffect(() => {
@@ -91,14 +94,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       resizeObserver.observe(mapRef.current);
     }
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [updateMapSize]);
 
   // 監聽地圖圖片載入完成
-  const handleMapLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  const handleMapLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     updateMapSize();
-  };
+  }, [updateMapSize]);
 
-  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!mapRef.current || isMoving) return;
     const rect = mapRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left - mapOffset.x) / mapSize.width) * 100;
@@ -110,11 +113,54 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       top: Math.max(0, Math.min(100, y)) 
     });
     setTimeout(() => setIsMoving(false), 2000); // 動畫結束後重置狀態
-  };
+  }, [isMoving, mapOffset.x, mapOffset.y, mapSize.width, mapSize.height]);
+
+  // 記憶化 MapIcon 的位置樣式
+  const characterStyle = useMemo(() => ({
+    left: mapSize.width ? `${(characterPos.left / 100) * mapSize.width / scale}px` : '0',
+    top: mapSize.height ? `${(characterPos.top / 100) * mapSize.height / scale}px` : '0',
+    transform: 'translate(-50%, -50%)',
+    width: '128px',
+    height: '128px'
+  }), [characterPos.left, characterPos.top, mapSize.width, mapSize.height, scale]);
+
+  const houseStyle = useMemo(() => ({
+    left: `${(8 / 100) * mapSize.width / scale}px`,
+    top: `${(26 / 100) * mapSize.height / scale}px`,
+    transform: 'translate(-50%, -50%)',
+    width: '128px',
+    height: '128px'
+  }), [mapSize.width, mapSize.height, scale]);
+
+  const campfireStyle = useMemo(() => ({
+    left: `${(34 / 100) * mapSize.width / scale}px`,
+    top: `${(74 / 100) * mapSize.height / scale}px`,
+    transform: 'translate(-50%, -50%)',
+    width: '128px',
+    height: '128px',
+    cursor: 'pointer'
+  }), [mapSize.width, mapSize.height, scale]);
+
+  const mailboxStyle = useMemo(() => ({
+    left: `${(69 / 100) * mapSize.width / scale}px`,
+    top: `${(31 / 100) * mapSize.height / scale}px`,
+    transform: 'translate(-50%, -50%)',
+    width: '128px',
+    height: '128px',
+    cursor: 'pointer'
+  }), [mapSize.width, mapSize.height, scale]);
+
+  const containerStyle = useMemo(() => ({
+    left: mapOffset.x || 0,
+    top: mapOffset.y || 0,
+    width: mapSize.width || '100%',
+    height: mapSize.height || '100%',
+    transform: `scale(${scale || 1})`,
+    transformOrigin: 'top left'
+  }), [mapOffset.x, mapOffset.y, mapSize.width, mapSize.height, scale]);
 
   return (
     <div className="relative w-full h-full bg-gradient-to-b from-blue-100 to-green-100 dark:from-blue-950 dark:to-green-950">
-
       <div
         className="w-full h-full relative overflow-hidden select-none"
         ref={mapRef}
@@ -133,54 +179,41 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             {/* Icon 容器 */}
             <div 
               className="absolute"
-              style={{
-                left: mapOffset.x,
-                top: mapOffset.y,
-                width: mapSize.width,
-                height: mapSize.height,
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left'
-              }}
+              style={containerStyle}
             >
-              {/* 固定位置的小人 - 第一個 topic */}
-              {topics.length > 0 && mapSize.width > 0 && (
+              {/* 固定位置的小人 - 永遠顯示 */}
+              {mapSize.width > 0 && (
                 <div 
                   className="absolute transition-all duration-[1500ms] linear"
-                  style={{
-                    left: `${(characterPos.left / 100) * mapSize.width / scale}px`,
-                    top: `${(characterPos.top / 100) * mapSize.height / scale}px`,
-                    transform: 'translate(-50%, -50%)',
-                    width: '128px',
-                    height: '128px'
-                  }}
+                  style={characterStyle}
                 >
                   <MapIcon
-                    topic={topics[0]}
+                    id="character"
+                    title="我"
                     src={jinImg}
                     left={0}
                     top={0}
-                    onTopicClick={onTopicClick}
+                    onTopicClick={() => {}}
                   />
                 </div>
               )}
 
-              {/* 固定位置的房子 - 第二個 topic */}
-              {topics.length > 1 && mapSize.width > 0 && (
-                <div className="absolute" style={{
-                  left: `${(8 / 100) * mapSize.width / scale}px`,
-                  top: `${(26 / 100) * mapSize.height / scale}px`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '128px',
-                  height: '128px'
-                }}
-                onClick={onHouseClick}
-                >
+              {/* 固定位置的房子 - 永遠顯示 */}
+              {mapSize.width > 0 && (
+                <div className="absolute" style={houseStyle} onClick={() => {
+                  if (activeTopics.length > 0) {
+                    onHouseClick();
+                  } else {
+                    alert('目前還沒有學習主題喔！先去建立一些學習主題吧！');
+                  }
+                }}>
                   <MapIcon
-                    topic={topics[1]}
+                    id="house"
+                    title="學習小屋"
                     src={heyaImg}
                     left={0}
                     top={0}
-                    onTopicClick={onHouseClick}
+                    onTopicClick={() => {}}
                     flip={true}
                   />
                 </div>
@@ -188,18 +221,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
               {/* 固定位置的火 - 營火永遠可點，顯示複習功能 */}
               {mapSize.width > 0 && (
-                <div className="absolute" style={{
-                  left: `${(34 / 100) * mapSize.width / scale}px`,
-                  top: `${(74 / 100) * mapSize.height / scale}px`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '128px',
-                  height: '128px',
-                  cursor: 'pointer'
-                }}
-                onClick={onCampfireClick}
-                >
+                <div className="absolute" style={campfireStyle} onClick={onCampfireClick}>
                   <MapIcon
-                    topic={topics[2]}
+                    id="campfire"
+                    title="營火"
                     src={fireImg}
                     left={0}
                     top={0}
@@ -208,28 +233,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 </div>
               )}
 
-              {/* 固定位置的信箱 - 第四個 topic */}
-              {topics[3] && mapSize.width > 0 && (
+              {/* 固定位置的信箱 - 永遠顯示 */}
+              {mapSize.width > 0 && (
                 <div 
                   className="absolute"
-                  style={{
-                    left: `${(69 / 100) * mapSize.width / scale}px`,
-                    top: `${(31 / 100) * mapSize.height / scale}px`,
-                    transform: 'translate(-50%, -50%)',
-                    width: '128px',
-                    height: '128px',
-                    cursor: 'pointer'
-                  }}
+                  style={mailboxStyle}
                   onClick={onMailboxClick}
                 >
                   <MapIcon
-                    topic={topics[3]}
+                    id="mailbox"
+                    title="信箱"
                     src={mailboxImg}
                     left={0}
                     top={0}
                     onTopicClick={onTopicClick}
-                    showOrbs={true}
-                    orbTopics={[topics[0], topics[1], topics[2]]}
+                    showOrbs={activeTopics.length > 0}
+                    orbTopics={activeTopics.slice(0, 3)}
                   />
                 </div>
               )}
