@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PageLayout from '../../components/layout/PageLayout';
 import Calendar from '../../components/calendar/Calendar';
 import { Task } from '../../components/tasks/TaskList';
 import ProgressChart from '../../components/progress/ProgressChart';
-import { Check, BookOpen, Clock, FileText } from 'lucide-react';
+import { Check, BookOpen, Clock, FileText, Layers, Search, Plus } from 'lucide-react';
 import ChatModule from '../../components/chat/ChatModule';
+import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
 
 // Mock data for demonstration
 const todayEvents = [
@@ -71,6 +72,7 @@ const progressData = [
 
 const StudentDashboard: React.FC = () => {
   const [tasks, setTasks] = React.useState<Task[]>(upcomingTasks);
+  const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
 
   const handleTaskToggle = (taskId: string) => {
     setTasks(tasks.map(task => 
@@ -84,6 +86,35 @@ const StudentDashboard: React.FC = () => {
     <PageLayout title="學生儀表板">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* 快速開始學習 */}
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+              快速開始學習
+            </h2>
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">開始新的學習主題</h3>
+                  <p className="text-indigo-100 mb-4">
+                    從課程模板庫選擇一個模板，開始您的學習旅程
+                  </p>
+                  <button
+                    onClick={() => setShowTemplateBrowser(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white text-indigo-600 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    <Layers className="w-4 h-4" />
+                    瀏覽課程模板
+                  </button>
+                </div>
+                <div className="hidden md:block">
+                  <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <BookOpen className="w-10 h-10" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section>
             <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
               今日學習規劃
@@ -346,6 +377,16 @@ const StudentDashboard: React.FC = () => {
       <div className="mt-6">
         <ChatModule />
       </div>
+
+      {/* 課程模板瀏覽器 */}
+      <TopicTemplateBrowser
+        isOpen={showTemplateBrowser}
+        onClose={() => setShowTemplateBrowser(false)}
+        onTemplateSelected={(templateId) => {
+          console.log('學生選擇了模板:', templateId);
+          // TODO: 導航到新建立的主題頁面
+        }}
+      />
     </PageLayout>
   );
 };

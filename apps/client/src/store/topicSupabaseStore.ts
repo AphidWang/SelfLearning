@@ -853,7 +853,7 @@ export const useTopicSupabaseStore = create<TopicSupabaseStore>((set, get) => ({
 
       const { error } = await supabase
         .from('topics')
-        .update({ is_collaborative: !topic.is_collaborative })
+        .update({ is_collaborative: !topic.isCollaborative })
         .eq('id', topicId);
 
       if (error) throw error;
@@ -862,7 +862,7 @@ export const useTopicSupabaseStore = create<TopicSupabaseStore>((set, get) => ({
       set(state => ({
         topics: state.topics.map(t =>
           t.id === topicId
-            ? { ...t, is_collaborative: !t.is_collaborative }
+            ? { ...t, isCollaborative: !t.isCollaborative }
             : t
         )
       }));
@@ -882,7 +882,7 @@ export const useTopicSupabaseStore = create<TopicSupabaseStore>((set, get) => ({
 
       const { error } = await supabase
         .from('topics')
-        .update({ show_avatars: !topic.show_avatars })
+        .update({ show_avatars: !topic.showAvatars })
         .eq('id', topicId);
 
       if (error) throw error;
@@ -891,7 +891,7 @@ export const useTopicSupabaseStore = create<TopicSupabaseStore>((set, get) => ({
       set(state => ({
         topics: state.topics.map(t =>
           t.id === topicId
-            ? { ...t, show_avatars: !t.show_avatars }
+            ? { ...t, showAvatars: !t.showAvatars }
             : t
         )
       }));
