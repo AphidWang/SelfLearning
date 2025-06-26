@@ -94,9 +94,7 @@ const TopicTemplateManager: React.FC = () => {
       goals: [],
       bubbles: [],
       is_public: false,
-      is_collaborative: false,
-      copy_count: 0,
-      usage_count: 0
+      is_collaborative: false
     });
 
     if (newTemplate) {

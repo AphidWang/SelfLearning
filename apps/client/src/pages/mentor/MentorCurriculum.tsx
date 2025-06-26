@@ -61,8 +61,8 @@ const MentorCurriculum: React.FC = () => {
     clearError
   } = useTopicTemplateStore();
 
-  const { user } = useUserStore();
-  const { checkTemplatePermission } = usePermissions(user?.id || '');
+  const { currentUser } = useUserStore();
+  const { checkTemplatePermission } = usePermissions(currentUser?.id || '');
 
   const [currentView, setCurrentView] = useState<'my' | 'public' | 'collaborative'>('my');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -244,12 +244,15 @@ const MentorCurriculum: React.FC = () => {
           <TemplateList
             templates={filteredTemplates}
             viewMode={viewMode}
-            currentUserId={user?.id || ''}
+            currentUserId={currentUser?.id || ''}
             onEdit={(template) => {
               // TODO: 開啟編輯模式
               console.log('編輯模板:', template.id);
             }}
-            onCopy={copyTemplate}
+            onCopy={(templateId) => {
+              // TODO: 實作複製功能，需要提供額外參數
+              console.log('複製模板:', templateId);
+            }}
             onDelete={deleteTemplate}
             onTogglePublic={togglePublic}
             onToggleCollaborative={toggleCollaborative}
