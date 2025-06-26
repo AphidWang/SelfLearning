@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUserStore } from '../../store/userStore';
-import { UserCard, UserForm, CreateUserForm, ResetPasswordDialog } from './index';
+import { UserCard, UserProfileDialog, PasswordResetDialog } from './index';
 import type { User } from '../../types/goal';
 import { 
   Users, Search, Filter, Loader2, 
@@ -26,9 +26,9 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<User['role'] | ''>('');
-  const [showForm, setShowForm] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
   const [roleUpdateLoading, setRoleUpdateLoading] = useState<string | null>(null);
@@ -73,20 +73,22 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
 
   const handleEditUser = (user: User) => {
     setEditingUser(user);
-    setShowForm(true);
-  };
-
-  const handleCloseForm = () => {
-    setShowForm(false);
-    setEditingUser(null);
+    setShowProfileDialog(true);
   };
 
   const handleCreateUser = () => {
-    setShowCreateForm(true);
+    setEditingUser(null);
+    setShowCreateDialog(true);
   };
 
-  const handleCloseCreateForm = () => {
-    setShowCreateForm(false);
+  const handleCloseProfileDialog = () => {
+    setShowProfileDialog(false);
+    setEditingUser(null);
+  };
+
+  const handleCloseCreateDialog = () => {
+    setShowCreateDialog(false);
+    setEditingUser(null);
   };
 
   const handleCreateSuccess = (user: User) => {
@@ -96,17 +98,11 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
 
   const handleResetPassword = (user: User) => {
     setResetPasswordUser(user);
-    setShowResetPasswordDialog(true);
+    setShowPasswordResetDialog(true);
   };
 
-  const handleResetPasswordConfirm = async (userId: string, newPassword: string) => {
-    await resetUserPassword(userId, newPassword);
-    setShowResetPasswordDialog(false);
-    setResetPasswordUser(null);
-  };
-
-  const handleCloseResetPasswordDialog = () => {
-    setShowResetPasswordDialog(false);
+  const handleClosePasswordResetDialog = () => {
+    setShowPasswordResetDialog(false);
     setResetPasswordUser(null);
   };
 
@@ -178,13 +174,6 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
         </div>
         
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            新增用戶
-          </button>
           <button
             onClick={handleCreateUser}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
@@ -306,24 +295,45 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
                     
                     {/* 角色切換下拉選單 */}
                     <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        角色設定
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={user.role || 'student'}
-                          onChange={(e) => handleUpdateRole(user.id, e.target.value as User['role'])}
-                          disabled={roleUpdateLoading === user.id}
-                          className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1 bg-white dark:bg-gray-800 text-gray-800 dark:text-white disabled:opacity-50"
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          角色設定
+                        </label>
+                        <button
+                          onClick={() => handleResetPassword(user)}
+                          className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 dark:bg-orange-900 dark:hover:bg-orange-800 text-orange-700 dark:text-orange-300 rounded-lg transition-colors text-xs flex items-center gap-1"
                         >
-                          <option value="student">學生</option>
-                          <option value="mentor">導師</option>
-                          <option value="parent">家長</option>
-                          <option value="admin">管理員</option>
-                        </select>
-                        {roleUpdateLoading === user.id && (
-                          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                        )}
+                          <Settings className="w-3 h-3" />
+                          重設密碼
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <select
+                            value={user.role || 'student'}
+                            onChange={(e) => handleUpdateRole(user.id, e.target.value as User['role'])}
+                            disabled={roleUpdateLoading === user.id}
+                            className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-800 dark:text-white disabled:opacity-50 appearance-none pr-8"
+                          >
+                            {(['student', 'mentor', 'parent', 'admin'] as const).map((role) => {
+                              const Icon = roleIcons[role];
+                              return (
+                                <option key={role} value={role}>
+                                  {roleLabels[role]}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                            {roleUpdateLoading === user.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                            ) : (
+                              <div className="w-4 h-4 text-gray-400">
+                                {React.createElement(roleIcons[user.role || 'student'], { className: "w-4 h-4" })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -336,23 +346,25 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
 
       {/* 用戶表單 Modal */}
       <AnimatePresence>
-        {showForm && (
-          <UserForm
+        {showProfileDialog && editingUser && (
+          <UserProfileDialog
+            isOpen={showProfileDialog}
             user={editingUser}
-            onClose={handleCloseForm}
+            onClose={handleCloseProfileDialog}
           />
         )}
-        {showCreateForm && (
-          <CreateUserForm
-            onClose={handleCloseCreateForm}
-            onSuccess={handleCreateSuccess}
+        {showCreateDialog && (
+          <UserProfileDialog
+            isOpen={showCreateDialog}
+            user={null}
+            onClose={handleCloseCreateDialog}
           />
         )}
-        {showResetPasswordDialog && resetPasswordUser && (
-          <ResetPasswordDialog
+        {showPasswordResetDialog && resetPasswordUser && (
+          <PasswordResetDialog
+            isOpen={showPasswordResetDialog}
             user={resetPasswordUser}
-            onClose={handleCloseResetPasswordDialog}
-            onConfirm={handleResetPasswordConfirm}
+            onClose={handleClosePasswordResetDialog}
           />
         )}
       </AnimatePresence>

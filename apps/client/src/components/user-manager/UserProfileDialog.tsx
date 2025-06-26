@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, User as UserIcon, Mail, Palette, Edit3, Loader2 } from 'lucide-react';
+import { X, Save, User as UserIcon, Mail, Edit3, Loader2, Lock, Eye, EyeOff, Crown, GraduationCap, Heart, Shield } from 'lucide-react';
 import { useUserStore } from '../../store/userStore';
 import { UserAvatar } from '../learning-map/UserAvatar';
 import { AvatarSelectionDialog } from './AvatarSelectionDialog';
@@ -9,20 +9,22 @@ import type { User } from '../../types/goal';
 interface UserProfileDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  user: User;
+  user: User | null; // 支援創建新用戶 (null = 創建模式)
 }
 
 interface FormData {
   name: string;
   email: string;
-  color: string;
+  role?: User['role'];
+  password?: string;
   avatar?: string;
 }
 
-const colorOptions = [
-  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-  '#F8C471', '#82E0AA', '#F1948A', '#85929E', '#A569BD'
+const roleOptions = [
+  { value: 'student' as const, label: '學生', icon: GraduationCap, color: 'text-blue-600' },
+  { value: 'mentor' as const, label: '導師', icon: Crown, color: 'text-purple-600' },
+  { value: 'parent' as const, label: '家長', icon: Heart, color: 'text-pink-600' },
+  { value: 'admin' as const, label: '管理員', icon: Shield, color: 'text-red-600' },
 ];
 
 export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
@@ -30,29 +32,44 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
   onClose,
   user
 }) => {
-  const { updateUser, loading } = useUserStore();
+  const { updateUser, createAuthUser, loading } = useUserStore();
   
   const [formData, setFormData] = useState<FormData>({
     name: user?.name || '',
     email: user?.email || '',
-    color: user?.color || colorOptions[0],
+    role: user?.role || 'student',
+    password: '',
     avatar: user?.avatar || ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  
+  const isCreateMode = !user;
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = '請輸入姓名';
+      newErrors.name = '請輸入暱稱';
     }
 
     if (!formData.email.trim()) {
       newErrors.email = '請輸入信箱';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = '請輸入有效的信箱格式';
+    }
+
+    // 創建模式下密碼必填，編輯模式下可選
+    if (isCreateMode) {
+      if (!formData.password?.trim()) {
+        newErrors.password = '請輸入密碼';
+      } else if (formData.password.length < 6) {
+        newErrors.password = '密碼至少需要 6 個字符';
+      }
+    } else if (formData.password && formData.password.length < 6) {
+      newErrors.password = '密碼至少需要 6 個字符';
     }
 
     setErrors(newErrors);
@@ -65,10 +82,20 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
     if (!validateForm()) return;
 
     try {
-      await updateUser(user.id, formData);
+      if (isCreateMode) {
+        // 創建新用戶
+        await createAuthUser(formData as Required<FormData>);
+      } else {
+        // 更新現有用戶
+        const updateData = { ...formData };
+        if (!formData.password) {
+          delete (updateData as any).password; // 不更新密碼
+        }
+        await updateUser(user!.id, updateData);
+      }
       onClose();
     } catch (error) {
-      console.error('更新用戶資料失敗:', error);
+      console.error(isCreateMode ? '創建用戶失敗:' : '更新用戶資料失敗:', error);
     }
   };
 
@@ -85,29 +112,16 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
   };
 
   const handleAvatarSelect = (avatar: string, color: string) => {
-    // 從頭像 URL 中提取背景色，並轉換為 hex
-    const bgColorMatch = avatar.match(/backgroundColor=([^&]+)/);
-    if (bgColorMatch) {
-      const bgColor = `#${bgColorMatch[1].replace(/^#/, '').toUpperCase()}`;
-      setFormData(prev => ({ ...prev, avatar, color: bgColor }));
-    } else {
-      setFormData(prev => ({ ...prev, avatar }));
-    }
-  };
-
-  const generateAvatar = () => {
-    const seed = formData.name.toLowerCase().replace(/\s+/g, '');
-    const bgColor = formData.color.replace('#', '');
-    const avatar = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}&backgroundColor=${bgColor}`;
     setFormData(prev => ({ ...prev, avatar }));
   };
 
   // 預覽用戶
   const previewUser: User = {
-    ...user,
-    name: formData.name || '預覽',
+    id: user?.id || 'preview',
+    name: formData.name || '暱稱預覽',
     email: formData.email,
-    color: formData.color,
+    role: formData.role || 'student',
+    color: user?.color || '#4ECDC4',
     avatar: formData.avatar
   };
 
@@ -127,7 +141,7 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden"
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -138,10 +152,10 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    個人資料
+                    {isCreateMode ? '創建新用戶' : '個人資料'}
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    編輯您的個人資訊
+                    {isCreateMode ? '創建新的認證用戶帳號' : '編輯您的個人資訊'}
                   </p>
                 </div>
               </div>
@@ -153,7 +167,8 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-160px)]">
+            <div className="flex-1 p-6 overflow-y-auto">
+              <form onSubmit={handleSubmit} className="space-y-4">
               {/* 頭像預覽和選擇 */}
               <div className="text-center">
                 <div className="inline-block relative">
@@ -172,10 +187,10 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
                 </p>
               </div>
 
-              {/* 姓名 */}
+              {/* 暱稱 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  姓名 *
+                  暱稱 *
                 </label>
                 <input
                   type="text"
@@ -184,87 +199,132 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-800 dark:text-white ${
                     errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                   }`}
-                  placeholder="請輸入姓名"
+                  placeholder="請輸入暱稱"
                 />
                 {errors.name && (
                   <p className="mt-1 text-sm text-red-600">{errors.name}</p>
                 )}
               </div>
 
-              {/* 信箱 */}
+                            {/* 信箱 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  信箱 *
+                  信箱 {isCreateMode ? '*' : '(不可修改)'}
                 </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-800 dark:text-white ${
-                    errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                  }`}
-                  placeholder="請輸入信箱"
-                />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    disabled={!isCreateMode}
+                    className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      isCreateMode 
+                        ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-white' 
+                        : 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                    } ${
+                      errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                    placeholder={isCreateMode ? "請輸入信箱" : "信箱不可修改"}
+                  />
+                </div>
                 {errors.email && (
                   <p className="mt-1 text-sm text-red-600">{errors.email}</p>
                 )}
+                {!isCreateMode && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    信箱是帳號的唯一識別，無法修改
+                  </p>
+                )}
               </div>
 
-              {/* 代表顏色 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  代表顏色
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => handleInputChange('color', color)}
-                      className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
-                        formData.color === color ? 'border-gray-800 dark:border-white scale-110' : 'border-gray-300'
-                      }`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
+              {/* 角色選擇 (創建模式或管理員編輯時顯示) */}
+              {isCreateMode && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    角色 *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {roleOptions.map((option) => {
+                      const Icon = option.icon;
+                      const isSelected = formData.role === option.value;
+                      
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => handleInputChange('role', option.value)}
+                          className={`flex items-center gap-2 p-3 border rounded-lg transition-colors ${
+                            isSelected
+                              ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                              : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 ${isSelected ? option.color : 'text-gray-400'}`} />
+                          <span className="text-sm font-medium">{option.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* 快速生成頭像 */}
-              <div>
-                <button
-                  type="button"
-                  onClick={generateAvatar}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm"
-                >
-                  <Palette className="w-4 h-4" />
-                  根據姓名和顏色自動生成頭像
-                </button>
-              </div>
-            </form>
+              {/* 密碼 (創建模式必填，編輯模式可選) */}
+              {isCreateMode && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    密碼 *
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password || ''}
+                      onChange={(e) => handleInputChange('password', e.target.value)}
+                      className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-800 dark:text-white ${
+                        errors.password ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                      }`}
+                      placeholder="請輸入密碼"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                  )}
+                </div>
+              )}
+
+              </form>
+            </div>
 
             {/* Footer */}
-            <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {loading ? '儲存中...' : '儲存'}
-              </button>
+            <div className="flex-shrink-0 p-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex gap-3">
+                              <button
+                  onClick={onClose}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {loading ? (isCreateMode ? '創建中...' : '儲存中...') : (isCreateMode ? '創建' : '儲存')}
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>
@@ -275,7 +335,7 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
         isOpen={showAvatarDialog}
         onClose={() => setShowAvatarDialog(false)}
         selectedAvatar={formData.avatar}
-        selectedColor={formData.color?.replace('#', '') || 'ffd5dc'}
+        selectedColor={user?.color?.replace('#', '') || 'ffd5dc'}
         onSelect={handleAvatarSelect}
       />
     </>
