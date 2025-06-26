@@ -1,10 +1,13 @@
 export interface User {
   id: string;
   name: string;
-  role: 'student' | 'teacher' | 'mentor' | 'parent' | 'admin';
+  roles: ('student' | 'teacher' | 'mentor' | 'parent' | 'admin')[];
   avatar?: string;
   email?: string;
   color?: string;
+  
+  /** @deprecated 請使用 roles 陣列，此欄位僅為向後兼容 */
+  role?: 'student' | 'teacher' | 'mentor' | 'parent' | 'admin';
 }
 
 export interface LoginCredentials {

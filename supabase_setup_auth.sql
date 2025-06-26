@@ -1,75 +1,41 @@
--- 這個腳本需要在 Supabase Dashboard 的 Authentication > Users 中手動執行
--- 或者使用 Supabase CLI
+-- Supabase 認證設置說明
+--
+-- 此專案已改用 Supabase Auth 原生架構，用戶管理通過以下方式進行：
+--
+-- 1. **用戶註冊**: 
+--    - 前端使用 supabase.auth.signUp() 方法
+--    - 用戶資料儲存在 user_metadata 中
+--
+-- 2. **用戶登入**:
+--    - supabase.auth.signInWithPassword() - 信箱密碼登入
+--    - supabase.auth.signInWithOAuth() - OAuth 登入 (Google 等)
+--
+-- 3. **用戶管理** (管理員功能):
+--    - 使用 Supabase Dashboard > Authentication > Users
+--    - 或通過 Admin API: supabaseAdmin.auth.admin.listUsers()
+--    - 或通過 Admin API: supabaseAdmin.auth.admin.updateUserById()
+--
+-- 4. **角色管理**:
+--    - 角色儲存在 auth.users.raw_user_meta_data.role
+--    - 支援角色: student, mentor, parent, admin
+--    - 通過 updateUser() API 更新用戶角色
+--
+-- 5. **當前用戶範例**:
+--    - u26480@gmail.com (Google OAuth, role: admin)
+--    - aphid@example.com (信箱註冊, role: mentor)  
+--    - min@example.com (信箱註冊, role: student)
+--
+-- 注意事項:
+-- ✅ 無需手動執行 SQL 創建認證用戶
+-- ✅ 用戶資料由 Supabase Auth 自動管理
+-- ✅ RLS 政策由 Supabase Auth 自動處理
+-- ✅ 密碼加密由 Supabase Auth 自動處理
+-- ✅ Email 驗證由 Supabase Auth 自動處理
+--
+-- 如需創建測試用戶，請使用:
+-- 1. 前端註冊功能
+-- 2. Supabase Dashboard
+-- 3. Admin API (在後端代碼中)
 
--- 1. 首先，我們需要在 SQL Editor 中執行這個函數來創建認證用戶
--- 注意：這個函數只能用一次，建立對應的 auth.users 記錄
-
--- 創建一個臨時函數來插入認證用戶
-CREATE OR REPLACE FUNCTION create_auth_users()
-RETURNS void AS $$
-BEGIN
-  -- 插入管理員認證用戶
-  INSERT INTO auth.users (
-    id,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    created_at,
-    updated_at,
-    raw_user_meta_data
-  ) VALUES (
-    gen_random_uuid(),
-    'admin@example.com',
-    crypt('admin123', gen_salt('bf')), -- 密碼: admin123
-    NOW(),
-    NOW(),
-    NOW(),
-    '{"name": "管理員", "role": "admin"}'::jsonb
-  ) ON CONFLICT (email) DO NOTHING;
-
-  -- 插入測試學生用戶
-  INSERT INTO auth.users (
-    id,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    created_at,
-    updated_at,
-    raw_user_meta_data
-  ) VALUES (
-    gen_random_uuid(),
-    'xiaoming@example.com',
-    crypt('student123', gen_salt('bf')), -- 密碼: student123
-    NOW(),
-    NOW(),
-    NOW(),
-    '{"name": "小明", "role": "student"}'::jsonb
-  ) ON CONFLICT (email) DO NOTHING;
-
-  -- 插入測試老師用戶
-  INSERT INTO auth.users (
-    id,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    created_at,
-    updated_at,
-    raw_user_meta_data
-  ) VALUES (
-    gen_random_uuid(),
-    'teacher.wang@example.com',
-    crypt('teacher123', gen_salt('bf')), -- 密碼: teacher123
-    NOW(),
-    NOW(),
-    NOW(),
-    '{"name": "王老師", "role": "teacher"}'::jsonb
-  ) ON CONFLICT (email) DO NOTHING;
-
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 執行函數
-SELECT create_auth_users();
-
--- 清理函數
-DROP FUNCTION create_auth_users(); 
+-- 舊版腳本已移除，因為不再需要手動管理 auth.users
+-- 最後更新: 2025-01-02 

@@ -2,9 +2,19 @@
  * Supabase 前端服務
  * 
  * 架構設計：
- * - 此檔案用於普通用戶操作（獲取自己的資料、更新個人資料等）
- * - 直接與 Supabase 通信，不經過 server 層
- * - 用於提高效能和減少不必要的 API 層
+ * - 此專案使用 Supabase Auth 內建認證系統
+ * - 用戶資料儲存在 auth.users.raw_user_meta_data 中
+ * - 不再使用自定義的 users 表
+ * - 用戶管理通過 Supabase Auth API 進行
+ * 
+ * 用戶資料結構 (存於 user_metadata):
+ * {
+ *   "name": "用戶暱稱",
+ *   "role": "student|mentor|parent|admin",
+ *   "avatar": "頭像 URL", 
+ *   "color": "#FF6B6B",
+ *   "email_verified": true
+ * }
  * 
  * 注意：管理其他用戶的操作請使用 userStore 中的管理員功能
  */
@@ -18,168 +28,15 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 數據庫類型定義
-export interface DatabaseUser {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  color?: string;
-  role: 'student' | 'mentor' | 'parent' | 'admin';
-  created_at: string;
-  updated_at: string;
-}
-
-// 用戶服務
-export const userService = {
-  // 獲取所有用戶
-  async getUsers(): Promise<User[]> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    
-    return data.map(transformDatabaseUser);
-  },
-
-  // 根據 ID 獲取用戶
-  async getUserById(id: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') return null; // 找不到記錄
-      throw error;
-    }
-
-    return transformDatabaseUser(data);
-  },
-
-  // 新增用戶
-  async createUser(userData: Omit<User, 'id'>): Promise<User> {
-    const dbUser = {
-      name: userData.name,
-      email: userData.email,
-      avatar: userData.avatar,
-      color: userData.color,
-      role: userData.role || 'student'
-    };
-
-    const { data, error } = await supabase
-      .from('users')
-      .insert([dbUser])
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    return transformDatabaseUser(data);
-  },
-
-  // 更新用戶
-  async updateUser(id: string, updates: Partial<User>): Promise<User> {
-    const dbUpdates = {
-      ...(updates.name && { name: updates.name }),
-      ...(updates.email && { email: updates.email }),
-      ...(updates.avatar !== undefined && { avatar: updates.avatar }),
-      ...(updates.color && { color: updates.color }),
-      ...(updates.role && { role: updates.role }),
-      updated_at: new Date().toISOString()
-    };
-
-    const { data, error } = await supabase
-      .from('users')
-      .update(dbUpdates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    return transformDatabaseUser(data);
-  },
-
-  // 刪除用戶
-  async deleteUser(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  // 搜尋用戶
-  async searchUsers(query: string): Promise<User[]> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    
-    return data.map(transformDatabaseUser);
-  },
-
-  // 根據角色獲取用戶
-  async getUsersByRole(role: User['role']): Promise<User[]> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('role', role)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    
-    return data.map(transformDatabaseUser);
-  },
-
-  // 實時訂閱用戶變化
-  subscribeToUsers(callback: (users: User[]) => void) {
-    const channel = supabase
-      .channel('users_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'users'
-        },
-        async () => {
-          // 重新獲取所有用戶
-          try {
-            const users = await this.getUsers();
-            callback(users);
-          } catch (error) {
-            console.error('Failed to fetch users on real-time update:', error);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }
-};
-
-// 將數據庫用戶轉換為應用用戶類型
-function transformDatabaseUser(dbUser: DatabaseUser): User {
-  return {
-    id: dbUser.id,
-    name: dbUser.name,
-    email: dbUser.email,
-    avatar: dbUser.avatar,
-    color: dbUser.color,
-    role: dbUser.role
-  };
-}
+// 注意：
+// 原本的 userService 已移除，因為不再使用自定義的 users 表
+// 用戶管理現在完全通過 Supabase Auth API 進行：
+// - 獲取用戶：supabaseAdmin.auth.admin.listUsers()
+// - 更新用戶：supabaseAdmin.auth.admin.updateUserById()
+// - 刪除用戶：supabaseAdmin.auth.admin.deleteUser()
+// 
+// 普通用戶操作請使用 authService
+// 管理員操作請使用 userStore 中的管理員功能
 
 // 用戶認證服務
 export const authService = {
@@ -216,10 +73,15 @@ export const authService = {
 
   // Google 登入
   async signInWithGoogle() {
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    console.log('Google OAuth redirect URL:', redirectUrl);
+    console.log('window.location.origin:', window.location.origin);
+    console.log('import.meta.env.DEV:', import.meta.env.DEV);
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        redirectTo: redirectUrl
       }
     });
 

@@ -31,7 +31,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
-  const [roleUpdateLoading, setRoleUpdateLoading] = useState<string | null>(null);
+
 
   // 載入用戶數據
   useEffect(() => {
@@ -106,37 +106,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
     setResetPasswordUser(null);
   };
 
-  // 更新用戶角色
-  const handleUpdateRole = async (userId: string, newRole: User['role']) => {
-    if (!newRole) return;
-    
-    setRoleUpdateLoading(userId);
-    
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/users/${userId}/role`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify({ role: newRole }),
-      });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Network error' }));
-        throw new Error(error.message || '更新角色失敗');
-      }
-
-      // 重新載入用戶列表
-      await getUsers();
-    } catch (error: any) {
-      console.error('Error updating user role:', error);
-      alert(error.message || '更新角色失敗');
-    } finally {
-      setRoleUpdateLoading(null);
-    }
-  };
 
   const roleIcons = {
     student: GraduationCap,
@@ -150,13 +120,6 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
     mentor: '導師',
     parent: '家長',
     admin: '管理員'
-  };
-
-  const roleColors = {
-    student: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    mentor: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-    parent: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
-    admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
   };
 
   return (
@@ -284,59 +247,11 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4 hover:shadow-md transition-shadow">
-                    <UserCard
-                      user={user}
-                      onEdit={handleEditUser}
-                      onResetPassword={handleResetPassword}
-                      roleColor={roleColors[user.role || 'student']}
-                      roleLabel={roleLabels[user.role || 'student']}
-                    />
-                    
-                    {/* 角色切換下拉選單 */}
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                          角色設定
-                        </label>
-                        <button
-                          onClick={() => handleResetPassword(user)}
-                          className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 dark:bg-orange-900 dark:hover:bg-orange-800 text-orange-700 dark:text-orange-300 rounded-lg transition-colors text-xs flex items-center gap-1"
-                        >
-                          <Settings className="w-3 h-3" />
-                          重設密碼
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                          <select
-                            value={user.role || 'student'}
-                            onChange={(e) => handleUpdateRole(user.id, e.target.value as User['role'])}
-                            disabled={roleUpdateLoading === user.id}
-                            className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-800 dark:text-white disabled:opacity-50 appearance-none pr-8"
-                          >
-                            {(['student', 'mentor', 'parent', 'admin'] as const).map((role) => {
-                              const Icon = roleIcons[role];
-                              return (
-                                <option key={role} value={role}>
-                                  {roleLabels[role]}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                            {roleUpdateLoading === user.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                            ) : (
-                              <div className="w-4 h-4 text-gray-400">
-                                {React.createElement(roleIcons[user.role || 'student'], { className: "w-4 h-4" })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <UserCard
+                    user={user}
+                    onEdit={handleEditUser}
+                    onResetPassword={handleResetPassword}
+                  />
                 </motion.div>
               ))}
             </AnimatePresence>

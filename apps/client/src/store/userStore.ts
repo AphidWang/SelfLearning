@@ -13,7 +13,7 @@
 
 import { create } from 'zustand';
 import type { User } from '../types/goal';
-import { authService } from '../services/supabase';
+import { authService } from '../services/auth';
 
 // 管理員 API 基礎 URL (只用於管理其他用戶)
 const ADMIN_API_BASE = '/api/users';
@@ -26,8 +26,7 @@ const adminApiCall = async (endpoint: string, options?: RequestInit) => {
   // 如果沒有 token，嘗試從 Supabase session 獲取
   if (!token) {
     try {
-      const { data: { session } } = await authService.supabase.auth.getSession();
-      token = session?.access_token || null;
+      token = await authService.getToken();
       
       // 如果找到 token，存儲它
       if (token) {
@@ -64,8 +63,15 @@ const adminUserApi = {
   getUser: (id: string) => adminApiCall(`/${id}`),
   
   // 創建認證用戶 (管理員功能)
-  createAuthUser: (userData: { email: string; password: string; name: string; role: User['role']; avatar?: string; color?: string }) => 
-    adminApiCall('/create-auth-user', {
+  createAuthUser: (userData: { 
+    email: string; 
+    password: string; 
+    name: string; 
+    roles?: User['roles']; 
+    role?: User['role']; // 向後兼容
+    avatar?: string; 
+    color?: string 
+  }) => adminApiCall('/create-auth-user', {
       method: 'POST',
       body: JSON.stringify(userData),
     }),
@@ -109,7 +115,15 @@ interface UserStore {
   
   // 管理員功能 (通過 server API)
   getUsers: () => Promise<void>;
-  createAuthUser: (userData: { email: string; password: string; name: string; role: User['role']; avatar?: string; color?: string }) => Promise<User>;
+  createAuthUser: (userData: { 
+    email: string; 
+    password: string; 
+    name: string; 
+    roles?: User['roles']; 
+    role?: User['role']; // 向後兼容
+    avatar?: string; 
+    color?: string 
+  }) => Promise<User>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   resetUserPassword: (userId: string, password: string) => Promise<void>;
@@ -134,20 +148,9 @@ export const useUserStore = create<UserStore>((set, get) => {
     // 普通用戶操作 - 直接使用 Supabase
     getCurrentUser: async () => {
       try {
-        const supabaseUser = await authService.getCurrentUser();
-        if (supabaseUser) {
-          const userData: User = {
-            id: supabaseUser.id,
-            name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
-            email: supabaseUser.email || '',
-            avatar: supabaseUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
-            color: supabaseUser.user_metadata?.color || '#FF6B6B',
-            role: supabaseUser.user_metadata?.role || 'student'
-          };
-          set({ currentUser: userData });
-          return userData;
-        }
-        return null;
+        const userData = await authService.getCurrentUser();
+        set({ currentUser: userData });
+        return userData;
       } catch (error: any) {
         set({ error: error.message || '獲取當前用戶失敗' });
         return null;
@@ -162,24 +165,32 @@ export const useUserStore = create<UserStore>((set, get) => {
           throw new Error('沒有當前用戶');
         }
 
-        // 直接使用 Supabase 更新 user_metadata
-        const { data, error } = await authService.supabase.auth.updateUser({
-          data: {
-            name: updates.name || currentUser.name,
-            avatar: updates.avatar || currentUser.avatar,
-            color: updates.color || currentUser.color,
-            role: updates.role || currentUser.role,
-          }
-        });
-
-        if (error) throw error;
-
-        // 更新本地狀態
-        const updatedUser = {
-          ...currentUser,
-          ...updates
+        // 直接使用 Supabase 更新 user_metadata，支援多角色
+        const updateData: any = {
+          name: updates.name || currentUser.name,
+          avatar: updates.avatar || currentUser.avatar,
+          color: updates.color || currentUser.color,
         };
-        set({ currentUser: updatedUser, loading: false });
+        
+        if (updates.roles) {
+          updateData.roles = updates.roles;
+          updateData.role = updates.roles[0]; // 向後兼容
+        } else if (updates.role) {
+          updateData.role = updates.role;
+          updateData.roles = [updates.role]; // 向前兼容
+        } else {
+          updateData.roles = currentUser.roles || [currentUser.role || 'student'];
+          updateData.role = currentUser.role || 'student';
+        }
+        
+        // 使用我們的 authService 更新用戶，這樣會回傳正確的 User 類型
+        await authService.updateCurrentUser(updates);
+        
+        // 重新獲取用戶資料以確保同步
+        const userData = await authService.getCurrentUser();
+        if (!userData) throw new Error('更新後無法獲取用戶資料');
+
+        set({ currentUser: userData, loading: false });
       } catch (error: any) {
         set({ loading: false, error: error.message || '更新用戶失敗' });
         throw error;

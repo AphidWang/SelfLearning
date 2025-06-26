@@ -22,13 +22,25 @@ export const UserAdminPage: React.FC = () => {
   }, [getUsers]);
 
   useEffect(() => {
-    // 計算統計數據
+    // 計算統計數據，支援多角色
     const newStats = {
       total: users.length,
-      students: users.filter(u => u.role === 'student').length,
-      mentors: users.filter(u => u.role === 'mentor').length,
-      parents: users.filter(u => u.role === 'parent').length,
-      admins: users.filter(u => u.role === 'admin').length
+      students: users.filter(u => {
+        const userRoles = u.roles || (u.role ? [u.role] : []);
+        return userRoles.includes('student');
+      }).length,
+      mentors: users.filter(u => {
+        const userRoles = u.roles || (u.role ? [u.role] : []);
+        return userRoles.includes('mentor');
+      }).length,
+      parents: users.filter(u => {
+        const userRoles = u.roles || (u.role ? [u.role] : []);
+        return userRoles.includes('parent');
+      }).length,
+      admins: users.filter(u => {
+        const userRoles = u.roles || (u.role ? [u.role] : []);
+        return userRoles.includes('admin');
+      }).length
     };
     setStats(newStats);
   }, [users]);

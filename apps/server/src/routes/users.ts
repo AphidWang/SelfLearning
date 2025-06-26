@@ -85,7 +85,7 @@ router.get('/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
 // 新增用戶
 router.post('/', adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, email, role, avatar, color } = req.body;
+    const { name, email, roles, role, avatar, color } = req.body;
     
     if (!name || !email) {
       return res.status(400).json({ message: '名稱和信箱為必填' });
@@ -94,7 +94,8 @@ router.post('/', adminAuthMiddleware, async (req: Request, res: Response) => {
     const userData = {
       name,
       email,
-      role: role || 'student',
+      roles: roles || (role ? [role] : ['student']), // 支援多角色
+      role: role || 'student', // 向後兼容
       avatar,
       color
     };
@@ -155,7 +156,7 @@ router.get('/role/:role', adminAuthMiddleware, async (req: Request, res: Respons
 // 如果系統中沒有任何用戶，則允許無認證創建第一個 admin 用戶
 router.post('/create-auth-user', async (req: Request, res: Response) => {
   try {
-    const { email, password, name, role, avatar, color } = req.body;
+    const { email, password, name, roles, role, avatar, color } = req.body;
     
     if (!email || !password || !name) {
       return res.status(400).json({ message: '信箱、密碼和姓名為必填' });
@@ -192,12 +193,14 @@ router.post('/create-auth-user', async (req: Request, res: Response) => {
     }
 
     // 在 Supabase Auth 中創建用戶（包含所有 metadata）
+    const userRoles = roles || (role ? [role] : ['student']);
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       user_metadata: {
         name,
-        role: role || 'student',
+        roles: userRoles,
+        role: userRoles[0], // 向後兼容
         avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${email}&backgroundColor=ffd5dc`,
         color: color || '#FF6B6B'
       },
@@ -213,7 +216,8 @@ router.post('/create-auth-user', async (req: Request, res: Response) => {
       id: authData.user.id,
       name,
       email,
-      role: role || 'student',
+      roles: userRoles,
+      role: userRoles[0], // 向後兼容
       avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${email}&backgroundColor=ffd5dc`,
       color: color || '#FF6B6B',
       created_at: authData.user.created_at,
@@ -236,20 +240,30 @@ router.post('/create-auth-user', async (req: Request, res: Response) => {
 router.put('/:id/role', adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.params.id;
-    const { role } = req.body;
+    const { roles, role } = req.body;
     
-    if (!role) {
+    if (!roles && !role) {
       return res.status(400).json({ message: '角色為必填' });
     }
 
+    // 支援多角色更新
+    const updateData: any = {};
+    if (roles) {
+      updateData.roles = roles;
+      updateData.role = roles[0]; // 向後兼容
+    } else if (role) {
+      updateData.role = role;
+      updateData.roles = [role]; // 向前兼容
+    }
+
     // 1. 更新資料庫中的角色
-    const updatedUser = await userService.updateUser(userId, { role });
+    const updatedUser = await userService.updateUser(userId, updateData);
 
     // 2. 更新 Supabase Auth 的 user_metadata
     const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(
       userId,
       {
-        user_metadata: { role }
+        user_metadata: updateData
       }
     );
 

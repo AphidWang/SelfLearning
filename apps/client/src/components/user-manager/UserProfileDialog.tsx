@@ -15,7 +15,8 @@ interface UserProfileDialogProps {
 interface FormData {
   name: string;
   email: string;
-  role?: User['role'];
+  roles?: User['roles']; // 改為多角色
+  role?: User['role']; // 向後兼容
   password?: string;
   avatar?: string;
 }
@@ -37,7 +38,8 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
   const [formData, setFormData] = useState<FormData>({
     name: user?.name || '',
     email: user?.email || '',
-    role: user?.role || 'student',
+    roles: user?.roles || (user?.role ? [user.role] : ['student']), // 支援多角色
+    role: user?.role || 'student', // 向後兼容
     password: '',
     avatar: user?.avatar || ''
   });
@@ -115,12 +117,39 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
     setFormData(prev => ({ ...prev, avatar }));
   };
 
+  // 處理角色多選
+  const handleRoleToggle = (role: 'student' | 'mentor' | 'parent' | 'admin') => {
+    setFormData(prev => {
+      const currentRoles = prev.roles || [];
+      const isSelected = currentRoles.includes(role);
+      
+      let newRoles: typeof currentRoles;
+      if (isSelected) {
+        // 取消選擇，但至少要有一個角色
+        newRoles = currentRoles.filter(r => r !== role);
+        if (newRoles.length === 0) {
+          newRoles = ['student']; // 預設保留學生角色
+        }
+      } else {
+        // 添加角色
+        newRoles = [...currentRoles, role];
+      }
+      
+      return {
+        ...prev,
+        roles: newRoles,
+        role: newRoles[0] // 更新主要角色為第一個
+      };
+    });
+  };
+
   // 預覽用戶
   const previewUser: User = {
     id: user?.id || 'preview',
     name: formData.name || '暱稱預覽',
     email: formData.email,
-    role: formData.role || 'student',
+    roles: formData.roles || ['student'],
+    role: formData.roles?.[0] || 'student', // 向後兼容
     color: user?.color || '#4ECDC4',
     avatar: formData.avatar
   };
@@ -238,22 +267,22 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
                 )}
               </div>
 
-              {/* 角色選擇 (創建模式或管理員編輯時顯示) */}
+              {/* 角色選擇 (僅在創建模式顯示) */}
               {isCreateMode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    角色 *
+                    角色 * <span className="text-xs text-gray-500">(可多選)</span>
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {roleOptions.map((option) => {
                       const Icon = option.icon;
-                      const isSelected = formData.role === option.value;
+                      const isSelected = formData.roles?.includes(option.value) || false;
                       
                       return (
                         <button
                           key={option.value}
                           type="button"
-                          onClick={() => handleInputChange('role', option.value)}
+                          onClick={() => handleRoleToggle(option.value)}
                           className={`flex items-center gap-2 p-3 border rounded-lg transition-colors ${
                             isSelected
                               ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
@@ -262,10 +291,16 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
                         >
                           <Icon className={`w-4 h-4 ${isSelected ? option.color : 'text-gray-400'}`} />
                           <span className="text-sm font-medium">{option.label}</span>
+                          {isSelected && (
+                            <div className="ml-auto w-2 h-2 bg-green-500 rounded-full"></div>
+                          )}
                         </button>
                       );
                     })}
                   </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    選擇的第一個角色將作為主要角色
+                  </p>
                 </div>
               )}
 

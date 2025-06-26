@@ -10,14 +10,18 @@ export const authService = {
       throw new Error('登入失敗：未獲得有效 token');
     }
     
-    // 直接使用 Supabase Auth 的 user_metadata
+    // 支援新的多角色系統，同時向後兼容單角色
+    const roles = supabaseUser.user_metadata?.roles || 
+                 (supabaseUser.user_metadata?.role ? [supabaseUser.user_metadata.role] : ['student']);
+    
     const userData: User = {
       id: supabaseUser.id,
       name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
       email: supabaseUser.email || '',
       avatar: supabaseUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
       color: supabaseUser.user_metadata?.color || '#FF6B6B',
-      role: supabaseUser.user_metadata?.role || 'student'
+      roles: roles,
+      role: roles[0] // 向後兼容：取第一個角色作為主要角色
     };
 
     // 存儲 token 到 localStorage
@@ -44,6 +48,30 @@ export const authService = {
     localStorage.removeItem('user');
   },
 
+  // 更新當前用戶
+  async updateCurrentUser(updates: Partial<User>): Promise<void> {
+    // 構建更新資料，支援多角色
+    const updateData: any = {};
+    
+    if (updates.name) updateData.name = updates.name;
+    if (updates.avatar) updateData.avatar = updates.avatar;
+    if (updates.color) updateData.color = updates.color;
+    
+    if (updates.roles) {
+      updateData.roles = updates.roles;
+      updateData.role = updates.roles[0]; // 向後兼容
+    } else if (updates.role) {
+      updateData.role = updates.role;
+      updateData.roles = [updates.role]; // 向前兼容
+    }
+    
+    const { error } = await supabaseAuthService.supabase.auth.updateUser({
+      data: updateData
+    });
+    
+    if (error) throw error;
+  },
+
   // 獲取當前用戶 - 直接使用 Supabase Auth user_metadata
   async getCurrentUser(): Promise<User | null> {
     try {
@@ -53,14 +81,18 @@ export const authService = {
         return null;
       }
 
-      // 直接使用 Supabase Auth 的 user_metadata
+      // 支援新的多角色系統，同時向後兼容單角色
+      const roles = supabaseUser.user_metadata?.roles || 
+                   (supabaseUser.user_metadata?.role ? [supabaseUser.user_metadata.role] : ['student']);
+      
       return {
         id: supabaseUser.id,
         name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
         email: supabaseUser.email || '',
         avatar: supabaseUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
         color: supabaseUser.user_metadata?.color || '#FF6B6B',
-        role: supabaseUser.user_metadata?.role || 'student'
+        roles: roles,
+        role: roles[0] // 向後兼容：取第一個角色作為主要角色
       };
     } catch (error) {
       console.error('Get current user error:', error);

@@ -17,6 +17,10 @@ export interface User {
   avatar?: string; // 頭像 URL 或 emoji
   color?: string; // 代表顏色
   email?: string;
+  roles?: ('student' | 'mentor' | 'parent' | 'admin')[]; // 改為複數陣列支援多角色
+  
+  // 向後兼容：保留單角色屬性（已棄用）
+  /** @deprecated 請使用 roles 陣列，此欄位僅為向後兼容 */
   role?: 'student' | 'mentor' | 'parent' | 'admin';
 }
 

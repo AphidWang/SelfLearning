@@ -8,6 +8,12 @@
 - Context API for state management
 - Tailwind CSS for styling
 
+### Database Architecture
+- **Supabase Auth**: 內建認證系統 (auth.users)
+- **User Management**: 使用 auth.users.raw_user_meta_data 儲存用戶資料
+- **No Custom Users Table**: 不再使用 public.users 表
+- **Role-based Access**: 角色儲存在 user_metadata.role 中
+
 ### Component Structure
 ```
 src/
