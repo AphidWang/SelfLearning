@@ -1,18 +1,16 @@
 /**
- * ✅ 課綱藍圖系統 - React Flow 流程圖管理
- *
- * 1. 此元件負責整體流程圖的管理邏輯，包含：
- *    - 節點狀態管理（nodes）
- *    - 連線狀態管理（edges）
- *    - 節點變更處理（onNodesChange）
- *    - 連線變更處理（onEdgesChange）
- *    - 新增連線處理（onConnect）
- *
- * 2. 節點的視覺效果和動畫請參考 nodeTypes.tsx
- * 3. 節點資料結構定義在 initial-elements.ts
+ * TODO: 課程藍圖頁面 - 需要重新設計
+ * 
+ * 計劃改動：
+ * 1. 整合 topicTemplate 視覺化編輯功能
+ * 2. 支援拖拽式課程設計介面
+ * 3. 與新的 Supabase 資料架構整合
+ * 4. 改進節點和連線的互動設計
+ * 
+ * 目前狀態：未完整，等待重新設計
  */
 
-import React from "react";
+import React, { useCallback, useMemo } from 'react';
 import ReactFlow, {
   Background,
   Controls,

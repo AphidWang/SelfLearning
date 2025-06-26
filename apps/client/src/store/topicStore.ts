@@ -1,3 +1,24 @@
+/**
+ * Topic Store - 學習主題管理
+ * 
+ * TODO: 重大遷移計劃 - 從 localStorage 遷移到 Supabase
+ * 
+ * 計劃改動：
+ * 1. 將所有資料從 localStorage 遷移到 Supabase 資料庫
+ * 2. 整合 TopicTemplate 系統，支援從模板建立主題
+ * 3. 實作權限控制和協作功能
+ * 4. 支援即時資料同步
+ * 5. 添加 RLS (Row Level Security) 權限控制
+ * 
+ * 目前狀態：使用 localStorage，等待遷移到 Supabase
+ * 
+ * 新架構設計：
+ * - Topic 資料存儲在 Supabase topics 表
+ * - 支援從 TopicTemplate 建立 Topic
+ * - 擁有者和協作者權限管理
+ * - 即時協作功能
+ */
+
 import { create } from 'zustand';
 import type { Topic, Goal, Task, Bubble, GoalStatus, User } from '../types/goal';
 import { SUBJECTS } from '../constants/subjects';
