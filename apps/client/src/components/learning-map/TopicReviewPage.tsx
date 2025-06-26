@@ -833,6 +833,15 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         users={users}
         owner={owner}
         collaborators={collaborators}
+        addTask={addTask}
+        deleteTask={deleteTask}
+        updateGoal={updateGoal}
+        deleteGoal={deleteGoal}
+        getCompletionRate={getCompletionRate}
+        setGoalOwner={setGoalOwner}
+        addGoalCollaborator={addGoalCollaborator}
+        removeGoalCollaborator={removeGoalCollaborator}
+        getTopic={getTopic}
       />
     );
   }
@@ -1677,6 +1686,15 @@ interface GoalDetailPanelProps {
   users: User[];
   owner?: User;
   collaborators?: Collaborator[];
+  addTask: (topicId: string, goalId: string, task: Omit<Task, 'id'>) => Promise<Task | null>;
+  deleteTask: (topicId: string, goalId: string, taskId: string) => Promise<boolean>;
+  updateGoal: (topicId: string, goalId: string, updates: Partial<Goal>) => Promise<Goal | null>;
+  deleteGoal: (topicId: string, goalId: string) => Promise<boolean>;
+  getCompletionRate: (topicId: string) => number;
+  setGoalOwner: (topicId: string, goalId: string, owner: User) => Promise<boolean>;
+  addGoalCollaborator: (topicId: string, goalId: string, collaborator: User) => Promise<boolean>;
+  removeGoalCollaborator: (topicId: string, goalId: string, collaboratorId: string) => Promise<boolean>;
+  getTopic: (id: string) => Promise<Topic | null>;
 }
 
 const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
@@ -1694,27 +1712,25 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   onCollaborationUpdate,
   users,
   owner,
-  collaborators
+  collaborators,
+  addTask,
+  deleteTask,
+  updateGoal,
+  deleteGoal,
+  getCompletionRate,
+  setGoalOwner,
+  addGoalCollaborator,
+  removeGoalCollaborator,
+  getTopic
 }) => {
-    const {
-    addTask, 
-    deleteTask, 
-    updateGoal,
-    deleteGoal,
-    getCompletionRate,
-    setGoalOwner,
-    addGoalCollaborator,
-    removeGoalCollaborator,
-    getTopic
-  } = useTopicStore();
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
-  const [showHelpDialog, setShowHelpDialog] = useState(false);
-  const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
-  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [isEditingGoal, setIsEditingGoal] = useState(false);
-  const [editedGoal, setEditedGoal] = useState(goal);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [pendingOperation, setPendingOperation] = useState<string | null>(null);
+    const [showHelpDialog, setShowHelpDialog] = useState(false);
+    const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
+    const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [isEditingGoal, setIsEditingGoal] = useState(false);
+    const [editedGoal, setEditedGoal] = useState(goal);
 
   const refreshTopic = useCallback(async () => {
     const fetchedTopic = await getTopic(topicId);
@@ -2086,9 +2102,12 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
             title="目標協作"
             owner={goal.owner}
             collaborators={goal.collaborators}
-            availableUsers={users.filter(user => 
-              user.id === topic.owner_id || 
-              (topic.collaborators || []).some(collaborator => collaborator.id === user.id)
+            availableUsers={[
+              ...(topic.owner ? [topic.owner] : []),
+              ...(topic.collaborators || [])
+            ].filter((user, index, self) => 
+              // 去重
+              index === self.findIndex((u) => u.id === user.id)
             )}
             onSetOwner={handleSetOwner}
             onAddCollaborator={handleAddCollaborator}
