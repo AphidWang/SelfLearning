@@ -8,12 +8,12 @@ import {
   Battery, BatteryMedium, BatteryLow,
   Target, Upload, PauseCircle
 } from 'lucide-react';
-import { useGoalStore } from '../../store/goalStore';
+import { useTopicStore } from '../../store/topicStore';
 
 interface TaskDetailProps {
   task: Task;
-  stepId: string;
   goalId: string;
+  topicId: string;
   onBack: () => void;
   onHelpRequest: (taskId: string) => void;
 }
@@ -48,12 +48,12 @@ const challengeLabels: Record<ChallengeLevel, string> = {
 
 export const TaskDetail: React.FC<TaskDetailProps> = ({
   task,
-  stepId,
   goalId,
+  topicId,
   onBack,
   onHelpRequest
 }) => {
-  const { updateTask } = useGoalStore();
+  const { updateTask } = useTopicStore();
   const [comment, setComment] = useState('');
   const [mood, setMood] = useState<MoodLevel | null>(null);
   const [energy, setEnergy] = useState<EnergyLevel | null>(null);
@@ -73,7 +73,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   }, []);
 
   const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
-    updateTask(goalId, stepId, {
+    updateTask(topicId, goalId, {
       ...task,
       status,
       completedAt: status === 'done' ? new Date().toISOString() : undefined

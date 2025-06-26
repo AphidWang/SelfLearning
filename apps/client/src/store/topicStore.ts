@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import type { Topic, Goal, Task, Bubble, GoalStatus, User } from '../types/goal';
-import { TOPIC_STATUSES } from '../constants/topics';
 import { SUBJECTS } from '../constants/subjects';
 
 const STORAGE_KEY = 'self_learning_topics';
@@ -30,7 +29,7 @@ const EXAMPLE_USERS: User[] = [
     email: 'teacher.wang@example.com',
     avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=teacher&backgroundColor=fff3e0&clothing=shirt&accessories=glasses',
     color: '#45B7D1',
-    role: 'teacher'
+    role: 'mentor'
   },
   {
     id: 'user-4',
