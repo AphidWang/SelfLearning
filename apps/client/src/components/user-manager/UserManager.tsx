@@ -4,8 +4,8 @@ import { useUserStore } from '../../store/userStore';
 import { UserCard, UserProfileDialog, PasswordResetDialog } from './index';
 import type { User } from '../../types/goal';
 import { 
-  Users, Search, Filter, Loader2, 
-  UserPlus, Crown, GraduationCap, Heart, Settings 
+  Search, Filter, Loader2, 
+  UserPlus, Users
 } from 'lucide-react';
 
 interface UserManagerProps {
@@ -55,21 +55,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
     return result;
   }, [users, selectedRole, searchQuery, getUsersByRole, searchUsers]);
 
-  // 統計數據
-  const stats = React.useMemo(() => {
-    const studentCount = users.filter(u => u.role === 'student').length;
-    const mentorCount = users.filter(u => u.role === 'mentor').length;
-    const parentCount = users.filter(u => u.role === 'parent').length;
-    const adminCount = users.filter(u => u.role === 'admin').length;
-    
-    return {
-      total: users.length,
-      students: studentCount,
-      mentors: mentorCount,
-      parents: parentCount,
-      admins: adminCount
-    };
-  }, [users]);
+
 
   const handleEditUser = (user: User) => {
     setEditingUser(user);
@@ -108,71 +94,13 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
 
 
 
-  const roleIcons = {
-    student: GraduationCap,
-    mentor: Crown,
-    parent: Heart,
-    admin: Settings
-  };
 
-  const roleLabels = {
-    student: '學生',
-    mentor: '導師',
-    parent: '家長',
-    admin: '管理員'
-  };
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 ${className}`}>
-      {/* 標題區域 */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-            <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white">用戶管理</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">管理系統中的所有用戶</p>
-          </div>
-        </div>
-        
-        <div className="flex gap-2">
-          <button
-            onClick={handleCreateUser}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            創建用戶
-          </button>
-        </div>
-      </div>
 
-      {/* 統計區域 */}
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="text-2xl font-bold text-gray-800 dark:text-white">{stats.total}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">總用戶</div>
-          </div>
-          
-          {(['student', 'mentor', 'parent', 'admin'] as const).map((role) => {
-            const Icon = roleIcons[role];
-            const count = stats[role === 'student' ? 'students' : 
-                              role === 'mentor' ? 'mentors' : 
-                              role === 'parent' ? 'parents' : 'admins'];
-            
-            return (
-              <div key={role} className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center justify-center mb-2">
-                  <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                </div>
-                <div className="text-xl font-bold text-gray-800 dark:text-white">{count}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">{roleLabels[role]}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+
+
 
       {/* 搜尋和篩選區域 */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -204,6 +132,15 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
               <option value="admin">管理員</option>
             </select>
           </div>
+
+          {/* 創建用戶按鈕 */}
+          <button
+            onClick={handleCreateUser}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors whitespace-nowrap"
+          >
+            <UserPlus className="w-4 h-4" />
+            創建用戶
+          </button>
         </div>
       </div>
 
