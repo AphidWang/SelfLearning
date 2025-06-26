@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTopicStore } from '../../store/topicStore';
 import type { Task } from '../../types/goal';
 
@@ -12,6 +12,13 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
   const { topics, updateTask } = useTopicStore();
   const topic = topics.find(t => t.id === topicId);
   const goal = topic?.goals.find(g => g.id === goalId);
+
+  useEffect(() => {
+    // 確保有初始化主題數據
+    if (topics.length === 0) {
+      // 這裡可能需要調用 fetchTopics()，但要確認組件的上下文
+    }
+  }, [topics]);
 
   if (!goal) {
     return (
@@ -29,9 +36,20 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
     );
   }
 
-  const toggleTaskStatus = (taskId: string, task: Task) => {
-    const newStatus = task.status === 'done' ? 'todo' : 'done';
-    updateTask(topicId, goalId, { ...task, status: newStatus });
+  const toggleTaskStatus = async (taskId: string, task: Task) => {
+    try {
+      const newStatus = task.status === 'done' ? 'todo' : 'done';
+      const updatedTask = await updateTask(goal.id, taskId, {
+        ...task,
+        status: newStatus,
+        completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
+      });
+      if (!updatedTask) {
+        throw new Error('Failed to update task status');
+      }
+    } catch (err) {
+      console.error('Error updating task status:', err);
+    }
   };
 
   const editTaskTitle = (taskId: string, task: Task) => {
@@ -39,6 +57,10 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
     if (title !== null && title !== task.title) {
       updateTask(topicId, goalId, { ...task, title });
     }
+  };
+
+  const handleTaskUpdate = (topicId: string, goalId: string, taskId: string, updates: Partial<Task>) => {
+    updateTask(topicId, goalId, taskId, updates);
   };
 
   return (

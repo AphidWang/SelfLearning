@@ -446,13 +446,14 @@ export class MindMapService {
   }
 
   updateTopic(topic: Topic) {
-    console.log('🎯 MindMapService.updateTopic 開始', { topic });
+    console.log('🔍 MindMapService.updateTopic 開始', { topic });
+    
     if (!this.currentTopicId) {
       console.log('❌ 更新失敗：沒有當前主題');
       return null;
     }
 
-    const result = useTopicStore.getState().updateTopic(topic);
+    const result = useTopicStore.getState().updateTopic(this.currentTopicId, topic);
     console.log('✅ 主題更新結果', { result });
     return result;
   }
@@ -460,7 +461,7 @@ export class MindMapService {
   updateGoal(goalId: string, updates: Goal) {
     if (!this.currentTopicId) return null;
 
-    return useTopicStore.getState().updateGoal(this.currentTopicId, { ...updates, id: goalId });
+    return useTopicStore.getState().updateGoal(this.currentTopicId, goalId, updates);
   }
 
   addTask(goalId: string, task: Task) {
@@ -476,7 +477,7 @@ export class MindMapService {
       return null;
     }
 
-    const result = useTopicStore.getState().updateTask(this.currentTopicId, goalId, updates);
+    const result = useTopicStore.getState().updateTask(this.currentTopicId, goalId, taskId, updates);
     console.log('🔄 更新結果', { result });
     return result;
   }

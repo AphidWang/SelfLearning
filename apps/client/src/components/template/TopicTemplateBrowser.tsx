@@ -26,7 +26,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useTopicTemplateStore } from '../../store/topicTemplateStore';
-import { useTopicSupabaseStore } from '../../store/topicSupabaseStore';
+import { useTopicStore } from '../../store/topicStore';
 import type { TopicTemplate } from '../../types/goal';
 import { SUBJECTS } from '../../constants/subjects';
 
@@ -51,7 +51,7 @@ export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
 
   const {
     createTopicFromTemplate
-  } = useTopicSupabaseStore();
+  } = useTopicStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('');

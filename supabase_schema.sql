@@ -180,189 +180,208 @@ ALTER TABLE topic_template_collaborators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topic_collaborators ENABLE ROW LEVEL SECURITY;
 
--- 課程模板 RLS 政策
--- 1. 任何人都可以查看公開模板
-CREATE POLICY "Public templates are viewable by everyone" ON topic_templates
-  FOR SELECT USING (is_public = true);
+-- 清理和重建所有 RLS 政策
+DO $$ 
+BEGIN
+    -- 清理課程模板的 policy
+    DROP POLICY IF EXISTS "Public templates are viewable by everyone" ON topic_templates;
+    DROP POLICY IF EXISTS "Users can view own templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Collaborators can view collaborative templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Users can create templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Owners and admins can update templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Only owners can delete templates" ON topic_templates;
 
--- 2. 用戶可以查看自己建立的模板
-CREATE POLICY "Users can view own templates" ON topic_templates
-  FOR SELECT USING (auth.uid() = created_by);
+    -- 清理課程模板協作者的 policy
+    DROP POLICY IF EXISTS "Template members can view collaborators" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Owners and admins can invite collaborators" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Owners and admins can update collaborator permissions" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Owners and admins can remove collaborators" ON topic_template_collaborators;
 
--- 3. 協作者可以查看協作模板
-CREATE POLICY "Collaborators can view collaborative templates" ON topic_templates
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM topic_template_collaborators
-      WHERE template_id = topic_templates.id
-      AND user_id = auth.uid()
-    )
-  );
+    -- 清理學習主題的 policy
+    DROP POLICY IF EXISTS "Users can view own topics" ON topics;
+    DROP POLICY IF EXISTS "Collaborators can view collaborative topics" ON topics;
+    DROP POLICY IF EXISTS "Users can create topics" ON topics;
+    DROP POLICY IF EXISTS "Owners and editors can update topics" ON topics;
+    DROP POLICY IF EXISTS "Only owners can delete topics" ON topics;
 
--- 4. 用戶可以建立模板
-CREATE POLICY "Users can create templates" ON topic_templates
-  FOR INSERT WITH CHECK (auth.uid() = created_by);
+    -- 清理主題協作者的 policy
+    DROP POLICY IF EXISTS "Topic members can view collaborators" ON topic_collaborators;
+    DROP POLICY IF EXISTS "Owners can invite collaborators" ON topic_collaborators;
 
--- 5. 擁有者和管理協作者可以更新模板
-CREATE POLICY "Owners and admins can update templates" ON topic_templates
-  FOR UPDATE USING (
-    auth.uid() = created_by OR
-    EXISTS (
-      SELECT 1 FROM topic_template_collaborators
-      WHERE template_id = topic_templates.id
-      AND user_id = auth.uid()
-      AND permission IN ('edit', 'admin')
-    )
-  );
+    -- 清理可能存在的重複 policy
+    DROP POLICY IF EXISTS "Anyone can view public topic templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Users can manage their own topic templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Collaborators can access templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Only owners can update templates" ON topic_templates;
+    DROP POLICY IF EXISTS "Users can view own and collaborative topics" ON topics;
+    DROP POLICY IF EXISTS "Users can view and manage collaborators" ON topic_collaborators;
+    DROP POLICY IF EXISTS "Template creators can manage collaborators" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Template owners can remove collaborators" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Template owners can invite collaborators" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Collaborators can view other collaborators" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Template owners can view collaborators" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Collaborators can view their own access" ON topic_template_collaborators;
+    DROP POLICY IF EXISTS "Template owners can update collaborator permissions" ON topic_template_collaborators;
+END $$;
 
--- 6. 只有擁有者可以刪除模板
-CREATE POLICY "Only owners can delete templates" ON topic_templates
-  FOR DELETE USING (auth.uid() = created_by);
+-- 重建課程模板的 policy
+DO $$ 
+BEGIN
+    -- 1. 查看權限
+    CREATE POLICY "Public templates are viewable by everyone" ON topic_templates
+        FOR SELECT USING (is_public = true);
 
--- 協作者表 RLS 政策
--- 1. 模板擁有者和協作者可以查看協作者列表
-CREATE POLICY "Template members can view collaborators" ON topic_template_collaborators
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM topic_templates
-      WHERE id = template_id
-      AND (created_by = auth.uid() OR 
-           EXISTS (
-             SELECT 1 FROM topic_template_collaborators tc
-             WHERE tc.template_id = topic_templates.id
-             AND tc.user_id = auth.uid()
-           ))
-    )
-  );
+    CREATE POLICY "Users can view own templates" ON topic_templates
+        FOR SELECT USING ((SELECT auth.uid()) = created_by);
 
--- 2. 模板擁有者和管理協作者可以邀請新協作者
-CREATE POLICY "Owners and admins can invite collaborators" ON topic_template_collaborators
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM topic_templates
-      WHERE id = template_id
-      AND (created_by = auth.uid() OR
-           EXISTS (
-             SELECT 1 FROM topic_template_collaborators tc
-             WHERE tc.template_id = topic_templates.id
-             AND tc.user_id = auth.uid()
-             AND tc.permission = 'admin'
-           ))
-    )
-  );
+    CREATE POLICY "Collaborators can view collaborative templates" ON topic_templates
+        FOR SELECT USING (
+            EXISTS (
+                SELECT 1 FROM topic_template_collaborators
+                WHERE template_id = topic_templates.id
+                AND user_id = (SELECT auth.uid())
+            )
+        );
 
--- 3. 模板擁有者和管理協作者可以更新協作者權限
-CREATE POLICY "Owners and admins can update collaborator permissions" ON topic_template_collaborators
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM topic_templates
-      WHERE id = template_id
-      AND (created_by = auth.uid() OR
-           EXISTS (
-             SELECT 1 FROM topic_template_collaborators tc
-             WHERE tc.template_id = topic_templates.id
-             AND tc.user_id = auth.uid()
-             AND tc.permission = 'admin'
-           ))
-    )
-  );
+    -- 2. 修改權限
+    CREATE POLICY "Users can create templates" ON topic_templates
+        FOR INSERT WITH CHECK ((SELECT auth.uid()) = created_by);
 
--- 4. 模板擁有者和管理協作者可以移除協作者
-CREATE POLICY "Owners and admins can remove collaborators" ON topic_template_collaborators
-  FOR DELETE USING (
-    EXISTS (
-      SELECT 1 FROM topic_templates
-      WHERE id = template_id
-      AND (created_by = auth.uid() OR
-           EXISTS (
-             SELECT 1 FROM topic_template_collaborators tc
-             WHERE tc.template_id = topic_templates.id
-             AND tc.user_id = auth.uid()
-             AND tc.permission = 'admin'
-           ))
-    )
-  );
+    CREATE POLICY "Owners and admins can update templates" ON topic_templates
+        FOR UPDATE USING (
+            (SELECT auth.uid()) = created_by OR
+            EXISTS (
+                SELECT 1 FROM topic_template_collaborators
+                WHERE template_id = topic_templates.id
+                AND user_id = (SELECT auth.uid())
+                AND permission IN ('edit', 'admin')
+            )
+        );
 
--- 學習主題 RLS 政策
--- 1. 用戶可以查看自己的主題
-CREATE POLICY "Users can view own topics" ON topics
-  FOR SELECT USING (auth.uid() = owner_id);
+    CREATE POLICY "Only owners can delete templates" ON topic_templates
+        FOR DELETE USING ((SELECT auth.uid()) = created_by);
+END $$;
 
--- 2. 協作者可以查看協作主題
-CREATE POLICY "Collaborators can view collaborative topics" ON topics
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM topic_collaborators
-      WHERE topic_id = topics.id
-      AND user_id = auth.uid()
-    )
-  );
+-- 重建課程模板協作者的 policy
+DO $$ 
+BEGIN
+    CREATE POLICY "Template members can view collaborators" ON topic_template_collaborators
+        FOR SELECT USING (
+            EXISTS (
+                SELECT 1 FROM topic_templates
+                WHERE id = template_id
+                AND ((SELECT auth.uid()) = created_by OR 
+                    EXISTS (
+                        SELECT 1 FROM topic_template_collaborators tc
+                        WHERE tc.template_id = topic_templates.id
+                        AND tc.user_id = (SELECT auth.uid())
+                    ))
+            )
+        );
 
--- 3. 用戶可以建立主題
-CREATE POLICY "Users can create topics" ON topics
-  FOR INSERT WITH CHECK (auth.uid() = owner_id);
+    CREATE POLICY "Owners and admins can invite collaborators" ON topic_template_collaborators
+        FOR INSERT WITH CHECK (
+            EXISTS (
+                SELECT 1 FROM topic_templates
+                WHERE id = template_id
+                AND ((SELECT auth.uid()) = created_by OR
+                    EXISTS (
+                        SELECT 1 FROM topic_template_collaborators tc
+                        WHERE tc.template_id = topic_templates.id
+                        AND tc.user_id = (SELECT auth.uid())
+                        AND tc.permission = 'admin'
+                    ))
+            )
+        );
 
--- 4. 擁有者和編輯協作者可以更新主題
-CREATE POLICY "Owners and editors can update topics" ON topics
-  FOR UPDATE USING (
-    auth.uid() = owner_id OR
-    EXISTS (
-      SELECT 1 FROM topic_collaborators
-      WHERE topic_id = topics.id
-      AND user_id = auth.uid()
-      AND permission = 'edit'
-    )
-  );
+    CREATE POLICY "Owners and admins can update collaborator permissions" ON topic_template_collaborators
+        FOR UPDATE USING (
+            EXISTS (
+                SELECT 1 FROM topic_templates
+                WHERE id = template_id
+                AND ((SELECT auth.uid()) = created_by OR
+                    EXISTS (
+                        SELECT 1 FROM topic_template_collaborators tc
+                        WHERE tc.template_id = topic_templates.id
+                        AND tc.user_id = (SELECT auth.uid())
+                        AND tc.permission = 'admin'
+                    ))
+            )
+        );
 
--- 5. 只有擁有者可以刪除主題
-CREATE POLICY "Only owners can delete topics" ON topics
-  FOR DELETE USING (auth.uid() = owner_id);
+    CREATE POLICY "Owners and admins can remove collaborators" ON topic_template_collaborators
+        FOR DELETE USING (
+            EXISTS (
+                SELECT 1 FROM topic_templates
+                WHERE id = template_id
+                AND ((SELECT auth.uid()) = created_by OR
+                    EXISTS (
+                        SELECT 1 FROM topic_template_collaborators tc
+                        WHERE tc.template_id = topic_templates.id
+                        AND tc.user_id = (SELECT auth.uid())
+                        AND tc.permission = 'admin'
+                    ))
+            )
+        );
+END $$;
 
--- 主題協作者表 RLS 政策
--- 1. 主題成員可以查看協作者列表
-CREATE POLICY "Topic members can view collaborators" ON topic_collaborators
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM topics
-      WHERE id = topic_id
-      AND (owner_id = auth.uid() OR 
-           EXISTS (
-             SELECT 1 FROM topic_collaborators tc
-             WHERE tc.topic_id = topics.id
-             AND tc.user_id = auth.uid()
-           ))
-    )
-  );
+-- 重建學習主題相關的 policy
+DO $$ 
+BEGIN
+    -- 學習主題的 policy
+    CREATE POLICY "Users can view own topics" ON topics
+        FOR SELECT USING ((SELECT auth.uid()) = owner_id);
 
--- 2. 主題擁有者可以邀請協作者
-CREATE POLICY "Topic owners can invite collaborators" ON topic_collaborators
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM topics
-      WHERE id = topic_id
-      AND owner_id = auth.uid()
-    )
-  );
+    CREATE POLICY "Collaborators can view collaborative topics" ON topics
+        FOR SELECT USING (
+            EXISTS (
+                SELECT 1 FROM topic_collaborators
+                WHERE topic_id = topics.id
+                AND user_id = (SELECT auth.uid())
+            )
+        );
 
--- 3. 主題擁有者可以更新協作者權限
-CREATE POLICY "Topic owners can update collaborator permissions" ON topic_collaborators
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM topics
-      WHERE id = topic_id
-      AND owner_id = auth.uid()
-    )
-  );
+    CREATE POLICY "Users can create topics" ON topics
+        FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
 
--- 4. 主題擁有者可以移除協作者
-CREATE POLICY "Topic owners can remove collaborators" ON topic_collaborators
-  FOR DELETE USING (
-    EXISTS (
-      SELECT 1 FROM topics
-      WHERE id = topic_id
-      AND owner_id = auth.uid()
-    )
-  );
+    CREATE POLICY "Owners and editors can update topics" ON topics
+        FOR UPDATE USING (
+            (SELECT auth.uid()) = owner_id OR
+            EXISTS (
+                SELECT 1 FROM topic_collaborators
+                WHERE topic_id = topics.id
+                AND user_id = (SELECT auth.uid())
+                AND permission = 'edit'
+            )
+        );
+
+    CREATE POLICY "Only owners can delete topics" ON topics
+        FOR DELETE USING ((SELECT auth.uid()) = owner_id);
+
+    -- 主題協作者的 policy
+    CREATE POLICY "Topic members can view collaborators" ON topic_collaborators
+        FOR SELECT USING (
+            EXISTS (
+                SELECT 1 FROM topics
+                WHERE id = topic_id
+                AND ((SELECT auth.uid()) = owner_id OR 
+                    EXISTS (
+                        SELECT 1 FROM topic_collaborators tc
+                        WHERE tc.topic_id = topics.id
+                        AND tc.user_id = (SELECT auth.uid())
+                    ))
+            )
+        );
+
+    CREATE POLICY "Owners can invite collaborators" ON topic_collaborators
+        FOR INSERT WITH CHECK (
+            EXISTS (
+                SELECT 1 FROM topics
+                WHERE id = topic_id
+                AND (SELECT auth.uid()) = owner_id
+            )
+        );
+END $$;
 
 -- ========================================
 -- 範例資料 (可選)
@@ -374,4 +393,4 @@ CREATE POLICY "Topic owners can remove collaborators" ON topic_collaborators
 -- ('英語入門', '英語字母和基本單字', '英語', '語言學習', true, 'user-uuid-here');
 
 -- 目前資料庫架構狀態: ✅ 完整的模板和主題管理系統
--- 最後更新: 2025-01-02 
+-- 最後更新: 2025-01-02 ㄇ
