@@ -79,6 +79,20 @@ export const useTopicReview = (topicId: string) => {
     }
   }, [refreshTopic, getUsers, users.length]);
 
+  // 通用的更新處理函數，確保所有更新都會同步狀態
+  const handleTopicUpdate = useCallback(async (updateFn: () => Promise<any>) => {
+    console.log('🔄 useTopicReview - handleTopicUpdate triggered');
+    setState(prev => ({ ...prev, isUpdating: true }));
+    
+    try {
+      const result = await updateFn();
+      await refreshTopic(); // 更新後立即刷新數據
+      return result;
+    } finally {
+      setState(prev => ({ ...prev, isUpdating: false }));
+    }
+  }, [refreshTopic]);
+
   // 計算衍生數據
   const derivedData = useMemo(() => {
     const { topic } = state;
@@ -189,6 +203,7 @@ export const useTopicReview = (topicId: string) => {
     actions: {
       refreshTopic,
       handleCollaborationUpdate,
+      handleTopicUpdate,
       setSelectedGoal,
       setSelectedTask,
       setEditingTitle,
@@ -200,6 +215,8 @@ export const useTopicReview = (topicId: string) => {
     },
     computed: {
       progress: state.topic ? getCompletionRate(state.topic.id) : 0,
+      collaborators: state.collaborators,
+      availableUsers: state.availableUsers,
     }
   };
 }; 

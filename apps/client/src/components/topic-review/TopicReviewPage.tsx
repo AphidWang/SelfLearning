@@ -5,6 +5,7 @@ import { subjects } from '../../styles/tokens';
 import { TopicRadialMap } from '../learning-map/TopicRadialMap';
 import { TopicHeader } from './components/TopicHeader';
 import { StatsPanel } from './components/StatsPanel';
+import { DetailsPanel } from './components/DetailsPanel';
 import { useTopicReview } from './hooks/useTopicReview';
 import { useTopicStats } from './hooks/useTopicStats';
 
@@ -71,6 +72,16 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     actions.setSelectedTask(taskId, goalId);
   };
 
+  // 處理從詳情面板選擇任務
+  const handleDetailsPanelTaskSelect = (taskId: string, goalId: string) => {
+    actions.setSelectedTask(taskId, goalId);
+  };
+
+  // 處理狀態更新並通知其他組件
+  const handleUpdateWithRefresh = async (updateFn: () => Promise<void>) => {
+    return await actions.handleTopicUpdate(updateFn);
+  };
+
   const handleSaveTitle = async () => {
     if (state.editedTopic) {
       const updates = {
@@ -80,12 +91,12 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
       };
 
       try {
-        const updatedTopic = await updateTopic(topicId, updates);
-        if (updatedTopic) {
-          await actions.refreshTopic();
-        } else {
-          alert('更新失敗，請稍後再試');
-        }
+        await actions.handleTopicUpdate(async () => {
+          const updatedTopic = await updateTopic(topicId, updates);
+          if (!updatedTopic) {
+            throw new Error('更新失敗');
+          }
+        });
       } catch (error) {
         console.error('更新主題失敗:', error);
         alert('更新失敗，請稍後再試');
@@ -227,7 +238,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                   </div>
                 )}
                 <TopicRadialMap
-                  key={`radial-${state.topic.id}`}
+                  key={`radial-${state.topic.id}-${state.topic.updated_at || Date.now()}`}
                   topicId={topicId}
                   goals={stats.memoizedGoals}
                   width={760}
@@ -242,28 +253,18 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               </motion.div>
             </div>
 
-            {/* 右側資訊面板 - 暫時顯示預留空間 */}
+            {/* 右側詳情面板 */}
             <div className="col-span-3 h-full min-h-0">
-              <motion.div
-                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col items-center justify-center p-6"
-                style={{ borderColor: `${subjectStyle.accent}50` }}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1, duration: 0.3 }}
-              >
-                <div className="text-center">
-                  <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
-                  </svg>
-                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">探索學習路徑</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    點擊中央主題查看整體規劃
-                    <br />
-                    點擊目標或任務查看詳細資訊
-                  </p>
-                </div>
-              </motion.div>
+              <DetailsPanel
+                topic={state.topic}
+                selectedGoalId={state.selectedGoalId}
+                selectedTaskId={state.selectedTaskId}
+                subjectStyle={subjectStyle}
+                onUpdateNotify={actions.handleTopicUpdate}
+                availableUsers={computed.availableUsers}
+                collaborators={computed.collaborators}
+                onTaskSelect={handleDetailsPanelTaskSelect}
+              />
             </div>
           </div>
         </div>

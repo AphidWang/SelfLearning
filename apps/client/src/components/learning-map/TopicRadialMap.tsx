@@ -245,7 +245,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     return () => resizeObserver.disconnect();
   }, [updateMapSize]);
 
-  // 獲取主題數據
+  // 獲取主題數據 - 優先使用外部傳入的 goals
   useEffect(() => {
     const fetchData = async () => {
       const fetchedTopic = await getTopic(topicId);
@@ -253,8 +253,15 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         setTopic(fetchedTopic);
       }
     };
-    fetchData();
-  }, [topicId, getTopic]);
+    
+    // 如果沒有傳入 goals 才從 store 獲取
+    if (!goals || goals.length === 0) {
+      fetchData();
+    } else {
+      // 如果有傳入 goals，只獲取 topic 基本信息
+      fetchData();
+    }
+  }, [topicId, getTopic, goals]);
   
   // 調試信息
   useEffect(() => {
@@ -485,9 +492,10 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
             style={{ cursor: 'default' }}
           />
           
-          {/* 背景放射線 */}
-          {goals.map((_, index) => {
-          const { x, y } = getRadialPosition(index, goals.length, goalRadius, centerX, centerY);
+                  {/* 背景放射線 */}
+        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((_, index) => {
+          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+          const { x, y } = getRadialPosition(index, currentGoals.length, goalRadius, centerX, centerY);
           return (
             <motion.line
               key={`bg-line-${index}`}
@@ -506,8 +514,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         })}
 
         {/* 目標和任務的連接線 - 在背景之後，節點之前 */}
-        {goals.map((goal, goalIndex) => {
-          const goalPos = getRadialPosition(goalIndex, goals.length, goalRadius, centerX, centerY);
+        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+          const goalPos = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
           
           return (
             <g key={`goal-connections-${goal.id}`}>
@@ -682,8 +691,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         </motion.g>
 
         {/* 目標節點 */}
-        {goals.map((goal, goalIndex) => {
-          const { x, y } = getRadialPosition(goalIndex, goals.length, goalRadius, centerX, centerY);
+        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+          const { x, y } = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
           const goalCompletedTasks = goal.tasks.filter(t => t.status === 'done').length;
           const goalProgress = goal.tasks.length > 0 ? (goalCompletedTasks / goal.tasks.length) * 100 : 0;
           const isSelected = selectedGoalId === goal.id && !selectedTaskId; // 只有在沒有選中任務時才顯示目標選中
@@ -909,8 +919,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         })}
 
         {/* 任務節點 */}
-        {goals.map((goal, goalIndex) => {
-          const goalPos = getRadialPosition(goalIndex, goals.length, goalRadius, centerX, centerY);
+        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+          const goalPos = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
           
           return goal.tasks.map((task, taskIndex) => {
             const { x, y } = getTaskPosition(taskIndex, goal.tasks.length, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);

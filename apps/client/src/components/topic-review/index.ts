@@ -8,4 +8,5 @@ export { useTopicStats } from './hooks/useTopicStats';
 
 // Components
 export { TopicHeader } from './components/TopicHeader';
-export { StatsPanel } from './components/StatsPanel'; 
+export { StatsPanel } from './components/StatsPanel';
+export { DetailsPanel } from './components/DetailsPanel'; 
