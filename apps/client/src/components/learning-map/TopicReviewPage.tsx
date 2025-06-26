@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
@@ -52,16 +52,17 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   // 異步載入主題數據
-  useEffect(() => {
-    const fetchTopic = async () => {
-      const fetchedTopic = await getTopic(topicId);
-      if (fetchedTopic) {
-        setTopic(fetchedTopic);
-        setEditedTopic(fetchedTopic);
-      }
-    };
-    fetchTopic();
+  const refreshTopic = useCallback(async () => {
+    const fetchedTopic = await getTopic(topicId);
+    if (fetchedTopic) {
+      setTopic(fetchedTopic);
+      setEditedTopic(fetchedTopic);
+    }
   }, [topicId, getTopic]);
+
+  useEffect(() => {
+    refreshTopic();
+  }, [refreshTopic]);
 
   // 當 topic 更新時同步 editedTopic
   useEffect(() => {
@@ -163,8 +164,12 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     if (!topic) return;
     
     try {
-      await deleteTopic(topic.id);
-      onClose();
+      const success = await deleteTopic(topic.id);
+      if (success) {
+        onClose();
+      } else {
+        throw new Error('刪除失敗');
+      }
     } catch (error) {
       console.error('刪除主題失敗:', error);
       alert('刪除主題失敗，請稍後再試。');
@@ -279,48 +284,11 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                       </div>
                     )}
                     
-                                <div className="flex items-center gap-2 flex-shrink-0">
-              {isEditingTitle ? (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (editedTopic) {
-                                updateTopic(topicId, editedTopic);
-                              }
-                              setIsEditingTitle(false);
-                              setShowSubjectDropdown(false);
-                            }}
-                            className="p-1.5 rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-                            aria-label="完成編輯"
-                          >
-                            <Check className="w-4 h-4 text-green-600" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditedTopic(topic); // 恢復原始數據
-                              setIsEditingTitle(false);
-                              setShowSubjectDropdown(false);
-                            }}
-                            className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                            aria-label="取消編輯"
-                          >
-                            <X className="w-4 h-4 text-red-600" />
-                          </button>
-                        </>
+                                <div className="flex items-center gap-2">
+                      {isEditingTitle ? (
+                        <div></div>
                       ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditedTopic(topic);
-                            setIsEditingTitle(true);
-                          }}
-                          className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                          aria-label="編輯標題"
-                        >
-                          <Pencil className="w-4 h-4 text-gray-500" />
-                        </button>
+                        <div></div>
                       )}
                     </div>
                   </div>
@@ -341,30 +309,96 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              {/* 編輯按鈕 */}
+              {isEditingTitle ? (
+                <>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (editedTopic) {
+                        const updates = {
+                          title: editedTopic.title,
+                          description: editedTopic.description,
+                          subject: editedTopic.subject
+                        };
+                        // 先更新 UI
+                        setTopic(prev => prev ? { ...prev, ...updates } : prev);
+                        setIsEditingTitle(false);
+                        setShowSubjectDropdown(false);
+                        
+                        // 後端更新
+                        try {
+                          const updatedTopic = await updateTopic(topicId, updates);
+                          if (updatedTopic) {
+                            setTopic(updatedTopic);
+                            setEditedTopic(updatedTopic);
+                          } else {
+                            // 如果更新失敗，回滾到原始狀態
+                            setTopic(topic);
+                            setEditedTopic(topic);
+                            alert('更新失敗，請稍後再試');
+                          }
+                        } catch (error) {
+                          console.error('更新主題失敗:', error);
+                          // 如果更新失敗，回滾到原始狀態
+                          setTopic(topic);
+                          setEditedTopic(topic);
+                          alert('更新失敗，請稍後再試');
+                        }
+                      }
+                    }}
+                    className="w-9 h-9 flex items-center justify-center hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                    aria-label="完成編輯"
+                  >
+                    <Check className="w-5 h-5 text-green-600" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditedTopic(topic); // 恢復原始數據
+                      setIsEditingTitle(false);
+                      setShowSubjectDropdown(false);
+                    }}
+                    className="w-9 h-9 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                    aria-label="取消編輯"
+                  >
+                    <X className="w-5 h-5 text-red-600" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditedTopic(topic);
+                    setIsEditingTitle(true);
+                  }}
+                  className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  aria-label="編輯標題"
+                >
+                  <Pencil className="w-5 h-5 text-gray-500" />
+                </button>
+              )}
+
+              {/* 刪除按鈕 */}
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-9 h-9 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors group"
+                title="刪除主題"
+              >
+                <Trash2 className="w-5 h-5 text-gray-400 group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors" />
+              </button>
+
               {/* 關閉按鈕 */}
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                aria-label="關閉"
+                className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                title="關閉"
               >
-                <X className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
-                title="刪除主題"
-              >
-                <Trash2 className="w-5 h-5 text-gray-400 group-hover:text-red-500 transition-colors" />
-              </button>
-              <button
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                title="編輯主題"
-              >
-                <Edit className="w-5 h-5 text-gray-600" />
+                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
-                    </div>
+          </div>
         </div>
 
         {/* 刪除確認對話框 */}
@@ -599,15 +633,16 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   const { getTopic, updateGoalHelp, updateTaskHelp } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
   
-  useEffect(() => {
-    const fetchTopic = async () => {
-      const fetchedTopic = await getTopic(topicId);
-      if (fetchedTopic) {
-        setTopic(fetchedTopic);
-      }
-    };
-    fetchTopic();
+  const refreshTopic = useCallback(async () => {
+    const fetchedTopic = await getTopic(topicId);
+    if (fetchedTopic) {
+      setTopic(fetchedTopic);
+    }
   }, [topicId, getTopic]);
+  
+  useEffect(() => {
+    refreshTopic();
+  }, [refreshTopic]);
   
   // 根據選擇顯示不同內容
   const selectedGoal = selectedGoalId ? topic?.goals.find(goal => goal.id === selectedGoalId) : null;
@@ -711,7 +746,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     getAvailableUsers,
     setTaskOwner,
     addTaskCollaborator,
-    removeTaskCollaborator
+    removeTaskCollaborator,
+    getTopic
   } = useTopicStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
@@ -720,36 +756,155 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [challenge, setChallenge] = useState<1 | 2 | 3 | 4 | 5 | undefined>(task.challenge as 1 | 2 | 3 | 4 | 5 | undefined);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [helpMessage, setHelpMessage] = useState(task.helpMessage || '');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
 
-  const handleSaveDescription = () => {
-    updateTask(topicId, goal.id, editedTask.id, editedTask);
-    setIsEditing(false);
+  const refreshTopic = useCallback(async () => {
+    const fetchedTopic = await getTopic(topicId);
+    if (fetchedTopic) {
+      const updatedGoal = fetchedTopic.goals.find(g => g.id === goal.id);
+      const updatedTask = updatedGoal?.tasks.find(t => t.id === task.id);
+      if (updatedTask) {
+        setEditedTask(updatedTask);
+      }
+    }
+  }, [topicId, goal.id, task.id, getTopic]);
+
+  useEffect(() => {
+    refreshTopic();
+  }, [refreshTopic]);
+
+  const handleSaveDescription = async () => {
+    if (isUpdating) return;
+    
+    const prevTask = { ...task };
+    try {
+      setIsUpdating(true);
+      setPendingOperation('description');
+      // 先更新 UI
+      setEditedTask(prev => ({
+        ...prev,
+        title: editedTask.title,
+        description: editedTask.description
+      }));
+      setIsEditing(false);
+
+      // 後端更新
+      const result = await updateTask(topicId, goal.id, editedTask.id, editedTask);
+      if (!result) {
+        // 如果更新失敗，回滾到原始狀態
+        setEditedTask(prevTask);
+        alert('更新任務失敗，請稍後再試');
+      }
+    } catch (error) {
+      // 如果更新失敗，回滾到原始狀態
+      setEditedTask(prevTask);
+      alert('更新任務失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
   };
 
   const handleStatusSelect = async (status: TaskStatus) => {
+    if (isUpdating) return;
+    
     try {
+      setIsUpdating(true);
+      setPendingOperation('status');
       const updatedTask = {
         ...task,
         status,
         completedAt: status === 'done' ? new Date().toISOString() : undefined
       };
+      
+      // 先更新 UI
+      setEditedTask(updatedTask);
+      
+      // 後端更新
       const result = await updateTask(topicId, goal.id, task.id, updatedTask);
       if (!result) {
-        throw new Error('Failed to update task status');
+        // 如果更新失敗，回滾到原始狀態
+        setEditedTask(task);
+        alert('更新狀態失敗，請稍後再試');
       }
     } catch (err) {
       console.error('Error updating task status:', err);
+      // 如果更新失敗，回滾到原始狀態
+      setEditedTask(task);
+      alert('更新狀態失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
     }
   };
 
-  const handleHelpSubmit = () => {
-    updateTaskHelp(topicId, goal.id, task.id, true, helpMessage);
-    setShowHelpDialog(false);
+  const handleHelpSubmit = async () => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('help');
+      // 先更新 UI
+      const prevHelpMessage = task.helpMessage;
+      const prevNeedHelp = task.needHelp;
+      setEditedTask(prev => ({
+        ...prev,
+        needHelp: true,
+        helpMessage
+      }));
+      setShowHelpDialog(false);
+
+      // 後端更新
+      try {
+        await updateTaskHelp(topicId, goal.id, task.id, true, helpMessage);
+        await refreshTopic();
+      } catch (error) {
+        // 如果更新失敗，回滾到原始狀態
+        setEditedTask(prev => ({
+          ...prev,
+          needHelp: prevNeedHelp,
+          helpMessage: prevHelpMessage
+        }));
+        alert('更新求助狀態失敗，請稍後再試');
+      } finally {
+        setIsUpdating(false);
+        setPendingOperation(null);
+      }
+    } catch (error) {
+      console.error('Error updating help status:', error);
+    }
   };
 
-  const handleHelpResolve = () => {
-    updateTaskHelp(topicId, goal.id, task.id, false);
-    setShowHelpDialog(false);
+  const handleHelpResolve = async () => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('help');
+      // 先更新 UI
+      setEditedTask(prev => ({
+        ...prev,
+        needHelp: false,
+        helpMessage: ''
+      }));
+      setShowHelpDialog(false);
+
+      // 後端更新
+      await updateTaskHelp(topicId, goal.id, task.id, false);
+      await refreshTopic();
+    } catch (error) {
+      // 如果更新失敗，回滾到原始狀態
+      setEditedTask(prev => ({
+        ...prev,
+        needHelp: task.needHelp,
+        helpMessage: task.helpMessage
+      }));
+      alert('更新求助狀態失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
   };
 
   const handleDeleteTask = () => {
