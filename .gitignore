@@ -53,3 +53,4 @@ pnpm-debug.log*
 .vite
 
 package-lock.json
+temp-token.json
