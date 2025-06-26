@@ -6,7 +6,6 @@ import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upl
 import { subjects } from '../../styles/tokens';
 import { useTopicStore } from '../../store/topicStore';
 import { GoalOverviewDialog } from './TopicOverviewDialog';
-import { TopicReviewPage } from './TopicReviewPage';
 
 interface WeeklyActivity {
   id: string;

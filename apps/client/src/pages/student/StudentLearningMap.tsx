@@ -13,7 +13,7 @@ import { TopicDashboardDialog } from '../../components/learning-map/TopicDashboa
 import { TopicDetailsDialog } from '../../components/learning-map/TopicDetailsDialog';
 import { DraggableDialog } from '../../components/learning-map/DraggableDialog';
 import { TopicProgressDialog } from '../../components/learning-map/TopicProgressDialog';
-import { TopicReviewPage } from '../../components/learning-map/TopicReviewPage';
+import { TopicReviewPage } from '../../components/topic-review';
 import { AnimatePresence } from 'framer-motion';
 
 export const StudentLearningMap: React.FC = () => {

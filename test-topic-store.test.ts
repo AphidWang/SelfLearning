@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useTopicStore } from '@/store/topicStore';
 import { SUBJECTS } from '@/constants/subjects';
+import { Topic } from '@/types/goal';
 
 describe('TopicStore', () => {
   let store: ReturnType<typeof useTopicStore.getState>;
@@ -24,7 +25,7 @@ describe('TopicStore', () => {
       title: '測試主題',
       description: '這是一個測試主題',
       subject: SUBJECTS.MATH,
-      type: 'personal',
+      type: '學習目標' as const,
       category: 'learning',
       status: 'active' as const,
       goals: [],
@@ -88,7 +89,7 @@ describe('TopicStore', () => {
         title: '測試主題',
         description: '這是一個測試主題',
         subject: SUBJECTS.MATH,
-        type: 'personal',
+        type: '學習目標' as const,
         category: 'learning',
         status: 'active' as const,
         goals: [],
@@ -104,7 +105,7 @@ describe('TopicStore', () => {
       const goal = {
         title: '測試目標',
         description: '這是一個測試目標',
-        status: 'pending' as const,
+        status: 'todo' as const,
         tasks: []
       };
 
@@ -125,7 +126,7 @@ describe('TopicStore', () => {
       const goal = await store.addGoal(testTopic!.id, {
         title: '測試目標',
         description: '這是一個測試目標',
-        status: 'pending' as const,
+        status: 'todo' as const,
         tasks: []
       });
       expect(goal).toBeDefined();
@@ -147,7 +148,7 @@ describe('TopicStore', () => {
       const goal = await store.addGoal(testTopic!.id, {
         title: '測試目標',
         description: '這是一個測試目標',
-        status: 'pending' as const,
+        status: 'todo' as const,
         tasks: []
       });
       expect(goal).toBeDefined();
@@ -171,7 +172,7 @@ describe('TopicStore', () => {
         title: '測試主題',
         description: '這是一個測試主題',
         subject: SUBJECTS.MATH,
-        type: 'personal',
+        type: '學習目標' as const,
         category: 'learning',
         status: 'active' as const,
         goals: [],
@@ -184,7 +185,7 @@ describe('TopicStore', () => {
       testGoal = await store.addGoal(testTopic!.id, {
         title: '測試目標',
         description: '這是一個測試目標',
-        status: 'pending' as const,
+        status: 'todo' as const,
         tasks: []
       });
       expect(testGoal).toBeDefined();
@@ -194,8 +195,8 @@ describe('TopicStore', () => {
       const task = {
         title: '測試任務',
         description: '這是一個測試任務',
-        status: 'pending' as const,
-        due_date: new Date().toISOString()
+        status: 'todo' as const,
+        dueDate: new Date().toISOString()
       };
 
       const result = await store.addTask(testTopic!.id, testGoal!.id, task);
@@ -213,8 +214,8 @@ describe('TopicStore', () => {
       const task = await store.addTask(testTopic!.id, testGoal!.id, {
         title: '測試任務',
         description: '這是一個測試任務',
-        status: 'pending' as const,
-        due_date: new Date().toISOString()
+        status: 'todo' as const,
+        dueDate: new Date().toISOString()
       });
       expect(task).toBeDefined();
 
@@ -232,8 +233,8 @@ describe('TopicStore', () => {
       const task = await store.addTask(testTopic!.id, testGoal!.id, {
         title: '測試任務',
         description: '這是一個測試任務',
-        status: 'pending' as const,
-        due_date: new Date().toISOString()
+        status: 'todo' as const,
+        dueDate: new Date().toISOString()
       });
       expect(task).toBeDefined();
 
@@ -255,7 +256,7 @@ describe('TopicStore', () => {
         title: '測試主題',
         description: '這是一個測試主題',
         subject: SUBJECTS.MATH,
-        type: 'personal',
+        type: '學習目標' as const,
         category: 'learning',
         status: 'active' as const,
         goals: [],

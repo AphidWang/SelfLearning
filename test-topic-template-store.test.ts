@@ -24,7 +24,7 @@ describe('TopicTemplateStore', () => {
       title: '測試模板',
       description: '這是一個測試模板',
       subject: SUBJECTS.MATH,
-      template_type: 'personal',
+      template_type: '學習目標' as const,
       category: 'learning',
       is_public: false,
       is_collaborative: false,
@@ -88,7 +88,7 @@ describe('TopicTemplateStore', () => {
         title: '測試模板',
         description: '這是一個測試模板',
         subject: SUBJECTS.MATH,
-        template_type: 'personal',
+        template_type: '學習目標' as const,
         category: 'learning',
         is_public: false,
         is_collaborative: false,
@@ -104,7 +104,7 @@ describe('TopicTemplateStore', () => {
       const goal = {
         title: '測試目標',
         description: '這是一個測試目標',
-        status: 'pending' as const,
+        status: 'todo' as const,
         tasks: []
       };
 
@@ -125,7 +125,7 @@ describe('TopicTemplateStore', () => {
       const goal = await store.addGoal(testTemplate!.id, {
         title: '測試目標',
         description: '這是一個測試目標',
-        status: 'pending' as const,
+        status: 'todo' as const,
         tasks: []
       });
       expect(goal).toBeDefined();
@@ -147,7 +147,7 @@ describe('TopicTemplateStore', () => {
       const goal = await store.addGoal(testTemplate!.id, {
         title: '測試目標',
         description: '這是一個測試目標',
-        status: 'pending' as const,
+        status: 'todo' as const,
         tasks: []
       });
       expect(goal).toBeDefined();
@@ -170,7 +170,7 @@ describe('TopicTemplateStore', () => {
         title: '測試模板',
         description: '這是一個測試模板',
         subject: SUBJECTS.MATH,
-        template_type: 'personal',
+        template_type: '學習目標' as const,
         category: 'learning',
         is_public: false,
         is_collaborative: false,
