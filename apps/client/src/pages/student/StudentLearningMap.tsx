@@ -28,7 +28,7 @@ export const StudentLearningMap: React.FC = () => {
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
   const [showDailyReview, setShowDailyReview] = useState(false);
 
-  const { topics, addTopic, getCompletionRate } = useTopicStore();
+  const { topics, addTopic, getCompletionRate, fetchTopics } = useTopicStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
   const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
@@ -131,8 +131,13 @@ export const StudentLearningMap: React.FC = () => {
   };
 
   const handleHelpRequest = (taskId: string) => {
-    // 處理協助請求
+    // 實現幫助請求邏輯
     console.log('Help requested for task:', taskId);
+  };
+
+  // 處理數據更新（刷新地圖）
+  const handleUpdate = async () => {
+    await fetchTopics();
   };
 
   // 過濾出有任務的目標，並轉換為地圖點
@@ -278,6 +283,7 @@ export const StudentLearningMap: React.FC = () => {
             onTaskClick={handleTaskClick}
             onGoalClick={(goalId) => console.log('Goal clicked:', goalId)}
             onShowReview={(topicId) => setShowTopicReviewId(topicId)}
+            onUpdate={handleUpdate}
           />
         </DraggableDialog>
       )}

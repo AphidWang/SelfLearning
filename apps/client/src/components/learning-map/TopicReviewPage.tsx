@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 interface Collaborator extends User {
-  permission: 'view' | 'edit' | 'none';
+  permission: 'view' | 'edit';
 }
 
 interface TopicReviewPageProps {
@@ -69,9 +69,64 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   const [pendingPermissions, setPendingPermissions] = useState<Record<string, 'view' | 'edit' | 'none'>>({});
-  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-  const [owner, setOwner] = useState<User | undefined>();
+
+    // 異步載入主題數據
+    const refreshTopic = useCallback(async () => {
+      console.log('📥 TopicReviewPage - refreshTopic started');
+      const fetchedTopic = await getTopic(topicId);
+      if (!fetchedTopic) return;
   
+      setTopic(fetchedTopic);
+      setEditedTopic(fetchedTopic);
+    }, [topicId, getTopic]);
+
+  // 當協作者更新時刷新頁面
+  const handleCollaborationUpdate = useCallback(async () => {
+    console.log('🔄 TopicReviewPage - handleCollaborationUpdate triggered');
+    setIsUpdating(true);
+    setPendingOperation('collaboration');
+    try {
+      await refreshTopic();
+      // 只在需要時重新獲取用戶
+      if (!users.length) {
+        await getUsers();
+      }
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  }, [refreshTopic, getUsers, users.length]);
+
+  // 直接從 topic 拿 owner/collaborators
+  const owner = useMemo(() => topic?.owner, [topic?.owner]);
+  const collaborators = useMemo(() => {
+    if (!topic?.collaborators) return [];
+    return (topic.collaborators as (User & { permission?: 'view' | 'edit' })[]).map(c => ({
+      ...c,
+      permission: c.permission || 'view'
+    })) as Collaborator[];
+  }, [topic?.collaborators]);
+  
+  const availableUsers = useMemo(() => {
+    if (!users.length) return [];
+    const ids = new Set([owner?.id, ...collaborators.map(c => c.id)]);
+    return users.filter(u => !ids.has(u.id));
+  }, [users, owner?.id, collaborators]);
+
+  // 監聽 users 變化
+  useEffect(() => {
+    if (!users.length) {
+      getUsers();
+    }
+  }, [users.length, getUsers]);
+
+  // 初始化 topic
+  useEffect(() => {
+    if (!topic) {
+      refreshTopic();
+    }
+  }, [topic, refreshTopic]);
+
   // 處理權限變更
   const handlePermissionChange = (userId: string, permission: 'view' | 'edit' | 'none') => {
     setPendingPermissions(prev => ({
@@ -105,32 +160,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     }
   };
   
-  // 異步載入主題數據
-  const refreshTopic = useCallback(async () => {
-    console.log('📥 TopicReviewPage - refreshTopic started');
-    const fetchedTopic = await getTopic(topicId);
-    if (fetchedTopic) {
-      console.log('📦 TopicReviewPage - Setting new topic:', fetchedTopic);
-      setTopic(fetchedTopic);
-      setEditedTopic(fetchedTopic);
-      
-      // 更新協作者列表
-      const invited = await getTopicInvitedCollaborators(topicId);
-      setCollaborators(invited as Collaborator[]);
-    }
-  }, [topicId, getTopic, getTopicInvitedCollaborators]);
 
-  // 當 topic 或 users 更新時更新擁有者
-  useEffect(() => {
-    if (topic && users.length > 0) {
-      const owner = users.find(user => user.id === topic.owner_id);
-      setOwner(owner);
-    }
-  }, [topic?.owner_id, users]);
-
-  useEffect(() => {
-    refreshTopic();
-  }, [refreshTopic]);
 
   // 當 topic 更新時同步 editedTopic
   useEffect(() => {
@@ -138,26 +168,6 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
       setEditedTopic(topic);
     }
   }, [topic]);
-
-  // 監聽 users 變化
-  useEffect(() => {
-    if (topic?.is_collaborative) {
-      getUsers();
-    }
-  }, [topic?.is_collaborative, getUsers]);
-
-  // 當協作者更新時刷新頁面
-  const handleCollaborationUpdate = useCallback(async () => {
-    console.log('🔄 TopicReviewPage - handleCollaborationUpdate triggered');
-    setIsUpdating(true);
-    setPendingOperation('collaboration');
-    try {
-      await refreshTopic();
-    } finally {
-      setIsUpdating(false);
-      setPendingOperation(null);
-    }
-  }, [refreshTopic]);
 
   // 處理點擊外部關閉下拉選單
   useEffect(() => {
@@ -768,12 +778,24 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   owner,
   collaborators
 }) => {
-  const { getTopic, updateGoalHelp, updateTaskHelp } = useTopicStore();
+  const { 
+    addTask, 
+    deleteTask, 
+    updateGoal,
+    deleteGoal,
+    getCompletionRate,
+    setGoalOwner,
+    addGoalCollaborator,
+    removeGoalCollaborator,
+    getTopic,
+    updateGoalHelp
+  } = useTopicStore();
+  
   const [topic, setTopic] = useState<Topic | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   
-  const refreshTopic = useCallback(async () => {
+  const refreshPanelTopic = useCallback(async () => {
     const fetchedTopic = await getTopic(topicId);
     if (fetchedTopic) {
       setTopic(fetchedTopic);
@@ -781,8 +803,8 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   }, [topicId, getTopic]);
   
   useEffect(() => {
-    refreshTopic();
-  }, [refreshTopic, topic]);
+    refreshPanelTopic();
+  }, [refreshPanelTopic, topic]);
   
   // 根據選擇顯示不同內容
   const selectedGoal = selectedGoalId && selectedGoalId !== 'TOPIC' ? topic?.goals.find(goal => goal.id === selectedGoalId) : null;
@@ -2105,10 +2127,14 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
             availableUsers={[
               ...(topic.owner ? [topic.owner] : []),
               ...(topic.collaborators || [])
-            ].filter((user, index, self) => 
-              // 去重
-              index === self.findIndex((u) => u.id === user.id)
-            )}
+            ].filter((user, index, self) => {
+              console.log('🔍 Goal Collaboration - Available Users:', {
+                owner: topic.owner,
+                collaborators: topic.collaborators,
+                filtered: index === self.findIndex((u) => u.id === user.id)
+              });
+              return index === self.findIndex((u) => u.id === user.id);
+            })}
             onSetOwner={handleSetOwner}
             onAddCollaborator={handleAddCollaborator}
             onRemoveCollaborator={handleRemoveCollaborator}
@@ -2338,7 +2364,7 @@ interface TopicDetailPanelProps {
   onCollaborationUpdate: () => Promise<void>;
   users: User[];
   owner?: User;
-  collaborators?: User[];
+  collaborators?: Collaborator[];  // 修正型別
 }
 
 const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
@@ -2374,11 +2400,15 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
 
   // 合併系統用戶和協作者
   const availableUsers = useMemo(() => {
+    // 避免不必要的計算
+    if (!users.length) return [];
+    if (!topic?.owner_id) return users;
+    
     return users.filter(user => 
       user.id !== topic.owner_id && 
       !collaborators?.some(c => c.id === user.id)
     );
-  }, [users, topic.owner_id, collaborators]);
+  }, [users, topic?.owner_id, collaborators]);
 
   const refreshTopic = useCallback(async () => {
     const fetchedTopic = await getTopic(topicId);
@@ -2483,7 +2513,7 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
   };
 
   // 邀請協作者
-  const handleInviteCollaborator = async (userId: string, permission: 'view' | 'edit' = 'view') => {
+  const handleInviteCollaborator = useCallback(async (userId: string, permission: 'view' | 'edit' = 'view') => {
     // 檢查是否已經是協作者
     if (collaborators?.some(c => c.id === userId)) {
       console.log('用戶已經是協作者');
@@ -2510,10 +2540,10 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
       setIsUpdating(false);
       setPendingOperation(null);
     }
-  };
+  }, [topicId, collaborators, inviteTopicCollaborator, onCollaborationUpdate]);
 
   // 移除協作者
-  const handleRemoveCollaborator = async (userId: string) => {
+  const handleRemoveCollaborator = useCallback(async (userId: string) => {
     try {
       setIsUpdating(true);
       setPendingOperation('remove');
@@ -2524,14 +2554,16 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
       } else {
         await onCollaborationUpdate();
       }
+      return success;
     } catch (error) {
       console.error('移除協作者失敗:', error);
       alert('移除協作者失敗，請稍後再試');
+      return false;
     } finally {
       setIsUpdating(false);
       setPendingOperation(null);
     }
-  };
+  }, [topicId, removeTopicCollaborator, onCollaborationUpdate]);
 
   const progress = getCompletionRate(topic.id);
   const totalGoals = topic.goals.length;
@@ -2540,6 +2572,12 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
     const completedTasks = goal.tasks.filter(task => task.status === 'done').length;
     return totalTasks > 0 && completedTasks === totalTasks;
   }).length;
+
+  console.log('🔍 Topic Panel Data:', {
+    owner,
+    collaborators,
+    users
+  });
 
   return (
     <motion.div

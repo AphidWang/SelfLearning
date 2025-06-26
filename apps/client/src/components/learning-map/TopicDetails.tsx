@@ -16,6 +16,7 @@ interface TopicDetailsProps {
   isCreating: boolean;
   isEditing: boolean;
   onEditToggle: () => void;
+  onUpdate?: () => Promise<void>;
 }
 
 export const TopicDetails: React.FC<TopicDetailsProps> = ({ 
@@ -24,7 +25,8 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   onTaskClick, 
   isCreating = false, 
   isEditing = isCreating, 
-  onEditToggle 
+  onEditToggle, 
+  onUpdate
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ 
@@ -106,40 +108,83 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
     
-    if (deleteTarget.type === 'topic') {
-      deleteTopic(deleteTarget.topicId);
-      onBack();
-    } else if (deleteTarget.type === 'goal' && deleteTarget.goalId) {
-      deleteGoal(deleteTarget.topicId, deleteTarget.goalId);
-    } else if (deleteTarget.type === 'task' && deleteTarget.goalId && deleteTarget.taskId) {
-      deleteTask(deleteTarget.topicId, deleteTarget.goalId, deleteTarget.taskId);
+    try {
+      if (deleteTarget.type === 'topic') {
+        const success = await deleteTopic(deleteTarget.topicId);
+        if (success) {
+          onBack();
+        } else {
+          alert('刪除主題失敗，請稍後再試');
+        }
+      } else if (deleteTarget.type === 'goal' && deleteTarget.goalId) {
+        const success = await deleteGoal(deleteTarget.topicId, deleteTarget.goalId);
+        if (success) {
+          await onUpdate?.();
+        } else {
+          alert('刪除目標失敗，請稍後再試');
+        }
+      } else if (deleteTarget.type === 'task' && deleteTarget.goalId && deleteTarget.taskId) {
+        const success = await deleteTask(deleteTarget.topicId, deleteTarget.goalId, deleteTarget.taskId);
+        if (success) {
+          await onUpdate?.();
+        } else {
+          alert('刪除任務失敗，請稍後再試');
+        }
+      }
+    } catch (error) {
+      console.error('刪除操作失敗:', error);
+      alert('刪除失敗，請稍後再試');
+    } finally {
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
     }
-    
-    setShowDeleteConfirm(false);
-    setDeleteTarget(null);
   };
 
-  const handleAddGoal = () => {
+  const handleAddGoal = async () => {
     if (!newGoalTitle.trim()) return;
-    addGoal(topic.id, {
-      title: newGoalTitle,
-      tasks: []
-    });
-    setNewGoalTitle('');
-    setSelectedGoalId(null);
+    
+    try {
+      const success = await addGoal(topic.id, {
+        title: newGoalTitle,
+        tasks: []
+      });
+      
+      if (success) {
+        setNewGoalTitle('');
+        setSelectedGoalId(null);
+        await onUpdate?.();
+      } else {
+        alert('新增目標失敗，請稍後再試');
+      }
+    } catch (error) {
+      console.error('新增目標失敗:', error);
+      alert('新增目標失敗，請稍後再試');
+    }
   };
 
-  const handleAddTask = (goalId: string) => {
+  const handleAddTask = async (goalId: string) => {
     if (!newTaskTitle.trim()) return;
-    addTask(topic.id, goalId, {
-      title: newTaskTitle,
-      status: 'todo'
-    });
-    setNewTaskTitle('');
-    setSelectedGoalId(null);
+    
+    try {
+      const success = await addTask(topic.id, goalId, {
+        title: newTaskTitle,
+        status: 'todo'
+      });
+      
+      if (success) {
+        setNewTaskTitle('');
+        setSelectedGoalId(null);
+        await onUpdate?.();
+      } else {
+        alert('新增任務失敗，請稍後再試');
+      }
+    } catch (error) {
+      console.error('新增任務失敗:', error);
+      alert('新增任務失敗，請稍後再試');
+    }
   };
 
   const handleSave = () => {
@@ -149,13 +194,25 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     }
   };
 
-  const handleTaskStatusChange = (goalId: string, task: Task) => {
+  const handleTaskStatusChange = async (goalId: string, task: Task) => {
     const newStatus = task.status === 'done' ? 'in_progress' : 'done';
-    updateTask(topic.id, goalId, task.id, {
-      ...task,
-      status: newStatus,
-      completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
-    });
+    
+    try {
+      const success = await updateTask(topic.id, goalId, task.id, {
+        ...task,
+        status: newStatus,
+        completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
+      });
+      
+      if (success) {
+        await onUpdate?.();
+      } else {
+        alert('更新任務狀態失敗，請稍後再試');
+      }
+    } catch (error) {
+      console.error('更新任務狀態失敗:', error);
+      alert('更新任務狀態失敗，請稍後再試');
+    }
   };
 
   const handleGoalMark = (goalId: string, event: React.MouseEvent) => {

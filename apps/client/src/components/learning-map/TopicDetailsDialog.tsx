@@ -28,6 +28,7 @@ interface TopicDetailsDialogProps {
   onTaskClick?: (taskId: string, goalId?: string) => void;
   onGoalClick?: (goalId: string) => void;
   onShowReview?: (topicId: string) => void;
+  onUpdate?: () => Promise<void>;
 }
 
 interface TaskDetailProps {
@@ -41,7 +42,8 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   onClose,
   onTaskClick,
   onGoalClick,
-  onShowReview
+  onShowReview,
+  onUpdate
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -85,14 +87,26 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   };
 
   // 處理新增任務
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTaskTitle.trim() || !currentGoal) return;
-    addTask(topic.id, currentGoal.id, {
-      title: newTaskTitle,
-      status: 'todo'
-    } as Task);
-    setNewTaskTitle('');
-    setShowAddTask(false);
+    
+    try {
+      const success = await addTask(topic.id, currentGoal.id, {
+        title: newTaskTitle,
+        status: 'todo'
+      } as Task);
+      
+      if (success) {
+        setNewTaskTitle('');
+        setShowAddTask(false);
+        await onUpdate?.();
+      } else {
+        alert('新增任務失敗，請稍後再試');
+      }
+    } catch (error) {
+      console.error('新增任務失敗:', error);
+      alert('新增任務失敗，請稍後再試');
+    }
   };
 
   // 處理任務點擊
@@ -600,6 +614,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                 isCreating={false}
                 isEditing={isEditing}
                 onEditToggle={() => setIsEditing(!isEditing)}
+                onUpdate={onUpdate}
               />
             </motion.div>
           ) : (

@@ -10,9 +10,11 @@ import {
   Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon, AlertTriangle,
   Pause, Award, Trophy, FlagOff, Users, Eye, EyeOff
 } from 'lucide-react';
+import type { Goal } from '../../types/goal';
 
 interface TopicRadialMapProps {
   topicId: string;
+  goals?: Goal[];
   width?: number;
   height?: number;
   showAnimations?: boolean;
@@ -49,8 +51,8 @@ const getTaskPosition = (taskIndex: number, totalTasks: number, stepX: number, s
   
   if (totalTasks === 1) {
     // 單個任務時，放在延伸線方向
-    const x = stepX + taskRadius * Math.cos(extensionAngle);
-    const y = stepY + taskRadius * Math.sin(extensionAngle);
+    const x = stepX + taskRadius * Math.cos(goalAngle);
+    const y = stepY + taskRadius * Math.sin(goalAngle);
     return { x, y, angle: extensionAngle };
   }
   
@@ -71,6 +73,7 @@ const getTaskPosition = (taskIndex: number, totalTasks: number, stepX: number, s
 
 export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   topicId,
+  goals = [],
   width = 1000,
   height = 700,
   showAnimations = true,
@@ -115,9 +118,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
   // 計算週進度統計
   const weeklyStats = useMemo(() => {
-    if (!topic) return { newlyCompleted: 0, totalTasks: 0, completedTasks: 0, inProgressTasks: 0 };
+    if (!goals) return { newlyCompleted: 0, totalTasks: 0, completedTasks: 0, inProgressTasks: 0 };
     
-    const goals = getActiveGoals(topic.id);
     let newlyCompleted = 0;
     let totalTasks = 0;
     let completedTasks = 0;
@@ -138,7 +140,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     });
     
     return { newlyCompleted, totalTasks, completedTasks, inProgressTasks };
-  }, [topic, getActiveGoals]);
+  }, [goals]);
 
   // 更新地圖尺寸
   const updateMapSize = useCallback(() => {
@@ -275,7 +277,6 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
     const subjectColor = subjectStyle.accent;
     const progress = getCompletionRate(topic.id);
-    const goals = getActiveGoals(topic.id);
     const showAvatars = topic?.show_avatars ?? true;
     const goalRadius = Math.min(width, height) * 0.46;
     const taskRadius = goalRadius * 0.6;
@@ -286,14 +287,13 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
       subjectStyle,
       subjectColor,
       progress,
-      goals,
       showAvatars,
       goalRadius,
       taskRadius,
       goalNodeSize,
       taskNodeSize
     };
-  }, [topic, width, height, getCompletionRate, getActiveGoals]);
+  }, [topic, width, height, getCompletionRate]);
 
   // 優化點擊處理函數
   const handleGoalClick = useCallback((e: React.MouseEvent, goalId: string) => {
@@ -343,7 +343,6 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     subjectStyle,
     subjectColor,
     progress,
-    goals,
     showAvatars,
     goalRadius,
     taskRadius,
@@ -606,6 +605,13 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           initial={showAnimations ? { scale: 0, opacity: 0 } : undefined}
           animate={showAnimations ? { scale: 1, opacity: 1 } : undefined}
           transition={showAnimations ? { delay: 0.2, duration: 0.5 } : undefined}
+          style={{ cursor: onGoalClick ? 'pointer' : 'default' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isDragging) {
+              onGoalClick?.('TOPIC'); // 使用特殊 ID 標識點擊的是主題節點
+            }
+          }}
         >
           {/* 主要圓圈 */}
           <circle

@@ -20,16 +20,10 @@
  */
 
 import { create } from 'zustand';
-import type { 
-  Topic,
-  CreateTopicFromTemplateParams,
-  Goal,
-  Task,
-  Bubble,
-  GoalStatus,
-  User 
-} from '../types/goal';
-import { supabase } from '../services/supabase';
+import { User, Topic, Goal, Task, Bubble, GoalStatus, CreateTopicFromTemplateParams } from '../types/goal';
+import type { TopicCollaborator } from '@self-learning/types';
+import { supabase, authService } from '../services/supabase';
+import { useUserStore } from './userStore';
 
 // 簡化的狀態管理類型
 
@@ -112,7 +106,10 @@ interface TopicStore {
   refreshTopic: (id: string) => Promise<void>;
   calculateProgress: (topic: Topic) => number; // 計算完成率
 
-  reset: () => void;
+  reset: () => void;  // 主題協作邀請管理
+  inviteTopicCollaborator: (topicId: string, userId: string, permission?: 'view' | 'edit') => Promise<boolean>;
+  removeTopicCollaborator: (topicId: string, userId: string) => Promise<boolean>;
+  getTopicInvitedCollaborators: (topicId: string) => Promise<TopicCollaborator[]>;
 }
 
 export const useTopicStore = create<TopicStore>((set, get) => ({
@@ -159,7 +156,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   fetchMyTopics: async () => {
     set({ loading: true, error: null });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await authService.getCurrentUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
@@ -194,14 +191,14 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   fetchCollaborativeTopics: async () => {
     set({ loading: true, error: null });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await authService.getCurrentUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
         .from('topics')
         .select(`
           *,
-          topic_collaborators!inner (
+          topic_collaborators (
             id,
             user_id,
             permission,
@@ -432,7 +429,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   // 協作功能
-  addCollaborator: async (topicId, userId, permission) => {
+  inviteTopicCollaborator: async (topicId, userId, permission = 'view') => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -452,13 +449,17 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       await get().refreshTopic(topicId);
       return true;
     } catch (error) {
-      console.error('Failed to add collaborator:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to add collaborator' });
+      console.error('Failed to invite collaborator:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to invite collaborator' });
       return false;
     }
   },
 
-  removeCollaborator: async (topicId, userId) => {
+  addCollaborator: async (topicId, userId, permission) => {
+    return get().inviteTopicCollaborator(topicId, userId, permission);
+  },
+
+  removeTopicCollaborator: async (topicId, userId) => {
     try {
       const { error } = await supabase
         .from('topic_collaborators')
@@ -478,6 +479,10 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     }
   },
 
+  removeCollaborator: async (topicId, userId) => {
+    return get().removeTopicCollaborator(topicId, userId);
+  },
+
   updateCollaboratorPermission: async (topicId, userId, permission) => {
     try {
       const { error } = await supabase
@@ -495,6 +500,47 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       console.error('Failed to update collaborator permission:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to update collaborator permission' });
       return false;
+    }
+  },
+
+  getTopicInvitedCollaborators: async (topicId) => {
+    try {
+      const { data, error } = await supabase
+        .from('topic_collaborators')
+        .select('user_id, permission')
+        .eq('topic_id', topicId);
+
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      const userState = useUserStore.getState();
+      if (userState.users.length === 0) {
+        await userState.getUsers();
+      }
+      const allUsers = useUserStore.getState().users;
+      
+      return data
+        .map(tc => {
+          const user = allUsers.find(u => u.id === tc.user_id);
+          if (!user || !['view', 'edit'].includes(tc.permission)) return undefined;
+          return {
+            id: user.id,
+            name: user.name,
+            roles: user.roles,
+            avatar: user.avatar,
+            email: user.email,
+            color: user.color,
+            role: user.role,
+            permission: tc.permission as 'view' | 'edit'
+          } as TopicCollaborator;
+        })
+        .filter((user): user is TopicCollaborator => user !== undefined);
+    } catch (error) {
+      console.error('Error getting topic collaborators:', error);
+      return [];
     }
   },
 
@@ -1269,6 +1315,15 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
+      // 檢查 owner 是否是主題的協作者或擁有者
+      const invitedCollaborators = await get().getTopicInvitedCollaborators(topicId);
+      const isValidOwner = invitedCollaborators.some(collaborator => collaborator.id === owner.id) || 
+                          topic.owner_id === owner.id;
+      
+      if (!isValidOwner) {
+        throw new Error('只能指派主題協作者為目標負責人');
+      }
+
       const updatedGoals = topic.goals.map(goal =>
         goal.id === goalId ? { ...goal, owner } : goal
       );
@@ -1301,6 +1356,15 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     try {
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
+
+      // 檢查 owner 是否是主題的協作者或擁有者
+      const invitedCollaborators = await get().getTopicInvitedCollaborators(topicId);
+      const isValidOwner = invitedCollaborators.some(collaborator => collaborator.id === owner.id) || 
+                          topic.owner_id === owner.id;
+      
+      if (!isValidOwner) {
+        throw new Error('只能指派主題協作者為任務負責人');
+      }
 
       const updatedGoals = topic.goals.map(goal =>
         goal.id === goalId
@@ -1342,8 +1406,23 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
+      // 檢查協作者是否是主題的協作者或擁有者
+      const invitedCollaborators = await get().getTopicInvitedCollaborators(topicId);
+      const isValidCollaborator = invitedCollaborators.some(invited => invited.id === collaborator.id) || 
+                                 topic.owner_id === collaborator.id;
+      
+      if (!isValidCollaborator) {
+        throw new Error('只能指派主題協作者為目標協作者');
+      }
+
       const updatedGoals = topic.goals.map(goal =>
-        goal.id === goalId ? { ...goal, collaborators: [...(goal.collaborators || []), collaborator] } : goal
+        goal.id === goalId ? { 
+          ...goal, 
+          collaborators: [...(goal.collaborators || []), collaborator].filter((user, index, self) => 
+            // 去重
+            index === self.findIndex((u) => u.id === user.id)
+          ) 
+        } : goal
       );
 
       const { error } = await supabase
@@ -1408,6 +1487,15 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
+      // 檢查協作者是否是主題的協作者或擁有者
+      const invitedCollaborators = await get().getTopicInvitedCollaborators(topicId);
+      const isValidCollaborator = invitedCollaborators.some(invited => invited.id === collaborator.id) || 
+                                 topic.owner_id === collaborator.id;
+      
+      if (!isValidCollaborator) {
+        throw new Error('只能指派主題協作者為任務協作者');
+      }
+
       const updatedGoals = topic.goals.map(goal =>
         goal.id === goalId
           ? {
@@ -1465,16 +1553,6 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         .eq('id', topicId);
 
       if (error) throw error;
-
-      // 更新本地狀態
-      set(state => ({
-        topics: state.topics.map(t =>
-          t.id === topicId
-            ? { ...t, goals: updatedGoals }
-            : t
-        )
-      }));
-
       return true;
     } catch (error) {
       console.error('Failed to remove task collaborator:', error);
@@ -1484,18 +1562,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   getAvailableUsers: () => {
-    // 嘗試從 userStore 獲取用戶，如果失敗則使用範例用戶
-    try {
-      // 動態導入 userStore 避免循環依賴
-      const userStore = (window as any).__userStore__;
-      if (userStore && userStore.users && userStore.users.length > 0) {
-        return userStore.users;
-      }
-    } catch (error) {
-      console.warn('無法從 userStore 獲取用戶，使用範例用戶:', error);
-    }
+    // 注意：由於架構分層原則，這個方法應該被棄用
+    // 調用方應該直接使用 userStore.users
+    console.warn('getAvailableUsers 應該被棄用，請直接使用 userStore.users');
     
-    // 範例用戶數據
+    // 範例用戶數據（作為後備）
     const EXAMPLE_USERS: User[] = [
       {
         id: 'user-1',

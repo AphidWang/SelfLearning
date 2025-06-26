@@ -199,10 +199,14 @@ export const useUserStore = create<UserStore>((set, get) => {
 
     // 管理員功能 - 通過 server API
     getUsers: async () => {
+      // 如果已經有用戶資料，直接返回，避免重複請求
+      const { users, loading } = get();
+      if (users.length > 0 || loading) return;
+
       set({ loading: true, error: null });
       try {
-        const users = await adminUserApi.getUsers();
-        set({ users, loading: false });
+        const fetchedUsers = await adminUserApi.getUsers();
+        set({ users: fetchedUsers, loading: false });
       } catch (error: any) {
         set({ loading: false, error: error.message || '獲取用戶失敗' });
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserAvatar, UserAvatarGroup } from './UserAvatar';
 import type { User } from '../../types/goal';
@@ -32,14 +32,29 @@ export const CollaborationManager: React.FC<CollaborationManagerProps> = ({
   const [showOwnerSelector, setShowOwnerSelector] = useState(false);
   const [showCollaboratorSelector, setShowCollaboratorSelector] = useState(false);
 
-  // 過濾出可選的用戶（排除已經是owner或collaborator的用戶）
-  const availableForOwner = availableUsers.filter(user => 
-    user.id !== owner?.id
+  // 使用 useMemo 優化可用用戶的計算
+  const availableForOwner = useMemo(() => 
+    availableUsers.filter(user => user.id !== owner?.id),
+    [availableUsers, owner?.id]
   );
   
-  const availableForCollaborator = availableUsers.filter(user => 
-    user.id !== owner?.id && !collaborators.some(c => c.id === user.id)
+  const availableForCollaborator = useMemo(() => 
+    availableUsers.filter(user => 
+      !(collaborators || []).some(c => c.id === user.id)
+    ),
+    [availableUsers, collaborators]
   );
+
+  // 使用 useMemo 優化日誌輸出
+  const debugInfo = useMemo(() => ({
+    all: availableUsers,
+    forOwner: availableForOwner,
+    forCollaborator: availableForCollaborator,
+    currentOwner: owner,
+    currentCollaborators: collaborators
+  }), [availableUsers, availableForOwner, availableForCollaborator, owner, collaborators]);
+
+  console.log('🔍 CollaborationManager - Available Users:', debugInfo);
 
   return (
     <div className={`bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200/50 dark:border-blue-700/50 ${className}`}>
