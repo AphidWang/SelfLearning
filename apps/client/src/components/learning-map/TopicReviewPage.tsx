@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
+import { useUserStore } from '../../store/userStore';
 import { subjects } from '../../styles/tokens';
 import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
 import { HelpMessageDisplay } from './HelpMessageDisplay';
@@ -14,8 +15,12 @@ import {
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare,
   ChevronLeft, Pencil, Sparkles, Check, HelpCircle,
   Save, AlertTriangle, Plus, Trash2, PenTool, Mic,
-  Edit
+  Edit, UserPlus, Users
 } from 'lucide-react';
+
+interface Collaborator extends User {
+  permission: 'view' | 'edit' | 'none';
+}
 
 interface TopicReviewPageProps {
   topicId: string;
@@ -31,16 +36,27 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   onClose
 }) => {
   const { 
-    getTopic, 
+    addGoal, 
+    deleteGoal,
+    getTopic,
     getCompletionRate,
+    toggleTopicCollaborative,
+    inviteTopicCollaborator,
+    removeTopicCollaborator,
+    getTopicInvitedCollaborators,
     getActiveGoals,
     updateTopic,
-    getAvailableUsers,
+    deleteTopic,
+    addTask, 
+    deleteTask, 
+    updateGoal,
     setGoalOwner,
     addGoalCollaborator,
-    removeGoalCollaborator,
-    deleteTopic
+    removeGoalCollaborator
   } = useTopicStore();
+  
+  // 使用 userStore 獲取用戶數據，遵循架構分層原則
+  const { getUsers, users } = useUserStore();
   
   const [topic, setTopic] = useState<Topic | null>(null);
   const weeklyStats = useTopicRadialMapStats(topicId);
@@ -50,15 +66,67 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   const [editedTopic, setEditedTopic] = useState<Topic | null>(null);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
+  const [pendingPermissions, setPendingPermissions] = useState<Record<string, 'view' | 'edit' | 'none'>>({});
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [owner, setOwner] = useState<User | undefined>();
+  
+  // 處理權限變更
+  const handlePermissionChange = (userId: string, permission: 'view' | 'edit' | 'none') => {
+    setPendingPermissions(prev => ({
+      ...prev,
+      [userId]: permission
+    }));
+  };
+
+  // 批量更新權限
+  const handleUpdatePermissions = async () => {
+    try {
+      setIsUpdating(true);
+      setPendingOperation('permissions');
+      
+      for (const [userId, permission] of Object.entries(pendingPermissions)) {
+        if (permission === 'none') {
+          await removeTopicCollaborator(topicId, userId);
+        } else {
+          await inviteTopicCollaborator(topicId, userId, permission);
+        }
+      }
+      
+      await handleCollaborationUpdate();
+      setPendingPermissions({});
+    } catch (error) {
+      console.error('更新權限失敗:', error);
+      alert('更新權限失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
   
   // 異步載入主題數據
   const refreshTopic = useCallback(async () => {
+    console.log('📥 TopicReviewPage - refreshTopic started');
     const fetchedTopic = await getTopic(topicId);
     if (fetchedTopic) {
+      console.log('📦 TopicReviewPage - Setting new topic:', fetchedTopic);
       setTopic(fetchedTopic);
       setEditedTopic(fetchedTopic);
+      
+      // 更新協作者列表
+      const invited = await getTopicInvitedCollaborators(topicId);
+      setCollaborators(invited as Collaborator[]);
     }
-  }, [topicId, getTopic]);
+  }, [topicId, getTopic, getTopicInvitedCollaborators]);
+
+  // 當 topic 或 users 更新時更新擁有者
+  useEffect(() => {
+    if (topic && users.length > 0) {
+      const owner = users.find(user => user.id === topic.owner_id);
+      setOwner(owner);
+    }
+  }, [topic?.owner_id, users]);
 
   useEffect(() => {
     refreshTopic();
@@ -70,6 +138,26 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
       setEditedTopic(topic);
     }
   }, [topic]);
+
+  // 監聽 users 變化
+  useEffect(() => {
+    if (topic?.is_collaborative) {
+      getUsers();
+    }
+  }, [topic?.is_collaborative, getUsers]);
+
+  // 當協作者更新時刷新頁面
+  const handleCollaborationUpdate = useCallback(async () => {
+    console.log('🔄 TopicReviewPage - handleCollaborationUpdate triggered');
+    setIsUpdating(true);
+    setPendingOperation('collaboration');
+    try {
+      await refreshTopic();
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  }, [refreshTopic]);
 
   // 處理點擊外部關閉下拉選單
   useEffect(() => {
@@ -113,6 +201,18 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     return count;
   }, [topic, topicId, getActiveGoals]);
 
+  // 記憶化 goals 以避免不必要的重新渲染
+  const memoizedGoals = useMemo(() => {
+    if (!topic) return [];
+    return topic.goals;
+  }, [topic?.goals]);
+
+  // 記憶化主題樣式
+  const subjectStyle = useMemo(() => {
+    if (!topic) return subjects.getSubjectStyle('');
+    return subjects.getSubjectStyle(topic.subject || '');
+  }, [topic?.subject]);
+
   if (!topic) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -121,7 +221,6 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     );
   }
 
-  const subjectStyle = subjects.getSubjectStyle((isEditingTitle ? editedTopic?.subject : topic.subject) || '');
   const progress = getCompletionRate(topic.id);
 
   // 處理 RadialMap 的點擊事件
@@ -403,34 +502,54 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 
         {/* 刪除確認對話框 */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                確定要刪除這個主題嗎？
-              </h3>
-              <p className="text-gray-600 mb-6">
-                這個動作無法復原，所有相關的目標和任務都會被永久刪除。
+          <motion.div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-800 dark:text-white">確認刪除主題</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    此操作無法復原
+                  </p>
+                </div>
+              </div>
+              
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                您確定要刪除主題 <strong>{topic.title}</strong> 嗎？所有相關的目標和任務都會被永久刪除。
               </p>
-              <div className="flex justify-end gap-3">
+              
+              <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
                   取消
                 </button>
                 <button
                   onClick={handleDeleteTopic}
-                  className="px-4 py-2 bg-red-500 text-white hover:bg-red-600 rounded-lg transition-colors"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                 >
-                  確定刪除
+                  確認刪除
                 </button>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {/* 主要內容區 */}
-                <div className="flex-1 p-3 overflow-hidden">
+        <div className="flex-1 p-3 overflow-hidden">
           <div className="grid grid-cols-12 gap-3 h-full">
             {/* 左側統計面板 */}
             <div className="col-span-3 flex flex-col gap-2 overflow-y-auto">
@@ -574,8 +693,15 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.4 }}
               >
+                {isUpdating && (
+                  <div className="absolute inset-0 bg-white/30 dark:bg-gray-800/30 flex items-center justify-center z-50">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                )}
                 <TopicRadialMap
+                  key={`radial-${topic.id}`}
                   topicId={topicId}
+                  goals={memoizedGoals}
                   width={760}
                   height={460}
                   showAnimations={true}
@@ -599,6 +725,10 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                 onGoalClick={onGoalClick}
                 onBackToGoal={handleBackToGoal}
                 onGoalDeleted={handleGoalDeleted}
+                onCollaborationUpdate={handleCollaborationUpdate}
+                users={users}
+                owner={topic.owner}
+                collaborators={collaborators}
               />
             </div>
         </div>
@@ -618,6 +748,10 @@ interface GoalTaskInfoPanelProps {
   onGoalClick?: (goalId: string) => void;
   onBackToGoal?: () => void;
   onGoalDeleted?: () => void;
+  onCollaborationUpdate: () => Promise<void>;
+  users: User[];
+  owner?: User;
+  collaborators?: Collaborator[];
 }
 
 const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
@@ -628,10 +762,16 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   onTaskSelect,
   onGoalClick,
   onBackToGoal,
-  onGoalDeleted
+  onGoalDeleted,
+  onCollaborationUpdate,
+  users,
+  owner,
+  collaborators
 }) => {
   const { getTopic, updateGoalHelp, updateTaskHelp } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   
   const refreshTopic = useCallback(async () => {
     const fetchedTopic = await getTopic(topicId);
@@ -642,10 +782,10 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   
   useEffect(() => {
     refreshTopic();
-  }, [refreshTopic]);
+  }, [refreshTopic, topic]);
   
   // 根據選擇顯示不同內容
-  const selectedGoal = selectedGoalId ? topic?.goals.find(goal => goal.id === selectedGoalId) : null;
+  const selectedGoal = selectedGoalId && selectedGoalId !== 'TOPIC' ? topic?.goals.find(goal => goal.id === selectedGoalId) : null;
   const selectedTask = selectedTaskId && selectedGoal ? 
     selectedGoal.tasks.find(task => task.id === selectedTaskId) : null;
 
@@ -660,6 +800,10 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         topicId={topicId}
         subjectColor={subjectColor}
         onBackToGoal={onBackToGoal}
+        onCollaborationUpdate={onCollaborationUpdate}
+        users={users}
+        owner={owner}
+        collaborators={collaborators}
       />
     );
   }
@@ -685,6 +829,27 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         completedTasks={completedTasks}
         inProgressTasks={inProgressTasks}
         onGoalDeleted={onGoalDeleted}
+        onCollaborationUpdate={onCollaborationUpdate}
+        users={users}
+        owner={owner}
+        collaborators={collaborators}
+      />
+    );
+  }
+
+  if (selectedGoalId === 'TOPIC' && topic) {
+    // 顯示主題詳情
+    return (
+      <TopicDetailPanel
+        key={`topic-${topic.id}`}
+        topic={topic}
+        topicId={topicId}
+        subjectColor={subjectColor}
+        onGoalClick={onGoalClick}
+        onCollaborationUpdate={onCollaborationUpdate}
+        users={users}
+        owner={owner}
+        collaborators={collaborators}
       />
     );
   }
@@ -710,11 +875,11 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
 
       <div className="text-center relative z-10">
         <Eye className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-        <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">選擇要查看的內容</h3>
+        <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">探索學習路徑</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          點擊左側路徑圖中的目標或任務
+          點擊中央主題查看整體規劃
           <br />
-          來查看詳細資訊
+          點擊目標或任務查看詳細資訊
         </p>
       </div>
     </motion.div>
@@ -729,6 +894,10 @@ interface TaskDetailPanelProps {
   topicId: string;
   subjectColor: string;
   onBackToGoal?: () => void;
+  onCollaborationUpdate: () => Promise<void>;
+  users: User[];
+  owner?: User;
+  collaborators?: Collaborator[];
 }
 
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
@@ -737,18 +906,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   topic,
   topicId,
   subjectColor,
-  onBackToGoal
+  onBackToGoal,
+  onCollaborationUpdate,
+  users,
+  owner,
+  collaborators
 }) => {
-  const { 
-    updateTask, 
-    updateTaskHelp, 
-    deleteTask,
-    getAvailableUsers,
-    setTaskOwner,
-    addTaskCollaborator,
-    removeTaskCollaborator,
-    getTopic
-  } = useTopicStore();
+  const { updateTask, updateTaskHelp, deleteTask, setTaskOwner, addTaskCollaborator, removeTaskCollaborator, getTopic } = useTopicStore();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
@@ -756,19 +922,23 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [challenge, setChallenge] = useState<1 | 2 | 3 | 4 | 5 | undefined>(task.challenge as 1 | 2 | 3 | 4 | 5 | undefined);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [helpMessage, setHelpMessage] = useState(task.helpMessage || '');
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
 
   const refreshTopic = useCallback(async () => {
+    console.log('📥 TaskDetailPanel - refreshTopic started');
     const fetchedTopic = await getTopic(topicId);
     if (fetchedTopic) {
       const updatedGoal = fetchedTopic.goals.find(g => g.id === goal.id);
       const updatedTask = updatedGoal?.tasks.find(t => t.id === task.id);
       if (updatedTask) {
+        console.log('📦 TaskDetailPanel - Setting new task:', updatedTask);
         setEditedTask(updatedTask);
       }
     }
   }, [topicId, goal.id, task.id, getTopic]);
+
+  useEffect(() => {
+    console.log('🔄 TaskDetailPanel - editedTask changed:', editedTask);
+  }, [editedTask]);
 
   useEffect(() => {
     refreshTopic();
@@ -812,26 +982,25 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     try {
       setIsUpdating(true);
       setPendingOperation('status');
-      const updatedTask = {
+      
+      // 後端更新
+      const result = await updateTask(topicId, goal.id, task.id, {
         ...task,
         status,
         completedAt: status === 'done' ? new Date().toISOString() : undefined
-      };
-      
-      // 先更新 UI
-      setEditedTask(updatedTask);
-      
-      // 後端更新
-      const result = await updateTask(topicId, goal.id, task.id, updatedTask);
+      });
+
       if (!result) {
-        // 如果更新失敗，回滾到原始狀態
-        setEditedTask(task);
         alert('更新狀態失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+        // 返回到目標詳情頁面
+        onBackToGoal?.();
       }
     } catch (err) {
       console.error('Error updating task status:', err);
-      // 如果更新失敗，回滾到原始狀態
-      setEditedTask(task);
       alert('更新狀態失敗，請稍後再試');
     } finally {
       setIsUpdating(false);
@@ -907,10 +1076,106 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     }
   };
 
-  const handleDeleteTask = () => {
-    if (confirm('確定要刪除這個任務嗎？')) {
-      deleteTask(topicId, goal.id, task.id);
-      onBackToGoal?.(); // 刪除後回到目標視圖
+  const [showDeleteTaskConfirm, setShowDeleteTaskConfirm] = useState(false);
+
+  const handleDeleteTask = async () => {
+    try {
+      setIsUpdating(true);
+      setPendingOperation('delete');
+      
+      // 後端更新
+      const success = await deleteTask(topicId, goal.id, task.id);
+      if (!success) {
+        alert('刪除任務失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+        onBackToGoal?.(); // 刪除後回到目標視圖
+      }
+    } catch (error) {
+      console.error('刪除任務失敗:', error);
+      alert('刪除任務失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+      setShowDeleteTaskConfirm(false);
+    }
+  };
+
+  // 處理協作相關的更新
+  const handleSetOwner = async (user: User) => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('owner');
+      
+      // 後端更新
+      const success = await setTaskOwner(topicId, goal.id, task.id, user);
+      if (!success) {
+        alert('設置任務負責人失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('設置任務負責人失敗:', error);
+      alert('設置任務負責人失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
+
+  const handleAddCollaborator = async (user: User) => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('collaborator');
+      
+      // 後端更新
+      const success = await addTaskCollaborator(topicId, goal.id, task.id, user);
+      if (!success) {
+        alert('新增協作者失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('新增協作者失敗:', error);
+      alert('新增協作者失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
+
+  const handleRemoveCollaborator = async (userId: string) => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('collaborator');
+      
+      // 後端更新
+      const success = await removeTaskCollaborator(topicId, goal.id, task.id, userId);
+      if (!success) {
+        alert('移除協作者失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('移除協作者失敗:', error);
+      alert('移除協作者失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
     }
   };
 
@@ -1115,10 +1380,13 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               title="任務協作"
               owner={task.owner}
               collaborators={task.collaborators}
-              availableUsers={getAvailableUsers()}
-              onSetOwner={(user) => setTaskOwner(topicId, goal.id, task.id, user)}
-              onAddCollaborator={(user) => addTaskCollaborator(topicId, goal.id, task.id, user)}
-              onRemoveCollaborator={(userId) => removeTaskCollaborator(topicId, goal.id, task.id, userId)}
+              availableUsers={users.filter(user => 
+                user.id === topic.owner_id || 
+                (topic.collaborators || []).some(collaborator => collaborator.id === user.id)
+              )}
+              onSetOwner={handleSetOwner}
+              onAddCollaborator={handleAddCollaborator}
+              onRemoveCollaborator={handleRemoveCollaborator}
               className="mb-3"
             />
           )}
@@ -1159,7 +1427,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             {/* 刪除按鈕 */}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
               <button
-                onClick={handleDeleteTask}
+                onClick={() => setShowDeleteTaskConfirm(true)}
                 className="w-full py-2 bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                 title="刪除任務"
               >
@@ -1340,6 +1608,54 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           </motion.div>
         </motion.div>
       )}
+
+      {/* 刪除確認對話框 */}
+      {showDeleteTaskConfirm && (
+        <motion.div
+          className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center p-4 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 w-full max-w-sm shadow-xl"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-800 dark:text-white">確認刪除任務</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  此操作無法復原
+                </p>
+              </div>
+            </div>
+            
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              您確定要刪除任務 <strong>{task.title}</strong> 嗎？
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteTaskConfirm(false)}
+                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDeleteTask}
+                className="px-3 py-1 text-sm bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors"
+              >
+                確認刪除
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+
     </motion.div>
   );
 };
@@ -1351,12 +1667,16 @@ interface GoalDetailPanelProps {
   topicId: string;
   subjectColor: string;
   onTaskSelect?: (taskId: string, goalId: string) => void;
-  updateGoalHelp: (topicId: string, goalId: string, needHelp: boolean, helpMessage?: string) => void;
+  updateGoalHelp: (topicId: string, goalId: string, needHelp: boolean, helpMessage?: string) => Promise<boolean>;
   progress: number;
   totalTasks: number;
   completedTasks: number;
   inProgressTasks: number;
   onGoalDeleted?: () => void;
+  onCollaborationUpdate: () => Promise<void>;
+  users: User[];
+  owner?: User;
+  collaborators?: Collaborator[];
 }
 
 const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
@@ -1370,32 +1690,125 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   totalTasks,
   completedTasks,
   inProgressTasks,
-  onGoalDeleted
+  onGoalDeleted,
+  onCollaborationUpdate,
+  users,
+  owner,
+  collaborators
 }) => {
-  const { 
+    const {
     addTask, 
     deleteTask, 
-    deleteGoal, 
     updateGoal,
-    getAvailableUsers,
+    deleteGoal,
+    getCompletionRate,
     setGoalOwner,
     addGoalCollaborator,
-    removeGoalCollaborator
+    removeGoalCollaborator,
+    getTopic
   } = useTopicStore();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [editedGoal, setEditedGoal] = useState(goal);
-  
-  // topic 已經透過 props 傳入，不需要重新獲取
+
+  const refreshTopic = useCallback(async () => {
+    const fetchedTopic = await getTopic(topicId);
+    if (fetchedTopic) {
+      const updatedGoal = fetchedTopic.goals.find(g => g.id === goal.id);
+      if (updatedGoal) {
+        setEditedGoal(updatedGoal);
+      }
+    }
+  }, [topicId, goal.id, getTopic]);
 
   // 當 goal 更新時同步 editedGoal
   useEffect(() => {
     setEditedGoal(goal);
   }, [goal]);
+
+  // 處理協作相關的更新
+  const handleSetOwner = async (user: User) => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('owner');
+      
+      // 後端更新
+      const success = await setGoalOwner(topicId, goal.id, user);
+      if (!success) {
+        alert('設置目標負責人失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('設置目標負責人失敗:', error);
+      alert('設置目標負責人失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
+
+  const handleAddCollaborator = async (user: User) => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('collaborator');
+      
+      // 後端更新
+      const success = await addGoalCollaborator(topicId, goal.id, user);
+      if (!success) {
+        alert('新增協作者失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('新增協作者失敗:', error);
+      alert('新增協作者失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
+
+  const handleRemoveCollaborator = async (userId: string) => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('collaborator');
+      
+      // 後端更新
+      const success = await removeGoalCollaborator(topicId, goal.id, userId);
+      if (!success) {
+        alert('移除協作者失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('移除協作者失敗:', error);
+      alert('移除協作者失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
   
+  // topic 已經透過 props 傳入，不需要重新獲取
+
   const handleHelpSubmit = () => {
     updateGoalHelp(topicId, goal.id, true, helpMessage);
     setShowHelpDialog(false);
@@ -1406,32 +1819,101 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
     setShowHelpDialog(false);
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (newTaskTitle.trim()) {
-      const newTask = {
-        id: `task-${Date.now()}`,
-        title: newTaskTitle.trim(),
-        description: '',
-        status: 'todo' as const,
-        order: goal.tasks.length
-      };
-      addTask(topicId, goal.id, newTask);
-      setNewTaskTitle('');
-      setShowAddTaskDialog(false);
+      try {
+        setIsUpdating(true);
+        setPendingOperation('add');
+        
+        const newTask = {
+          id: `task-${Date.now()}`,
+          title: newTaskTitle.trim(),
+          description: '',
+          status: 'todo' as const,
+          order: goal.tasks.length
+        };
+        
+        // 後端更新
+        const success = await addTask(topicId, goal.id, newTask);
+        if (!success) {
+          alert('新增任務失敗，請稍後再試');
+        } else {
+          // 刷新整個主題數據
+          await refreshTopic();
+          await onCollaborationUpdate();
+          setNewTaskTitle('');
+          setShowAddTaskDialog(false);
+        }
+      } catch (error) {
+        console.error('新增任務失敗:', error);
+        alert('新增任務失敗，請稍後再試');
+      } finally {
+        setIsUpdating(false);
+        setPendingOperation(null);
+      }
     }
   };
 
-  const handleDeleteTaskFromList = (taskId: string, e: React.MouseEvent) => {
+  const [showDeleteTaskFromListConfirm, setShowDeleteTaskFromListConfirm] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<{ id: string; title: string } | null>(null);
+
+  const handleDeleteTaskFromList = (taskId: string, taskTitle: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 防止觸發選擇任務
-    if (confirm('確定要刪除這個任務嗎？')) {
-      deleteTask(topicId, goal.id, taskId);
+    setTaskToDelete({ id: taskId, title: taskTitle });
+    setShowDeleteTaskFromListConfirm(true);
+  };
+
+  const confirmDeleteTaskFromList = async () => {
+    if (!taskToDelete) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('delete');
+      
+      // 後端更新
+      const success = await deleteTask(topicId, goal.id, taskToDelete.id);
+      if (!success) {
+        alert('刪除任務失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('刪除任務失敗:', error);
+      alert('刪除任務失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+      setShowDeleteTaskFromListConfirm(false);
+      setTaskToDelete(null);
     }
   };
 
-  const handleDeleteGoal = () => {
-    if (confirm('確定要刪除這個目標嗎？這將會同時刪除所有相關任務。')) {
-      deleteGoal(topicId, goal.id);
-      onGoalDeleted?.(); // 刪除後清除選擇狀態
+  const [showDeleteGoalConfirm, setShowDeleteGoalConfirm] = useState(false);
+
+  const handleDeleteGoal = async () => {
+    try {
+      setIsUpdating(true);
+      setPendingOperation('delete');
+      
+      // 後端更新
+      const success = await deleteGoal(topicId, goal.id);
+      if (!success) {
+        alert('刪除目標失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+        onGoalDeleted?.(); // 刪除後清除選擇狀態
+      }
+    } catch (error) {
+      console.error('刪除目標失敗:', error);
+      alert('刪除目標失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+      setShowDeleteGoalConfirm(false);
     }
   };
 
@@ -1503,13 +1985,13 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
             <div 
               className="h-2 rounded-full transition-all duration-300"
               style={{ 
-                width: `${progress}%`,
-                backgroundColor: progress === 100 ? '#22c55e' : subjectColor
+                width: `${getCompletionRate(goal.id)}%`,
+                backgroundColor: getCompletionRate(goal.id) === 100 ? '#22c55e' : subjectColor
               }}
             />
           </div>
           <span className="text-xs text-gray-500 min-w-[40px]">
-            {progress}%
+            {Math.round(getCompletionRate(goal.id))}%
           </span>
         </div>
         <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -1604,10 +2086,13 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
             title="目標協作"
             owner={goal.owner}
             collaborators={goal.collaborators}
-            availableUsers={getAvailableUsers()}
-            onSetOwner={(user) => setGoalOwner(topicId, goal.id, user)}
-            onAddCollaborator={(user) => addGoalCollaborator(topicId, goal.id, user)}
-            onRemoveCollaborator={(userId) => removeGoalCollaborator(topicId, goal.id, userId)}
+            availableUsers={users.filter(user => 
+              user.id === topic.owner_id || 
+              (topic.collaborators || []).some(collaborator => collaborator.id === user.id)
+            )}
+            onSetOwner={handleSetOwner}
+            onAddCollaborator={handleAddCollaborator}
+            onRemoveCollaborator={handleRemoveCollaborator}
             className="mb-4"
           />
         )}
@@ -1669,7 +2154,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
                     </div>
                   </div>
                   <button
-                    onClick={(e) => handleDeleteTaskFromList(task.id, e)}
+                    onClick={(e) => handleDeleteTaskFromList(task.id, task.title, e)}
                     className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors opacity-0 group-hover:opacity-100"
                     title="刪除任務"
                   >
@@ -1696,7 +2181,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
       {/* 底部刪除按鈕 */}
       <div className="flex-shrink-0 p-4 pt-2 border-t border-gray-200 dark:border-gray-700">
         <button
-          onClick={handleDeleteGoal}
+          onClick={() => setShowDeleteGoalConfirm(true)}
           className="w-full py-2 bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
           title="刪除目標"
         >
@@ -1820,6 +2305,571 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
             </div>
           </motion.div>
         </motion.div>
+      )}
+    </motion.div>
+  );
+};
+
+// TopicDetailPanel 組件 - 顯示主題詳情和目標管理
+interface TopicDetailPanelProps {
+  topic: Topic;
+  topicId: string;
+  subjectColor: string;
+  onGoalClick?: (goalId: string) => void;
+  onCollaborationUpdate: () => Promise<void>;
+  users: User[];
+  owner?: User;
+  collaborators?: User[];
+}
+
+const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
+  topic,
+  topicId,
+  subjectColor,
+  onGoalClick,
+  onCollaborationUpdate,
+  users,
+  owner,
+  collaborators
+}) => {
+  const { 
+    addGoal, 
+    deleteGoal, 
+    getTopic, 
+    getCompletionRate, 
+    toggleTopicCollaborative,
+    inviteTopicCollaborator,
+    removeTopicCollaborator
+  } = useTopicStore();
+  
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
+  const [showAddGoalDialog, setShowAddGoalDialog] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [newGoalDescription, setNewGoalDescription] = useState('');
+  const [selectedGoalToDelete, setSelectedGoalToDelete] = useState<Goal | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCollaborationConfirm, setShowCollaborationConfirm] = useState(false);
+  const [collaborationAction, setCollaborationAction] = useState<'enable' | 'disable'>('enable');
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+
+  // 合併系統用戶和協作者
+  const availableUsers = useMemo(() => {
+    return users.filter(user => 
+      user.id !== topic.owner_id && 
+      !collaborators?.some(c => c.id === user.id)
+    );
+  }, [users, topic.owner_id, collaborators]);
+
+  const refreshTopic = useCallback(async () => {
+    const fetchedTopic = await getTopic(topicId);
+    if (fetchedTopic) {
+      // 刷新會由父組件處理
+    }
+  }, [topicId, getTopic]);
+
+  const handleAddGoal = async () => {
+    if (!newGoalTitle.trim()) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('add');
+      
+      const newGoal = {
+        title: newGoalTitle.trim(),
+        description: newGoalDescription.trim(),
+        tasks: []
+      };
+      
+      // 後端更新
+      const success = await addGoal(topicId, newGoal);
+      if (!success) {
+        alert('新增目標失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+        setNewGoalTitle('');
+        setNewGoalDescription('');
+        setShowAddGoalDialog(false);
+      }
+    } catch (error) {
+      console.error('新增目標失敗:', error);
+      alert('新增目標失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
+
+  const handleDeleteGoal = async (goal: Goal) => {
+    setSelectedGoalToDelete(goal);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteGoal = async () => {
+    if (!selectedGoalToDelete) return;
+    
+    try {
+      setIsUpdating(true);
+      setPendingOperation('delete');
+      
+      // 後端更新
+      const success = await deleteGoal(topicId, selectedGoalToDelete.id);
+      if (!success) {
+        alert('刪除目標失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('刪除目標失敗:', error);
+      alert('刪除目標失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+      setShowDeleteConfirm(false);
+      setSelectedGoalToDelete(null);
+    }
+  };
+
+  const handleToggleCollaboration = (action: 'enable' | 'disable') => {
+    setCollaborationAction(action);
+    setShowCollaborationConfirm(true);
+  };
+
+  const confirmToggleCollaboration = async () => {
+    try {
+      setIsUpdating(true);
+      setPendingOperation('collaboration');
+      
+      // 後端更新
+      const success = await toggleTopicCollaborative(topicId);
+      if (!success) {
+        alert('更新協作設置失敗，請稍後再試');
+      } else {
+        // 刷新整個主題數據
+        await refreshTopic();
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('更新協作設置失敗:', error);
+      alert('更新協作設置失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+      setShowCollaborationConfirm(false);
+    }
+  };
+
+  // 邀請協作者
+  const handleInviteCollaborator = async (userId: string, permission: 'view' | 'edit' = 'view') => {
+    // 檢查是否已經是協作者
+    if (collaborators?.some(c => c.id === userId)) {
+      console.log('用戶已經是協作者');
+      return true;
+    }
+
+    try {
+      setIsUpdating(true);
+      setPendingOperation('invite');
+      
+      const success = await inviteTopicCollaborator(topicId, userId, permission);
+      if (!success) {
+        alert('邀請協作者失敗，請稍後再試');
+      } else {
+        await onCollaborationUpdate();
+        setShowInviteDialog(false);
+      }
+      return success;
+    } catch (error) {
+      console.error('邀請協作者失敗:', error);
+      alert('邀請協作者失敗，請稍後再試');
+      return false;
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
+
+  // 移除協作者
+  const handleRemoveCollaborator = async (userId: string) => {
+    try {
+      setIsUpdating(true);
+      setPendingOperation('remove');
+      
+      const success = await removeTopicCollaborator(topicId, userId);
+      if (!success) {
+        alert('移除協作者失敗，請稍後再試');
+      } else {
+        await onCollaborationUpdate();
+      }
+    } catch (error) {
+      console.error('移除協作者失敗:', error);
+      alert('移除協作者失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+      setPendingOperation(null);
+    }
+  };
+
+  const progress = getCompletionRate(topic.id);
+  const totalGoals = topic.goals.length;
+  const completedGoals = topic.goals.filter(goal => {
+    const totalTasks = goal.tasks.length;
+    const completedTasks = goal.tasks.filter(task => task.status === 'done').length;
+    return totalTasks > 0 && completedTasks === totalTasks;
+  }).length;
+
+  return (
+    <motion.div
+      className="bg-white/90 dark:bg-gray-800/90 backdrop-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col overflow-hidden"
+      style={{ borderColor: `${subjectColor}50` }}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.1, duration: 0.3 }}
+    >
+      {/* 背景裝飾 */}
+      <div 
+        className="absolute inset-0 opacity-5 rounded-xl"
+        style={{
+          background: `radial-gradient(circle at 20% 20%, ${subjectColor}40 0%, transparent 50%)`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* 固定標題區 */}
+      <div className="flex-shrink-0 p-4 pb-2 relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4" style={{ color: subjectColor }} />
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">主題總覽</h3>
+          </div>
+          
+          {/* 新增目標按鈕 */}
+          <button
+            onClick={() => setShowAddGoalDialog(true)}
+            className="p-1.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+            title="新增目標"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* 可滾動內容區 */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-10">
+        {/* 主題進度 */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+              <div 
+                className="h-3 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${progress}%`,
+                  backgroundColor: progress === 100 ? '#22c55e' : subjectColor
+                }}
+              />
+            </div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[45px]">
+              {Math.round(progress)}%
+            </span>
+          </div>
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+            <span>已完成目標: {completedGoals}</span>
+            <span>總目標: {totalGoals}</span>
+          </div>
+        </div>
+
+        {/* 主題資訊卡片 */}
+        <div 
+          className="rounded-xl p-4 border-2 mb-4 shadow-sm" 
+          style={{ 
+            borderColor: `${subjectColor}40`,
+            background: `linear-gradient(135deg, ${subjectColor}10 0%, ${subjectColor}20 100%)`,
+            boxShadow: `0 2px 8px ${subjectColor}15`
+          }}
+        >
+          <div className="flex items-start justify-between mb-2">
+            <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm">
+              {topic.title}
+            </h4>
+            <div className={`px-2 py-1 rounded-full text-xs font-medium ${subjects.getSubjectStyle(topic.subject || '').bg} ${subjects.getSubjectStyle(topic.subject || '').text}`}>
+              {topic.subject || '未分類'}
+            </div>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-3">
+            {topic.description || "這個主題還沒有描述"}
+          </p>
+          
+          {/* 協作設置 */}
+          <div className="pt-2 border-t border-gray-200/50 dark:border-gray-600/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 dark:text-gray-400">協作模式</span>
+                {topic.is_collaborative && (
+                  <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+                    已開啟
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => handleToggleCollaboration(topic.is_collaborative ? 'disable' : 'enable')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  topic.is_collaborative
+                    ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                    : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                }`}
+                disabled={isUpdating}
+              >
+                {topic.is_collaborative ? '關閉協作' : '開啟協作'}
+              </button>
+            </div>
+
+            {/* 協作者管理 - 只在協作模式開啟時顯示 */}
+            {topic.is_collaborative && (
+              <div className="space-y-4 mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300">協作者管理</h5>
+                  <button
+                    onClick={() => setShowInviteDialog(true)}
+                    className="text-sm text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
+                  >
+                    + 邀請
+                  </button>
+                </div>
+                
+                {/* 協作者列表 */}
+                <div className="flex flex-wrap gap-2">
+                  {collaborators?.map(collaborator => (
+                    <div
+                      key={collaborator.id}
+                      className="relative group"
+                    >
+                      <div className="relative">
+                        <UserAvatar
+                          user={collaborator}
+                          size="sm"
+                          className="rounded-full"
+                        />
+                        <button
+                          onClick={() => handleRemoveCollaborator(collaborator.id)}
+                          className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                      <span className="absolute left-1/2 -translate-x-1/2 -bottom-6 text-xs whitespace-nowrap bg-gray-800 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        {collaborator.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 目標列表 */}
+        <div className="space-y-2">
+          {topic.goals.map(goal => (
+            <div
+              key={goal.id}
+              className="group relative rounded-xl border border-gray-200 dark:border-gray-700 p-3 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
+              onClick={() => onGoalClick?.(goal.id)}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  {goal.title}
+                </h4>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteGoal(goal);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-100 text-red-500"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                {goal.description || "這個目標還沒有描述"}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                  <div 
+                    className="h-1.5 rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${getCompletionRate(goal.id)}%`,
+                      backgroundColor: getCompletionRate(goal.id) === 100 ? '#22c55e' : subjectColor
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {Math.round(getCompletionRate(goal.id))}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 新增目標對話框 */}
+      {showAddGoalDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96">
+            <h3 className="text-lg font-medium mb-4">新增目標</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  標題
+                </label>
+                <input
+                  type="text"
+                  value={newGoalTitle}
+                  onChange={(e) => setNewGoalTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                  placeholder="輸入目標標題"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  描述
+                </label>
+                <textarea
+                  value={newGoalDescription}
+                  onChange={(e) => setNewGoalDescription(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 h-24 resize-none"
+                  placeholder="輸入目標描述"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowAddGoalDialog(false);
+                  setNewGoalTitle('');
+                  setNewGoalDescription('');
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleAddGoal}
+                disabled={!newGoalTitle.trim() || isUpdating}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUpdating ? '處理中...' : '新增'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 刪除目標確認對話框 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96">
+            <h3 className="text-lg font-medium mb-2">確認刪除</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              確定要刪除目標「{selectedGoalToDelete?.title}」嗎？此操作無法復原。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setSelectedGoalToDelete(null);
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDeleteGoal}
+                disabled={isUpdating}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {isUpdating ? '處理中...' : '刪除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 協作模式切換確認對話框 */}
+      {showCollaborationConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96">
+            <h3 className="text-lg font-medium mb-2">確認{collaborationAction === 'enable' ? '開啟' : '關閉'}協作模式</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {collaborationAction === 'enable'
+                ? '開啟協作模式後，您可以邀請其他用戶參與此主題的學習。'
+                : '關閉協作模式後，所有協作者將失去對此主題的訪問權限。'}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowCollaborationConfirm(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmToggleCollaboration}
+                disabled={isUpdating}
+                className={`px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 ${
+                  collaborationAction === 'enable'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {isUpdating ? '處理中...' : collaborationAction === 'enable' ? '開啟' : '關閉'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 邀請協作者對話框 */}
+      {showInviteDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96">
+            <h3 className="text-lg font-medium mb-4">邀請協作者</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {availableUsers.map(user => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <UserAvatar user={user} size="sm" className="rounded-full" />
+                    <span>{user.name}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleInviteCollaborator(user.id, 'edit');
+                      setShowInviteDialog(false);
+                    }}
+                    className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-full"
+                  >
+                    邀請
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowInviteDialog(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </motion.div>
   );
