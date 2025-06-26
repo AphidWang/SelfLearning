@@ -19,12 +19,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, weekId, onEdit }) => {
 
   const getStatusStyle = (status: TaskStatus) => {
     switch (status) {
-      case 'completed':
+      case 'done':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
       case 'in_progress':
         return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
-      case 'waiting_feedback':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'idea':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+      case 'archived':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
       default:
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
     }
@@ -32,12 +34,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, weekId, onEdit }) => {
 
   const getStatusText = (status: TaskStatus) => {
     switch (status) {
-      case 'completed':
+      case 'done':
         return '已完成';
       case 'in_progress':
         return '進行中';
-      case 'waiting_feedback':
-        return '待回饋';
+      case 'idea':
+        return '構想中';
+      case 'archived':
+        return '已封存';
       default:
         return '未開始';
     }

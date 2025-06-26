@@ -65,6 +65,8 @@ interface TopicTemplateStore {
   setSelectedTemplateId: (id: string | null) => void;
   clearError: () => void;
   refreshTemplate: (id: string) => Promise<void>;
+
+  reset: () => void;
 }
 
 export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
@@ -244,19 +246,45 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // 確保必要欄位存在
+      const requiredFields = ['title', 'description', 'template_type', 'subject', 'category'];
+      const missingFields = requiredFields.filter(field => !templateData[field]);
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
+      // 設定預設值
+      const templateWithDefaults = {
+        ...templateData,
+        goals: templateData.goals || [],
+        bubbles: templateData.bubbles || [],
+        is_public: templateData.is_public || false,
+        is_collaborative: templateData.is_collaborative || false,
+        copy_count: 0,
+        usage_count: 0,
+        created_by: user.id
+      };
+
       const { data, error } = await supabase
         .from('topic_templates')
-        .insert({
-          ...templateData,
-          created_by: user.id
-        })
-        .select()
+        .insert(templateWithDefaults)
+        .select(`
+          *,
+          topic_template_collaborators (
+            id,
+            user_id,
+            permission,
+            invited_by,
+            invited_at
+          )
+        `)
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       // 更新本地狀態
-      const newTemplate = { ...data, collaborators: [] };
+      const newTemplate = { ...data, collaborators: data.topic_template_collaborators || [] };
       set(state => ({
         templates: [newTemplate, ...state.templates]
       }));
@@ -275,21 +303,28 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
         .from('topic_templates')
         .update(updates)
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          topic_template_collaborators (
+            id,
+            user_id,
+            permission,
+            invited_by,
+            invited_at
+          )
+        `)
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       // 更新本地狀態
+      const updatedTemplate = { ...data, collaborators: data.topic_template_collaborators || [] };
       set(state => ({
-        templates: state.templates.map(template =>
-          template.id === id 
-            ? { ...template, ...data }
-            : template
-        )
+        templates: state.templates.map(t => t.id === id ? updatedTemplate : t)
       }));
 
-      return data;
+      return updatedTemplate;
     } catch (error) {
       console.error('Failed to update template:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to update template' });
@@ -308,7 +343,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
 
       // 更新本地狀態
       set(state => ({
-        templates: state.templates.filter(template => template.id !== id),
+        templates: state.templates.filter(t => t.id !== id),
         selectedTemplateId: state.selectedTemplateId === id ? null : state.selectedTemplateId
       }));
 
@@ -443,12 +478,15 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
       const template = get().templates.find(t => t.id === templateId);
       if (!template) throw new Error('Template not found');
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('topic_templates')
         .update({ is_public: !template.is_public })
-        .eq('id', templateId);
+        .eq('id', templateId)
+        .select()
+        .single();
 
       if (error) throw error;
+      if (!data) return false;
 
       // 更新本地狀態
       set(state => ({
@@ -717,5 +755,12 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to refresh template:', error);
     }
-  }
+  },
+
+  reset: () => set({
+    templates: [],
+    selectedTemplateId: null,
+    loading: false,
+    error: null
+  })
 })); 

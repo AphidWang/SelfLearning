@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Task } from '../../types/goal';
+import { Task, TaskStatus } from '../../types/goal';
 import { 
   ChevronLeft, MessageSquare, Paperclip, 
   HelpCircle, CheckCircle, PlayCircle,
@@ -72,14 +72,18 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
-    updateTask(topicId, goalId, {
+  const handleStatusChange = (newStatus: TaskStatus) => {
+    const updatedTask = {
       ...task,
-      status,
-      completedAt: status === 'done' ? new Date().toISOString() : undefined
-    });
-    setShowStatusOptions(false);
-    onBack();
+      status: newStatus,
+      completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
+    };
+    updateTask(topicId, goalId, task.id, updatedTask);
+  };
+
+  const handleFieldUpdate = (field: keyof Task, value: any) => {
+    const updatedTask = { ...task, [field]: value };
+    updateTask(topicId, goalId, task.id, updatedTask);
   };
 
   return (
@@ -248,21 +252,21 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
                 {showStatusOptions && (
                   <div className="absolute bottom-full right-0 mb-2 space-y-2">
                     <button
-                      onClick={() => handleStatusSelect('todo')}
+                      onClick={() => handleStatusChange('todo')}
                       className="w-full px-6 py-2 bg-gradient-to-r from-slate-400 to-gray-500 text-white rounded-full hover:from-slate-500 hover:to-gray-600 transition-colors whitespace-nowrap flex items-center gap-2"
                     >
                       <PauseCircle size={20} />
                       暫停
                     </button>
                     <button
-                      onClick={() => handleStatusSelect('in_progress')}
+                      onClick={() => handleStatusChange('in_progress')}
                       className="w-full px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full hover:from-indigo-600 hover:to-purple-600 transition-colors whitespace-nowrap flex items-center gap-2"
                     >
                       <PlayCircle size={20} />
                       進行中
                     </button>
                     <button
-                      onClick={() => handleStatusSelect('done')}
+                      onClick={() => handleStatusChange('done')}
                       className="w-full px-6 py-2 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 text-white rounded-full hover:from-emerald-500 hover:via-green-600 hover:to-teal-600 transition-colors whitespace-nowrap flex items-center gap-2"
                     >
                       <CheckCircle size={20} />

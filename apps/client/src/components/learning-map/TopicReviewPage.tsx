@@ -6,14 +6,15 @@ import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
 import { HelpMessageDisplay } from './HelpMessageDisplay';
 import { UserAvatar, UserAvatarGroup } from './UserAvatar';
 import { CollaborationManager } from './CollaborationManager';
-import type { Goal, Task, User } from '../../types/goal';
+import type { Goal, Task, User, Topic, TaskStatus } from '../../types/goal';
 import { 
   Brain, TrendingUp, Calendar, Trophy, Star, Clock, 
   CheckCircle2, Target, BookOpen, Zap, Award, 
   BarChart3, PieChart, TrendingDown, ArrowUp,
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare,
   ChevronLeft, Pencil, Sparkles, Check, HelpCircle,
-  Save, AlertTriangle, Plus, Trash2, PenTool, Mic
+  Save, AlertTriangle, Plus, Trash2, PenTool, Mic,
+  Edit
 } from 'lucide-react';
 
 interface TopicReviewPageProps {
@@ -31,28 +32,42 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 }) => {
   const { 
     getTopic, 
-    getCompletionRate, 
+    getCompletionRate,
+    getActiveGoals,
     updateTopic,
     getAvailableUsers,
     setGoalOwner,
     addGoalCollaborator,
-    removeGoalCollaborator
+    removeGoalCollaborator,
+    deleteTopic
   } = useTopicStore();
-  const topic = getTopic(topicId);
+  
+  const [topic, setTopic] = useState<Topic | null>(null);
   const weeklyStats = useTopicRadialMapStats(topicId);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTopic, setEditedTopic] = useState(topic);
+  const [editedTopic, setEditedTopic] = useState<Topic | null>(null);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
-  if (!topic) {
-    return null;
-  }
-  
+  // 異步載入主題數據
+  useEffect(() => {
+    const fetchTopic = async () => {
+      const fetchedTopic = await getTopic(topicId);
+      if (fetchedTopic) {
+        setTopic(fetchedTopic);
+        setEditedTopic(fetchedTopic);
+      }
+    };
+    fetchTopic();
+  }, [topicId, getTopic]);
+
   // 當 topic 更新時同步 editedTopic
   useEffect(() => {
-    setEditedTopic(topic);
+    if (topic) {
+      setEditedTopic(topic);
+    }
   }, [topic]);
 
   // 處理點擊外部關閉下拉選單
@@ -73,14 +88,11 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     };
   }, [showSubjectDropdown]);
 
-  const subjectStyle = subjects.getSubjectStyle((isEditingTitle ? editedTopic?.subject : topic.subject) || '');
-  const progress = getCompletionRate(topic.id);
-
   // 計算需要幫助的項目數量
   const needHelpCount = useMemo(() => {
-    const { getActiveGoals } = useTopicStore.getState();
-    const activeGoals = getActiveGoals(topicId);
+    if (!topic) return 0;
     
+    const activeGoals = getActiveGoals(topicId);
     let count = 0;
     
     // 計算需要幫助的目標數量
@@ -98,7 +110,18 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     });
     
     return count;
-  }, [topicId]);
+  }, [topic, topicId, getActiveGoals]);
+
+  if (!topic) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  const subjectStyle = subjects.getSubjectStyle((isEditingTitle ? editedTopic?.subject : topic.subject) || '');
+  const progress = getCompletionRate(topic.id);
 
   // 處理 RadialMap 的點擊事件
   const handleRadialMapGoalClick = (goalId: string) => {
@@ -136,7 +159,17 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     setSelectedTaskId(null);
   };
 
-
+  const handleDeleteTopic = async () => {
+    if (!topic) return;
+    
+    try {
+      await deleteTopic(topic.id);
+      onClose();
+    } catch (error) {
+      console.error('刪除主題失敗:', error);
+      alert('刪除主題失敗，請稍後再試。');
+    }
+  };
 
   return (
     <motion.div
@@ -180,7 +213,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                           onKeyPress={(e) => {
                             if (e.key === 'Enter') {
                               if (editedTopic) {
-                                updateTopic(editedTopic);
+                                updateTopic(topicId, editedTopic);
                               }
                               setIsEditingTitle(false);
                             }
@@ -253,7 +286,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                             onClick={(e) => {
                               e.stopPropagation();
                               if (editedTopic) {
-                                updateTopic(editedTopic);
+                                updateTopic(topicId, editedTopic);
                               }
                               setIsEditingTitle(false);
                               setShowSubjectDropdown(false);
@@ -317,9 +350,50 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               >
                 <X className="w-4 h-4" />
               </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+                title="刪除主題"
+              >
+                <Trash2 className="w-5 h-5 text-gray-400 group-hover:text-red-500 transition-colors" />
+              </button>
+              <button
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="編輯主題"
+              >
+                <Edit className="w-5 h-5 text-gray-600" />
+              </button>
             </div>
                     </div>
         </div>
+
+        {/* 刪除確認對話框 */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                確定要刪除這個主題嗎？
+              </h3>
+              <p className="text-gray-600 mb-6">
+                這個動作無法復原，所有相關的目標和任務都會被永久刪除。
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleDeleteTopic}
+                  className="px-4 py-2 bg-red-500 text-white hover:bg-red-600 rounded-lg transition-colors"
+                >
+                  確定刪除
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 主要內容區 */}
                 <div className="flex-1 p-3 overflow-hidden">
@@ -523,20 +597,31 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   onGoalDeleted
 }) => {
   const { getTopic, updateGoalHelp, updateTaskHelp } = useTopicStore();
-  const topic = getTopic(topicId);
+  const [topic, setTopic] = useState<Topic | null>(null);
+  
+  useEffect(() => {
+    const fetchTopic = async () => {
+      const fetchedTopic = await getTopic(topicId);
+      if (fetchedTopic) {
+        setTopic(fetchedTopic);
+      }
+    };
+    fetchTopic();
+  }, [topicId, getTopic]);
   
   // 根據選擇顯示不同內容
   const selectedGoal = selectedGoalId ? topic?.goals.find(goal => goal.id === selectedGoalId) : null;
   const selectedTask = selectedTaskId && selectedGoal ? 
     selectedGoal.tasks.find(task => task.id === selectedTaskId) : null;
 
-  if (selectedTask && selectedGoal) {
+  if (selectedTask && selectedGoal && topic) {
     // 顯示任務詳情
     return (
       <TaskDetailPanel 
         key={`task-${selectedTask.id}`}
         task={selectedTask}
         goal={selectedGoal}
+        topic={topic}
         topicId={topicId}
         subjectColor={subjectColor}
         onBackToGoal={onBackToGoal}
@@ -544,7 +629,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
     );
   }
 
-  if (selectedGoal) {
+  if (selectedGoal && topic) {
     // 顯示目標詳情
     const totalTasks = selectedGoal.tasks.length;
     const completedTasks = selectedGoal.tasks.filter(task => task.status === 'done').length;
@@ -555,6 +640,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
       <GoalDetailPanel
         key={`goal-${selectedGoal.id}`}
         goal={selectedGoal}
+        topic={topic}
         topicId={topicId}
         subjectColor={subjectColor}
         onTaskSelect={onTaskSelect}
@@ -604,6 +690,7 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
 interface TaskDetailPanelProps {
   task: Task;
   goal: Goal;
+  topic: Topic;
   topicId: string;
   subjectColor: string;
   onBackToGoal?: () => void;
@@ -612,6 +699,7 @@ interface TaskDetailPanelProps {
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   task,
   goal,
+  topic,
   topicId,
   subjectColor,
   onBackToGoal
@@ -634,18 +722,24 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [helpMessage, setHelpMessage] = useState(task.helpMessage || '');
 
   const handleSaveDescription = () => {
-    updateTask(topicId, goal.id, editedTask);
+    updateTask(topicId, goal.id, editedTask.id, editedTask);
     setIsEditing(false);
   };
 
-  const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
-    const updatedTask = {
-      ...task,
-      status,
-      challenge: challenge as number,
-      completedAt: status === 'done' ? new Date().toISOString() : undefined
-    };
-    updateTask(topicId, goal.id, updatedTask);
+  const handleStatusSelect = async (status: TaskStatus) => {
+    try {
+      const updatedTask = {
+        ...task,
+        status,
+        completedAt: status === 'done' ? new Date().toISOString() : undefined
+      };
+      const result = await updateTask(topicId, goal.id, task.id, updatedTask);
+      if (!result) {
+        throw new Error('Failed to update task status');
+      }
+    } catch (err) {
+      console.error('Error updating task status:', err);
+    }
   };
 
   const handleHelpSubmit = () => {
@@ -861,22 +955,18 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           </div>
 
           {/* 協作管理 - 只在協作模式下顯示 */}
-          {(() => {
-            const { getTopic } = useTopicStore();
-            const topic = getTopic(topicId);
-            return topic?.isCollaborative ? (
-              <CollaborationManager
-                title="任務協作"
-                owner={task.owner}
-                collaborators={task.collaborators}
-                availableUsers={getAvailableUsers()}
-                onSetOwner={(user) => setTaskOwner(topicId, goal.id, task.id, user)}
-                onAddCollaborator={(user) => addTaskCollaborator(topicId, goal.id, task.id, user)}
-                onRemoveCollaborator={(userId) => removeTaskCollaborator(topicId, goal.id, task.id, userId)}
-                className="mb-3"
-              />
-            ) : null;
-          })()}
+          {topic?.is_collaborative && (
+            <CollaborationManager
+              title="任務協作"
+              owner={task.owner}
+              collaborators={task.collaborators}
+              availableUsers={getAvailableUsers()}
+              onSetOwner={(user) => setTaskOwner(topicId, goal.id, task.id, user)}
+              onAddCollaborator={(user) => addTaskCollaborator(topicId, goal.id, task.id, user)}
+              onRemoveCollaborator={(userId) => removeTaskCollaborator(topicId, goal.id, task.id, userId)}
+              className="mb-3"
+            />
+          )}
 
           {/* 最近活動 */}
           <div className="p-3 bg-gradient-to-br from-green-50/90 to-emerald-50/90 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl border border-green-200/50 dark:border-green-700/50">
@@ -1102,6 +1192,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 // GoalDetailPanel 組件 - 顯示目標詳情和幫助功能
 interface GoalDetailPanelProps {
   goal: Goal;
+  topic: Topic;
   topicId: string;
   subjectColor: string;
   onTaskSelect?: (taskId: string, goalId: string) => void;
@@ -1115,6 +1206,7 @@ interface GoalDetailPanelProps {
 
 const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   goal,
+  topic,
   topicId,
   subjectColor,
   onTaskSelect,
@@ -1142,9 +1234,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [editedGoal, setEditedGoal] = useState(goal);
   
-  // 獲取主題資訊來檢查協作模式
-  const { getTopic } = useTopicStore();
-  const topic = getTopic(topicId);
+  // topic 已經透過 props 傳入，不需要重新獲取
 
   // 當 goal 更新時同步 editedGoal
   useEffect(() => {
@@ -1191,7 +1281,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   };
 
   const handleSaveGoalEdit = () => {
-    updateGoal(topicId, editedGoal);
+    updateGoal(topicId, editedGoal.id, editedGoal);
     setIsEditingGoal(false);
   };
 
@@ -1354,7 +1444,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
         />
 
         {/* 協作管理 - 只在協作模式下顯示 */}
-        {topic?.isCollaborative && (
+        {topic?.is_collaborative && (
           <CollaborationManager
             title="目標協作"
             owner={goal.owner}

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
+import { Topic } from '../../types/goal';
 import { subjectColors } from '../../styles/tokens';
 import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
 import { 
@@ -22,7 +23,16 @@ export const TopicMindmapOverviewDialog: React.FC<TopicMindmapOverviewDialogProp
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
   const { getTopic, getCompletionRate } = useTopicStore();
-  const topic = getTopic(topicId);
+  const [topic, setTopic] = useState<Topic | null>(null);
+  
+  useEffect(() => {
+    const fetchTopic = async () => {
+      const fetchedTopic = await getTopic(topicId);
+      setTopic(fetchedTopic);
+    };
+    fetchTopic();
+  }, [topicId, getTopic]);
+  
   const weeklyStats = useTopicRadialMapStats(topicId);
   
   if (!topic || !open) {

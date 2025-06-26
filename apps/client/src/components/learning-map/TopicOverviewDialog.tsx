@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
+import { Topic } from '../../types/goal';
 import { CircularProgress } from './CircularProgress';
 import { 
   X, Target, Calendar, CheckCircle2, Clock, 
@@ -79,8 +80,16 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
   onTopicClick
 }) => {
   const { getTopic, getActiveGoals, getCompletionRate } = useTopicStore();
-  const topic = getTopic(topicId);
-  
+  const [topic, setTopic] = useState<Topic | null>(null);
+
+  useEffect(() => {
+    const fetchTopic = async () => {
+      const fetchedTopic = await getTopic(topicId);
+      setTopic(fetchedTopic);
+    };
+    fetchTopic();
+  }, [topicId, getTopic]);
+
   if (!topic) {
     return null;
   }

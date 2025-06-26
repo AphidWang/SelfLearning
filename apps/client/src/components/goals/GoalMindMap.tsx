@@ -125,6 +125,12 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
   const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [activeTasks, setActiveTasks] = useState<Map<string, Task[]>>(new Map());
 
+  // 初始化數據載入
+  useEffect(() => {
+    const { fetchTopics } = useTopicStore.getState();
+    fetchTopics();
+  }, []);
+
   // 初始化數據
   useEffect(() => {
     if (!topic) {
@@ -677,8 +683,8 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
   useEffect(() => {
     const unsubscribe = useTopicStore.subscribe((state) => {
       const currentTopic = state.topics.find(t => t.id === topicId);
-      if (currentTopic?.focusElement) {
-        const elementId = `${currentTopic.focusElement.type}-${currentTopic.focusElement.id}`;
+      if (currentTopic?.focus_element) {
+        const elementId = `${currentTopic.focus_element.type}-${currentTopic.focus_element.id}`;
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             flyToElement(elementId);
@@ -980,40 +986,46 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
   const handleAddGoal = useCallback(() => {
     if (!topic) return;
 
-    const newGoal: Partial<Goal> = {
+    const newGoal = {
+      id: Date.now().toString(),
       title: '新目標',
       tasks: [],
-      status: 'active'
+      status: 'todo' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     console.log('📝 準備新增目標', { newGoal });
 
     // 先新增到 store
-    const addedGoal = mindMapService.addGoal(newGoal as Goal);
-    console.log('✅ 目標已新增到 store', { addedGoal });
-    if (!addedGoal) return;
+    const addedGoalPromise = mindMapService.addGoal(newGoal);
+    if (!addedGoalPromise) return;
 
-    // 找到新增的 goal
-    const updatedTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
-    if (!updatedTopic) return;
+    addedGoalPromise.then(addedGoal => {
+      if (!addedGoal) return;
 
-    const newAddedGoal = updatedTopic.goals.find(g => g.id === addedGoal.id);
-    if (!newAddedGoal) return;
+      // 直接從 store 獲取最新狀態
+      const updatedTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
+      if (!updatedTopic) return;
 
-    // 計算新 goal 的位置
-    const newGoalIndex = updatedTopic.goals.length - 1;
-    const goalPos = getGoalPosition(newGoalIndex, updatedTopic.goals);
-    const container = containerRef.current;
-    if (!container) return;
+      const newAddedGoal = updatedTopic.goals.find(g => g.id === addedGoal.id);
+      if (!newAddedGoal) return;
 
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+      // 計算新 goal 的位置
+      const newGoalIndex = updatedTopic.goals.length - 1;
+      const goalPos = getGoalPosition(newGoalIndex, updatedTopic.goals);
+      const container = containerRef.current;
+      if (!container) return;
 
-    // 計算新的位置，使 goal 位於畫面中心
-    const newX = (containerWidth / 2 / zoom) - goalPos.x;
-    const newY = (containerHeight / 2 / zoom) - goalPos.y;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
 
-    setPosition({ x: newX, y: newY });
+      // 計算新的位置，使 goal 位於畫面中心
+      const newX = (containerWidth / 2 / zoom) - goalPos.x;
+      const newY = (containerHeight / 2 / zoom) - goalPos.y;
+
+      setPosition({ x: newX, y: newY });
+    });
   }, [topic, mindMapService, zoom, topicId, getGoalPosition]);
 
   // 處理 goal 標題更新
@@ -1054,54 +1066,56 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
     };
 
     // 先新增到 store
-    const addedTask = mindMapService.addTask(goalId, newTask as Task);
-    console.log('✅ Store 新增結果', { addedTask });
-    if (!addedTask) return;
+    const addedTaskPromise = mindMapService.addTask(goalId, newTask as Task);
+    console.log('✅ Store 新增結果', { addedTaskPromise });
+    if (!addedTaskPromise) return;
 
-    // 直接從 store 獲取最新狀態
-    const updatedTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
-    if (!updatedTopic) return;
+    addedTaskPromise.then(addedTask => {
+      if (!addedTask) return;
 
-    const goal = updatedTopic.goals.find(g => g.id === goalId);
-    if (!goal) return;
+      // 直接從 store 獲取最新狀態
+      const updatedTopic = useTopicStore.getState().topics.find(t => t.id === topicId);
+      if (!updatedTopic) return;
 
-    const newAddedTask = goal.tasks.find(t => t.id === addedTask.id);
-    console.log('📝 準備設置編輯狀態', { 
-      newTaskId: newAddedTask?.id,
-      currentEditingTaskId: editingTaskId,
-      currentEditingTaskTitle: editingTaskTitle 
+      const goal = updatedTopic.goals.find(g => g.id === goalId);
+      if (!goal) return;
+
+      const newAddedTask = goal.tasks.find(t => t.id === addedTask.id);
+      console.log('📝 準備設置編輯狀態', { 
+        newTaskId: newAddedTask?.id,
+        currentEditingTaskId: editingTaskId,
+        currentEditingTaskTitle: editingTaskTitle 
+      });
+      if (!newAddedTask) return;
+
+      // 計算新 task 的位置
+      const taskPos = getTaskPosition(
+        goalIndex,
+        goal.tasks.length - 1,
+        goal.tasks.length
+      );
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+
+      // 計算新的位置，使新的 task 出現在畫面中心
+      const newX = (containerWidth / 2 / zoom) - taskPos.x;
+      const newY = (containerHeight / 2 / zoom) - taskPos.y;
+
+      // 更新位置
+      setPosition({ x: newX, y: newY });
+
+      // 設置編輯狀態
+      setEditingTaskId(newAddedTask.id);
+      setEditingTaskTitle(newAddedTask.title);
+      console.log('✏️ 編輯狀態已設置', { 
+        taskId: newAddedTask.id, 
+        title: newAddedTask.title 
+      });
     });
-    if (!newAddedTask) return;
-
-    // 計算新 task 的位置
-    const taskPos = getTaskPosition(
-      goalIndex,
-      goal.tasks.length - 1,
-      goal.tasks.length
-    );
-
-    const container = containerRef.current;
-    if (!container) return;
-
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-
-    // 計算新的位置，使新的 task 出現在畫面中心
-    const newX = (containerWidth / 2 / zoom) - taskPos.x;
-    const newY = (containerHeight / 2 / zoom) - taskPos.y;
-
-    // 更新位置
-    setPosition({ x: newX, y: newY });
-
-    // 設置編輯狀態
-    setEditingTaskId(newAddedTask.id);
-    setEditingTaskTitle(newAddedTask.title);
-    console.log('✏️ 編輯狀態已設置', { 
-      taskId: newAddedTask.id, 
-      title: newAddedTask.title 
-    });
-
-    // 不需要 dump，store 已經自動更新
   }, [topic, mindMapService, zoom, topicId, getTaskPosition, editingTaskId, editingTaskTitle]);
 
   // 處理 task 標題更新
@@ -1138,9 +1152,15 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
     });
 
     if (updatedTask) {
-      setEditingTaskTitle(updatedTask.title);
-      setEditingTaskId(null);
-      console.log('✅ 任務更新完成', { updatedTask });
+      updatedTask.then(task => {
+        if (task) {
+          setEditingTaskTitle(task.title);
+          setEditingTaskId(null);
+          console.log('✅ 任務更新完成', { task });
+        } else {
+          console.log('❌ 任務更新失敗');
+        }
+      });
     } else {
       console.log('❌ 任務更新失敗');
     }
@@ -1309,18 +1329,24 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
                   const newTopic: Topic = {
-                    id: '',  // store 會自動生成
-                    title: '做點什麼呢?',  // 必填欄位
+                    id: Date.now().toString(),
+                    title: '做點什麼呢?',
                     type: '學習目標',
                     status: 'active',
-                    goals: []
+                    goals: [],
+                    owner_id: '',  // store 會自動設定
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
                   };
                   const { addTopic } = useTopicStore.getState();
                   console.log('📝 準備新增主題', { newTopic });
-                  const addedTopic = addTopic({ ...newTopic, id: Date.now().toString() });
-                  console.log('✅ 主題已新增', { addedTopic });
-                  // 直接導航到新主題
-                  navigate(`/student/planning/topic/${addedTopic.id}`);
+                  const addedTopicPromise = addTopic(newTopic);
+                  addedTopicPromise.then(addedTopic => {
+                    if (!addedTopic) return;
+                    console.log('✅ 主題已新增', { addedTopic });
+                    // 直接導航到新主題
+                    navigate(`/student/planning/topic/${addedTopic.id}`);
+                  });
                 }}
                 className="inline-flex items-center px-4 py-2 border border-indigo-300 rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-white hover:bg-indigo-50"
               >

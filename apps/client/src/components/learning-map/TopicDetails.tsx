@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Trash2, Plus, Pencil, Brain, Target, Sparkles, PartyPopper, X, GripVertical, List, Heart, Star } from 'lucide-react';
-import type { Topic, Goal, Task } from '../../types/goal';
+import type { Goal, Task } from '../../types/goal';
+import type { Topic } from '../../types/goal';
 import { useTopicStore } from '../../store/topicStore';
 import { subjectColors } from '../../styles/tokens';
 import { goalTemplates } from '../../constants/goalTemplates';
@@ -11,10 +12,10 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 interface TopicDetailsProps {
   topic: Topic;
   onBack: () => void;
-  onTaskClick: (taskId: string) => void;
-  isCreating?: boolean;
-  isEditing?: boolean;
-  onEditToggle?: () => void;
+  onTaskClick?: (taskId: string, goalId?: string) => void;
+  isCreating: boolean;
+  isEditing: boolean;
+  onEditToggle: () => void;
 }
 
 export const TopicDetails: React.FC<TopicDetailsProps> = ({ 
@@ -39,14 +40,18 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   const [showTypeSelect, setShowTypeSelect] = useState(false);
   const [editedTopic, setEditedTopic] = useState<Topic>({
     ...topic,
-    templateType: topic.templateType || '學習主題',
+    template_type: topic.template_type || '學習主題',
     subject: topic.subject || SUBJECTS.CUSTOM
   });
-  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopic, getActiveGoals, updateTask, reorderTasks } = useTopicStore();
+  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopic, getActiveGoals, updateTask, reorderTasks, fetchTopics } = useTopicStore();
   const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [showGoalsOverview, setShowGoalsOverview] = useState(false);
   const [selectedGoalForTasks, setSelectedGoalForTasks] = useState<string | null>(null);
   const [markedGoals, setMarkedGoals] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetchTopics(); // 初始化數據
+  }, []);
 
   useEffect(() => {
     const goals = getActiveGoals(topic.id);
@@ -56,7 +61,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   useEffect(() => {
     setEditedTopic({
       ...topic,
-      templateType: topic.templateType || '學習主題',
+      template_type: topic.template_type || '學習主題',
       subject: topic.subject || SUBJECTS.CUSTOM
     });
   }, [topic]);
@@ -120,7 +125,6 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   const handleAddGoal = () => {
     if (!newGoalTitle.trim()) return;
     addGoal(topic.id, {
-      id: '',
       title: newGoalTitle,
       tasks: []
     });
@@ -131,7 +135,6 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   const handleAddTask = (goalId: string) => {
     if (!newTaskTitle.trim()) return;
     addTask(topic.id, goalId, {
-      id: '',
       title: newTaskTitle,
       status: 'todo'
     });
@@ -140,7 +143,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   };
 
   const handleSave = () => {
-    updateTopic(editedTopic);
+    updateTopic(topic.id, editedTopic);
     if (onEditToggle) {
       onEditToggle();
     }
@@ -148,7 +151,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
 
   const handleTaskStatusChange = (goalId: string, task: Task) => {
     const newStatus = task.status === 'done' ? 'in_progress' : 'done';
-    updateTask(topic.id, goalId, {
+    updateTask(topic.id, goalId, task.id, {
       ...task,
       status: newStatus,
       completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
@@ -247,17 +250,17 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
                     <button
                       onClick={handleTypeSelectClick}
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
-                        editedTopic.templateType === '學習主題' ? 'bg-purple-100 text-purple-800' :
-                        editedTopic.templateType === '個人成長' ? 'bg-blue-100 text-blue-800' :
-                        editedTopic.templateType === '專案計畫' ? 'bg-green-100 text-green-800' :
+                        editedTopic.template_type === '學習主題' ? 'bg-purple-100 text-purple-800' :
+                        editedTopic.template_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
+                        editedTopic.template_type === '專案計畫' ? 'bg-green-100 text-green-800' :
                         'bg-orange-100 text-orange-800'
                       }`}
                     >
-                      {editedTopic.templateType === '學習主題' ? <Brain className="h-3 w-3" /> :
-                       editedTopic.templateType === '個人成長' ? <Target className="h-3 w-3" /> :
-                       editedTopic.templateType === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
+                      {editedTopic.template_type === '學習主題' ? <Brain className="h-3 w-3" /> :
+                       editedTopic.template_type === '個人成長' ? <Target className="h-3 w-3" /> :
+                       editedTopic.template_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
                        <PartyPopper className="h-3 w-3" />}
-                      {editedTopic.templateType || '選擇類型'}
+                      {editedTopic.template_type || '選擇類型'}
                       <ChevronDown className="h-3 w-3" />
                     </button>
                     {showTypeSelect && (
@@ -267,9 +270,9 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
                             <button
                               key={type}
                               onClick={() => {
-                                const updatedTopic = {...editedTopic, templateType: type};
+                                const updatedTopic = {...editedTopic, template_type: type};
                                 setEditedTopic(updatedTopic);
-                                updateTopic(updatedTopic);
+                                updateTopic(topic.id, updatedTopic);
                                 setShowTypeSelect(false);
                               }}
                               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dropdown-option ${
@@ -311,7 +314,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
                               onClick={() => {
                                 const updatedTopic = {...editedTopic, subject: value};
                                 setEditedTopic(updatedTopic);
-                                updateTopic(updatedTopic);
+                                updateTopic(topic.id, updatedTopic);
                                 setShowSubjectSelect(false);
                               }}
                               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dropdown-option ${
@@ -329,16 +332,16 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
               ) : (
                 <>
                   <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
-                    topic.templateType === '學習主題' ? 'bg-purple-100 text-purple-800' :
-                    topic.templateType === '個人成長' ? 'bg-blue-100 text-blue-800' :
-                    topic.templateType === '專案計畫' ? 'bg-green-100 text-green-800' :
+                    topic.template_type === '學習主題' ? 'bg-purple-100 text-purple-800' :
+                    topic.template_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
+                    topic.template_type === '專案計畫' ? 'bg-green-100 text-green-800' :
                     'bg-orange-100 text-orange-800'
                   }`}>
-                    {topic.templateType === '學習主題' ? <Brain className="h-3 w-3" /> :
-                     topic.templateType === '個人成長' ? <Target className="h-3 w-3" /> :
-                     topic.templateType === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
+                    {topic.template_type === '學習主題' ? <Brain className="h-3 w-3" /> :
+                     topic.template_type === '個人成長' ? <Target className="h-3 w-3" /> :
+                     topic.template_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
                      <PartyPopper className="h-3 w-3" />}
-                    {topic.templateType}
+                    {topic.template_type}
                   </span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
                     subjects.getSubjectStyle(topic.subject || '').bg
@@ -382,7 +385,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
                   onChange={(e) => {
                     const updatedTopic = {...editedTopic, description: e.target.value};
                     setEditedTopic(updatedTopic);
-                    updateTopic(updatedTopic);
+                    updateTopic(topic.id, updatedTopic);
                   }}
                   className="w-full p-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
@@ -451,7 +454,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
                      // 點擊目標時展開任務列表
                      const firstTask = goal.tasks[0];
                      if (firstTask) {
-                       onTaskClick(firstTask.id || `${goal.id}-0`);
+                       onTaskClick?.(firstTask.id || `${goal.id}-0`, goal.id);
                      }
                    }}
                 >

@@ -4,6 +4,7 @@ import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { UserAvatar, UserAvatarGroup } from './UserAvatar';
 import type { User } from '../../types/goal';
+import { Topic } from '../../types/goal';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,
   Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon, AlertTriangle,
@@ -80,21 +81,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   className = ""
 }) => {
   const { getTopic, getActiveGoals, getCompletionRate, toggleAvatarDisplay } = useTopicStore();
-  const topic = getTopic(topicId);
-  
-  // 調試信息
-  useEffect(() => {
-    if (topic?.isCollaborative) {
-      console.log('🔍 RadialMap Debug:', {
-        topicId,
-        topicTitle: topic.title,
-        isCollaborative: topic.isCollaborative,
-        showAvatars: topic.showAvatars,
-        owner: topic.owner,
-        collaborators: topic.collaborators
-      });
-    }
-  }, [topic?.isCollaborative, topic?.showAvatars, topicId, topic?.title]);
+  const [topic, setTopic] = useState<Topic | null>(null);
   
   // 縮放和拖拽狀態
   const [scale, setScale] = useState(1);
@@ -102,19 +89,35 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   const [translateY, setTranslateY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
   
-  if (!topic) {
-    return null;
-  }
+  const centerX = width / 2;
+  const centerY = height / 2;
 
-  const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
-  const subjectColor = subjectStyle.accent;
-  const progress = getCompletionRate(topic.id);
-  const goals = getActiveGoals(topic.id);
-  
+  // 定義裝飾圖示的位置和類型
+  const decorativeIcons = useMemo(() => {
+    return [
+      // 天空區域 - 上方
+      { icon: Sun, x: centerX + 280, y: centerY - 280, size: 70, color: '#fcd34d', opacity: 0.7 },
+      { icon: Cloud, x: centerX + 250, y: centerY - 200, size: 50, color: '#93c5fd', opacity: 0.7 },
+      { icon: Cloud, x: centerX - 220, y: centerY - 240, size: 50, color: '#ddd6fe', opacity: 0.7 },
+      { icon: Star, x: centerX - 330, y: centerY - 130, size: 30, color: '#fbbf24', opacity: 0.7 },
+      { icon: Moon, x: centerX - 300, y: centerY - 180, size: 70, color: '#cbd5e1', opacity: 0.7 },
+      
+      // 地面區域 - 下方
+      { icon: TreePine, x: centerX + 280, y: centerY + 220, size: 70, color: '#86efac', opacity: 0.7 },
+      { icon: TreePine, x: centerX - 250, y: centerY + 200, size: 70, color: '#65a30d', opacity: 0.7 },
+      { icon: Car, x: centerX - 200, y: centerY + 280, size: 70, color: '#fbbf24', opacity: 0.7 },
+    ];
+  }, [centerX, centerY]);
+
   // 計算週進度統計
   const weeklyStats = useMemo(() => {
+    if (!topic) return { newlyCompleted: 0, totalTasks: 0, completedTasks: 0, inProgressTasks: 0 };
+    
+    const goals = getActiveGoals(topic.id);
     let newlyCompleted = 0;
     let totalTasks = 0;
     let completedTasks = 0;
@@ -135,7 +138,47 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     });
     
     return { newlyCompleted, totalTasks, completedTasks, inProgressTasks };
-  }, [goals]);
+  }, [topic, getActiveGoals]);
+
+  // 更新地圖尺寸
+  const updateMapSize = useCallback(() => {
+    if (!svgRef.current) return;
+    const container = svgRef.current;
+    const img = container.querySelector('img');
+    if (!img) return;
+
+    // 計算圖片在容器中的實際顯示尺寸
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const containerRatio = containerWidth / containerHeight;
+
+    let displayWidth, displayHeight;
+    if (imgRatio > containerRatio) {
+      displayWidth = containerWidth;
+      displayHeight = containerWidth / imgRatio;
+    } else {
+      displayHeight = containerHeight;
+      displayWidth = containerHeight * imgRatio;
+    }
+
+    // 計算地圖在容器中的偏移量
+    const offsetX = (containerWidth - displayWidth) / 2;
+    const offsetY = (containerHeight - displayHeight) / 2;
+
+    setMapSize({
+      width: displayWidth,
+      height: displayHeight
+    });
+
+    setMapOffset({
+      x: offsetX,
+      y: offsetY
+    });
+
+    // 計算縮放比例，增加 1.5 倍
+    setScale((displayWidth / img.naturalWidth) * 1.5);
+  }, []);
 
   // 縮放和拖拽處理函數
   const handleZoomIn = useCallback(() => {
@@ -181,37 +224,132 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     setScale(prev => Math.max(0.5, Math.min(3, prev * delta)));
   }, []);
 
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const goalRadius = Math.min(width, height) * 0.46; // 縮短 topic-goal 距離
-  const taskRadius = goalRadius * 0.6; // 讓 goal-task 距離與 topic-goal 成比例
-  
-  // 節點圓圈大小
-  const goalNodeSize = Math.min(60, Math.min(width, height) * 0.13);
-  const taskNodeSize = Math.min(24, Math.min(width, height) * 0.06);
+  const handleToggleAvatars = useCallback(() => {
+    if (topic) {
+      toggleAvatarDisplay(topic.id);
+    }
+  }, [topic, toggleAvatarDisplay]);
 
-  // 定義裝飾圖示的位置和類型
-  const decorativeIcons = useMemo(() => {
-    return [
-      // 天空區域 - 上方
-      { icon: Sun, x: centerX + 280, y: centerY - 280, size: 70, color: '#fcd34d', opacity: 0.7 },
-      { icon: Cloud, x: centerX + 250, y: centerY - 200, size: 50, color: '#93c5fd', opacity: 0.7 },
-      { icon: Cloud, x: centerX - 220, y: centerY - 240, size: 50, color: '#ddd6fe', opacity: 0.7 },
-      { icon: Star, x: centerX - 330, y: centerY - 130, size: 30, color: '#fbbf24', opacity: 0.7 },
-      //{ icon: Star, x: centerX + 320, y: centerY - 150, size: 45, color: '#fbbf24', opacity: 0.4 },
-      { icon: Moon, x: centerX - 300, y: centerY - 180, size: 70, color: '#cbd5e1', opacity: 0.7 },
-      
-      // 地面區域 - 下方
-      { icon: TreePine, x: centerX + 280, y: centerY + 220, size: 70, color: '#86efac', opacity: 0.7 },
-      { icon: TreePine, x: centerX - 250, y: centerY + 200, size: 70, color: '#65a30d', opacity: 0.7 },
-      { icon: Car, x: centerX - 200, y: centerY + 280, size: 70, color: '#fbbf24', opacity: 0.7 },
-      //{ icon: Car, x: centerX + 220, y: centerY + 120, size: 30, color: '#f97316', opacity: 0.5 },
-      
-      // 中間區域裝飾
-      // { icon: Heart, x: centerX - 160, y: centerY + 80, size: 30, color: '#fb7185', opacity: 0.4 },
-      //{ icon: Flower2, x: centerX + 100, y: centerY + 60, size: 25, color: '#c084fc', opacity: 0.5 },
-    ];
-  }, [centerX, centerY]);
+  const handleMapLoad = useCallback(() => {
+    updateMapSize();
+  }, [updateMapSize]);
+
+  // 監聽容器大小變化
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver(updateMapSize);
+    if (svgRef.current) {
+      resizeObserver.observe(svgRef.current);
+    }
+    return () => resizeObserver.disconnect();
+  }, [updateMapSize]);
+
+  // 獲取主題數據
+  useEffect(() => {
+    const fetchData = async () => {
+      const fetchedTopic = await getTopic(topicId);
+      if (fetchedTopic) {
+        setTopic(fetchedTopic);
+      }
+    };
+    fetchData();
+  }, [topicId, getTopic]);
+  
+  // 調試信息
+  useEffect(() => {
+    if (topic?.is_collaborative) {
+      console.log('🔍 RadialMap Debug:', {
+        topicId,
+        topicTitle: topic.title,
+        isCollaborative: topic.is_collaborative,
+        showAvatars: topic.show_avatars,
+        owner: topic.owner,
+        collaborators: topic.collaborators
+      });
+    }
+  }, [topic?.is_collaborative, topic?.show_avatars, topicId, topic?.title]);
+
+  // 提前計算所有可能需要的值，避免在渲染時計算
+  const computedValues = useMemo(() => {
+    if (!topic) return null;
+
+    const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+    const subjectColor = subjectStyle.accent;
+    const progress = getCompletionRate(topic.id);
+    const goals = getActiveGoals(topic.id);
+    const showAvatars = topic?.show_avatars ?? true;
+    const goalRadius = Math.min(width, height) * 0.46;
+    const taskRadius = goalRadius * 0.6;
+    const goalNodeSize = Math.min(60, Math.min(width, height) * 0.13);
+    const taskNodeSize = Math.min(24, Math.min(width, height) * 0.06);
+
+    return {
+      subjectStyle,
+      subjectColor,
+      progress,
+      goals,
+      showAvatars,
+      goalRadius,
+      taskRadius,
+      goalNodeSize,
+      taskNodeSize
+    };
+  }, [topic, width, height, getCompletionRate, getActiveGoals]);
+
+  // 優化點擊處理函數
+  const handleGoalClick = useCallback((e: React.MouseEvent, goalId: string) => {
+    e.stopPropagation();
+    if (!isDragging) {
+      onGoalClick?.(goalId);
+    }
+  }, [isDragging, onGoalClick]);
+
+  const handleTaskClick = useCallback((e: React.MouseEvent, taskId: string, goalId: string) => {
+    e.stopPropagation();
+    if (!isDragging) {
+      onTaskClick?.(taskId, goalId);
+    }
+  }, [isDragging, onTaskClick]);
+
+  // 優化動畫效果
+  const animationConfig = useMemo(() => ({
+    initial: showAnimations ? { scale: 0, opacity: 0 } : undefined,
+    animate: showAnimations ? { scale: 1, opacity: 1 } : undefined,
+    transition: showAnimations ? { 
+      type: "spring",
+      stiffness: 200,
+      damping: 20,
+      mass: 0.5,
+      duration: 0.2
+    } : undefined
+  }), [showAnimations]);
+
+  // 優化選中效果動畫
+  const selectedAnimationConfig = useMemo(() => ({
+    initial: { fillOpacity: 0.05 },
+    animate: { fillOpacity: 0.15 },
+    transition: {
+      repeat: Infinity,
+      duration: 1.5,
+      ease: "easeInOut",
+      repeatType: "reverse" as const
+    }
+  }), []);
+
+  if (!topic || !computedValues) {
+    return null;
+  }
+
+  const {
+    subjectStyle,
+    subjectColor,
+    progress,
+    goals,
+    showAvatars,
+    goalRadius,
+    taskRadius,
+    goalNodeSize,
+    taskNodeSize
+  } = computedValues;
 
   return (
     <div className={`relative ${className}`} style={{ overflow: 'visible' }}>
@@ -225,19 +363,19 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
       {/* 控制按鈕 */}
       <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
         {/* 協作頭像開關 - 只在協作模式下顯示 */}
-        {topic.isCollaborative && (
+        {topic?.is_collaborative && (
           <motion.button
-            onClick={() => toggleAvatarDisplay(topicId)}
+            onClick={handleToggleAvatars}
             className={`w-8 h-8 rounded-lg shadow-md flex items-center justify-center transition-colors ${
-              topic.showAvatars 
+              showAvatars 
                 ? 'bg-blue-500 hover:bg-blue-600 text-white' 
                 : 'bg-white/90 hover:bg-white text-gray-700'
             }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            title={topic.showAvatars ? '隱藏頭像' : '顯示頭像'}
+            title={showAvatars ? '隱藏頭像' : '顯示頭像'}
           >
-            {topic.showAvatars ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {showAvatars ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </motion.button>
         )}
         
@@ -601,34 +739,24 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           return (
             <motion.g
               key={`goal-${goal.id}`}
-              initial={showAnimations ? { scale: 0, opacity: 0 } : undefined}
-              animate={showAnimations ? { scale: 1, opacity: 1 } : undefined}
-              transition={showAnimations ? { delay: 0.5 + goalIndex * 0.1, duration: 0.4 } : undefined}
+              {...animationConfig}
+              transition={showAnimations ? { 
+                ...animationConfig.transition,
+                delay: 0.5 + goalIndex * 0.05 
+              } : undefined}
               style={{ cursor: onGoalClick ? 'pointer' : 'default' }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isDragging) {
-                  onGoalClick?.(goal.id);
-                }
-              }}
+              onClick={(e) => handleGoalClick(e, goal.id)}
             >
               {/* 選中狀態的外圈 */}
               {isSelected && (
-                <circle
+                <motion.circle
                   cx={x}
                   cy={y}
                   r={Math.min(68, Math.min(width, height) * 0.15)}
                   fill="#3b82f6"
-                  fillOpacity="0.15"
                   stroke="none"
-                >
-                  <animate
-                    attributeName="fill-opacity"
-                    values="0.05;0.25;0.05"
-                    dur="2s"
-                    repeatCount="indefinite"
-                  />
-                </circle>
+                  {...selectedAnimationConfig}
+                />
               )}
               
               {/* 專注狀態的脈動效果 */}
@@ -729,7 +857,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               )}
 
               {/* 協作頭像 - 只在協作模式且開啟頭像顯示時顯示 */}
-              {topic.isCollaborative && topic.showAvatars && goal.owner && (
+              {topic.is_collaborative && topic.show_avatars && goal.owner && (
                 <foreignObject
                   x={x + goalNodeSize * 0}
                   y={y - goalNodeSize * 1.5}
@@ -804,38 +932,24 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
             return (
               <motion.g
                 key={`task-${task.id}`}
-                initial={showAnimations ? { scale: 0, opacity: 0 } : undefined}
-                animate={showAnimations ? { scale: 1, opacity: 1 } : undefined}
+                {...animationConfig}
                 transition={showAnimations ? { 
-                  delay: 1 + goalIndex * 0.1 + taskIndex * 0.05, 
-                  duration: 0.3 
+                  ...animationConfig.transition,
+                  delay: 0.8 + goalIndex * 0.05 + taskIndex * 0.02 
                 } : undefined}
-                whileHover={{ scale: 1.1 }}
                 style={{ cursor: onTaskClick ? 'pointer' : 'default' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isDragging) {
-                    onTaskClick?.(task.id, goal.id);
-                  }
-                }}
+                onClick={(e) => handleTaskClick(e, task.id, goal.id)}
               >
                 {/* 選中狀態的外圈 */}
                 {isSelected && (
-                  <circle
+                  <motion.circle
                     cx={x}
                     cy={y}
                     r={Math.min(32, Math.min(width, height) * 0.08)}
                     fill="#3b82f6"
-                    fillOpacity="0.15"
                     stroke="none"
-                  >
-                    <animate
-                      attributeName="fill-opacity"
-                      values="0.05;0.25;0.05"
-                      dur="2s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
+                    {...selectedAnimationConfig}
+                  />
                 )}
                 
                 {/* 進行中任務的脈動效果 */}
@@ -954,7 +1068,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                 )}
 
                 {/* 任務協作頭像 - 只在協作模式且開啟頭像顯示時顯示 */}
-                {topic.isCollaborative && topic.showAvatars && task.owner && (
+                {topic.is_collaborative && topic.show_avatars && task.owner && (
                   <foreignObject
                     x={x + taskNodeSize * 0.1}
                     y={y - taskNodeSize * 1.9}

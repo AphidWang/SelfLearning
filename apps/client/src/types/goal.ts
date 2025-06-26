@@ -30,20 +30,29 @@ export interface Topic {
   description?: string;
   type?: TopicType;
   status: TopicStatus;
-  dueDate?: string;
+  due_date?: string; // 對應 Supabase schema
   goals: Goal[];
   category?: string;
-  templateType?: string;
+  template_type?: string; // 對應 Supabase schema
   subject?: SubjectType;
   progress?: number;
-  focusElement?: { type: 'goal' | 'task', id: string };
+  focus_element?: { type: 'goal' | 'task', id: string }; // 對應 Supabase schema
   bubbles?: Bubble[];
-  // 協作相關字段
-  isCollaborative?: boolean; // 是否為協作主題
-  owner?: User; // 主要擁有者
-  collaborators?: User[]; // 協作人列表
-  showAvatars?: boolean; // 是否在 Radial 中顯示頭像
-  // 移除 focusedGoalIds，改用目標的 status 字段來管理
+  
+  // Supabase 相關字段
+  template_id?: string;
+  template_version?: number;
+  owner_id: string;
+  is_collaborative?: boolean; // 對應 Supabase schema
+  show_avatars?: boolean; // 對應 Supabase schema
+  created_at: string;
+  updated_at: string;
+  
+  // 前端額外欄位 (從查詢時會填入)
+  owner?: User; // 擁有者資訊
+  template?: TopicTemplate; // 來源模板資訊
+  topic_collaborators?: TopicCollaborator[]; // 協作者列表
+  collaborators?: User[]; // 從 topic_collaborators 轉換而來的協作者列表
 }
 
 export interface Goal {
@@ -160,28 +169,7 @@ export interface TopicTemplateCollaborator {
   user?: User; // 用戶資訊
 }
 
-/**
- * Topic - 學生實際使用的學習主題 (擴展現有的 Topic 介面)
- */
-export interface TopicWithSupabase extends Omit<Topic, 'id'> {
-  id: string; // UUID from Supabase
-  
-  // 來源追蹤
-  template_id?: string; // 來源模板 ID
-  template_version?: number; // 來源模板版本
-  
-  // 權限相關
-  owner_id: string; // 擁有者 UUID
-  
-  // 時間戳記
-  created_at: string;
-  updated_at: string;
-  
-  // 前端額外欄位
-  owner?: User; // 擁有者資訊
-  template?: TopicTemplate; // 來源模板資訊
-  topic_collaborators?: TopicCollaborator[]; // 協作者列表
-}
+// TopicWithSupabase 已合併到 Topic，不再需要
 
 /**
  * Topic 協作者

@@ -5,7 +5,8 @@ import { AIAssistant } from '../../components/goals/AIAssistant';
 import { ActionItem } from '../../components/goals/ActionItem';
 import { goalTemplates } from '../../constants/goalTemplates';
 import { useTopicStore } from '../../store/topicStore';
-import type { Topic, Goal, Task } from '../../types/goal';
+import type { Task } from '../../types/goal';
+import type { Topic } from '../../types/goal';
 import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
 import { SUBJECTS, type SubjectType } from '../../constants/subjects';
 import { subjects } from '../../styles/tokens';
@@ -13,9 +14,10 @@ import { GoalItem } from '../../components/goals/GoalItem';
 import { useNavigate } from 'react-router-dom';
 import { FloatingAssistant } from '../../components/assistant/FloatingAssistant';
 import { useAssistant } from '../../hooks/useAssistant';
+import { supabase } from '../../services/supabase';
 
 const StudentPlanning: React.FC = () => {
-  const { topics, updateTopic, updateTask: storeUpdateTask } = useTopicStore();
+  const { topics, updateTopic, updateTask: storeUpdateTask, fetchTopics, createTopic, addGoal } = useTopicStore();
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [showNewTopicModal, setShowNewTopicModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -30,11 +32,40 @@ const StudentPlanning: React.FC = () => {
   const [showTypeSelect, setShowTypeSelect] = useState(false);
   const [expandedGoals, setExpandedGoals] = useState<string[]>([]);
   const { isVisible: showAssistant, position: assistantPosition, setPosition: setAssistantPosition, toggleAssistant } = useAssistant({
-    position: { x: -120, y: 0 }
+    position: { x: -120, y: 0 },
+    isVisible: false
   });
   const detailsRef = useRef<HTMLDivElement>(null);
   const assistantContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate('/login');
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
+  useEffect(() => {
+    loadTopics();
+  }, []);
+
+  const loadTopics = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await useTopicStore.getState().fetchTopics();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '載入主題時發生錯誤');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     setSavedTopicIds(new Set(topics.map(topic => topic.id)));
@@ -67,16 +98,12 @@ const StudentPlanning: React.FC = () => {
   };
 
   const handleAddToSchedule = (topicId: string, goalId: string, taskId: string) => {
-    const topic = topics.find(t => t.id === topicId);
-    if (!topic) return;
-
-    const goal = topic.goals.find(g => g.id === goalId);
-    if (!goal) return;
-
-    const task = goal.tasks.find(t => t.id === taskId);
+    const topic = useTopicStore.getState().topics.find(t => t.id === topicId);
+    const goal = topic?.goals.find(g => g.id === goalId);
+    const task = goal?.tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    storeUpdateTask(topicId, goalId, { ...task, notes: '已加入排程' });
+    storeUpdateTask(topicId, goalId, taskId, { ...task, notes: '已加入排程' });
   };
 
   const toggleGoal = (goalId: string) => {
@@ -97,33 +124,59 @@ const StudentPlanning: React.FC = () => {
     return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   };
 
-  const handleTaskStatusChange = (topicId: string, goalId: string, task: Task) => {
-    storeUpdateTask(topicId, goalId, task);
-  };
-
-  const handleTaskEdit = (topicId: string, goalId: string, task: Task) => {
-    storeUpdateTask(topicId, goalId, task);
-  };
-
-  const handleDeleteTopic = (topicId: string) => {
-    const topicToDelete = topics.find(t => t.id === topicId);
-    if (topicToDelete) {
-      const updatedTopic = { ...topicToDelete, status: GOAL_STATUSES.ARCHIVED };
-      console.log('Deleting topic:', { topicId, updatedTopic });
-      updateTopic(updatedTopic);
+  const handleTaskStatusChange = async (topicId: string, goalId: string, task: Task) => {
+    try {
+      const newStatus = task.status === 'done' ? 'todo' : 'done';
+      const updatedTask = await storeUpdateTask(topicId, goalId, task.id, {
+        ...task,
+        status: newStatus,
+        completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
+      });
+      if (!updatedTask) {
+        throw new Error('Failed to update task status');
+      }
+    } catch (err) {
+      console.error('Error updating task status:', err);
+      setError(err instanceof Error ? err.message : '更新任務狀態時發生錯誤');
     }
   };
 
-  const handleAddNewTopic = (newTopic: Topic) => {
-    updateTopic(newTopic);
+  const handleTaskEdit = async (topicId: string, goalId: string, task: Task) => {
+    try {
+      const updatedTask = await storeUpdateTask(topicId, goalId, task.id, task);
+      if (!updatedTask) {
+        throw new Error('Failed to update task');
+      }
+    } catch (err) {
+      console.error('Error editing task:', err);
+      setError(err instanceof Error ? err.message : '編輯任務時發生錯誤');
+    }
   };
 
-  const handleSaveTopic = (topic: Topic) => {
-    updateTopic(topic);
+  const handleDeleteTopic = (topicId: string) => {
+    updateTopic(topicId, { status: 'archived' });
+  };
+
+  const handleAddNewTopic = (newTopic: Topic) => {
+    // 新的 API 需要使用 createTopic 或 addTopic
+    // 這裡需要檢查實際的使用場景
+    console.log('Add new topic:', newTopic);
+  };
+
+  const handleSave = () => {
+    if (editedTopic &&
+        editedTopic.title?.trim() !== '' &&
+        editedTopic.description?.trim() !== '') {
+      setIsEditing(false);
+      updateTopic(editedTopic.id, editedTopic);
+      setSelectedTopic(editedTopic);
+      setHasAttemptedSave(false);
+      setSavedTopicIds(prev => new Set(prev).add(editedTopic.id));
+    }
   };
 
   const handleUpdateTopic = (topic: Topic) => {
-    updateTopic(topic);
+    updateTopic(topic.id, topic);
   };
 
   const handleTopicSelect = (topic: Topic) => {
@@ -160,6 +213,31 @@ const StudentPlanning: React.FC = () => {
   const handleTopicFilter = (filteredTopics: Topic[]) => {
     // 這裡不需要更新 store，因為我們只是過濾顯示
     return filteredTopics;
+  };
+
+  const handleAddGoal = async () => {
+    if (!selectedTopic) return;
+    
+    try {
+      const newGoal = await useTopicStore.getState().addGoal(selectedTopic.id, {
+        title: '新目標',
+        description: '',
+        status: 'todo',
+        tasks: [],
+        order: selectedTopic.goals.length
+      });
+
+      if (newGoal) {
+        await loadTopics();
+        const updatedTopic = useTopicStore.getState().topics.find(t => t.id === selectedTopic.id);
+        if (updatedTopic) {
+          setSelectedTopic(updatedTopic);
+          setEditedTopic(updatedTopic);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '新增目標時發生錯誤');
+    }
   };
 
   return (
@@ -258,13 +336,13 @@ const StudentPlanning: React.FC = () => {
                     </div>
                   </div>
 
-                  {topic.dueDate && (
+                  {topic.due_date && (
                     <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
                       <Calendar className="h-4 w-4 mr-1" />
                       {new Intl.DateTimeFormat('zh-TW', {
                         month: 'long',
                         day: 'numeric'
-                      }).format(new Date(topic.dueDate))}
+                      }).format(new Date(topic.due_date))}
                     </div>
                   )}
                 </button>
@@ -381,8 +459,7 @@ const StudentPlanning: React.FC = () => {
                                 {goalTemplates.map((template) => (
                                   <button
                                     key={template.title}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
+                                    onClick={() => {
                                       if (editedTopic) {
                                         setEditedTopic({...editedTopic, type: template.title});
                                         setShowTypeSelect(false);
@@ -439,18 +516,7 @@ const StudentPlanning: React.FC = () => {
                         </div>
                         <div className="flex justify-end space-x-2">
                           <button
-                            onClick={() => {
-                              setHasAttemptedSave(true);
-                              if (editedTopic && selectedTopic && 
-                                  editedTopic.title.trim() !== '' && 
-                                  editedTopic.description?.trim() !== '') {
-                                setIsEditing(false);
-                                updateTopic(editedTopic);
-                                setSelectedTopic(editedTopic);
-                                setHasAttemptedSave(false);
-                                setSavedTopicIds(prev => new Set(prev).add(editedTopic.id));
-                              }
-                            }}
+                            onClick={handleSave}
                             disabled={!editedTopic?.title || !editedTopic?.description}
                             className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                           >
@@ -562,7 +628,7 @@ const StudentPlanning: React.FC = () => {
                       學習目標
                     </h3>
                     <button
-                      onClick={() => {/* 添加目標的邏輯 */}}
+                      onClick={handleAddGoal}
                       className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50"
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -636,24 +702,28 @@ const StudentPlanning: React.FC = () => {
                 {goalTemplates.map((template, index) => (
                   <button
                     key={index}
-                    onClick={() => {
-                      const newTopic: Topic = {
-                        id: crypto.randomUUID(),
-                        title: '',
-                        description: '',
+                    onClick={async () => {
+                      setShowTemplateModal(false);
+                      const newTopic = await useTopicStore.getState().createTopic({
+                        title: template.title || '新主題',
+                        description: template.description || '',
                         type: template.title,
                         subject: SUBJECTS.CUSTOM,
-                        dueDate: new Date().toISOString(),
-                        progress: 0,
+                        category: 'learning',
+                        status: 'active',
                         goals: [],
-                        status: 'active'
-                      };
+                        bubbles: [],
+                        progress: 0,
+                        is_collaborative: false,
+                        show_avatars: true
+                      });
                       
-                      setShowTemplateModal(false);
-                      updateTopic(newTopic);
-                      setSelectedTopic(newTopic);
-                      setEditedTopic(newTopic);
-                      setIsEditing(true);
+                      if (newTopic) {
+                        await loadTopics();
+                        setSelectedTopic(newTopic);
+                        setEditedTopic(newTopic);
+                        setIsEditing(true);
+                      }
                     }}
                     className="p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-indigo-500 dark:hover:border-indigo-500 transition text-left"
                   >

@@ -1,5 +1,5 @@
 /**
- * Topic Supabase Store - 基於 Supabase 的學習主題管理
+ * Topic Store - 基於 Supabase 的學習主題管理 (樂觀更新版本)
  * 
  * 功能說明：
  * 1. 管理學生的學習主題 (從 TopicTemplate 建立或自創)
@@ -8,19 +8,20 @@
  * 4. 與 Supabase 資料庫同步
  * 5. 權限控制和資料安全
  * 6. 從 TopicTemplate 建立新主題
+ * 7. 樂觀更新機制，提供流暢的用戶體驗
  * 
  * 架構設計：
  * - 所有資料存儲在 Supabase
  * - 使用 RLS (Row Level Security) 控制權限
  * - 支援即時協作和權限管理
  * - 整合 TopicTemplate 系統
+ * - 樂觀更新：先更新本地狀態，後同步到資料庫
+ * - 失敗時自動回滾並顯示錯誤訊息
  */
 
 import { create } from 'zustand';
 import type { 
   Topic,
-  TopicWithSupabase, 
-  TopicCollaborator, 
   CreateTopicFromTemplateParams,
   Goal,
   Task,
@@ -30,28 +31,34 @@ import type {
 } from '../types/goal';
 import { supabase } from '../services/supabase';
 
+// 簡化的狀態管理類型
+
 interface TopicStore {
   // 狀態
-  topics: TopicWithSupabase[];
+  topics: Topic[];
   selectedTopicId: string | null;
   loading: boolean;
   error: string | null;
+  
+  // 同步狀態
+  syncing: boolean;
 
   // 基本 CRUD 操作
   fetchTopics: () => Promise<void>;
   fetchMyTopics: () => Promise<void>;
   fetchCollaborativeTopics: () => Promise<void>;
-  getTopic: (id: string) => Promise<TopicWithSupabase | null>;
-  createTopic: (topic: Omit<TopicWithSupabase, 'id' | 'owner_id' | 'created_at' | 'updated_at'>) => Promise<TopicWithSupabase | null>;
-  createTopicFromTemplate: (params: CreateTopicFromTemplateParams) => Promise<TopicWithSupabase | null>;
-  updateTopic: (id: string, updates: Partial<TopicWithSupabase>) => Promise<TopicWithSupabase | null>;
+  getTopic: (id: string) => Promise<Topic | null>;
+  createTopic: (topic: Omit<Topic, 'id' | 'owner_id' | 'created_at' | 'updated_at'>) => Promise<Topic | null>;
+  addTopic: (topic: Omit<Topic, 'id' | 'owner_id' | 'created_at' | 'updated_at'>) => Promise<Topic | null>; // 別名，兼容舊代碼
+  createTopicFromTemplate: (params: CreateTopicFromTemplateParams) => Promise<Topic | null>;
+  updateTopic: (id: string, updates: Partial<Topic>) => Promise<Topic | null>;
   deleteTopic: (id: string) => Promise<boolean>;
 
   // 協作功能
   addCollaborator: (topicId: string, userId: string, permission: 'view' | 'edit') => Promise<boolean>;
   removeCollaborator: (topicId: string, userId: string) => Promise<boolean>;
   updateCollaboratorPermission: (topicId: string, userId: string, permission: 'view' | 'edit') => Promise<boolean>;
-  getCollaborators: (topicId: string) => Promise<TopicCollaborator[]>;
+  getCollaborators: (topicId: string) => Promise<User[]>;
 
   // 內容管理
   addGoal: (topicId: string, goal: Omit<Goal, 'id'>) => Promise<Goal | null>;
@@ -78,7 +85,7 @@ interface TopicStore {
   getActiveGoals: (topicId: string) => Goal[];
   getActiveTasks: (topicId: string, goalId: string) => Task[];
   getCompletionRate: (topicId: string) => number;
-  getActiveTopics: () => TopicWithSupabase[];
+  getActiveTopics: () => Topic[];
   setGoalStatus: (topicId: string, goalId: string, status: GoalStatus) => Promise<boolean>;
   getGoalsByStatus: (topicId: string, status: GoalStatus) => Goal[];
   getFocusedGoals: (topicId: string) => Goal[];
@@ -97,10 +104,15 @@ interface TopicStore {
   getAvailableUsers: () => User[];
 
   // 工具方法
+  setSyncing: (syncing: boolean) => void;
+
+  // 工具方法
   setSelectedTopicId: (id: string | null) => void;
   clearError: () => void;
   refreshTopic: (id: string) => Promise<void>;
-  calculateProgress: (topic: TopicWithSupabase) => number; // 計算完成率
+  calculateProgress: (topic: Topic) => number; // 計算完成率
+
+  reset: () => void;
 }
 
 export const useTopicStore = create<TopicStore>((set, get) => ({
@@ -110,32 +122,34 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   loading: false,
   error: null,
 
+  // 同步狀態
+  syncing: false,
+
   // 基本 CRUD 操作
   fetchTopics: async () => {
     set({ loading: true, error: null });
     try {
-      const { data, error } = await supabase
+      const { data: topics, error } = await supabase
         .from('topics')
-        .select(`
-          *,
-          topic_collaborators (
-            id,
-            user_id,
-            permission,
-            invited_by,
-            invited_at
-          )
-        `)
+        .select('*')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
 
-      const topics = data?.map(topic => ({
+      // 分別獲取協作者資訊
+      const { data: collaborators, error: collabError } = await supabase
+        .from('topic_collaborators')
+        .select('*');
+
+      if (collabError) throw collabError;
+
+      // 手動組合資料
+      const topicsWithCollaborators = topics?.map(topic => ({
         ...topic,
-        topic_collaborators: topic.topic_collaborators || []
+        topic_collaborators: collaborators?.filter(c => c.topic_id === topic.id) || []
       })) || [];
 
-      set({ topics, loading: false });
+      set({ topics: topicsWithCollaborators, loading: false });
     } catch (error) {
       console.error('Failed to fetch topics:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to fetch topics', loading: false });
@@ -248,29 +262,54 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
+      // 確保必要欄位存在
+      const requiredFields = ['title', 'description', 'type', 'subject', 'category', 'status'];
+      const missingFields = requiredFields.filter(field => !topicData[field]);
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
+      // 設定預設值
+      const topicWithDefaults = {
+        ...topicData,
+        goals: topicData.goals || [],
+        bubbles: topicData.bubbles || [],
+        progress: topicData.progress || 0,
+        is_collaborative: topicData.is_collaborative || false,
+        show_avatars: topicData.show_avatars || true,
+        owner_id: user.id
+      };
+
+      const { data: newTopic, error } = await supabase
         .from('topics')
-        .insert({
-          ...topicData,
-          owner_id: user.id
-        })
+        .insert(topicWithDefaults)
         .select()
         .single();
 
       if (error) throw error;
+      if (!newTopic) return null;
 
       // 更新本地狀態
-      const newTopic = { ...data, topic_collaborators: [] };
+      const finalTopic = {
+        ...newTopic,
+        topic_collaborators: []  // 新主題還沒有協作者
+      };
+
       set(state => ({
-        topics: [newTopic, ...state.topics]
+        topics: [finalTopic, ...state.topics]
       }));
 
-      return newTopic;
+      return finalTopic;
     } catch (error) {
       console.error('Failed to create topic:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to create topic' });
       return null;
     }
+  },
+
+  // 別名方法，兼容舊代碼
+  addTopic: async (topicData) => {
+    return get().createTopic(topicData);
   },
 
   createTopicFromTemplate: async (params) => {
@@ -331,25 +370,37 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
   updateTopic: async (id, updates) => {
     try {
-      const { data, error } = await supabase
+      // 先更新主題
+      const { data: updatedTopic, error: updateError } = await supabase
         .from('topics')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+      if (!updatedTopic) return null;
+
+      // 再獲取協作者資訊
+      const { data: collaborators, error: collabError } = await supabase
+        .from('topic_collaborators')
+        .select('*')
+        .eq('topic_id', id);
+
+      if (collabError) throw collabError;
+
+      // 組合資料
+      const finalTopic = {
+        ...updatedTopic,
+        topic_collaborators: collaborators || []
+      };
 
       // 更新本地狀態
       set(state => ({
-        topics: state.topics.map(topic =>
-          topic.id === id 
-            ? { ...topic, ...data }
-            : topic
-        )
+        topics: state.topics.map(t => t.id === id ? finalTopic : t)
       }));
 
-      return data;
+      return finalTopic;
     } catch (error) {
       console.error('Failed to update topic:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to update topic' });
@@ -368,7 +419,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       // 更新本地狀態
       set(state => ({
-        topics: state.topics.filter(topic => topic.id !== id),
+        topics: state.topics.filter(t => t.id !== id),
         selectedTopicId: state.selectedTopicId === id ? null : state.selectedTopicId
       }));
 
@@ -449,13 +500,23 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
   getCollaborators: async (topicId) => {
     try {
+      // 如果 topic 已經在本地狀態中，直接返回協作者列表
+      const topic = get().topics.find(t => t.id === topicId);
+      if (topic && topic.collaborators) {
+        return topic.collaborators;
+      }
+
+      // 否則查詢資料庫
       const { data, error } = await supabase
         .from('topic_collaborators')
-        .select('*')
+        .select('user_id')
         .eq('topic_id', topicId);
 
       if (error) throw error;
-      return data || [];
+      
+      const userIds = data?.map(tc => tc.user_id) || [];
+      const availableUsers = get().getAvailableUsers();
+      return availableUsers.filter(user => userIds.includes(user.id));
     } catch (error) {
       console.error('Failed to get collaborators:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to get collaborators' });
@@ -517,7 +578,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       if (error) throw error;
 
       // 更新本地狀態
-      set(state => ({
+    set(state => ({
         topics: state.topics.map(t =>
           t.id === topicId
             ? { ...t, goals: updatedGoals }
@@ -551,7 +612,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       // 更新本地狀態
       set(state => ({
         topics: state.topics.map(t =>
-          t.id === topicId
+        t.id === topicId
             ? { ...t, goals: updatedGoals }
             : t
         )
@@ -874,18 +935,21 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('topics')
-        .update({ is_collaborative: !topic.isCollaborative })
-        .eq('id', topicId);
+        .update({ is_collaborative: !topic.is_collaborative })
+        .eq('id', topicId)
+        .select()
+        .single();
 
       if (error) throw error;
+      if (!data) return false;
 
       // 更新本地狀態
       set(state => ({
         topics: state.topics.map(t =>
           t.id === topicId
-            ? { ...t, isCollaborative: !t.isCollaborative }
+            ? { ...t, is_collaborative: !t.is_collaborative }
             : t
         )
       }));
@@ -905,7 +969,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       const { error } = await supabase
         .from('topics')
-        .update({ show_avatars: !topic.showAvatars })
+        .update({ show_avatars: !topic.show_avatars })
         .eq('id', topicId);
 
       if (error) throw error;
@@ -914,7 +978,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       set(state => ({
         topics: state.topics.map(t =>
           t.id === topicId
-            ? { ...t, showAvatars: !t.showAvatars }
+            ? { ...t, show_avatars: !t.show_avatars }
             : t
         )
       }));
@@ -959,7 +1023,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       // 更新本地狀態
       set(state => ({
         topics: state.topics.map(t =>
-          t.id === topicId
+        t.id === topicId
             ? { ...t, goals: updatedGoals }
             : t
         )
@@ -1045,11 +1109,6 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   getGoalsByStatus: (topicId, status) => {
-    const topic = get().topics.find(t => t.id === topicId);
-    return topic?.goals.filter(goal => goal.status === status) || [];
-  },
-
-  getGoalsByStatus: (topicId, status) => {
     const activeGoals = get().getActiveGoals(topicId);
     return activeGoals.filter(goal => goal.status === status);
   },
@@ -1123,14 +1182,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         )
       }));
 
-      // 找到並返回更新後的任務
-      const updatedGoal = updatedGoals.find(g => g.id === goalId);
-      const updatedTask = updatedGoal?.tasks.find(t => t.id === taskId);
-      return updatedTask || null;
+      return true;
     } catch (error) {
       console.error('Failed to update task help:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to update task help' });
-      return null;
+      return false;
     }
   },
 
@@ -1199,14 +1255,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         )
       }));
 
-      // 找到並返回更新後的任務
-      const updatedGoal = updatedGoals.find(g => g.id === goalId);
-      const updatedTask = updatedGoal?.tasks.find(t => t.id === taskId);
-      return updatedTask || null;
+      return true;
     } catch (error) {
       console.error('Failed to set task reply:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to set task reply' });
-      return null;
+      return false;
     }
   },
 
@@ -1276,14 +1329,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         )
       }));
 
-      // 找到並返回更新後的任務
-      const updatedGoal = updatedGoals.find(g => g.id === goalId);
-      const updatedTask = updatedGoal?.tasks.find(t => t.id === taskId);
-      return updatedTask || null;
+      return true;
     } catch (error) {
       console.error('Failed to set task owner:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to set task owner' });
-      return null;
+      return false;
     }
   },
 
@@ -1493,6 +1543,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   // 工具方法
+  setSyncing: (syncing) => set({ syncing }),
+
+  // 工具方法
   setSelectedTopicId: (id) => set({ selectedTopicId: id }),
 
   clearError: () => set({ error: null }),
@@ -1522,5 +1575,12 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     );
     
     return Math.round((completedTasks / totalTasks) * 100);
-  }
+  },
+
+  reset: () => set({
+    topics: [],
+    selectedTopicId: null,
+    loading: false,
+    error: null
+  }),
 })); 

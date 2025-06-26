@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import PageLayout from '../../components/layout/PageLayout';
 import Calendar from '../../components/calendar/Calendar';
-import { Task } from '../../components/tasks/TaskList';
+import { Task } from '../../types/goal';
 import ProgressChart from '../../components/progress/ProgressChart';
 import { Check, BookOpen, Clock, FileText, Layers, Search, Plus } from 'lucide-react';
 import ChatModule from '../../components/chat/ChatModule';
@@ -34,31 +34,32 @@ const upcomingTasks: Task[] = [
     id: '1',
     title: '寫一篇遊記',
     description: '選擇一個最近去過的地方，寫一篇遊記',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 1)),
-    completed: false,
-    subject: '國語',
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
+    status: 'todo',
+    category: '國語',
     priority: 'high',
-    assignedBy: '陳老師'
+    assignedTo: '陳老師'
   },
   {
     id: '2',
     title: '水三態的科學實驗',
     description: '準備水三態實驗的報告',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 3)),
-    completed: false,
-    subject: '自然',
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 3)).toISOString(),
+    status: 'todo',
+    category: '自然',
     priority: 'medium',
-    assignedBy: '林老師'
+    assignedTo: '王老師'
   },
   {
     id: '3',
     title: '閱讀課外讀物 - 科學家',
     description: '閱讀科學家的傳記並做筆記',
-    dueDate: new Date(),
-    completed: true,
-    subject: '自然',
+    dueDate: new Date().toISOString(),
+    status: 'done',
+    category: '自然',
     priority: 'low',
-    assignedBy: '林老師'
+    assignedTo: '王老師',
+    completedAt: new Date().toISOString()
   }
 ];
 
@@ -77,7 +78,7 @@ const StudentDashboard: React.FC = () => {
   const handleTaskToggle = (taskId: string) => {
     setTasks(tasks.map(task => 
       task.id === taskId 
-        ? { ...task, completed: !task.completed } 
+        ? { ...task, status: task.status === 'done' ? 'todo' : 'done', completedAt: task.status === 'todo' ? new Date().toISOString() : undefined } 
         : task
     ));
   };
@@ -183,7 +184,7 @@ const StudentDashboard: React.FC = () => {
             </div>
             
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow divide-y divide-gray-200 dark:divide-gray-700">
-              {tasks.filter(task => !task.completed).slice(0, 3).map((task, index) => (
+              {tasks.filter(task => task.status !== 'done').slice(0, 3).map((task, index) => (
                 <div key={index} className="p-4 flex items-start">
                   <button
                     className="mt-0.5 mr-3 focus:outline-none"
@@ -217,18 +218,18 @@ const StudentDashboard: React.FC = () => {
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className="inline-flex items-center text-xs font-medium text-indigo-600 dark:text-indigo-400">
                         <BookOpen size={14} className="mr-1" />
-                        {task.subject}
+                        {task.category}
                       </span>
                       <span className="inline-flex items-center text-xs font-medium text-gray-500 dark:text-gray-400">
                         <Clock size={14} className="mr-1" />
-                        到期: {new Intl.DateTimeFormat('zh-TW', { month: 'short', day: 'numeric' }).format(task.dueDate)}
+                        到期: {new Intl.DateTimeFormat('zh-TW', { month: 'short', day: 'numeric' }).format(task.dueDate ? new Date(task.dueDate) : undefined)}
                       </span>
                     </div>
                   </div>
                 </div>
               ))}
               
-              {tasks.filter(task => !task.completed).length === 0 && (
+              {tasks.filter(task => task.status !== 'done').length === 0 && (
                 <div className="p-6 text-center text-gray-500 dark:text-gray-400">
                   沒有待完成的任務
                 </div>
@@ -245,7 +246,7 @@ const StudentDashboard: React.FC = () => {
             
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
               <div className="space-y-4">
-                {tasks.filter(task => task.completed).map((task, index) => (
+                {tasks.filter(task => task.status === 'done').map((task, index) => (
                   <div key={index} className="flex items-center">
                     <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-3">
                       <Check size={16} className="text-green-600 dark:text-green-400" />
@@ -253,7 +254,7 @@ const StudentDashboard: React.FC = () => {
                     <div>
                       <p className="font-medium text-gray-800 dark:text-white">{task.title}</p>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {task.subject} · 今天完成
+                        {task.category} · 今天完成
                       </span>
                     </div>
                   </div>

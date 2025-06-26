@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Task } from '../../types/goal';
+import { Topic } from '../../types/goal';
 import { 
   ChevronLeft, MessageSquare, Paperclip, 
   HelpCircle, CheckCircle, PlayCircle,
@@ -38,8 +39,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   const [attachments, setAttachments] = useState<File[]>([]);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const topic = getTopic(topicId);
+  const [topic, setTopic] = useState<Topic | null>(null);
   const subjectStyle = subjects.getSubjectStyle(topic?.subject || '');
 
   const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
@@ -49,12 +49,12 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
       challenge: challenge as number,
       completedAt: status === 'done' ? new Date().toISOString() : undefined
     };
-    updateTask(topicId, goalId, updatedTask);
+    updateTask(topicId, goalId, task.id, updatedTask);
     onBack();
   };
 
   const handleSaveDescription = () => {
-    updateTask(topicId, goalId, editedTask);
+    updateTask(topicId, goalId, task.id, editedTask);
     setIsEditing(false);
   };
 
@@ -71,6 +71,28 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    const fetchTopic = async () => {
+      const fetchedTopic = await getTopic(topicId);
+      if (fetchedTopic) {
+        setTopic(fetchedTopic);
+        const goal = fetchedTopic.goals.find(g => g.id === goalId);
+        const foundTask = goal?.tasks.find(t => t.id === task.id);
+        if (foundTask) {
+          setEditedTask(foundTask);
+        }
+      }
+    };
+    fetchTopic();
+  }, [topicId, goalId, task.id, getTopic]);
+
+  const handleSave = async () => {
+    if (!task || !topic) return;
+    
+    await updateTask(topicId, goalId, task.id, task);
+    onClose();
   };
 
   return (

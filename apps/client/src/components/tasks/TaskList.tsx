@@ -160,7 +160,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           onStatusChange?.(task.id, 
-                            task.status === 'completed' ? 'pending' : 'completed'
+                            task.status === 'done' ? 'todo' : 'done'
                           );
                         }}
                       >

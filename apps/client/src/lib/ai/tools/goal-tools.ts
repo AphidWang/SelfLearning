@@ -13,7 +13,10 @@ export const createTopicTool: Tool<{ topic: string }, Topic> = {
       title: params.topic,
       description: '',
       status: 'active',
-      goals: []
+      goals: [],
+      owner_id: '',  // 這會由 store 處理
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
     topicStore.addTopic(newTopic);
     return newTopic;
@@ -94,7 +97,7 @@ export const completeTopicTool: Tool<void, boolean> = {
     const topic = topicStore.topics.find(t => t.id === selectedTopicId);
     if (!topic) return false;
 
-    topicStore.updateTopic({
+    topicStore.updateTopic(selectedTopicId, {
       ...topic,
       status: 'completed'
     });
@@ -114,7 +117,7 @@ export const markAsBookmarkTool: Tool<void, boolean> = {
     const topic = topicStore.topics.find(t => t.id === selectedTopicId);
     if (!topic) return false;
 
-    topicStore.updateTopic({
+    topicStore.updateTopic(selectedTopicId, {
       ...topic,
       status: 'archived'
     });

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Topic } from '../../types/goal';
 import { Compass, Book, Target } from 'lucide-react';
 
 interface MapIconProps {
-  topic: Topic;
+  id: string;
+  title: string;
   src: string;
   left: number;
   top: number;
@@ -21,7 +22,8 @@ const ORB_SIZE = 56; // 水晶球的大小 (w-14 = 56px)
 const ORB_ANGLES = [150, 30, -90];
 
 export const MapIcon: React.FC<MapIconProps> = ({ 
-  topic, 
+  id,
+  title, 
   src, 
   left, 
   top, 
@@ -34,7 +36,7 @@ export const MapIcon: React.FC<MapIconProps> = ({
   const [hoveredOrbArea, setHoveredOrbArea] = useState(false);
 
   // 計算實際位置
-  const getOrbPosition = (angle: number) => {
+  const getOrbPosition = useCallback((angle: number) => {
     const radian = (angle * Math.PI) / 180;
     const centerOffset = CANVAS_SIZE / 2;
     const orbOffset = ORB_SIZE / 2;
@@ -48,17 +50,57 @@ export const MapIcon: React.FC<MapIconProps> = ({
     position.y -= orbOffset;
 
     return position;
-  };
+  }, []);
+
+  // 記憶化主要樣式
+  const mainStyle = useMemo(() => ({
+    left: `${left}%`,
+    top: `${top}%`,
+    transform: 'translate(-50%, -50%)',
+    transformOrigin: 'center center'
+  }), [left, top]);
+
+  const imageStyle = useMemo(() => ({
+    transform: flip ? 'scaleX(-1)' : 'none',
+    transformOrigin: 'center'
+  }), [flip]);
+
+  const orbContainerStyle = useMemo(() => ({
+    width: `${CANVAS_SIZE}px`,
+    height: `${CANVAS_SIZE}px`,
+    left: '0',
+    top: '0',
+    right: '0',
+    bottom: '0',
+    margin: 'auto',
+    marginLeft: `${(PARENT_SIZE - CANVAS_SIZE) / 2}px`,
+    marginTop: `${(PARENT_SIZE - CANVAS_SIZE) / 2}px`
+  }), []);
+
+  // 記憶化圖標列表
+  const icons = useMemo(() => [
+    <Target key="target" className="w-6 h-6 text-purple-500" />,
+    <Book key="book" className="w-6 h-6 text-purple-500" />,
+    <Compass key="compass" className="w-6 h-6 text-purple-500" />
+  ], []);
+
+  // 記憶化事件處理函數
+  const handleMouseEnter = useCallback(() => setIsHovered(true), []);
+  const handleMouseLeave = useCallback(() => setIsHovered(false), []);
+  const handleOrbAreaEnter = useCallback(() => setHoveredOrbArea(true), []);
+  const handleOrbAreaLeave = useCallback(() => {
+    setHoveredOrbArea(false);
+    setTimeout(() => {
+      if (!isHovered) {
+        setIsHovered(false);
+      }
+    }, 100);
+  }, [isHovered]);
 
   return (
     <motion.div
       className="absolute cursor-pointer"
-      style={{
-        left: `${left}%`,
-        top: `${top}%`,
-        transform: 'translate(-50%, -50%)',
-        transformOrigin: 'center center'
-      }}
+      style={mainStyle}
       animate={{
         scale: isHovered ? 1.15 : 1
       }}
@@ -66,17 +108,14 @@ export const MapIcon: React.FC<MapIconProps> = ({
         scale: { duration: 0.2 }
       }}
       initial={false}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
+      onHoverStart={handleMouseEnter}
+      onHoverEnd={handleMouseLeave}
     >
       <img 
         src={src} 
-        alt={topic.title} 
+        alt={title} 
         className="w-32 h-32 drop-shadow-lg object-contain"
-        style={{
-          transform: flip ? 'scaleX(-1)' : 'none',
-          transformOrigin: 'center'
-        }}
+        style={imageStyle}
       />
 
       {/* 水晶球容器 */}
@@ -84,41 +123,19 @@ export const MapIcon: React.FC<MapIconProps> = ({
         {(isHovered || hoveredOrbArea) && showOrbs && (
           <motion.div
             className="absolute inset-0"
-            style={{
-              width: `${CANVAS_SIZE}px`,
-              height: `${CANVAS_SIZE}px`,
-              left: '0',
-              top: '0',
-              right: '0',
-              bottom: '0',
-              margin: 'auto',
-              marginLeft: `${(PARENT_SIZE - CANVAS_SIZE) / 2}px`,
-              marginTop: `${(PARENT_SIZE - CANVAS_SIZE) / 2}px`
-            }}
+            style={orbContainerStyle}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.3 }}
-            onMouseEnter={() => setHoveredOrbArea(true)}
-            onMouseLeave={() => {
-              setHoveredOrbArea(false);
-              setTimeout(() => {
-                if (!isHovered) {
-                  setIsHovered(false);
-                }
-              }, 100);
-            }}
+            onMouseEnter={handleOrbAreaEnter}
+            onMouseLeave={handleOrbAreaLeave}
           >
             {ORB_ANGLES.map((angle, index) => {
               const orbTopic = orbTopics[index];
               if (!orbTopic) return null;
 
               const pos = getOrbPosition(angle);
-              const icons = [
-                <Target className="w-6 h-6 text-purple-500" />,
-                <Book className="w-6 h-6 text-purple-500" />,
-                <Compass className="w-6 h-6 text-purple-500" />
-              ];
 
               return (
                 <motion.div
