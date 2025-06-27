@@ -126,27 +126,57 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   fetchTopics: async () => {
     set({ loading: true, error: null });
     try {
-      const { data: topics, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // 獲取用戶自己的主題
+      const { data: ownTopics, error: ownError } = await supabase
         .from('topics')
-        .select('*')
+        .select(`
+          *,
+          topic_collaborators (
+            id,
+            user_id,
+            permission,
+            invited_by,
+            invited_at
+          )
+        `)
+        .eq('owner_id', user.id)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (ownError) throw ownError;
 
-      // 分別獲取協作者資訊
-      const { data: collaborators, error: collabError } = await supabase
-        .from('topic_collaborators')
-        .select('*');
+      // 獲取協作主題
+      const { data: collabTopics, error: collabError } = await supabase
+        .from('topics')
+        .select(`
+          *,
+          topic_collaborators!inner (
+            id,
+            user_id,
+            permission,
+            invited_by,
+            invited_at
+          )
+        `)
+        .eq('topic_collaborators.user_id', user.id)
+        .order('updated_at', { ascending: false });
 
       if (collabError) throw collabError;
 
-      // 手動組合資料
-      const topicsWithCollaborators = topics?.map(topic => ({
-        ...topic,
-        topic_collaborators: collaborators?.filter(c => c.topic_id === topic.id) || []
-      })) || [];
+      // 合併並去重
+      const allTopics = [...(ownTopics || []), ...(collabTopics || [])];
+      const uniqueTopics = allTopics.filter((topic, index, self) =>
+        index === self.findIndex((t) => t.id === topic.id)
+      );
 
-      set({ topics: topicsWithCollaborators, loading: false });
+      const topics = uniqueTopics.map(topic => ({
+        ...topic,
+        topic_collaborators: topic.topic_collaborators || []
+      }));
+
+      set({ topics, loading: false });
     } catch (error) {
       console.error('Failed to fetch topics:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to fetch topics', loading: false });
