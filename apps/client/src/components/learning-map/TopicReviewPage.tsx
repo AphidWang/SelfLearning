@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { subjects } from '../../styles/tokens';
-import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
+import { TopicRadialMap, useTopicRadialMapStats } from '../topic-review/TopicRadialMap';
 import { HelpMessageDisplay } from './HelpMessageDisplay';
 import { UserAvatar, UserAvatarGroup } from './UserAvatar';
 import { CollaborationManager } from './CollaborationManager';

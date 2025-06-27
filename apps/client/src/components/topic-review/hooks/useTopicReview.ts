@@ -70,14 +70,14 @@ export const useTopicReview = (topicId: string) => {
     setState(prev => ({ ...prev, isUpdating: true, pendingOperation: 'collaboration' }));
     
     try {
+      // 確保用戶列表是最新的
+      await getUsers();
+      // 刷新主題數據（包含最新的協作者信息）
       await refreshTopic();
-      if (!users.length) {
-        await getUsers();
-      }
     } finally {
       setState(prev => ({ ...prev, isUpdating: false, pendingOperation: null }));
     }
-  }, [refreshTopic, getUsers, users.length]);
+  }, [refreshTopic, getUsers]);
 
   // 通用的更新處理函數，確保所有更新都會同步狀態
   const handleTopicUpdate = useCallback(async (updateFn: () => Promise<any>) => {
@@ -99,14 +99,22 @@ export const useTopicReview = (topicId: string) => {
     if (!topic) return { owner: undefined, collaborators: [], availableUsers: [] };
 
     const owner = topic.owner;
-    const collaborators = (topic.collaborators as (User & { permission?: 'view' | 'edit' })[])?.map(c => ({
+    // 處理協作者數據 - topic.collaborators 是從 getTopic 返回的完整用戶信息
+    const collaborators = (topic.collaborators || []).map(c => ({
       ...c,
-      permission: c.permission || 'view'
-    })) as Collaborator[] || [];
+      permission: 'edit'
+    })) as Collaborator[];
     
     const availableUsers = users.length ? users.filter(u => 
       u.id !== owner?.id && !collaborators.some(c => c.id === u.id)
     ) : [];
+
+    console.log('🔍 useTopicReview - derivedData:', { 
+      owner: owner?.name, 
+      collaborators: collaborators.map(c => c.name), 
+      availableUsers: availableUsers.map(u => u.name),
+      totalUsers: users.length
+    });
 
     return { owner, collaborators, availableUsers };
   }, [state.topic, users]);

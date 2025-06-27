@@ -5,7 +5,7 @@ export { TopicDashboardDialog, GoalDashboardDialog } from './TopicDashboardDialo
 export { TopicDashboardCard, GoalDashboardCard } from './TopicDashboardCard';
 export { TopicOverviewDialog, GoalOverviewDialog } from './TopicOverviewDialog';
 export { TopicMindmapOverviewDialog } from './TopicMindmapOverviewDialog';
-export { TopicRadialMap, useTopicRadialMapStats, GoalRadialMap, useGoalRadialMapStats } from './TopicRadialMap';
+export { TopicRadialMap, useTopicRadialMapStats, GoalRadialMap, useGoalRadialMapStats } from '../topic-review/TopicRadialMap';
 export { TopicReviewPage, GoalReviewPage } from './TopicReviewPage';
 export { CircularProgress } from './CircularProgress';
 export { DraggableDialog } from './DraggableDialog'; 

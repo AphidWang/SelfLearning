@@ -229,7 +229,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         .from('topics')
         .select(`
           *,
-          topic_collaborators (
+          topic_collaborators!topic_collaborators_topic_id_fkey (
             id,
             user_id,
             permission,
@@ -243,9 +243,50 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       if (error) throw error;
       if (!data) return null;
 
+      console.log('Topic data from DB:', JSON.stringify(data, null, 2));
+
+      // 使用 userStore 獲取用戶資訊
+      const userState = useUserStore.getState();
+      
+      // 最多嘗試 3 次獲取用戶資料
+      let retryCount = 0;
+      let allUsers = userState.users;
+      
+      while (allUsers.length === 0 && retryCount < 3) {
+        console.log(`Attempting to fetch users (attempt ${retryCount + 1})`);
+        await userState.getUsers();
+        allUsers = useUserStore.getState().users;
+        retryCount++;
+        
+        if (allUsers.length === 0 && retryCount < 3) {
+          // 等待一小段時間再重試
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log('All users from userStore:', allUsers);
+
+      if (allUsers.length === 0) {
+        console.error('Failed to fetch users after multiple attempts');
+        throw new Error('無法獲取用戶資料');
+      }
+
+      // 組合完整的協作者資訊
+      const collaborators = data.topic_collaborators?.map(tc => {
+        const user = allUsers.find(u => u.id === tc.user_id);
+        if (!user) return null;
+        return {
+          ...user,
+          permission: tc.permission
+        };
+      }).filter(Boolean) || [];
+
+      console.log('Final collaborators:', collaborators);
+
       return {
         ...data,
-        topic_collaborators: data.topic_collaborators || []
+        collaborators: collaborators,
+        topic_collaborators: collaborators  // 保留這個以維持向後兼容
       };
     } catch (error) {
       console.error('Failed to get topic:', error);
@@ -434,6 +475,19 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // 檢查是否已經是協作者
+      const { data: existing } = await supabase
+        .from('topic_collaborators')
+        .select('id')
+        .eq('topic_id', topicId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (existing) {
+        console.log('User is already a collaborator');
+        return true; // 已經是協作者，返回成功
+      }
+
       const { error } = await supabase
         .from('topic_collaborators')
         .insert({
@@ -443,7 +497,13 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
           invited_by: user.id
         });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') { // unique constraint violation
+          console.log('User is already a collaborator (duplicate key)');
+          return true;
+        }
+        throw error;
+      }
 
       // 重新取得主題資料以更新協作者列表
       await get().refreshTopic(topicId);

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { Topic } from '../../types/goal';
 import { subjectColors } from '../../styles/tokens';
-import { TopicRadialMap, useTopicRadialMapStats } from './TopicRadialMap';
+import { TopicRadialMap, useTopicRadialMapStats } from '../topic-review/TopicRadialMap';
 import { 
   X, Brain, TrendingUp, Calendar, CheckCircle2
 } from 'lucide-react';

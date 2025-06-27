@@ -2,7 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
-import { TopicRadialMap } from '../learning-map/TopicRadialMap';
+import { TopicRadialMap } from './TopicRadialMap';
 import { TopicHeader } from './components/TopicHeader';
 import { StatsPanel } from './components/StatsPanel';
 import { DetailsPanel } from './components/DetailsPanel';
@@ -255,16 +255,16 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 
             {/* 右側詳情面板 */}
             <div className="col-span-3 h-full min-h-0">
-              <DetailsPanel
-                topic={state.topic}
-                selectedGoalId={state.selectedGoalId}
-                selectedTaskId={state.selectedTaskId}
-                subjectStyle={subjectStyle}
-                onUpdateNotify={actions.handleTopicUpdate}
-                availableUsers={computed.availableUsers}
-                collaborators={computed.collaborators}
-                onTaskSelect={handleDetailsPanelTaskSelect}
-              />
+                          <DetailsPanel
+              topic={state.topic}
+              selectedGoalId={state.selectedGoalId}
+              selectedTaskId={state.selectedTaskId}
+              subjectStyle={subjectStyle}
+              onUpdateNotify={actions.handleCollaborationUpdate}
+              availableUsers={computed.availableUsers}
+              collaborators={computed.collaborators}
+              onTaskSelect={handleDetailsPanelTaskSelect}
+            />
             </div>
           </div>
         </div>

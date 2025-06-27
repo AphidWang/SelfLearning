@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useTopicRadialMapStats } from '../../learning-map/TopicRadialMap';
+import { useTopicRadialMapStats } from '../TopicRadialMap';
 import { useTopicStore } from '../../../store/topicStore';
 import type { Topic } from '../../../types/goal';
 

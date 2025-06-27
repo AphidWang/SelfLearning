@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
-import { UserAvatar, UserAvatarGroup } from './UserAvatar';
+import { UserAvatar, UserAvatarGroup } from '../learning-map/UserAvatar';
 import type { User } from '../../types/goal';
 import { Topic } from '../../types/goal';
 import { 
@@ -85,7 +85,21 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 }) => {
   const { getTopic, getActiveGoals, getCompletionRate, toggleAvatarDisplay } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
+  const isInitialRender = useRef(true);
+  const [shouldAnimate, setShouldAnimate] = useState(showAnimations);
   
+  // 只在第一次渲染時才允許動畫
+  useEffect(() => {
+    if (isInitialRender.current) {
+      // 第一次載入時根據 showAnimations 參數決定是否動畫
+      setShouldAnimate(showAnimations);
+      isInitialRender.current = false;
+    } else {
+      // 後續更新時禁用動畫
+      setShouldAnimate(false);
+    }
+  }, []);
+
   // 縮放和拖拽狀態
   const [scale, setScale] = useState(1);
   const [translateX, setTranslateX] = useState(0);
@@ -319,16 +333,16 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
   // 優化動畫效果
   const animationConfig = useMemo(() => ({
-    initial: showAnimations ? { scale: 0, opacity: 0 } : undefined,
-    animate: showAnimations ? { scale: 1, opacity: 1 } : undefined,
-    transition: showAnimations ? { 
+    initial: shouldAnimate ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 1 },
+    animate: { scale: 1, opacity: 1 },
+    transition: shouldAnimate ? { 
       type: "spring",
       stiffness: 200,
       damping: 20,
       mass: 0.5,
       duration: 0.2
-    } : undefined
-  }), [showAnimations]);
+    } : { duration: 0 }
+  }), [shouldAnimate]);
 
   // 優化選中效果動畫
   const selectedAnimationConfig = useMemo(() => ({
@@ -448,9 +462,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
             return (
               <motion.g
                 key={`decoration-${index}`}
-                initial={showAnimations ? { opacity: 0, scale: 0 } : { opacity: decoration.opacity, scale: 1 }}
-                animate={{ opacity: decoration.opacity, scale: 1 }}
-                transition={showAnimations ? { delay: 0.5 + index * 0.1, duration: 0.4 } : undefined}
+                              initial={shouldAnimate ? { opacity: 0, scale: 0 } : { opacity: decoration.opacity, scale: 1 }}
+              animate={{ opacity: decoration.opacity, scale: 1 }}
+              transition={shouldAnimate ? { delay: 0.5 + index * 0.1, duration: 0.4 } : { duration: 0 }}
               >
                 <foreignObject
                   x={decoration.x - decoration.size / 2}
@@ -506,9 +520,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               stroke={subjectColor}
               strokeWidth="3"
               strokeOpacity="0.15"
-              initial={showAnimations ? { pathLength: 0 } : undefined}
-              animate={showAnimations ? { pathLength: 1 } : undefined}
-              transition={showAnimations ? { delay: index * 0.1, duration: 0.8 } : undefined}
+              initial={shouldAnimate ? { pathLength: 0 } : { pathLength: 1 }}
+              animate={{ pathLength: 1 }}
+              transition={shouldAnimate ? { delay: index * 0.1, duration: 0.8 } : { duration: 0 }}
             />
           );
         })}
@@ -528,9 +542,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                 y2={goalPos.y}
                 stroke={subjectColor}
                 strokeWidth="4"
-                initial={showAnimations ? { pathLength: 0 } : undefined}
-                animate={showAnimations ? { pathLength: 1 } : undefined}
-                transition={showAnimations ? { delay: 0.5 + goalIndex * 0.1, duration: 0.6 } : undefined}
+                              initial={shouldAnimate ? { pathLength: 0 } : { pathLength: 1 }}
+              animate={{ pathLength: 1 }}
+              transition={shouldAnimate ? { delay: 0.5 + goalIndex * 0.1, duration: 0.6 } : { duration: 0 }}
               />
               
               {/* 目標到任務的連接線 */}
@@ -611,9 +625,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
         {/* 中央主題節點 */}
         <motion.g
-          initial={showAnimations ? { scale: 0, opacity: 0 } : undefined}
-          animate={showAnimations ? { scale: 1, opacity: 1 } : undefined}
-          transition={showAnimations ? { delay: 0.2, duration: 0.5 } : undefined}
+          initial={showAnimations ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 1 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={showAnimations ? { delay: 0.2, duration: 0.5 } : { duration: 0 }}
           style={{ cursor: onGoalClick ? 'pointer' : 'default' }}
           onClick={(e) => {
             e.stopPropagation();
