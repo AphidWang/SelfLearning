@@ -530,44 +530,76 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             </div>
           </div>
 
-          {/* 完成率 */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">完成進度</h4>
-            <div className="space-y-2">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600 dark:text-gray-400">目標完成率</span>
-                  <span style={{ color: subjectStyle.accent }}>
-                    {totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          {/* 目標網格視圖 */}
+          <div className="mt-4">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">目標進度</h4>
+            <div className="grid grid-cols-1 gap-2">
+              {topic.goals?.map((goal, index) => {
+                const totalTasks = goal.tasks.length;
+                const completedTasks = goal.tasks.filter(t => t.status === 'done').length;
+                const inProgressTasks = goal.tasks.filter(t => t.status === 'in_progress').length;
+                const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
+                // 決定目標狀態顏色
+                let goalStatusColor = '';
+                let goalStatusBg = '';
+                let goalStatusText = '';
+                
+                if (progress === 100) {
+                  goalStatusColor = '#22c55e';
+                  goalStatusBg = 'bg-green-50 dark:bg-green-900/20';
+                  goalStatusText = 'text-green-700 dark:text-green-300';
+                } else if (inProgressTasks > 0) {
+                  goalStatusColor = '#8b5cf6';
+                  goalStatusBg = 'bg-purple-50 dark:bg-purple-900/20';
+                  goalStatusText = 'text-purple-700 dark:text-purple-300';
+                } else if (completedTasks > 0) {
+                  goalStatusColor = '#3b82f6';
+                  goalStatusBg = 'bg-blue-50 dark:bg-blue-900/20';
+                  goalStatusText = 'text-blue-700 dark:text-blue-300';
+                } else {
+                  goalStatusColor = '#6b7280';
+                  goalStatusBg = 'bg-gray-50 dark:bg-gray-800';
+                  goalStatusText = 'text-gray-600 dark:text-gray-400';
+                }
+
+                return (
                   <div
-                    className="h-2 rounded-full"
-                    style={{ 
-                      width: `${totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0}%`,
-                      backgroundColor: subjectStyle.accent 
-                    }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600 dark:text-gray-400">任務完成率</span>
-                  <span style={{ color: subjectStyle.accent }}>
-                    {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full"
-                    style={{ 
-                      width: `${totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0}%`,
-                      backgroundColor: subjectStyle.accent 
-                    }}
-                  />
-                </div>
-              </div>
+                    key={goal.id}
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${goalStatusBg} hover:brightness-95 dark:hover:brightness-110`}
+                    onClick={() => onTaskSelect?.(goal.tasks[0].id, goal.id)}
+                  >
+                    {/* 編號和標題 */}
+                    <div className="flex items-center gap-2 flex-1">
+                      <span
+                        className="w-5 h-5 flex items-center justify-center rounded-full text-xs text-white flex-shrink-0"
+                        style={{ backgroundColor: goalStatusColor }}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className={`text-sm ${goalStatusText} line-clamp-1`}>
+                        {goal.title}
+                      </span>
+                    </div>
+
+                    {/* 進度條和百分比 */}
+                    <div className="flex items-center gap-2 min-w-[100px]">
+                      <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${progress}%`,
+                            backgroundColor: goalStatusColor
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs min-w-[32px] text-right" style={{ color: goalStatusColor }}>
+                        {progress}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -598,9 +630,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
           {/* 協作管理 */}
           <TopicCollaborationManager
-            topic={topic}
+            topic={{
+              id: topic.id,
+              is_collaborative: topic.is_collaborative ?? false,
+              owner: topic.owner
+            }}
             availableUsers={availableUsers}
-            collaborators={collaborators.map(c => ({ ...c, permission: 'edit' as const }))}
+            collaborators={collaborators.map(c => ({ user: c, permission: 'edit' as const }))}
             onInviteCollaborator={async (userId, permission) => {
               await handleUpdate(async () => {
                 return await inviteTopicCollaborator(topic.id, userId, permission);

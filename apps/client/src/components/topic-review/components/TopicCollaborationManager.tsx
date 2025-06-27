@@ -1,21 +1,24 @@
 import React, { useState, useMemo } from 'react';
-import { UserPlus, Users, X, Check, Eye } from 'lucide-react';
-import { UserAvatar } from '../../learning-map/UserAvatar';
-import type { User, Topic } from '../../../types/goal';
-
-interface Collaborator extends User {
-  permission: 'view' | 'edit';
-}
+import { motion, AnimatePresence } from 'framer-motion';
+import { UserAvatar, UserAvatarGroup } from '../../learning-map/UserAvatar';
+import type { User } from '../../../types/goal';
+import { 
+  Users, Plus, X, Check, UserPlus, Trash2, 
+  ChevronDown, ChevronUp 
+} from 'lucide-react';
 
 interface TopicCollaborationManagerProps {
-  topic: Topic;
+  topic: {
+    id: string;
+    is_collaborative: boolean;
+    owner?: User;
+  };
   availableUsers: User[];
-  collaborators: Collaborator[];
-  onInviteCollaborator: (userId: string, permission: 'view' | 'edit') => Promise<boolean>;
+  collaborators: { user: User; permission: 'edit' | 'view' }[];
+  onInviteCollaborator: (userId: string, permission: 'edit' | 'view') => Promise<boolean>;
   onRemoveCollaborator: (userId: string) => Promise<boolean>;
   onToggleCollaborative: () => Promise<boolean>;
   isUpdating?: boolean;
-  className?: string;
 }
 
 export const TopicCollaborationManager: React.FC<TopicCollaborationManagerProps> = ({
@@ -25,211 +28,200 @@ export const TopicCollaborationManager: React.FC<TopicCollaborationManagerProps>
   onInviteCollaborator,
   onRemoveCollaborator,
   onToggleCollaborative,
-  isUpdating = false,
-  className = ''
+  isUpdating = false
 }) => {
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showCollaboratorSelector, setShowCollaboratorSelector] = useState(false);
 
-  const handleInvite = async (userId: string, permission: 'view' | 'edit' = 'view') => {
-    const success = await onInviteCollaborator(userId, permission);
-    if (success) {
-      setShowInviteDialog(false);
-    }
-  };
-
-  const handleToggleCollaborative = async () => {
-    const success = await onToggleCollaborative();
-    if (success) {
-      setShowToggleConfirm(false);
-    }
-  };
+  // 使用 useMemo 優化可用用戶的計算
+  const availableForCollaborator = useMemo(() => 
+    availableUsers.filter(user => 
+      !collaborators.some(c => c.user.id === user.id)
+    ),
+    [availableUsers, collaborators]
+  );
 
   return (
-    <div className={`space-y-3 ${className}`}>
-      {/* 協作模式開關 */}
-      <div className="flex items-center justify-between">
+    <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200/50 dark:border-blue-700/50">
+      {/* 標題和摺疊按鈕 */}
+      <div 
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-blue-100/30 dark:hover:bg-blue-800/20 rounded-t-xl transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">協作模式</span>
-          {topic.is_collaborative && (
-            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
-              已開啟
-            </span>
+          <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <h4 className="font-medium text-blue-800 dark:text-blue-300 text-sm">協作管理</h4>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {/* 快速預覽 */}
+          <div className="flex items-center gap-1">
+            {topic.owner && <UserAvatar user={topic.owner} size="xs" />}
+            {collaborators.length > 0 && (
+              <UserAvatarGroup users={collaborators.map(c => c.user)} size="xs" maxDisplay={2} />
+            )}
+          </div>
+          
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           )}
         </div>
-        <button
-          onClick={() => setShowToggleConfirm(true)}
-          disabled={isUpdating}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            topic.is_collaborative
-              ? 'bg-red-100 text-red-600 hover:bg-red-200'
-              : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-          } disabled:opacity-50`}
-        >
-          {topic.is_collaborative ? '關閉協作' : '開啟協作'}
-        </button>
       </div>
 
-      {/* 協作者管理 - 只在協作模式開啟時顯示 */}
-      {topic.is_collaborative && (
-        <>
-          {/* 協作者列表 */}
-          {collaborators.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  協作者 ({collaborators.length})
-                </h5>
-              </div>
-              <div className="space-y-2">
-                {collaborators.map(collaborator => (
-                  <div
-                    key={collaborator.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+      {/* 展開的內容 */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="p-3 pt-0 space-y-3">
+              {/* 協作模式開關 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                    協作模式
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleCollaborative();
+                    }}
+                    className={`text-xs px-2 py-1 rounded-full transition-colors ${
+                      topic.is_collaborative
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    disabled={isUpdating}
                   >
-                    <div className="flex items-center gap-2">
-                      <UserAvatar user={collaborator} size="sm" />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {collaborator.name}
-                        </span>
-                        <div className="text-xs text-gray-500">
-                          {collaborator.permission === 'edit' ? '可編輯' : '僅檢視'}
-                        </div>
-                      </div>
-                    </div>
+                    {topic.is_collaborative ? '已開啟' : '已關閉'}
+                  </button>
+                </div>
+              </div>
+
+
+              {/* 協作人員 */}
+              {topic.is_collaborative && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                      <UserPlus className="w-3 h-3" />
+                      協作人員 ({collaborators.length})
+                    </span>
                     <button
-                      onClick={() => onRemoveCollaborator(collaborator.id)}
-                      disabled={isUpdating}
-                      className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
-                      title="移除協作者"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCollaboratorSelector(!showCollaboratorSelector);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition-colors flex items-center gap-1"
+                      disabled={availableForCollaborator.length === 0}
                     >
-                      <X className="w-3 h-3" />
+                      <Plus className="w-3 h-3" />
+                      邀請
                     </button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* 邀請按鈕 */}
-          {availableUsers.length > 0 && (
-            <button
-              onClick={() => setShowInviteDialog(true)}
-              disabled={isUpdating}
-              className="w-full py-2 px-3 border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <UserPlus className="w-4 h-4" />
-              邀請協作者
-            </button>
-          )}
-        </>
-      )}
-
-      {/* 開關協作模式確認對話框 */}
-      {showToggleConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-medium mb-2">
-              確認{topic.is_collaborative ? '關閉' : '開啟'}協作模式
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {topic.is_collaborative
-                ? '關閉協作模式後，所有協作者將失去對此主題的訪問權限。'
-                : '開啟協作模式後，您可以邀請其他用戶參與此主題的學習。'}
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowToggleConfirm(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleToggleCollaborative}
-                disabled={isUpdating}
-                className={`px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
-                  topic.is_collaborative
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {isUpdating ? '處理中...' : (topic.is_collaborative ? '關閉' : '開啟')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 邀請協作者對話框 */}
-      {showInviteDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-medium mb-4">邀請協作者</h3>
-            {availableUsers.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">沒有可邀請的用戶</p>
-                <p className="text-sm text-gray-400 mt-1">所有用戶都已是協作者</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {availableUsers.map(user => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
-                  >
-                    <div className="flex items-center gap-3">
-                      <UserAvatar user={user} size="sm" />
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {user.name}
+                  {/* 現有協作人員列表 */}
+                  <div className="space-y-1">
+                    {collaborators.map((collaborator) => (
+                      <motion.div
+                        key={collaborator.user.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        className="flex items-center gap-2 p-2 bg-white/60 dark:bg-gray-800/40 rounded-lg"
+                      >
+                        <UserAvatar user={collaborator.user} size="xs" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                            {collaborator.user.name}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {collaborator.user.role === 'student' ? '學生' :
+                             collaborator.user.role === 'mentor' ? '導師' :
+                             collaborator.user.role === 'parent' ? '家長' : 
+                             collaborator.user.role === 'admin' ? '管理員' : '其他'}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500 flex items-center gap-2">
-                          <span>{user.email || user.id}</span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                            {user.role === 'student' ? '學生' :
-                             user.role === 'mentor' ? '導師' :
-                             user.role === 'parent' ? '家長' : 
-                             user.role === 'admin' ? '管理員' : '其他'}
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            collaborator.permission === 'edit'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {collaborator.permission === 'edit' ? '可編輯' : '僅查看'}
                           </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemoveCollaborator(collaborator.user.id);
+                            }}
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                            title="移除協作人員"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
+                      </motion.div>
+                    ))}
+                    
+                    {collaborators.length === 0 && (
+                      <div className="p-2 bg-gray-100/60 dark:bg-gray-800/40 rounded-lg text-center text-sm text-gray-500 dark:text-gray-400">
+                        尚無協作人員
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleInvite(user.id, 'view')}
-                        disabled={isUpdating}
-                        className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                      >
-                        <Eye className="w-3 h-3" />
-                        檢視
-                      </button>
-                      <button
-                        onClick={() => handleInvite(user.id, 'edit')}
-                        disabled={isUpdating}
-                        className="px-3 py-1.5 text-xs bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                      >
-                        <UserPlus className="w-3 h-3" />
-                        編輯
-                      </button>
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setShowInviteDialog(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                取消
-              </button>
+
+                  {/* 協作人員選擇器 */}
+                  {showCollaboratorSelector && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-700 shadow-sm max-h-32 overflow-y-auto"
+                    >
+                      {availableForCollaborator.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onInviteCollaborator(user.id, 'edit');
+                            setShowCollaboratorSelector(false);
+                          }}
+                          className="w-full flex items-center gap-2 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg text-left transition-colors"
+                        >
+                          <UserAvatar user={user} size="xs" />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                              {user.name}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {user.role === 'student' ? '學生' :
+                               user.role === 'mentor' ? '導師' :
+                               user.role === 'parent' ? '家長' : 
+                               user.role === 'admin' ? '管理員' : '其他'}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                      
+                      {availableForCollaborator.length === 0 && (
+                        <div className="p-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                          沒有可邀請的用戶
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }; 
