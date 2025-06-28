@@ -72,8 +72,9 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
     {currentUser && (
       <UserProfileDialog
         isOpen={showProfileDialog}
-        onClose={() => setShowProfileDialog(false)}
         user={currentUser}
+        onClose={() => setShowProfileDialog(false)}
+        isAdminMode={false}
       />
     )}
   </>

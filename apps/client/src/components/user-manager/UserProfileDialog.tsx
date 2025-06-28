@@ -5,11 +5,13 @@ import { useUserStore } from '../../store/userStore';
 import { UserAvatar } from '../learning-map/UserAvatar';
 import { AvatarSelectionDialog } from './AvatarSelectionDialog';
 import type { User } from '../../types/goal';
+import { authService } from '../../services/auth';
 
 interface UserProfileDialogProps {
   isOpen: boolean;
   onClose: () => void;
   user: User | null; // 支援創建新用戶 (null = 創建模式)
+  isAdminMode?: boolean; // 新增: 是否為管理員模式
 }
 
 interface FormData {
@@ -31,7 +33,8 @@ const roleOptions = [
 export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
   isOpen,
   onClose,
-  user
+  user,
+  isAdminMode = false
 }) => {
   const { updateUser, createAuthUser, loading } = useUserStore();
   
@@ -85,15 +88,22 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
 
     try {
       if (isCreateMode) {
-        // 創建新用戶
+        // 創建新用戶 - 只能通過管理員 API
         await createAuthUser(formData as Required<FormData>);
       } else {
-        // 更新現有用戶
+        // 更新用戶 - 根據模式使用不同的 API
         const updateData = { ...formData };
         if (!formData.password) {
           delete (updateData as any).password; // 不更新密碼
         }
-        await updateUser(user!.id, updateData);
+        
+        if (isAdminMode) {
+          // 管理員模式：使用管理員 API
+          await updateUser(user!.id, updateData);
+        } else {
+          // 普通用戶模式：直接使用 Supabase
+          await authService.updateCurrentUser(updateData);
+        }
       }
       onClose();
     } catch (error) {

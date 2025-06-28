@@ -242,6 +242,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           isOpen={showProfileDialog}
           onClose={() => setShowProfileDialog(false)}
           user={currentUser}
+          isAdminMode={false}
         />
       )}
     </>

@@ -203,6 +203,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
             isOpen={showProfileDialog}
             user={editingUser}
             onClose={handleCloseProfileDialog}
+            isAdminMode={true}
           />
         )}
         {showCreateDialog && (
@@ -210,6 +211,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ className = '' }) => {
             isOpen={showCreateDialog}
             user={null}
             onClose={handleCloseCreateDialog}
+            isAdminMode={true}
           />
         )}
         {showPasswordResetDialog && resetPasswordUser && (
