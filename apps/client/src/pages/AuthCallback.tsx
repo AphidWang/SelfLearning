@@ -15,13 +15,18 @@ export const AuthCallback: React.FC = () => {
         const { data: { session } } = await authService.supabase.auth.getSession();
         
         if (session?.user) {
+          // 先獲取當前用戶資料
+          const currentUser = await authService.getCurrentUser();
+          
           const userData = {
             id: session.user.id,
             name: session.user.user_metadata?.full_name || 
                   session.user.user_metadata?.name || 
                   session.user.email?.split('@')[0] || 'User',
             email: session.user.email || '',
-            avatar: session.user.user_metadata?.avatar_url || 
+            // 如果用戶已經有頭像，就保留原來的頭像
+            avatar: currentUser?.user_metadata?.avatar || 
+                    session.user.user_metadata?.avatar_url || 
                     session.user.user_metadata?.picture ||
                     `https://api.dicebear.com/7.x/adventurer/svg?seed=${session.user.id}&backgroundColor=ffd5dc`,
             color: session.user.user_metadata?.color || '#FF6B6B',
