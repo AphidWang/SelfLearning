@@ -19,6 +19,7 @@ import { CurriculumProvider } from './context/CurriculumContext';
 import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
 import TopicMindMapPage from './pages/student/TopicMindMapPage.tsx';
+import TaskWallPage from './pages/student/TaskWallPage';
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
 import { UserAdminPage } from './pages/admin/UserAdminPage';
@@ -41,6 +42,7 @@ function App() {
             
             {/* Student Routes */}
             <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/student/task-wall" element={<TaskWallPage />} />
             <Route path="/student/schedule" element={<StudentSchedule />} />
             <Route path="/student/tasks" element={<StudentTasks />} />
             <Route path="/student/planning" element={<StudentPlanning />} />
