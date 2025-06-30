@@ -80,13 +80,7 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
       y: 0,
       scale: 1,
       opacity: 1,
-      rotate: 0,
-      transition: {
-        type: "spring",
-        damping: 20,
-        stiffness: 300,
-        duration: 0.8
-      }
+      rotate: 0
     }
   };
 
@@ -115,6 +109,12 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
         initial="hidden"
         animate="visible"
         variants={index === 0 ? cardFlyInVariants : {}}
+        transition={index === 0 ? {
+          type: "spring",
+          damping: 20,
+          stiffness: 300,
+          duration: 0.8
+        } : undefined}
       >
         {isTop && (
           <div className="p-3 h-full flex flex-col">

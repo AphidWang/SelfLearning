@@ -86,12 +86,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
    */
   const cardVariants = {
     front: {
-      rotateY: 0,
-      transition: { duration: 0.6, ease: "easeInOut" }
+      rotateY: 0
     },
     back: {
-      rotateY: 180,
-      transition: { duration: 0.6, ease: "easeInOut" }
+      rotateY: 180
     }
   };
 
@@ -103,6 +101,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
         onClick={() => setIsFlipped(!isFlipped)}
         animate={isFlipped ? "back" : "front"}
         variants={cardVariants}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
         style={{ transformStyle: "preserve-3d" }}
       >
         {/* 正面 */}

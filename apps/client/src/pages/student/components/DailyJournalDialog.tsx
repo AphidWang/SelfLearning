@@ -242,7 +242,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
                           #48ca8f 100%)`
                       }}
                     />
-                    <style jsx>{`
+                    <style>{`
                       input[type="range"]::-webkit-slider-thumb {
                         appearance: none;
                         width: 24px;

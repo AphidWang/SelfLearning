@@ -67,12 +67,10 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onAddTask }) => {
    */
   const cardVariants = {
     front: {
-      rotateY: 0,
-      transition: { duration: 0.6, ease: "easeInOut" }
+      rotateY: 0
     },
     back: {
-      rotateY: 180,
-      transition: { duration: 0.6, ease: "easeInOut" }
+      rotateY: 180
     }
   };
 
@@ -84,6 +82,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onAddTask }) => {
         onClick={() => !isFlipped && setIsFlipped(true)}
         animate={isFlipped ? "back" : "front"}
         variants={cardVariants}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
         style={{ transformStyle: "preserve-3d" }}
       >
         {/* 正面 */}
@@ -225,9 +224,9 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onAddTask }) => {
                 placeholder="例如：完成第一章節練習題..."
                 className="w-full p-3 text-sm bg-white/80 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none"
                 style={{ 
-                  focusRingColor: goal.subjectStyle.accent + '50',
-                  minHeight: '80px'
-                }}
+                  minHeight: '80px',
+                  '--tw-ring-color': goal.subjectStyle.accent + '50'
+                } as React.CSSProperties}
                 maxLength={100}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -256,10 +255,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onAddTask }) => {
                 disabled={!taskTitle.trim() || isSubmitting}
                 className="w-full py-2 px-3 text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: goal.subjectStyle.accent,
-                  ':hover': {
-                    backgroundColor: goal.subjectStyle.accent + 'DD'
-                  }
+                  backgroundColor: goal.subjectStyle.accent
                 }}
               >
                 {isSubmitting ? (
