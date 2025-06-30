@@ -100,30 +100,18 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
    * 輕微的彈跳效果，模擬手貼便條紙的感覺
    */
   const cardVariants = {
-    hidden: (index: number) => ({
+    hidden: {
       opacity: 0,
       scale: 0.8,
       y: 20,
-      rotate: 0, // 起始不旋轉
-      transition: {
-        type: "spring",
-        delay: index * 0.05, // 交錯動畫
-        damping: 20,
-        stiffness: 300
-      }
-    }),
-    visible: (index: number) => ({
+      rotate: 0
+    },
+    visible: {
       opacity: 1,
       scale: 1,
       y: 0,
-      rotate: (index % 7 - 3) * 0.5, // 輕微隨機旋轉 -1.5° 到 1.5°
-      transition: {
-        type: "spring",
-        delay: index * 0.05,
-        damping: 20,
-        stiffness: 300
-      }
-    }),
+      rotate: 0
+    },
     exit: {
       opacity: 0,
       scale: 0.9,

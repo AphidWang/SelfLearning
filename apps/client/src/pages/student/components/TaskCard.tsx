@@ -137,14 +137,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
               </div>
               
               <div className="flex items-center gap-1">
-                {/* 優先權指示 */}
-                <span 
-                  className="text-xs"
-                  title={priorityDisplay.text}
-                >
-                  {priorityDisplay.icon}
-                </span>
-                
                 {/* 狀態指示 */}
                 <StatusIcon 
                   className="w-4 h-4" 

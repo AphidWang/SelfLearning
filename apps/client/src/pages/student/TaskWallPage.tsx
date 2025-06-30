@@ -25,10 +25,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Settings, Filter, Star } from 'lucide-react';
+import { ArrowLeft, Settings, Filter, Star, BookMarked } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
 import { CompletedCardsStack } from './components/CompletedCardsStack';
+import { DailyJournalDialog } from './components/DailyJournalDialog';
 import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
 
 /**
@@ -85,6 +86,7 @@ const TaskWallPage: React.FC = () => {
   });
   
   const [showSettings, setShowSettings] = useState(false);
+  const [showJournalDialog, setShowJournalDialog] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<TaskWithContext[]>([]);
 
   // 初始化資料載入
@@ -154,6 +156,26 @@ const TaskWallPage: React.FC = () => {
       console.error('新增任務失敗:', error);
     }
   }, [addTask]);
+
+  /**
+   * 處理日誌保存
+   */
+  const handleSaveJournal = useCallback(async (journalEntry: any) => {
+    try {
+      // TODO: 實際保存到後端
+      console.log('保存日誌:', journalEntry);
+      
+      // 暫時存到 localStorage
+      const existingJournals = JSON.parse(localStorage.getItem('dailyJournals') || '[]');
+      const newJournals = [journalEntry, ...existingJournals];
+      localStorage.setItem('dailyJournals', JSON.stringify(newJournals));
+      
+      alert('日誌保存成功！繼續加油！ 🎉');
+    } catch (error) {
+      console.error('保存日誌失敗:', error);
+      throw error;
+    }
+  }, []);
 
   /**
    * 從所有主題中提取活躍的任務
@@ -323,10 +345,45 @@ const TaskWallPage: React.FC = () => {
                   <p className="text-amber-700 mt-1">
                     {allCards.length} 張卡片 • {completedTasks.length} 個已完成
                   </p>
+                  {/* 顯示活躍主題 */}
+                  {topics && topics.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {topics
+                        .filter(topic => topic.status !== 'archived')
+                        .slice(0, 3) // 最多顯示3個主題
+                        .map(topic => {
+                          const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+                          return (
+                            <span
+                              key={topic.id}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+                              style={{
+                                backgroundColor: `${subjectStyle.accent}20`,
+                                color: subjectStyle.accent
+                              }}
+                            >
+                              <span>{topic.title}</span>
+                            </span>
+                          );
+                        })}
+                      {topics.filter(topic => topic.status !== 'archived').length > 3 && (
+                        <span className="text-xs text-amber-600">
+                          +{topics.filter(topic => topic.status !== 'archived').length - 3} 個主題
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowJournalDialog(true)}
+                  className="p-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 text-white hover:from-purple-500 hover:to-pink-500 transition-all shadow-md hover:shadow-lg"
+                  title="寫今日學習日記"
+                >
+                  <BookMarked className="w-5 h-5" />
+                </button>
                 <button
                   onClick={() => setShowSettings(!showSettings)}
                   className="p-2 rounded-full bg-white/80 text-amber-700 hover:bg-white transition-colors shadow-sm"
@@ -349,7 +406,15 @@ const TaskWallPage: React.FC = () => {
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             >
               <div className="space-y-6">
-                <h3 className="text-lg font-bold text-gray-800">任務牆設定</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-gray-800">任務牆設定</h3>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
                 
                 {/* 最大卡片數設定 */}
                 <div>
@@ -441,6 +506,13 @@ const TaskWallPage: React.FC = () => {
             onClearStack={() => setCompletedTasks([])}
           />
         )}
+
+        {/* 日誌記錄 Dialog */}
+        <DailyJournalDialog
+          isOpen={showJournalDialog}
+          onClose={() => setShowJournalDialog(false)}
+          onSave={handleSaveJournal}
+        />
       </div>
     </PageLayout>
   );
