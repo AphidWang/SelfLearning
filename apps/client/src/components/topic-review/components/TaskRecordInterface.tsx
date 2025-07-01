@@ -11,6 +11,7 @@ interface TaskRecordInterfaceProps {
   isUpdating?: boolean;
   topicId?: string;
   goalId?: string;
+  onRecordComplete?: () => void;
 }
 
 export const TaskRecordInterface: React.FC<TaskRecordInterfaceProps> = ({
@@ -19,7 +20,8 @@ export const TaskRecordInterface: React.FC<TaskRecordInterfaceProps> = ({
   onBack,
   isUpdating = false,
   topicId,
-  goalId
+  goalId,
+  onRecordComplete
 }) => {
   return (
     <motion.div 
@@ -56,6 +58,10 @@ export const TaskRecordInterface: React.FC<TaskRecordInterfaceProps> = ({
           showCancelButton={true}
           onCancel={onBack}
           buttonText="保存學習記錄"
+          onSuccess={() => {
+            onRecordComplete?.();
+            onBack();
+          }}
         />
       </div>
     </motion.div>

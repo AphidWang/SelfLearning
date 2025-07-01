@@ -17,7 +17,7 @@ import { useAssistant } from '../../hooks/useAssistant';
 import { supabase } from '../../services/supabase';
 
 const StudentPlanning: React.FC = () => {
-  const { topics, updateTopic, updateTask: storeUpdateTask, fetchTopics, createTopic, addGoal } = useTopicStore();
+  const { topics, updateTopic, updateTaskInfo, markTaskCompleted, markTaskInProgress, markTaskTodo, fetchTopics, createTopic, addGoal } = useTopicStore();
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [showNewTopicModal, setShowNewTopicModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -103,7 +103,19 @@ const StudentPlanning: React.FC = () => {
     const task = goal?.tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    storeUpdateTask(topicId, goalId, taskId, { ...task, notes: '已加入排程' });
+    updateTaskInfo(topicId, goalId, taskId, {
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      category: task.category,
+      role: task.role,
+      estimatedTime: task.estimatedTime,
+      notes: '已加入排程',
+      challenge: task.challenge,
+      dueDate: task.dueDate,
+      assignedTo: task.assignedTo,
+      order: task.order
+    });
   };
 
   const toggleGoal = (goalId: string) => {
@@ -126,14 +138,14 @@ const StudentPlanning: React.FC = () => {
 
   const handleTaskStatusChange = async (topicId: string, goalId: string, task: Task) => {
     try {
-      const newStatus = task.status === 'done' ? 'todo' : 'done';
-      const updatedTask = await storeUpdateTask(topicId, goalId, task.id, {
-        ...task,
-        status: newStatus,
-        completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
-      });
+      let updatedTask: Task | null;
+      if (task.status === 'done') {
+        updatedTask = await markTaskTodo(topicId, goalId, task.id);
+      } else {
+        updatedTask = await markTaskCompleted(topicId, goalId, task.id);
+      }
       if (!updatedTask) {
-        throw new Error('Failed to update task status');
+        // 錯誤信息已在 store 中設置
       }
     } catch (err) {
       console.error('Error updating task status:', err);
@@ -143,9 +155,21 @@ const StudentPlanning: React.FC = () => {
 
   const handleTaskEdit = async (topicId: string, goalId: string, task: Task) => {
     try {
-      const updatedTask = await storeUpdateTask(topicId, goalId, task.id, task);
+      const updatedTask = await updateTaskInfo(topicId, goalId, task.id, {
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        category: task.category,
+        role: task.role,
+        estimatedTime: task.estimatedTime,
+        notes: task.notes,
+        challenge: task.challenge,
+        dueDate: task.dueDate,
+        assignedTo: task.assignedTo,
+        order: task.order
+      });
       if (!updatedTask) {
-        throw new Error('Failed to update task');
+        // 錯誤信息已在 store 中設置
       }
     } catch (err) {
       console.error('Error editing task:', err);

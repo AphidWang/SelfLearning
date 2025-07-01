@@ -72,8 +72,11 @@ const TaskWallPage: React.FC = () => {
   const { 
     fetchTopics, 
     topics, 
-    updateTask, 
     addTask,
+    markTaskCompleted,
+    markTaskInProgress,
+    markTaskTodo,
+    clearError,
     loading, 
     error 
   } = useTopicStore();
@@ -110,6 +113,17 @@ const TaskWallPage: React.FC = () => {
 
     initializeData();
   }, [fetchTopics, getUsers]);
+
+  // 自動清除錯誤消息
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        clearError();
+      }, 5000); // 5秒後自動清除錯誤
+
+      return () => clearTimeout(timer);
+    }
+  }, [error, clearError]);
 
   // 從資料庫載入已完成任務到完成收藏
   useEffect(() => {
@@ -155,7 +169,7 @@ const TaskWallPage: React.FC = () => {
 
   /**
    * 處理任務狀態更新
-   * 更新後會重新載入資料，確保完成收藏同步
+   * 使用專門的狀態切換函數，包含學習記錄檢查
    */
   const handleTaskStatusUpdate = useCallback(async (
     taskId: string, 
@@ -164,17 +178,54 @@ const TaskWallPage: React.FC = () => {
     newStatus: TaskStatus
   ) => {
     try {
-      // 更新任務狀態
-      await updateTask(topicId, goalId, taskId, { 
-        status: newStatus,
-        completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
-      });
+      let result: Task | null = null;
+      
+      // 使用專門的狀態切換函數
+      switch (newStatus) {
+        case 'done':
+          result = await markTaskCompleted(topicId, goalId, taskId, true); // 要求學習記錄
+          break;
+        case 'in_progress':
+          result = await markTaskInProgress(topicId, goalId, taskId);
+          break;
+        case 'todo':
+          result = await markTaskTodo(topicId, goalId, taskId);
+          break;
+        default:
+          console.warn('未知的任務狀態:', newStatus);
+          return;
+      }
+
+      // 如果狀態切換失敗（如缺少學習記錄），result 會是 null
+      if (!result && newStatus === 'done') {
+        // 任務完成失敗，可能需要先記錄學習心得
+        // 錯誤信息已在 store 中設置，這裡可以選擇顯示提示
+        const task = topics
+          .find(t => t.id === topicId)
+          ?.goals?.find(g => g.id === goalId)
+          ?.tasks?.find(t => t.id === taskId);
+        
+        if (task) {
+          // 自動打開記錄對話框
+          setSelectedTaskForRecord({
+            ...task,
+            topicId,
+            topicTitle: topics.find(t => t.id === topicId)?.title || '',
+            topicSubject: topics.find(t => t.id === topicId)?.subject || '未分類',
+            goalId,
+            goalTitle: topics.find(t => t.id === topicId)?.goals?.find(g => g.id === goalId)?.title || '',
+            subjectStyle: {}
+          });
+          setShowRecordDialog(true);
+        }
+        return;
+      }
 
       // 更新成功後會自動觸發 topics 重新載入，完成收藏會自動更新
     } catch (error) {
       console.error('更新任務狀態失敗:', error);
     }
-  }, [updateTask]);
+  }, [markTaskCompleted, markTaskInProgress, markTaskTodo]);
 
   /**
    * 處理新增任務到目標
@@ -205,17 +256,14 @@ const TaskWallPage: React.FC = () => {
     topicId: string
   ) => {
     try {
-      // 更新任務狀態為進行中
-      await updateTask(topicId, goalId, taskId, { 
-        status: 'in_progress',
-        completedAt: undefined
-      });
+      // 使用專門的狀態切換函數
+      await markTaskInProgress(topicId, goalId, taskId);
 
       // 更新成功後會自動觸發 topics 重新載入，完成收藏會自動更新
     } catch (error) {
       console.error('恢復任務失敗:', error);
     }
-  }, [updateTask]);
+  }, [markTaskInProgress]);
 
   /**
    * 處理打開記錄對話框
@@ -429,6 +477,19 @@ const TaskWallPage: React.FC = () => {
                     {activeTasks.filter(task => task.status === 'in_progress').length} 個進行中 • 
                     {completedTasks.length} 個已完成
                   </p>
+                  {/* 錯誤消息顯示 */}
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg"
+                    >
+                      <p className="text-red-700 text-sm font-medium">
+                        {error}
+                      </p>
+                    </motion.div>
+                  )}
                 </div>
               </div>
               
@@ -559,6 +620,9 @@ const TaskWallPage: React.FC = () => {
         <TaskRecordDialog
           isOpen={showRecordDialog}
           taskTitle={selectedTaskForRecord?.title || ''}
+          topic_id={selectedTaskForRecord?.topicId}
+          task_id={selectedTaskForRecord?.id}
+          task_type="task"
           onClose={() => {
             setShowRecordDialog(false);
             setSelectedTaskForRecord(null);

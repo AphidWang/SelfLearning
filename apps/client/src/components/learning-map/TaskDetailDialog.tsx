@@ -28,7 +28,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   onBack,
   onHelpRequest
 }) => {
-  const { updateTask, getTopic } = useTopicStore();
+  const { updateTaskInfo, markTaskCompleted, markTaskInProgress, getTopic } = useTopicStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
@@ -37,12 +37,11 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   const subjectStyle = subjects.getSubjectStyle(topic?.subject || '');
 
   const handleStatusUpdate = async (status: 'in_progress' | 'done') => {
-    const updatedTask = {
-      ...task,
-      status,
-      completedAt: status === 'done' ? new Date().toISOString() : undefined
-    };
-    await updateTask(topicId, goalId, task.id, updatedTask);
+    if (status === 'done') {
+      await markTaskCompleted(topicId, goalId, task.id);
+    } else {
+      await markTaskInProgress(topicId, goalId, task.id);
+    }
     onBack();
   };
 
@@ -51,7 +50,19 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   };
 
   const handleSaveDescription = () => {
-    updateTask(topicId, goalId, task.id, editedTask);
+    updateTaskInfo(topicId, goalId, task.id, {
+      title: editedTask.title,
+      description: editedTask.description,
+      priority: editedTask.priority,
+      category: editedTask.category,
+      role: editedTask.role,
+      estimatedTime: editedTask.estimatedTime,
+      notes: editedTask.notes,
+      challenge: editedTask.challenge,
+      dueDate: editedTask.dueDate,
+      assignedTo: editedTask.assignedTo,
+      order: editedTask.order
+    });
     setIsEditing(false);
   };
 
@@ -77,7 +88,19 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   const handleSave = async () => {
     if (!task || !topic) return;
     
-    await updateTask(topicId, goalId, task.id, task);
+    await updateTaskInfo(topicId, goalId, task.id, {
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      category: task.category,
+      role: task.role,
+      estimatedTime: task.estimatedTime,
+      notes: task.notes,
+      challenge: task.challenge,
+      dueDate: task.dueDate,
+      assignedTo: task.assignedTo,
+      order: task.order
+    });
     onClose();
   };
 

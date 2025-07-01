@@ -53,7 +53,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onBack,
   onHelpRequest
 }) => {
-  const { updateTask } = useTopicStore();
+  const { updateTaskInfo, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTopicStore();
   const [comment, setComment] = useState('');
   const [mood, setMood] = useState<MoodLevel | null>(null);
   const [energy, setEnergy] = useState<EnergyLevel | null>(null);
@@ -72,18 +72,27 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleStatusChange = (newStatus: TaskStatus) => {
-    const updatedTask = {
-      ...task,
-      status: newStatus,
-      completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
-    };
-    updateTask(topicId, goalId, task.id, updatedTask);
+  const handleStatusChange = async (newStatus: TaskStatus) => {
+    switch (newStatus) {
+      case 'done':
+        await markTaskCompleted(topicId, goalId, task.id);
+        break;
+      case 'in_progress':
+        await markTaskInProgress(topicId, goalId, task.id);
+        break;
+      case 'todo':
+        await markTaskTodo(topicId, goalId, task.id);
+        break;
+    }
   };
 
   const handleFieldUpdate = (field: keyof Task, value: any) => {
-    const updatedTask = { ...task, [field]: value };
-    updateTask(topicId, goalId, task.id, updatedTask);
+    if (field === 'title' || field === 'description' || field === 'priority' || 
+        field === 'category' || field === 'role' || field === 'estimatedTime' || 
+        field === 'notes' || field === 'challenge' || field === 'dueDate' || 
+        field === 'assignedTo' || field === 'order') {
+      updateTaskInfo(topicId, goalId, task.id, { [field]: value } as any);
+    }
   };
 
   return (

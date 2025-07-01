@@ -9,6 +9,7 @@
  * 5. 權限控制和資料安全
  * 6. 從 TopicTemplate 建立新主題
  * 7. 樂觀更新機制，提供流暢的用戶體驗
+ * 8. 專門的狀態切換函數，包含業務邏輯檢查
  * 
  * 架構設計：
  * - 所有資料存儲在 Supabase
@@ -17,6 +18,12 @@
  * - 整合 TopicTemplate 系統
  * - 樂觀更新：先更新本地狀態，後同步到資料庫
  * - 失敗時自動回滾並顯示錯誤訊息
+ * 
+ * 🚨 重要架構原則：
+ * - 推薦使用專門的狀態切換函數（markTaskCompleted, markTaskInProgress, markTaskTodo）
+ * - 避免直接使用 updateTask，因為它繞過了業務邏輯檢查
+ * - 任務完成時會自動檢查是否有學習記錄，確保學習品質
+ * - 遵循嚴格的分層原則，與其他 store 適當分工
  */
 
 import { create } from 'zustand';
@@ -24,6 +31,7 @@ import { User, Topic, Goal, Task, Bubble, GoalStatus, CreateTopicFromTemplatePar
 import type { TopicCollaborator } from '@self-learning/types';
 import { supabase, authService } from '../services/supabase';
 import { useUserStore } from './userStore';
+import { taskRecordStore } from './taskRecordStore';
 
 // 簡化的狀態管理類型
 
@@ -59,7 +67,7 @@ interface TopicStore {
   updateGoal: (topicId: string, goalId: string, updates: Partial<Goal>) => Promise<Goal | null>;
   deleteGoal: (topicId: string, goalId: string) => Promise<boolean>;
   addTask: (topicId: string, goalId: string, task: Omit<Task, 'id'>) => Promise<Task | null>;
-  updateTask: (topicId: string, goalId: string, taskId: string, updates: Partial<Task>) => Promise<Task | null>;
+  updateTaskInfo: (topicId: string, goalId: string, taskId: string, updates: Pick<Task, 'title' | 'description' | 'priority' | 'category' | 'role' | 'estimatedTime' | 'notes' | 'challenge' | 'dueDate' | 'assignedTo' | 'order'>) => Promise<Task | null>;
   deleteTask: (topicId: string, goalId: string, taskId: string) => Promise<boolean>;
   addBubble: (topicId: string, bubble: Omit<Bubble, 'id'>) => Promise<Bubble | null>;
   updateBubble: (topicId: string, bubbleId: string, updates: Partial<Bubble>) => Promise<Bubble | null>;
@@ -97,8 +105,19 @@ interface TopicStore {
   removeTaskCollaborator: (topicId: string, goalId: string, taskId: string, collaboratorId: string) => Promise<boolean>;
   getAvailableUsers: () => User[];
 
+  // 專門的狀態切換函數（推薦使用）
+  markTaskCompleted: (topicId: string, goalId: string, taskId: string, requireRecord?: boolean) => Promise<Task | null>;
+  markTaskInProgress: (topicId: string, goalId: string, taskId: string) => Promise<Task | null>;
+  markTaskTodo: (topicId: string, goalId: string, taskId: string) => Promise<Task | null>;
+  
+  // 學習記錄檢查
+  hasTaskRecord: (taskId: string) => Promise<boolean>;
+
   // 工具方法
   setSyncing: (syncing: boolean) => void;
+
+  // 私有方法（不推薦直接使用）
+  _updateTask: (topicId: string, goalId: string, taskId: string, updates: Partial<Task>) => Promise<Task | null>;
 
   // 工具方法
   setSelectedTopicId: (id: string | null) => void;
@@ -802,7 +821,23 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     }
   },
 
-  updateTask: async (topicId, goalId, taskId, updates) => {
+  updateTaskInfo: async (topicId: string, goalId: string, taskId: string, updates: Pick<Task, 'title' | 'description' | 'priority' | 'category' | 'role' | 'estimatedTime' | 'notes' | 'challenge' | 'dueDate' | 'assignedTo' | 'order'>) => {
+    try {
+      // 確保不能更新狀態相關欄位
+      if ('status' in updates || 'completedAt' in updates) {
+        throw new Error('不能使用 updateTaskInfo 更新任務狀態，請使用專門的狀態切換函數');
+      }
+
+      return await get()._updateTask(topicId, goalId, taskId, updates);
+    } catch (error) {
+      console.error('Failed to update task info:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to update task info' });
+      return null;
+    }
+  },
+
+  // 私有方法：內部任務更新，不對外暴露
+  _updateTask: async (topicId, goalId, taskId, updates) => {
     try {
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
@@ -1736,6 +1771,68 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     );
     
     return Math.round((completedTasks / totalTasks) * 100);
+  },
+
+  // 專門的狀態切換函數（推薦使用）
+  markTaskCompleted: async (topicId, goalId, taskId, requireRecord = true) => {
+    try {
+      // 如果需要檢查學習記錄
+      if (requireRecord) {
+        const hasRecord = await get().hasTaskRecord(taskId);
+        if (!hasRecord) {
+          set({ error: '請先記錄學習心得再標記完成！完成任務需要反思學習過程。' });
+          return null;
+        }
+      }
+
+      // 執行狀態切換
+      return await get()._updateTask(topicId, goalId, taskId, { 
+        status: 'done',
+        completedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to mark task completed:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to mark task completed' });
+      return null;
+    }
+  },
+
+  markTaskInProgress: async (topicId, goalId, taskId) => {
+    try {
+      return await get()._updateTask(topicId, goalId, taskId, { 
+        status: 'in_progress'
+      });
+    } catch (error) {
+      console.error('Failed to mark task in progress:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to mark task in progress' });
+      return null;
+    }
+  },
+
+  markTaskTodo: async (topicId, goalId, taskId) => {
+    try {
+      return await get()._updateTask(topicId, goalId, taskId, { 
+        status: 'todo',
+        completedAt: undefined
+      });
+    } catch (error) {
+      console.error('Failed to mark task todo:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to mark task todo' });
+      return null;
+    }
+  },
+
+  // 學習記錄檢查
+  hasTaskRecord: async (taskId) => {
+    try {
+      const records = await taskRecordStore.getUserTaskRecords({ 
+        task_id: taskId 
+      });
+      return records.length > 0;
+    } catch (error) {
+      console.error('Failed to check task record:', error);
+      return false; // 檢查失敗時不阻止狀態切換
+    }
   },
 
   reset: () => set({

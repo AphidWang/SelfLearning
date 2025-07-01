@@ -52,6 +52,7 @@ export interface CreateTaskRecordData {
 
 export interface TaskRecordFilters {
   topic_id?: string;
+  task_id?: string;
   difficulty?: 1 | 2 | 3 | 4 | 5;
   task_type?: string;
   start_date?: string;
@@ -139,6 +140,9 @@ class TaskRecordStore {
       if (filters) {
         if (filters.topic_id) {
           query = query.eq('topic_id', filters.topic_id);
+        }
+        if (filters.task_id) {
+          query = query.eq('task_id', filters.task_id);
         }
         if (filters.difficulty) {
           query = query.eq('difficulty', filters.difficulty);

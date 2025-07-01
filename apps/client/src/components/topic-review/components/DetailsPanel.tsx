@@ -95,11 +95,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   onTaskSelect
 }) => {
   const { 
-    addTask, updateTask, deleteTask, updateGoal, deleteGoal, 
+    addTask, updateTaskInfo, deleteTask, updateGoal, deleteGoal, 
     setGoalOwner, addGoalCollaborator, removeGoalCollaborator,
     setTaskOwner, addTaskCollaborator, removeTaskCollaborator,
     addGoal, toggleTopicCollaborative, inviteTopicCollaborator,
-    removeTopicCollaborator
+    removeTopicCollaborator,
+    markTaskCompleted,
+    markTaskInProgress,
+    markTaskTodo
   } = useTopicStore();
 
   // 編輯狀態
@@ -140,13 +143,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     if (!selectedTask || !selectedGoal) return;
     
     await handleUpdate(async () => {
-      const updates: Partial<Task> = { 
-        status, 
-        completedAt: status === 'done' ? new Date().toISOString() : undefined 
-      };
-      await updateTask(topic.id, selectedGoal.id, selectedTask.id, updates);
+      switch (status) {
+        case 'done':
+          await markTaskCompleted(topic.id, selectedGoal.id, selectedTask.id);
+          break;
+        case 'in_progress':
+          await markTaskInProgress(topic.id, selectedGoal.id, selectedTask.id);
+          break;
+        case 'todo':
+          await markTaskTodo(topic.id, selectedGoal.id, selectedTask.id);
+          break;
+      }
     });
-  }, [selectedTask, selectedGoal, topic.id, updateTask, handleUpdate]);
+  }, [selectedTask, selectedGoal, topic.id, markTaskCompleted, markTaskInProgress, markTaskTodo, handleUpdate]);
 
   // 目標狀態更新  
   const handleGoalStatusUpdate = useCallback(async (status: GoalStatus) => {
@@ -159,25 +168,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
   // 編輯保存處理
   const handleSaveEdit = useCallback(async () => {
-    if (!editTitle.trim()) return;
+    if (!editTitle.trim() || !selectedGoal || !selectedTask) return;
     
-    if (selectedTask && selectedGoal) {
-      await handleUpdate(async () => {
-        await updateTask(topic.id, selectedGoal.id, selectedTask.id, {
-          title: editTitle,
-          description: editDescription
-        });
-      });
-    } else if (selectedGoal) {
-      await handleUpdate(async () => {
-        await updateGoal(topic.id, selectedGoal.id, {
-          title: editTitle,
-          description: editDescription
-        });
-      });
-    }
+    // 只允許更新任務資訊，不允許更新狀態
+    const taskInfo: Pick<Task, 'title' | 'description'> = {
+      title: editTitle,
+      description: editDescription
+    };
+    
+    await handleUpdate(async () => {
+      await updateTaskInfo(topic.id, selectedGoal.id, selectedTask.id, taskInfo);
+    });
     setIsEditing(false);
-  }, [editTitle, editDescription, selectedTask, selectedGoal, topic.id, updateTask, updateGoal, handleUpdate]);
+  }, [editTitle, editDescription, selectedTask, selectedGoal, topic.id, updateTaskInfo, handleUpdate]);
 
   // 開始編輯
   const handleStartEdit = useCallback(() => {
@@ -726,8 +729,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   onTaskSelect
 }) => {
   const { 
-    updateTask, deleteTask, setTaskOwner, addTaskCollaborator, 
-    removeTaskCollaborator 
+    updateTaskInfo, deleteTask, setTaskOwner, addTaskCollaborator,
+    removeTaskCollaborator, markTaskCompleted, markTaskInProgress, markTaskTodo
   } = useTopicStore();
   
   // 編輯狀態
@@ -755,29 +758,35 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   // 任務狀態更新
   const handleTaskStatusUpdate = useCallback(async (status: TaskStatus) => {
     await handleUpdate(async () => {
-      const updates: Partial<Task> = { 
-        status, 
-        completedAt: status === 'done' ? new Date().toISOString() : undefined 
-      };
-      await updateTask(topic.id, goal.id, task.id, updates);
+      switch (status) {
+        case 'done':
+          await markTaskCompleted(topic.id, goal.id, task.id);
+          break;
+        case 'in_progress':
+          await markTaskInProgress(topic.id, goal.id, task.id);
+          break;
+        case 'todo':
+          await markTaskTodo(topic.id, goal.id, task.id);
+          break;
+      }
     });
-    
-    // 狀態更新後關閉記錄界面
-    setShowRecordInterface(false);
-  }, [task, goal, topic.id, updateTask, handleUpdate]);
+  }, [task, goal, topic.id, markTaskCompleted, markTaskInProgress, markTaskTodo, handleUpdate]);
 
   // 編輯保存處理
   const handleSaveEdit = useCallback(async () => {
     if (!editTitle.trim()) return;
     
+    // 只允許更新任務資訊，不允許更新狀態
+    const taskInfo: Pick<Task, 'title' | 'description'> = {
+      title: editTitle,
+      description: editDescription
+    };
+    
     await handleUpdate(async () => {
-      await updateTask(topic.id, goal.id, task.id, {
-        title: editTitle,
-        description: editDescription
-      });
+      await updateTaskInfo(topic.id, goal.id, task.id, taskInfo);
     });
     setIsEditing(false);
-  }, [editTitle, editDescription, task, goal, topic.id, updateTask, handleUpdate]);
+  }, [editTitle, editDescription, task, goal, topic.id, updateTaskInfo, handleUpdate]);
 
   // 開始編輯
   const handleStartEdit = useCallback(() => {
@@ -850,6 +859,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           isUpdating={isUpdating}
           topicId={topic.id}
           goalId={goal.id}
+          onRecordComplete={() => setShowRecordInterface(false)}
         />
       </motion.div>
     );

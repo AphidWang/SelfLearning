@@ -45,7 +45,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     template_type: topic.template_type || '學習主題',
     subject: topic.subject || SUBJECTS.CUSTOM
   });
-  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopic, getActiveGoals, updateTask, reorderTasks, fetchTopics } = useTopicStore();
+  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopic, getActiveGoals, updateTaskInfo, markTaskCompleted, markTaskInProgress, reorderTasks, fetchTopics } = useTopicStore();
   const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [showGoalsOverview, setShowGoalsOverview] = useState(false);
   const [selectedGoalForTasks, setSelectedGoalForTasks] = useState<string | null>(null);
@@ -195,23 +195,22 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   };
 
   const handleTaskStatusChange = async (goalId: string, task: Task) => {
-    const newStatus = task.status === 'done' ? 'in_progress' : 'done';
-    
     try {
-      const success = await updateTask(topic.id, goalId, task.id, {
-        ...task,
-        status: newStatus,
-        completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
-      });
+      let success: Task | null;
+      
+      if (task.status === 'done') {
+        success = await markTaskInProgress(topic.id, goalId, task.id);
+      } else {
+        success = await markTaskCompleted(topic.id, goalId, task.id);
+      }
       
       if (success) {
         await onUpdate?.();
       } else {
-        alert('更新任務狀態失敗，請稍後再試');
+        // 錯誤信息已在 store 中設置
       }
     } catch (error) {
       console.error('更新任務狀態失敗:', error);
-      alert('更新任務狀態失敗，請稍後再試');
     }
   };
 
