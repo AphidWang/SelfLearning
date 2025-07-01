@@ -391,6 +391,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             currentStatus={selectedGoal.status}
             onStatusChange={handleGoalStatusUpdate}
             isUpdating={isUpdating}
+            totalTasks={totalTasks}
+            completedTasks={completedTasks}
           />
 
           {/* 協作者管理 */}
