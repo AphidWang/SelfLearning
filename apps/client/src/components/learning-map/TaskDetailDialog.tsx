@@ -36,19 +36,18 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   const [topic, setTopic] = useState<Topic | null>(null);
   const subjectStyle = subjects.getSubjectStyle(topic?.subject || '');
 
-  const handleStatusSelect = (status: 'in_progress' | 'done') => {
+  const handleStatusUpdate = async (status: 'in_progress' | 'done') => {
     const updatedTask = {
       ...task,
       status,
       completedAt: status === 'done' ? new Date().toISOString() : undefined
     };
-    updateTask(topicId, goalId, task.id, updatedTask);
+    await updateTask(topicId, goalId, task.id, updatedTask);
     onBack();
   };
 
   const handleRecordSuccess = () => {
-    // 記錄成功後可以選擇翻回正面或保持在背面
-    // 這裡選擇保持在背面，讓用戶選擇狀態
+    // 記錄成功後保持在背面，讓用戶選擇狀態
   };
 
   const handleSaveDescription = () => {
@@ -318,8 +317,8 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
               topicId={topicId}
               goalId={goalId}
               onSuccess={handleRecordSuccess}
-              showStatusButtons={true}
-              onStatusUpdate={handleStatusSelect}
+              showStatusButtons={false}
+              onStatusUpdate={handleStatusUpdate}
               showCancelButton={true}
               onCancel={handleFlipCard}
               buttonText="保存學習記錄"

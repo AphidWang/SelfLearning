@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import type { Task, TaskStatus } from '../../../types/goal';
@@ -21,13 +21,6 @@ export const TaskRecordInterface: React.FC<TaskRecordInterfaceProps> = ({
   topicId,
   goalId
 }) => {
-  const [showStatusButtons, setShowStatusButtons] = useState(false);
-
-  // 記錄成功後的回調
-  const handleRecordSuccess = () => {
-    setShowStatusButtons(true);
-  };
-
   return (
     <motion.div 
       className="flex flex-col h-full relative z-10"
@@ -57,8 +50,7 @@ export const TaskRecordInterface: React.FC<TaskRecordInterfaceProps> = ({
           taskId={task.id}
           topicId={topicId}
           goalId={goalId}
-          onSuccess={handleRecordSuccess}
-          showStatusButtons={showStatusButtons}
+          showStatusButtons={false}
           onStatusUpdate={onStatusUpdate}
           isUpdating={isUpdating}
           showCancelButton={true}

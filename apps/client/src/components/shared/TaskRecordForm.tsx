@@ -232,43 +232,37 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
       </div>
 
       {/* 按鈕組 */}
-      {showStatusButtons ? (
-        /* 狀態更新按鈕 */
-        <div className="flex gap-2 mt-3">
-          {showCancelButton && (
-            <button
-              onClick={onCancel}
-              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md"
-            >
-              返回
-            </button>
-          )}
+      <div className="flex gap-2 mt-3">
+        {/* 返回/取消按鈕 - 統一顯示 */}
+        {(showCancelButton || showStatusButtons) && (
           <button
-            onClick={() => onStatusUpdate?.('in_progress')}
-            disabled={isUpdating}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-lg hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md disabled:opacity-50"
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md"
           >
-            {isUpdating ? '更新中...' : '進行中'}
+            返回
           </button>
-          <button
-            onClick={() => onStatusUpdate?.('done')}
-            disabled={isUpdating}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md disabled:opacity-50"
-          >
-            {isUpdating ? '更新中...' : '完成'}
-          </button>
-        </div>
-      ) : (
-        /* 保存按鈕 */
-        <div className="flex gap-2 mt-3">
-          {showCancelButton && (
+        )}
+
+        {showStatusButtons ? (
+          /* 狀態更新按鈕 */
+          <>
             <button
-              onClick={onCancel}
-              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md"
+              onClick={() => onStatusUpdate?.('in_progress')}
+              disabled={isUpdating}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-lg hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md disabled:opacity-50"
             >
-              取消
+              {isUpdating ? '更新中...' : '進行中'}
             </button>
-          )}
+            <button
+              onClick={() => onStatusUpdate?.('done')}
+              disabled={isUpdating}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md disabled:opacity-50"
+            >
+              {isUpdating ? '更新中...' : '完成'}
+            </button>
+          </>
+        ) : (
+          /* 保存按鈕 */
           <button
             onClick={handleSave}
             disabled={isSaving || !comment.trim()}
@@ -283,8 +277,8 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
               buttonText
             )}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }; 

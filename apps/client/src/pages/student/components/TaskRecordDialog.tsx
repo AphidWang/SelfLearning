@@ -56,7 +56,7 @@ export const TaskRecordDialog: React.FC<TaskRecordDialogProps> = ({
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="bg-white rounded-2xl shadow-2xl max-h-[85vh] overflow-hidden w-full max-w-4xl flex flex-col"
+            className="bg-white rounded-2xl shadow-2xl max-h-[85vh] overflow-hidden w-full max-w-2xl flex flex-col"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
