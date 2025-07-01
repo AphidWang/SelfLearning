@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '../services/supabase';
+import { httpInterceptor } from '../services/httpInterceptor';
 
 export interface TaskRecord {
   id: string;
@@ -91,22 +92,24 @@ class TaskRecordStore {
       }
 
       // 3. 建立記錄
-      const { data: record, error } = await supabase
-        .from('task_records')
-        .insert({
-          title: data.title,
-          difficulty: data.difficulty,
-          message: data.message,
-          files: fileInfos,
-          topic_id: data.topic_id,
-          task_id: data.task_id,
-          task_type: data.task_type,
-          completion_time: data.completion_time,
-          tags: data.tags || [],
-          author_id: user.id  // 設定作者 ID 為當前用戶
-        })
-        .select('*')
-        .single();
+      const { data: record, error } = await httpInterceptor.wrapSupabaseQuery(
+        async () => supabase
+          .from('task_records')
+          .insert({
+            title: data.title,
+            difficulty: data.difficulty,
+            message: data.message,
+            files: fileInfos,
+            topic_id: data.topic_id,
+            task_id: data.task_id,
+            task_type: data.task_type,
+            completion_time: data.completion_time,
+            tags: data.tags || [],
+            author_id: user.id  // 設定作者 ID 為當前用戶
+          })
+          .select('*')
+          .single()
+      );
 
       if (error) {
         console.error('創建任務記錄失敗:', error);
@@ -152,14 +155,14 @@ class TaskRecordStore {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error } = await httpInterceptor.wrapSupabaseQuery(async () => query);
 
       if (error) {
         console.error('獲取任務記錄失敗:', error);
         throw new Error(`獲取任務記錄失敗: ${error.message}`);
       }
 
-      return data || [];
+      return (data as TaskRecord[]) || [];
     } catch (error) {
       console.error('getUserTaskRecords 錯誤:', error);
       throw error;
@@ -171,11 +174,13 @@ class TaskRecordStore {
    */
   async getTaskRecord(id: string): Promise<TaskRecord | null> {
     try {
-      const { data, error } = await supabase
-        .from('task_records')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data, error } = await httpInterceptor.wrapSupabaseQuery(
+        async () => supabase
+          .from('task_records')
+          .select('*')
+          .eq('id', id)
+          .single()
+      );
 
       if (error) {
         console.error('獲取任務記錄失敗:', error);
@@ -213,12 +218,14 @@ class TaskRecordStore {
       // 移除不應該在更新中的字段
       delete updateData.files; // 如果沒有新檔案
 
-      const { data, error } = await supabase
-        .from('task_records')
-        .update(updateData)
-        .eq('id', id)
-        .select('*')
-        .single();
+      const { data, error } = await httpInterceptor.wrapSupabaseQuery(
+        async () => supabase
+          .from('task_records')
+          .update(updateData)
+          .eq('id', id)
+          .select('*')
+          .single()
+      );
 
       if (error) {
         console.error('更新任務記錄失敗:', error);
@@ -248,10 +255,12 @@ class TaskRecordStore {
         }
       }
 
-      const { error } = await supabase
-        .from('task_records')
-        .delete()
-        .eq('id', id);
+      const { error } = await httpInterceptor.wrapSupabaseQuery(
+        async () => supabase
+          .from('task_records')
+          .delete()
+          .eq('id', id)
+      );
 
       if (error) {
         console.error('刪除任務記錄失敗:', error);
@@ -286,14 +295,14 @@ class TaskRecordStore {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error } = await httpInterceptor.wrapSupabaseQuery(async () => query);
 
       if (error) {
         console.error('獲取統計失敗:', error);
         throw new Error(`獲取統計失敗: ${error.message}`);
       }
 
-      const records = data || [];
+      const records = (data as any[]) || [];
       
       // 計算統計
       const stats: TaskRecordStats = {
@@ -344,9 +353,11 @@ class TaskRecordStore {
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${user.id}/task-records/${fileName}`;
 
-      const { data, error } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, file);
+      const { data, error } = await httpInterceptor.wrapStorageOperation(
+        () => supabase.storage
+          .from('uploads')
+          .upload(filePath, file)
+      );
 
       if (error) {
         console.error('檔案上傳失敗:', error);
@@ -376,9 +387,11 @@ class TaskRecordStore {
    */
   private async deleteFile(filePath: string): Promise<void> {
     try {
-      const { error } = await supabase.storage
-        .from('uploads')
-        .remove([filePath]);
+      const { error } = await httpInterceptor.wrapStorageOperation(
+        () => supabase.storage
+          .from('uploads')
+          .remove([filePath])
+      );
 
       if (error) {
         console.error('檔案刪除失敗:', error);
