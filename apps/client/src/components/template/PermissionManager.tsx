@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { Eye, Edit3, Shield, Users, Lock } from 'lucide-react';
-import type { TopicTemplate, TopicWithSupabase, User } from '../../types/goal';
+import type { TopicTemplate, Topic, User } from '../../types/goal';
 
 // 權限類型
 export type Permission = 'view' | 'edit' | 'admin' | 'owner';
@@ -42,7 +42,7 @@ export const usePermissions = (currentUserId: string) => {
   };
 
   // 檢查主題權限
-  const checkTopicPermission = (topic: TopicWithSupabase, requiredPermission: Permission): boolean => {
+  const checkTopicPermission = (topic: Topic, requiredPermission: Permission): boolean => {
     // 擁有者有所有權限
     if (topic.owner_id === currentUserId) {
       return true;

@@ -11,7 +11,8 @@
  * - 使用 topicStore 獲取最新的主題/目標/任務資料 [[memory:1599136828095381917]]
  * - 分層組件設計：TaskWallPage -> TaskWallGrid -> TaskCard/GoalCard
  * - 響應式佈局：手機2欄，平板3欄，桌面可調整
- * - 優先權排序：高優先權任務優先顯示
+ * - 優先權排序：進行中任務優先，高優先權任務優先顯示
+ * - 顯示所有符合條件的卡片（無數量限制）
  * 
  * 🎨 視覺設計：
  * - 溫暖色調：米色、奶油色、淡橙色背景
@@ -25,18 +26,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Settings, Filter, Star, BookMarked } from 'lucide-react';
+import { ArrowLeft, Settings, Filter, Star, BookMarked, X } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
 import { CompletedCardsStack } from './components/CompletedCardsStack';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
+import { TaskRecordDialog } from './components/TaskRecordDialog';
 import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
 
 /**
  * 任務牆配置介面
  */
 interface TaskWallConfig {
-  maxVisibleCards: number; // 主畫面最大卡片數
+  maxVisibleCards: number; // 已停用 - 現在顯示所有卡片
   gridColumns: 'auto' | 2 | 3; // 網格欄數
   showCompletedStack: boolean; // 是否顯示完成堆疊
   priorityFilter: 'all' | 'high' | 'medium' | 'low'; // 優先權過濾
@@ -87,6 +89,8 @@ const TaskWallPage: React.FC = () => {
   
   const [showSettings, setShowSettings] = useState(false);
   const [showJournalDialog, setShowJournalDialog] = useState(false);
+  const [showRecordDialog, setShowRecordDialog] = useState(false);
+  const [selectedTaskForRecord, setSelectedTaskForRecord] = useState<TaskWithContext | null>(null);
   const [completedTasks, setCompletedTasks] = useState<TaskWithContext[]>([]);
 
   // 初始化資料載入
@@ -105,9 +109,51 @@ const TaskWallPage: React.FC = () => {
     initializeData();
   }, [fetchTopics, getUsers]);
 
+  // 從資料庫載入已完成任務到完成收藏
+  useEffect(() => {
+    if (!topics) return;
+
+    const completedTasksFromDB: TaskWithContext[] = [];
+    
+    topics.forEach(topic => {
+      if (topic.status === 'archived') return;
+      
+      const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+      
+      topic.goals?.forEach(goal => {
+        if (goal.status === 'archived') return;
+        
+        goal.tasks?.forEach(task => {
+          // 載入已完成的任務
+          if (task.status === 'done') {
+            completedTasksFromDB.push({
+              ...task,
+              topicId: topic.id,
+              topicTitle: topic.title,
+              topicSubject: topic.subject || '未分類',
+              goalId: goal.id,
+              goalTitle: goal.title,
+              subjectStyle
+            });
+          }
+        });
+      });
+    });
+
+    // 按完成時間排序（最新的在前）
+    completedTasksFromDB.sort((a, b) => {
+      const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+      const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    // 最多保留最近的 10 個已完成任務
+    setCompletedTasks(completedTasksFromDB.slice(0, 10));
+  }, [topics]);
+
   /**
    * 處理任務狀態更新
-   * 當任務完成時，觸發動畫並移動到完成堆疊
+   * 更新後會重新載入資料，確保完成收藏同步
    */
   const handleTaskStatusUpdate = useCallback(async (
     taskId: string, 
@@ -116,22 +162,13 @@ const TaskWallPage: React.FC = () => {
     newStatus: TaskStatus
   ) => {
     try {
-      // 先找到任務以便動畫使用
-      const task = activeTasks.find(t => t.id === taskId);
-      
       // 更新任務狀態
       await updateTask(topicId, goalId, taskId, { 
         status: newStatus,
         completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
       });
 
-      // 如果任務完成，加入完成堆疊
-      if (newStatus === 'done' && task) {
-        setCompletedTasks(prev => [task, ...prev.slice(0, 9)]); // 最多保留 10 個
-      } else if (newStatus !== 'done') {
-        // 如果任務狀態改為未完成，從完成堆疊移除
-        setCompletedTasks(prev => prev.filter(t => t.id !== taskId));
-      }
+      // 更新成功後會自動觸發 topics 重新載入，完成收藏會自動更新
     } catch (error) {
       console.error('更新任務狀態失敗:', error);
     }
@@ -158,24 +195,58 @@ const TaskWallPage: React.FC = () => {
   }, [addTask]);
 
   /**
-   * 處理日誌保存
+   * 處理任務恢復到進行中
    */
-  const handleSaveJournal = useCallback(async (journalEntry: any) => {
+  const handleRestoreTask = useCallback(async (
+    taskId: string, 
+    goalId: string, 
+    topicId: string
+  ) => {
+    try {
+      // 更新任務狀態為進行中
+      await updateTask(topicId, goalId, taskId, { 
+        status: 'in_progress',
+        completedAt: undefined
+      });
+
+      // 更新成功後會自動觸發 topics 重新載入，完成收藏會自動更新
+    } catch (error) {
+      console.error('恢復任務失敗:', error);
+    }
+  }, [updateTask]);
+
+  /**
+   * 處理打開記錄對話框
+   */
+  const handleOpenRecord = useCallback((task: TaskWithContext) => {
+    setSelectedTaskForRecord(task);
+    setShowRecordDialog(true);
+  }, []);
+
+  /**
+   * 處理記錄保存
+   */
+  const handleSaveRecord = useCallback(async (record: any) => {
+    if (!selectedTaskForRecord) return;
+
     try {
       // TODO: 實際保存到後端
-      console.log('保存日誌:', journalEntry);
+      console.log('保存學習記錄:', record);
       
       // 暫時存到 localStorage
-      const existingJournals = JSON.parse(localStorage.getItem('dailyJournals') || '[]');
-      const newJournals = [journalEntry, ...existingJournals];
-      localStorage.setItem('dailyJournals', JSON.stringify(newJournals));
+      const existingRecords = JSON.parse(localStorage.getItem('taskRecords') || '{}');
+      existingRecords[selectedTaskForRecord.id] = {
+        ...record,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('taskRecords', JSON.stringify(existingRecords));
       
-      alert('日誌保存成功！繼續加油！ 🎉');
+      alert('學習記錄保存成功！繼續加油！ 🎉');
     } catch (error) {
-      console.error('保存日誌失敗:', error);
+      console.error('保存記錄失敗:', error);
       throw error;
     }
-  }, []);
+  }, [selectedTaskForRecord]);
 
   /**
    * 從所有主題中提取活躍的任務
@@ -213,8 +284,18 @@ const TaskWallPage: React.FC = () => {
       });
     });
 
-    // 按優先權和更新時間排序
+    // 按狀態、優先權和更新時間排序
     return tasks.sort((a, b) => {
+      // 首先按狀態排序：進行中 > 待開始
+      const statusOrder = { in_progress: 2, todo: 1 };
+      const aStatus = statusOrder[a.status] || 1;
+      const bStatus = statusOrder[b.status] || 1;
+      
+      if (aStatus !== bStatus) {
+        return bStatus - aStatus; // 進行中在前
+      }
+      
+      // 相同狀態則按優先權排序
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       const aPriority = priorityOrder[a.priority || 'medium'];
       const bPriority = priorityOrder[b.priority || 'medium'];
@@ -276,8 +357,8 @@ const TaskWallPage: React.FC = () => {
       filtered = filtered.filter(task => task.priority === config.priorityFilter);
     }
     
-    // 限制顯示數量
-    return filtered.slice(0, config.maxVisibleCards);
+    // 顯示所有符合條件的任務（移除數量限制）
+    return filtered;
   }, [activeTasks, config]);
 
   /**
@@ -285,11 +366,10 @@ const TaskWallPage: React.FC = () => {
    */
   const allCards = useMemo(() => {
     const taskCards = filteredTasks.map(task => ({ type: 'task' as const, data: task }));
-    const goalCards = goalsNeedingTasks.slice(0, Math.max(0, config.maxVisibleCards - taskCards.length))
-      .map(goal => ({ type: 'goal' as const, data: goal }));
+    const goalCards = goalsNeedingTasks.map(goal => ({ type: 'goal' as const, data: goal }));
     
     return [...taskCards, ...goalCards];
-  }, [filteredTasks, goalsNeedingTasks, config.maxVisibleCards]);
+  }, [filteredTasks, goalsNeedingTasks]);
 
   // 載入狀態
   if (loading) {
@@ -343,36 +423,10 @@ const TaskWallPage: React.FC = () => {
                     📝 我的任務牆
                   </h1>
                   <p className="text-amber-700 mt-1">
-                    {allCards.length} 張卡片 • {completedTasks.length} 個已完成
+                    {allCards.length} 張卡片 • 
+                    {activeTasks.filter(task => task.status === 'in_progress').length} 個進行中 • 
+                    {completedTasks.length} 個已完成
                   </p>
-                  {/* 顯示活躍主題 */}
-                  {topics && topics.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {topics
-                        .filter(topic => topic.status !== 'archived')
-                        .slice(0, 3) // 最多顯示3個主題
-                        .map(topic => {
-                          const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
-                          return (
-                            <span
-                              key={topic.id}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
-                              style={{
-                                backgroundColor: `${subjectStyle.accent}20`,
-                                color: subjectStyle.accent
-                              }}
-                            >
-                              <span>{topic.title}</span>
-                            </span>
-                          );
-                        })}
-                      {topics.filter(topic => topic.status !== 'archived').length > 3 && (
-                        <span className="text-xs text-amber-600">
-                          +{topics.filter(topic => topic.status !== 'archived').length - 3} 個主題
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
               
@@ -399,7 +453,7 @@ const TaskWallPage: React.FC = () => {
         <AnimatePresence>
           {showSettings && (
             <motion.div
-              className="fixed top-0 right-0 w-80 h-full bg-white/95 backdrop-blur-md shadow-2xl z-40 p-6"
+              className="fixed top-0 right-0 w-80 h-full bg-white/95 backdrop-blur-md shadow-2xl z-[100] p-6"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
@@ -416,24 +470,7 @@ const TaskWallPage: React.FC = () => {
                   </button>
                 </div>
                 
-                {/* 最大卡片數設定 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    最大顯示卡片數
-                  </label>
-                  <input
-                    type="range"
-                    min="6"
-                    max="24"
-                    value={config.maxVisibleCards}
-                    onChange={(e) => setConfig(prev => ({ 
-                      ...prev, 
-                      maxVisibleCards: parseInt(e.target.value) 
-                    }))}
-                    className="w-full"
-                  />
-                  <span className="text-sm text-gray-500">{config.maxVisibleCards} 張</span>
-                </div>
+                {/* 最大卡片數設定已移除 - 現在顯示所有卡片 */}
 
                 {/* 優先權過濾 */}
                 <div>
@@ -495,6 +532,7 @@ const TaskWallPage: React.FC = () => {
               config={config}
               onTaskStatusUpdate={handleTaskStatusUpdate}
               onAddTaskToGoal={handleAddTaskToGoal}
+              onOpenRecord={handleOpenRecord}
             />
           )}
         </div>
@@ -504,6 +542,7 @@ const TaskWallPage: React.FC = () => {
           <CompletedCardsStack 
             completedTasks={completedTasks}
             onClearStack={() => setCompletedTasks([])}
+            onRestoreTask={handleRestoreTask}
           />
         )}
 
@@ -511,7 +550,20 @@ const TaskWallPage: React.FC = () => {
         <DailyJournalDialog
           isOpen={showJournalDialog}
           onClose={() => setShowJournalDialog(false)}
-          onSave={handleSaveJournal}
+        />
+
+        {/* 任務記錄 Dialog */}
+        <TaskRecordDialog
+          isOpen={showRecordDialog}
+          taskTitle={selectedTaskForRecord?.title || ''}
+          onClose={() => {
+            setShowRecordDialog(false);
+            setSelectedTaskForRecord(null);
+          }}
+          onSuccess={() => {
+            setShowRecordDialog(false);
+            setSelectedTaskForRecord(null);
+          }}
         />
       </div>
     </PageLayout>

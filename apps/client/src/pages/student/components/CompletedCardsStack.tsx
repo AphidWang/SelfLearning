@@ -22,7 +22,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, X, Star, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trophy, X, Star, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 import type { Task } from '../../../types/goal';
 
 /**
@@ -40,11 +40,13 @@ interface TaskWithContext extends Task {
 interface CompletedCardsStackProps {
   completedTasks: TaskWithContext[];
   onClearStack: () => void;
+  onRestoreTask: (taskId: string, goalId: string, topicId: string) => Promise<void>;
 }
 
 export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
   completedTasks,
-  onClearStack
+  onClearStack,
+  onRestoreTask
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -126,7 +128,7 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
                   color: task.subjectStyle.accent
                 }}
               >
-                {task.topicSubject}
+                {task.topicTitle}
               </div>
               <Star className="w-4 h-4 text-amber-600" />
             </div>
@@ -172,7 +174,7 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
                 color: task.subjectStyle.accent
               }}
             >
-              {task.topicSubject}
+              {task.topicTitle}
             </div>
             <Star className="w-3 h-3 text-amber-500" />
           </div>
@@ -181,15 +183,30 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
             {task.title}
           </h4>
           
-          <p className="text-xs text-gray-600">
-            {task.goalTitle}
-          </p>
-          
-          {task.completedAt && (
-            <p className="text-xs text-gray-500 mt-1">
-              完成於 {new Date(task.completedAt).toLocaleDateString()}
-            </p>
-          )}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">
+                {task.goalTitle}
+              </p>
+              
+              {task.completedAt && (
+                <p className="text-xs text-gray-500 mt-1">
+                  完成於 {new Date(task.completedAt).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRestoreTask(task.id, task.goalId, task.topicId);
+              }}
+              className="ml-2 p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
+              title="恢復到進行中"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
+          </div>
         </motion.div>
       ))}
     </motion.div>
@@ -225,22 +242,13 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
                 </div>
               </div>
               
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={onClearStack}
-                  className="p-1.5 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors"
-                  title="清空收藏"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="收起"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="收起"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
             </div>
 
             {/* 已完成任務列表 */}

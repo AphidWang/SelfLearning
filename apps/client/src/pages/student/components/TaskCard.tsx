@@ -20,9 +20,9 @@
  * - 手寫風字體：親切溫馨的視覺效果
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Star } from 'lucide-react';
+import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Star, Pause } from 'lucide-react';
 import type { Task, TaskStatus } from '../../../types/goal';
 
 /**
@@ -40,10 +40,18 @@ interface TaskWithContext extends Task {
 interface TaskCardProps {
   task: TaskWithContext;
   onStatusUpdate: (newStatus: TaskStatus) => void;
+  onOpenRecord?: (task: TaskWithContext) => void;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord }) => {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [hasRecord, setHasRecord] = useState(false); // 追蹤是否已有記錄
+
+  // 初始化時檢查是否已有記錄
+  useEffect(() => {
+    const existingRecords = JSON.parse(localStorage.getItem('taskRecords') || '{}');
+    setHasRecord(!!existingRecords[task.id]);
+  }, [task.id]);
 
   /**
    * 獲取優先權顏色和圖示
@@ -80,6 +88,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
   const priorityDisplay = getPriorityDisplay(task.priority);
   const statusDisplay = getStatusDisplay(task.status);
   const StatusIcon = statusDisplay.icon;
+
+  /**
+   * 處理完成任務，檢查是否需要記錄
+   */
+  const handleCompleteTask = () => {
+    if (!hasRecord) {
+      // 檢查 localStorage 是否有記錄
+      const existingRecords = JSON.parse(localStorage.getItem('taskRecords') || '{}');
+      if (!existingRecords[task.id]) {
+        alert('請先記錄一下學習心得再完成任務喔！ 😊');
+        onOpenRecord?.(task);
+        return;
+      }
+    }
+    onStatusUpdate('done');
+  };
 
   /**
    * 卡片翻轉動畫變體
@@ -122,8 +146,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
           }}
         >
           <div className="p-4 h-full flex flex-col">
-            {/* 頂部：學科標籤和狀態 */}
-            <div className="flex items-center justify-between mb-3">
+            {/* 頂部：主題標籤 */}
+            <div className="mb-3">
               <div 
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
                 style={{ 
@@ -132,15 +156,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
                 }}
               >
                 <BookOpen className="w-3 h-3" />
-                {task.topicSubject}
-              </div>
-              
-              <div className="flex items-center gap-1">
-                {/* 狀態指示 */}
-                <StatusIcon 
-                  className="w-4 h-4" 
-                  style={{ color: statusDisplay.color }}
-                />
+                {task.topicTitle}
               </div>
             </div>
 
@@ -170,8 +186,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
             </div>
           </div>
 
-          {/* 裝飾性元素：模擬便條紙的打孔 */}
-          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-white/60 shadow-inner"></div>
+          {/* 裝飾性元素和狀態指示器 */}
+          {task.status === 'in_progress' ? (
+            <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-purple-500 shadow-md"></div>
+          ) : (
+            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-white/60 shadow-inner"></div>
+          )}
         </motion.div>
 
         {/* 背面 */}
@@ -189,65 +209,78 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate }) => {
             backfaceVisibility: 'hidden'
           }}
         >
-          <div className="p-4 h-full flex flex-col items-center justify-center gap-3">
+          <div className="p-4 h-full flex flex-col items-center justify-center gap-4">
             {/* 背面標題 */}
-            <div className="text-center mb-2">
+            <div className="text-center">
               <h4 className="text-sm font-bold text-gray-800 mb-1">
                 {task.title}
               </h4>
-              <p className="text-xs text-gray-600">
-                點擊按鈕來更新狀態
-              </p>
             </div>
 
-            {/* 操作按鈕 */}
-            <div className="space-y-2 w-full">
-              {task.status !== 'done' && (
-                <>
-                  {task.status === 'todo' && (
+            {/* 狀態操作按鈕 */}
+            {task.status !== 'done' && (
+              <div className="flex gap-2 w-full">
+                {task.status === 'todo' ? (
+                  <>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onStatusUpdate('in_progress');
                       }}
-                      className="w-full py-2 px-3 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 py-2 px-3 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors flex items-center justify-center gap-1"
                     >
-                      <Play className="w-4 h-4" />
-                      開始執行
+                      <Play className="w-3 h-3" />
+                      開始
                     </button>
-                  )}
-                  
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStatusUpdate('done');
-                    }}
-                    className="w-full py-2 px-3 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    標記完成
-                  </button>
-                </>
-              )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCompleteTask();
+                      }}
+                      className="flex-1 py-2 px-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      完成
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStatusUpdate('todo');
+                      }}
+                      className="flex-1 py-2 px-3 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Pause className="w-3 h-3" />
+                      暫停
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCompleteTask();
+                      }}
+                      className="flex-1 py-2 px-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      完成
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
-              {/* 學習記錄按鈕 */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // TODO: 開啟學習記錄界面
-                  console.log('開啟學習記錄:', task.id);
-                }}
-                className="w-full py-2 px-3 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
-              >
-                <Edit className="w-4 h-4" />
-                📝 留下記錄
-              </button>
-            </div>
-
-            {/* 回到正面提示 */}
-            <p className="text-xs text-gray-500 text-center mt-auto">
-              再次點擊卡片可翻回正面
-            </p>
+            {/* 學習記錄按鈕 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenRecord?.(task);
+              }}
+              className="w-full py-2 px-3 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <Edit className="w-4 h-4" />
+              📝 留下記錄
+            </button>
           </div>
         </motion.div>
       </motion.div>

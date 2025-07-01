@@ -3,7 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, ListTodo, Users, BookMarked, 
-  Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight, Target, Grid3X3 
+  Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight, Target, Grid3X3, 
+  PenTool
 } from 'lucide-react';
 import { useUser, UserRole } from '../../context/UserContext';
 import { UserProfileDialog } from '../user-manager';
@@ -28,11 +29,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       return {
         items: [
           { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
-          { name: '儀表板', path: '/student', icon: <BookOpen size={20} /> },
           { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
-          { name: '學習規劃', path: '/student/planning', icon: <Target size={20} /> },
           { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-          { name: '學習日誌', path: '/student/journal', icon: <BookMarked size={20} /> },
+          { name: '日誌', path: '/journal', icon: <PenTool size={20} /> },
         ],
         viewType: 'student'
       };
@@ -92,11 +91,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     return {
       items: [
         { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
-        { name: '儀表板', path: '/student', icon: <BookOpen size={20} /> },
         { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
-        { name: '學習規劃', path: '/student/planning', icon: <Target size={20} /> },
         { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-        { name: '學習日誌', path: '/student/journal', icon: <BookMarked size={20} /> },
+        { name: '日誌', path: '/journal', icon: <PenTool size={20} /> },
       ],
       viewType: 'student'
     };
