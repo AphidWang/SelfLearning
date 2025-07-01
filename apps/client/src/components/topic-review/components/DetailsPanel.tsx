@@ -846,6 +846,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           onStatusUpdate={handleTaskStatusUpdate}
           onBack={() => setShowRecordInterface(false)}
           isUpdating={isUpdating}
+          topicId={topic.id}
+          goalId={goal.id}
         />
       </motion.div>
     );

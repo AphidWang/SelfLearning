@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Settings, Shield, Users, Database, AlertTriangle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Settings, Shield, Users, Database, AlertTriangle } from 'lucide-react';
 import { UserManager } from '../../components/user-manager';
 import { useUserStore } from '../../store/userStore';
+import PageLayout from '../../components/layout/PageLayout';
 
 export const UserAdminPage: React.FC = () => {
-  const navigate = useNavigate();
   const { users, loading, error, getUsers, clearError } = useUserStore();
   const [stats, setStats] = useState({
     total: 0,
@@ -45,26 +44,6 @@ export const UserAdminPage: React.FC = () => {
     setStats(newStats);
   }, [users]);
 
-  const handleGoBack = () => {
-    // 根據用戶角色導向不同頁面
-    const userRole = localStorage.getItem('userRole');
-    
-    switch (userRole) {
-      case 'admin':
-        navigate('/admin');
-        break;
-      case 'mentor':
-        navigate('/mentor');
-        break;
-      case 'student':
-      case 'parent':
-        navigate('/student');
-        break;
-      default:
-        navigate('/');
-    }
-  };
-
   const StatCard: React.FC<{
     title: string;
     value: number;
@@ -95,70 +74,52 @@ export const UserAdminPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleGoBack}
-                className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                返回
-              </button>
-              
-              <div className="h-8 w-px bg-gray-300 dark:bg-gray-600" />
-              
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                  <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    用戶管理中心
-                  </h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    管理系統中的所有用戶帳號
-                  </p>
-                </div>
-              </div>
-            </div>
+    <PageLayout title="用戶管理中心">
+      <div className="space-y-6">
+        {/* 錯誤提示 */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-2 px-4 py-3 bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-lg text-sm"
+          >
+            <AlertTriangle className="w-4 h-4" />
+            <span>{error}</span>
+            <button
+              onClick={clearError}
+              className="ml-auto text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+            >
+              ×
+            </button>
+          </motion.div>
+        )}
 
-            <div className="flex items-center gap-3">
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-2 px-3 py-2 bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-lg text-sm"
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>{error}</span>
-                  <button
-                    onClick={clearError}
-                    className="ml-2 text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
-                  >
-                    ×
-                  </button>
-                </motion.div>
-              )}
-              
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <Database className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                <span className="text-sm text-gray-600 dark:text-gray-300">
-                  {loading ? '同步中...' : '已同步'}
-                </span>
-              </div>
+        {/* 頁面標題和狀態 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+              <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                用戶管理中心
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                管理系統中的所有用戶帳號
+              </p>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+            <Database className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-300">
+              {loading ? '同步中...' : '已同步'}
+            </span>
+          </div>
+        </div>
+
+        {/* 統計數據 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <StatCard
             title="總用戶數"
             value={stats.total}
@@ -196,7 +157,7 @@ export const UserAdminPage: React.FC = () => {
           />
         </div>
 
-        {/* User Manager */}
+        {/* 用戶管理器 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -220,6 +181,6 @@ export const UserAdminPage: React.FC = () => {
           </div>
         </motion.div>
       </div>
-    </div>
+    </PageLayout>
   );
 }; 

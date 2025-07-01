@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Task } from '../../types/goal';
 import { Topic } from '../../types/goal';
 import { 
-  ChevronLeft, MessageSquare, Paperclip, 
+  ChevronLeft, MessageSquare, 
   HelpCircle, CheckCircle, PlayCircle,
-  Target, Upload, PauseCircle, X, Pencil, Star, Sparkles, Edit3, Zap, PenTool, Mic
+  Target, X, Pencil, Star, Sparkles, Edit3
 } from 'lucide-react';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
+import { TaskRecordForm } from '../shared/TaskRecordForm';
 
 interface TaskDetailDialogProps {
   task: Task;
@@ -19,9 +20,6 @@ interface TaskDetailDialogProps {
   onHelpRequest: (taskId: string) => void;
 }
 
-// 移除 MoodLevel 和 EnergyLevel，只保留 ChallengeLevel 但簡化為數字
-type ChallengeLevel = 1 | 2 | 3 | 4 | 5;
-
 export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   task,
   goalId,
@@ -31,26 +29,26 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   onHelpRequest
 }) => {
   const { updateTask, getTopic } = useTopicStore();
-  const [comment, setComment] = useState('');
-  const [challenge, setChallenge] = useState<ChallengeLevel | undefined>(task.challenge as ChallengeLevel | undefined);
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
-  const [attachments, setAttachments] = useState<File[]>([]);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [topic, setTopic] = useState<Topic | null>(null);
   const subjectStyle = subjects.getSubjectStyle(topic?.subject || '');
 
-  const handleStatusSelect = (status: 'in_progress' | 'done' | 'todo') => {
+  const handleStatusSelect = (status: 'in_progress' | 'done') => {
     const updatedTask = {
       ...task,
       status,
-      challenge: challenge as number,
       completedAt: status === 'done' ? new Date().toISOString() : undefined
     };
     updateTask(topicId, goalId, task.id, updatedTask);
     onBack();
+  };
+
+  const handleRecordSuccess = () => {
+    // 記錄成功後可以選擇翻回正面或保持在背面
+    // 這裡選擇保持在背面，讓用戶選擇狀態
   };
 
   const handleSaveDescription = () => {
@@ -60,17 +58,6 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
 
   const handleFlipCard = () => {
     setIsFlipped(!isFlipped);
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      setAttachments(prev => [...prev, ...Array.from(files)]);
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -324,127 +311,20 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col space-y-3">
-            {/* 挑戰程度 - 重新設計為色彩豐富的樣式 */}
-            <div className="p-3 bg-gradient-to-br from-orange-50/90 to-red-50/90 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl border border-orange-200/50 dark:border-orange-700/50">
-              <div className="flex items-center gap-2 mb-3">
-                <Zap size={16} className="text-orange-600 dark:text-orange-400" />
-                <h4 className="text-sm font-semibold text-orange-800 dark:text-orange-300">挑戰程度</h4>
-              </div>
-              <div className="flex justify-center gap-1.5">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setChallenge((i + 1) as ChallengeLevel)}
-                    className="p-1.5 rounded-lg transition-all hover:scale-110 hover:bg-white/40 dark:hover:bg-gray-800/40"
-                  >
-                    <Star 
-                      size={20} 
-                      className={challenge && i < challenge ? 'text-orange-500' : 'text-gray-300'} 
-                      fill={challenge && i < challenge ? 'currentColor' : 'none'}
-                    />
-                  </button>
-                ))}
-              </div>
-              {challenge && (
-                <p className="text-center text-xs text-orange-700 dark:text-orange-300 mt-2 font-medium">
-                  {challenge === 1 && "很簡單"}
-                  {challenge === 2 && "有點簡單"}
-                  {challenge === 3 && "剛剛好"}
-                  {challenge === 4 && "有點困難"}
-                  {challenge === 5 && "很有挑戰"}
-                </p>
-              )}
-            </div>
-
-            {/* 學習心得 - 改為更開放的設計 */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <PenTool size={16} className="text-purple-600 dark:text-purple-400" />
-                <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-300">學習心得</h4>
-              </div>
-              <div className="relative">
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？✨"
-                  className="w-full min-h-[120px] p-4 text-sm border-2 border-purple-200/60 dark:border-purple-700/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 backdrop-blur-sm resize-none transition-all hover:border-purple-300 dark:hover:border-purple-600"
-                  style={{
-                    backgroundImage: 'linear-gradient(135deg, rgba(168, 85, 247, 0.02) 0%, rgba(236, 72, 153, 0.02) 100%)'
-                  }}
-                />
-                <button 
-                  className="absolute bottom-3 right-3 p-2 rounded-lg hover:bg-purple-100/80 dark:hover:bg-purple-800/40 transition-colors"
-                  title="語音輸入 (即將推出)"
-                >
-                  <Mic size={18} className="text-purple-500/70 hover:text-purple-600 dark:hover:text-purple-400" />
-                </button>
-              </div>
-            </div>
-
-            {/* 附件區域 */}
-            <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">附件</h4>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                >
-                  <Paperclip size={16} />
-                </button>
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleFileUpload}
-                accept="image/*,video/*,.pdf,.doc,.docx,.txt"
-              />
-
-              {attachments.length > 0 ? (
-                <div className="space-y-1 max-h-16 overflow-y-auto">
-                  {attachments.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-1.5 bg-white dark:bg-gray-800 rounded text-xs">
-                      <span className="truncate flex-1">{file.name}</span>
-                      <button
-                        onClick={() => removeAttachment(index)}
-                        className="p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
-                  點擊附件圖標來上傳檔案
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 按鈕組 - 移到底部 */}
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleFlipCard}
-              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md"
-            >
-              返回
-            </button>
-            <button
-              onClick={() => handleStatusSelect('in_progress')}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-lg hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md"
-            >
-              進行中
-            </button>
-            <button
-              onClick={() => handleStatusSelect('done')}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md"
-            >
-              完成
-            </button>
+          <div className="flex-1 flex flex-col">
+            <TaskRecordForm
+              taskTitle={task.title}
+              taskId={task.id}
+              topicId={topicId}
+              goalId={goalId}
+              onSuccess={handleRecordSuccess}
+              showStatusButtons={true}
+              onStatusUpdate={handleStatusSelect}
+              showCancelButton={true}
+              onCancel={handleFlipCard}
+              buttonText="保存學習記錄"
+              initialChallenge={task.challenge as 1 | 2 | 3 | 4 | 5 | undefined}
+            />
           </div>
         </motion.div>
       </motion.div>
