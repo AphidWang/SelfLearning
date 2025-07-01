@@ -36,6 +36,10 @@ export interface ServerUser {
   created_at: string;
   updated_at: string;
   
+  // 新增：用戶狀態相關欄位
+  banned_until?: string | null;
+  is_banned?: boolean;
+  
   // 向後兼容：保留單角色屬性（已棄用）
   /** @deprecated 請使用 roles 陣列，此欄位僅為向後兼容 */
   role?: 'student' | 'teacher' | 'mentor' | 'parent' | 'admin';
@@ -48,23 +52,33 @@ export const userService = {
 
     if (error) throw new Error(`Failed to fetch users: ${error.message}`);
     
-    return (data.users || []).map(user => {
-      // 支援新的多角色系統，同時向後兼容單角色
-      const roles = user.user_metadata?.roles || 
-                   (user.user_metadata?.role ? [user.user_metadata.role] : ['student']);
-      
-      return {
-        id: user.id,
-        name: user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
-        email: user.email || '',
-        avatar: user.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.id}&backgroundColor=ffd5dc`,
-        color: user.user_metadata?.color || '#FF6B6B',
-        roles: roles,
-        role: roles[0], // 向後兼容：取第一個角色作為主要角色
-        created_at: user.created_at,
-        updated_at: user.updated_at || user.created_at
-      };
-    });
+        return (data.users || [])
+      .filter(user => !user.user_metadata?.is_deleted) // 過濾掉軟刪除的用戶
+      .map(user => {
+        // 支援新的多角色系統，同時向後兼容單角色
+        const roles = user.user_metadata?.roles || 
+                     (user.user_metadata?.role ? [user.user_metadata.role] : ['student']);
+        
+        // 檢查是否被禁用
+        const bannedUntil = user.user_metadata?.banned_until;
+        const isBanned = bannedUntil === 'permanent' || 
+                        (bannedUntil && new Date(bannedUntil) > new Date());
+        
+        return {
+          id: user.id,
+          name: user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
+          email: user.email || '',
+          avatar: user.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.id}&backgroundColor=ffd5dc`,
+          color: user.user_metadata?.color || '#FF6B6B',
+          roles: roles,
+          role: roles[0], // 向後兼容：取第一個角色作為主要角色
+          created_at: user.created_at,
+          updated_at: user.updated_at || user.created_at,
+          // 新增狀態資訊
+          banned_until: bannedUntil,
+          is_banned: isBanned
+        };
+      });
   },
 
   // 根據 ID 獲取用戶
@@ -80,6 +94,11 @@ export const userService = {
     const roles = user.user_metadata?.roles || 
                  (user.user_metadata?.role ? [user.user_metadata.role] : ['student']);
     
+    // 檢查是否被禁用
+    const bannedUntil = user.user_metadata?.banned_until;
+    const isBanned = bannedUntil === 'permanent' || 
+                    (bannedUntil && new Date(bannedUntil) > new Date());
+    
     return {
       id: user.id,
       name: user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
@@ -89,7 +108,10 @@ export const userService = {
       roles: roles,
       role: roles[0], // 向後兼容：取第一個角色作為主要角色
       created_at: user.created_at,
-      updated_at: user.updated_at || user.created_at
+      updated_at: user.updated_at || user.created_at,
+      // 新增狀態資訊
+      banned_until: bannedUntil,
+      is_banned: isBanned
     };
   },
 
@@ -138,10 +160,72 @@ export const userService = {
     };
   },
 
-  // 刪除用戶
+  // 刪除用戶（軟刪除）
   async deleteUser(id: string): Promise<void> {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
-    if (error) throw new Error(`Failed to delete user: ${error.message}`);
+    // 首先獲取當前用戶的 metadata
+    const { data: currentUser } = await supabaseAdmin.auth.admin.getUserById(id);
+    if (!currentUser?.user) {
+      throw new Error('用戶不存在');
+    }
+
+    // 使用軟刪除而不是硬刪除，避免外鍵約束問題
+    const updatedMetadata = {
+      ...currentUser.user.user_metadata,
+      deleted_at: new Date().toISOString(),
+      deleted_reason: 'Admin deletion',
+      is_deleted: true
+    };
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      user_metadata: updatedMetadata
+    });
+    
+    if (error) throw new Error(`軟刪除用戶失敗: ${error.message}`);
+  },
+
+  // 新增：停用用戶功能
+  async banUser(id: string, banUntil?: Date): Promise<void> {
+    // 首先獲取當前用戶的 metadata
+    const { data: currentUser } = await supabaseAdmin.auth.admin.getUserById(id);
+    if (!currentUser?.user) {
+      throw new Error('用戶不存在');
+    }
+
+    const updatedMetadata = {
+      ...currentUser.user.user_metadata,
+      banned_until: banUntil ? banUntil.toISOString() : 'permanent',
+      banned_at: new Date().toISOString(),
+      is_banned: true
+    };
+    
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      user_metadata: updatedMetadata
+    });
+    
+    if (error) throw new Error(`停用用戶失敗: ${error.message}`);
+  },
+
+  // 新增：恢復用戶功能
+  async unbanUser(id: string): Promise<void> {
+    // 首先獲取當前用戶的 metadata
+    const { data: currentUser } = await supabaseAdmin.auth.admin.getUserById(id);
+    if (!currentUser?.user) {
+      throw new Error('用戶不存在');
+    }
+
+    const updatedMetadata = {
+      ...currentUser.user.user_metadata,
+      banned_until: null,
+      banned_at: null,
+      is_banned: false,
+      unbanned_at: new Date().toISOString()
+    };
+    
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      user_metadata: updatedMetadata
+    });
+    
+    if (error) throw new Error(`恢復用戶失敗: ${error.message}`);
   },
 
   // 搜尋用戶 (先獲取所有用戶再篩選)

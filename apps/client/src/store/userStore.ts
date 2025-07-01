@@ -83,10 +83,23 @@ const adminUserApi = {
       body: JSON.stringify(userData),
     }),
   
-  // 刪除用戶 (管理員功能)
+  // 刪除用戶 (管理員功能) - 軟刪除
   deleteUser: (id: string) =>
     adminApiCall(`/${id}`, {
       method: 'DELETE',
+    }),
+  
+  // 停用用戶 (管理員功能)
+  banUser: (id: string, banUntil?: string) =>
+    adminApiCall(`/${id}/ban`, {
+      method: 'PUT',
+      body: JSON.stringify({ banUntil }),
+    }),
+  
+  // 恢復用戶 (管理員功能)
+  unbanUser: (id: string) =>
+    adminApiCall(`/${id}/unban`, {
+      method: 'PUT',
     }),
   
   // 搜尋用戶 (管理員功能)
@@ -126,6 +139,8 @@ interface UserStore {
   }) => Promise<User>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
+  banUser: (id: string, banUntil?: string) => Promise<void>;
+  unbanUser: (id: string) => Promise<void>;
   resetUserPassword: (userId: string, password: string) => Promise<void>;
   setCurrentUser: (user: User | null) => void;
   
@@ -262,13 +277,61 @@ export const useUserStore = create<UserStore>((set, get) => {
       try {
         await adminUserApi.deleteUser(id);
         
-        // 更新本地狀態
+        // 軟刪除：從本地狀態移除用戶
         const currentUsers = get().users;
         const updatedUsers = currentUsers.filter(user => user.id !== id);
         
         set({ users: updatedUsers, loading: false });
       } catch (error: any) {
         set({ loading: false, error: error.message || '刪除用戶失敗' });
+        throw error;
+      }
+    },
+
+    banUser: async (id, banUntil) => {
+      set({ loading: true, error: null });
+      try {
+        await adminUserApi.banUser(id, banUntil);
+        
+        // 更新本地狀態
+        const currentUsers = get().users;
+        const updatedUsers = currentUsers.map(user =>
+          user.id === id 
+            ? { 
+                ...user, 
+                banned_until: banUntil || 'permanent',
+                is_banned: true 
+              }
+            : user
+        );
+        
+        set({ users: updatedUsers, loading: false });
+      } catch (error: any) {
+        set({ loading: false, error: error.message || '停用用戶失敗' });
+        throw error;
+      }
+    },
+
+    unbanUser: async (id) => {
+      set({ loading: true, error: null });
+      try {
+        await adminUserApi.unbanUser(id);
+        
+        // 更新本地狀態
+        const currentUsers = get().users;
+        const updatedUsers = currentUsers.map(user =>
+          user.id === id 
+            ? { 
+                ...user, 
+                banned_until: null,
+                is_banned: false 
+              }
+            : user
+        );
+        
+        set({ users: updatedUsers, loading: false });
+      } catch (error: any) {
+        set({ loading: false, error: error.message || '恢復用戶失敗' });
         throw error;
       }
     },

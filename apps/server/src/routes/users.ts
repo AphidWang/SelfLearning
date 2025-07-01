@@ -120,13 +120,40 @@ router.put('/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-// 刪除用戶
+// 刪除用戶（軟刪除）
 router.delete('/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
     await userService.deleteUser(req.params.id);
-    res.json({ message: '用戶已刪除' });
+    res.json({ message: '用戶已刪除（軟刪除）' });
   } catch (error: any) {
     res.status(500).json({ message: error.message || '刪除用戶失敗' });
+  }
+});
+
+// 停用用戶
+router.put('/:id/ban', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const { banUntil } = req.body; // 可選：停用到某個時間點
+    
+    const banDate = banUntil ? new Date(banUntil) : undefined;
+    await userService.banUser(userId, banDate);
+    
+    res.json({ 
+      message: banDate ? `用戶已停用至 ${banDate.toISOString()}` : '用戶已永久停用' 
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || '停用用戶失敗' });
+  }
+});
+
+// 恢復用戶
+router.put('/:id/unban', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    await userService.unbanUser(req.params.id);
+    res.json({ message: '用戶已恢復' });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || '恢復用戶失敗' });
   }
 });
 

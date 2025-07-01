@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { UserProvider } from './context/UserContext.tsx';
 import { AuthProvider, ProtectedRoute } from './context/AuthContext';
 import Login from './pages/Login';
-import StudentDashboard from './pages/student/StudentDashboard';
 import MentorDashboard from './pages/mentor/MentorDashboard';
 import StudentSchedule from './pages/student/StudentSchedule';
 import StudentTasks from './pages/student/StudentTasks';
@@ -44,7 +43,7 @@ function App() {
             <Route path="/preview/lottie" element={<LottiePreview />} />
             
             {/* Student Routes */}
-            <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/student" element={<TaskWallPage />} />
             <Route path="/student/task-wall" element={<TaskWallPage />} />
             <Route path="/student/schedule" element={<StudentSchedule />} />
             <Route path="/student/tasks" element={<StudentTasks />} />
