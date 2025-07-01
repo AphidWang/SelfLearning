@@ -187,7 +187,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   const confirmViewHistory = () => {
     setShowHistoryConfirm(false);
     onClose();
-    navigate('/journal');
+    navigate('/student/journal');
   };
 
   const selectedMoodOption = MOOD_OPTIONS.find(mood => mood.type === selectedMood);

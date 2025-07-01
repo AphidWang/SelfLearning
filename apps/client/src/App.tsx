@@ -49,7 +49,6 @@ function App() {
             <Route path="/student/planning/goal/:goalId" element={<GoalMindMapPage />} />
             <Route path="/student/planning/topic/:topicId" element={<TopicMindMapPage />} />
             <Route path="/student/journal" element={<StudentJournal />} />
-            <Route path="/journal" element={<StudentJournal />} />
             <Route path="/student/goals" element={<StudentGoals />} />
             <Route path="/student/learning-map" element={<StudentLearningMap />} />
             <Route path="/student/subject/:subjectId" element={<SubjectPage />} />

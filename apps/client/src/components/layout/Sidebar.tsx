@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
           { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
           { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-          { name: '日誌', path: '/journal', icon: <PenTool size={20} /> },
+          { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
         ],
         viewType: 'student'
       };
@@ -93,7 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
         { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
         { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
         { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-        { name: '日誌', path: '/journal', icon: <PenTool size={20} /> },
+        { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
       ],
       viewType: 'student'
     };
