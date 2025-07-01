@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider } from './context/UserContext.tsx';
+import { AuthProvider, ProtectedRoute } from './context/AuthContext';
 import Login from './pages/Login';
 import StudentDashboard from './pages/student/StudentDashboard';
 import MentorDashboard from './pages/mentor/MentorDashboard';
@@ -24,15 +25,17 @@ import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
 import { UserAdminPage } from './pages/admin/UserAdminPage';
 import { AuthCallback } from './pages/AuthCallback.tsx';
+
 // import { initGA } from './utils/analytics';
 
 // initGA();
 
 function App() {
   return (
-    <CurriculumProvider>
-      <UserProvider>
-        <Router>
+    <AuthProvider>
+      <CurriculumProvider>
+        <UserProvider>
+          <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
@@ -64,13 +67,16 @@ function App() {
             {/* Admin Routes */}
             <Route path="/admin/users" element={<UserAdminPage />} />
             
+
+            
             {/* Default and Not Found Routes */}
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </Router>
-      </UserProvider>
-    </CurriculumProvider>
+          </Router>
+        </UserProvider>
+      </CurriculumProvider>
+    </AuthProvider>
   );
 }
 
