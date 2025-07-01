@@ -84,7 +84,13 @@ class TaskRecordStore {
         }
       }
 
-      // 2. 建立記錄
+      // 2. 獲取當前用戶 ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('用戶未登入');
+      }
+
+      // 3. 建立記錄
       const { data: record, error } = await supabase
         .from('task_records')
         .insert({
@@ -96,7 +102,8 @@ class TaskRecordStore {
           task_id: data.task_id,
           task_type: data.task_type,
           completion_time: data.completion_time,
-          tags: data.tags || []
+          tags: data.tags || [],
+          author_id: user.id  // 設定作者 ID 為當前用戶
         })
         .select('*')
         .single();
