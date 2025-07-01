@@ -22,7 +22,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Star, Pause } from 'lucide-react';
+import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Star, Pause, User as UserIcon } from 'lucide-react';
 import type { Task, TaskStatus } from '../../../types/goal';
 
 /**
@@ -41,9 +41,10 @@ interface TaskCardProps {
   task: TaskWithContext;
   onStatusUpdate: (newStatus: TaskStatus) => void;
   onOpenRecord?: (task: TaskWithContext) => void;
+  currentUserId?: string;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord, currentUserId }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [hasRecord, setHasRecord] = useState(false); // 追蹤是否已有記錄
 
@@ -88,6 +89,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
   const priorityDisplay = getPriorityDisplay(task.priority);
   const statusDisplay = getStatusDisplay(task.status);
   const StatusIcon = statusDisplay.icon;
+  
+  // 檢查是否需要顯示 owner tag
+  const shouldShowOwnerTag = task.owner && currentUserId && task.owner.id !== currentUserId;
 
   /**
    * 處理完成任務，檢查是否需要記錄
@@ -162,12 +166,27 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
 
             {/* 中間：任務標題 */}
             <div className="flex-1 flex flex-col justify-center">
-              <h3 
-                className="text-lg font-bold text-gray-800 leading-tight mb-2 line-clamp-2"
-                style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}
-              >
-                {task.title}
-              </h3>
+              <div className="flex items-start gap-2 mb-2">
+                <h3 
+                  className="text-lg font-bold text-gray-800 leading-tight line-clamp-2 flex-1"
+                  style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}
+                >
+                  {task.title}
+                </h3>
+                {shouldShowOwnerTag && (
+                  <div 
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium flex-shrink-0"
+                    style={{ 
+                      backgroundColor: task.owner!.color + '20',
+                      color: task.owner!.color,
+                      border: `1px solid ${task.owner!.color}40`
+                    }}
+                  >
+                    <UserIcon className="w-3 h-3" />
+                    {task.owner!.name}
+                  </div>
+                )}
+              </div>
               
               {/* 任務描述（如果有） */}
               {task.description && (

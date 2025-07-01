@@ -15,11 +15,14 @@
  * - 簡單直覺的操作流程
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mic, Save, Smile, Zap, Heart, BookOpen, History } from 'lucide-react';
+import { X, Mic, Save, Smile, Zap, Heart, BookOpen, History, CheckCircle, Play, Clock } from 'lucide-react';
 import { journalStore, type MoodType, type CreateJournalEntry } from '../../../store/journalStore';
+import { taskRecordStore, type TaskRecord } from '../../../store/taskRecordStore';
+import { useTopicStore } from '../../../store/topicStore';
 import { useNavigate } from 'react-router-dom';
+import { Task } from '../../../types/goal';
 
 type MotivationLevel = number; // 1-10
 
@@ -119,17 +122,107 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   onSave
 }) => {
   const navigate = useNavigate();
+  const { topics } = useTopicStore();
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
-  const [motivationLevel, setMotivationLevel] = useState<MotivationLevel>(6);
+  const [motivationLevel, setMotivationLevel] = useState<MotivationLevel | null>(null);
   const [journalContent, setJournalContent] = useState('');
   const [hasVoiceNote, setHasVoiceNote] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showHistoryConfirm, setShowHistoryConfirm] = useState(false);
+  const [todayTaskRecords, setTodayTaskRecords] = useState<TaskRecord[]>([]);
+  const [todayCompletedTasks, setTodayCompletedTasks] = useState<Task[]>([]);
+
+  // 獲取今天的任務資料
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchTodayTasks = async () => {
+      try {
+        // 設定今天的日期範圍
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // 獲取今天的任務記錄
+        const records = await taskRecordStore.getUserTaskRecords({
+          start_date: today.toISOString(),
+          end_date: tomorrow.toISOString()
+        });
+        setTodayTaskRecords(records);
+
+        // 從 topics 中獲取今天完成的任務
+        const completedTasks: Task[] = [];
+        topics.forEach(topic => {
+          topic.goals?.forEach(goal => {
+            goal.tasks?.forEach(task => {
+              if (task.status === 'done' && task.completedAt) {
+                const completedDate = new Date(task.completedAt);
+                completedDate.setHours(0, 0, 0, 0);
+                if (completedDate.getTime() === today.getTime()) {
+                  completedTasks.push({
+                    ...task,
+                    // 加入額外資訊方便顯示
+                    category: topic.title,
+                    assignedTo: goal.title
+                  } as Task);
+                }
+              }
+            });
+          });
+        });
+        setTodayCompletedTasks(completedTasks);
+      } catch (error) {
+        console.error('獲取今天任務資料失敗:', error);
+      }
+    };
+
+    fetchTodayTasks();
+  }, [isOpen, topics]);
+
+  // 合併今天有做過的任務（記錄 + 完成）
+  const todayActiveTasks = useMemo(() => {
+    const taskMap = new Map();
+    
+    // 加入有記錄的任務
+    todayTaskRecords.forEach(record => {
+      if (record.task_id) {
+        taskMap.set(record.task_id, {
+          id: record.task_id,
+          title: record.title,
+          type: 'recorded',
+          difficulty: record.difficulty,
+          time: record.created_at
+        });
+      }
+    });
+
+    // 加入完成的任務
+    todayCompletedTasks.forEach(task => {
+      taskMap.set(task.id, {
+        id: task.id,
+        title: task.title,
+        type: 'completed',
+        category: task.category,
+        assignedTo: task.assignedTo,
+        time: task.completedAt
+      });
+    });
+
+    return Array.from(taskMap.values()).sort((a, b) => 
+      new Date(b.time).getTime() - new Date(a.time).getTime()
+    );
+  }, [todayTaskRecords, todayCompletedTasks]);
 
   const handleSave = async () => {
     if (!selectedMood) {
       alert('請選擇今天的心情！');
+      return;
+    }
+
+    if (!motivationLevel) {
+      alert('請選擇今天的學習動力！');
       return;
     }
 
@@ -157,7 +250,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
       
       // 重置表單
       setSelectedMood(null);
-      setMotivationLevel(6);
+      setMotivationLevel(null);
       setJournalContent('');
       setHasVoiceNote(false);
       onClose();
@@ -327,6 +420,70 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
                 </div>
               </div>
 
+              {/* 今天做過的任務 */}
+              {todayActiveTasks.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <h3 className="text-lg font-semibold text-gray-800">今天做過的任務</h3>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {todayActiveTasks.map((task, index) => (
+                      <motion.div
+                        key={task.id || index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"
+                      >
+                        {task.type === 'completed' ? (
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        ) : (
+                          <Play className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                        )}
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-800 truncate">
+                              {task.title}
+                            </span>
+                            
+                            {task.type === 'completed' && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                                完成
+                              </span>
+                            )}
+                            
+                            {task.type === 'recorded' && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                記錄
+                              </span>
+                            )}
+                          </div>
+                          
+                          {(task.category || task.assignedTo) && (
+                            <div className="text-xs text-gray-500 truncate">
+                              {task.category && task.assignedTo 
+                                ? `${task.category} · ${task.assignedTo}`
+                                : task.category || task.assignedTo
+                              }
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="text-xs text-gray-400 flex-shrink-0">
+                          {new Date(task.time).toLocaleTimeString('zh-TW', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* 文字記錄 */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-3">今天學了什麼？</h3>
@@ -375,14 +532,14 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
               {/* 儲存按鈕 */}
               <motion.button
                 onClick={handleSave}
-                disabled={isSaving || !selectedMood}
+                disabled={isSaving || !selectedMood || !motivationLevel}
                 className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all ${
-                  !selectedMood || isSaving
+                  !selectedMood || !motivationLevel || isSaving
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg'
                 }`}
-                whileHover={!isSaving && selectedMood ? { scale: 1.02 } : {}}
-                whileTap={!isSaving && selectedMood ? { scale: 0.98 } : {}}
+                whileHover={!isSaving && selectedMood && motivationLevel ? { scale: 1.02 } : {}}
+                whileTap={!isSaving && selectedMood && motivationLevel ? { scale: 0.98 } : {}}
               >
                 {isSaving ? (
                   <div className="flex items-center justify-center gap-2">
