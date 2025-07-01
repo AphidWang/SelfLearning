@@ -25,14 +25,30 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
   const getNavigationItems = () => {
     const pathname = location.pathname;
     
+    // 獲取用戶的所有角色（支援新舊格式）
+    const userRoles = currentUser?.roles || (currentUser?.role ? [currentUser.role] : ['student']);
+    const hasRole = (role: string) => userRoles.includes(role as any);
+    
     if (pathname.startsWith('/student')) {
+      const studentItems = [
+        { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
+        { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
+        { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
+        { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
+      ];
+      
+      // 如果有導師身份，加入導師視圖
+      if (hasRole('mentor')) {
+        studentItems.push({ name: '導師視圖', path: '/mentor', icon: <Target size={20} /> });
+      }
+      
+      // 如果有管理員身份，加入用戶管理
+      if (hasRole('admin')) {
+        studentItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+      }
+      
       return {
-        items: [
-          { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
-          { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
-          { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-          { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
-        ],
+        items: studentItems,
         viewType: 'student'
       };
     }
@@ -49,14 +65,26 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     }
     
     if (pathname.startsWith('/mentor')) {
+      const mentorItems = [
+        { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
+        { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
+        { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
+        { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
+        { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
+      ];
+      
+      // 如果有家長或學生身份，加入學生視圖
+      if (hasRole('parent') || hasRole('student')) {
+        mentorItems.push({ name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> });
+      }
+      
+      // 如果有管理員身份，加入用戶管理
+      if (hasRole('admin')) {
+        mentorItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+      }
+      
       return {
-        items: [
-          { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
-          { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
-          { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
-          { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
-          { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
-        ],
+        items: mentorItems,
         viewType: 'mentor'
       };
     }
@@ -75,26 +103,50 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     }
     
     if (role === 'mentor') {
+      const mentorItems = [
+        { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
+        { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
+        { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
+        { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
+        { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
+      ];
+      
+      // 如果有家長或學生身份，加入學生視圖
+      if (hasRole('parent') || hasRole('student')) {
+        mentorItems.push({ name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> });
+      }
+      
+      // 如果有管理員身份，加入用戶管理
+      if (hasRole('admin')) {
+        mentorItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+      }
+      
       return {
-        items: [
-          { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
-          { name: '任務管理', path: '/mentor/tasks', icon: <ListTodo size={20} /> },
-          { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
-          { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
-          { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
-        ],
+        items: mentorItems,
         viewType: 'mentor'
       };
     }
     
     // 預設為學生視圖 (student, parent, admin 都可以看)
+    const studentItems = [
+      { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
+      { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
+      { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
+      { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
+    ];
+    
+    // 如果有導師身份，加入導師視圖
+    if (hasRole('mentor')) {
+      studentItems.push({ name: '導師視圖', path: '/mentor', icon: <Target size={20} /> });
+    }
+    
+    // 如果有管理員身份，加入用戶管理
+    if (hasRole('admin')) {
+      studentItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+    }
+    
     return {
-      items: [
-        { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
-        { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
-        { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-        { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
-      ],
+      items: studentItems,
       viewType: 'student'
     };
   };

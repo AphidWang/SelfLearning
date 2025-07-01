@@ -25,6 +25,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
+import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
 import { ArrowLeft, Settings, Filter, Star, BookMarked, X } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
@@ -78,6 +79,7 @@ const TaskWallPage: React.FC = () => {
   } = useTopicStore();
   
   const { users, getUsers } = useUserStore();
+  const { currentUser } = useUser();
 
   // 組件狀態
   const [config, setConfig] = useState<TaskWallConfig>({
@@ -533,6 +535,7 @@ const TaskWallPage: React.FC = () => {
               onTaskStatusUpdate={handleTaskStatusUpdate}
               onAddTaskToGoal={handleAddTaskToGoal}
               onOpenRecord={handleOpenRecord}
+              currentUserId={currentUser?.id}
             />
           )}
         </div>

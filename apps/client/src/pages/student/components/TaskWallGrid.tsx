@@ -74,6 +74,7 @@ interface TaskWallGridProps {
     taskTitle: string
   ) => void;
   onOpenRecord?: (task: TaskWithContext) => void;
+  currentUserId?: string;
 }
 
 export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
@@ -81,7 +82,8 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   config,
   onTaskStatusUpdate,
   onAddTaskToGoal,
-  onOpenRecord
+  onOpenRecord,
+  currentUserId
 }) => {
   /**
    * 計算網格欄數
@@ -180,6 +182,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
                   )
                 }
                 onOpenRecord={onOpenRecord}
+                currentUserId={currentUserId}
               />
             ) : (
               <GoalCard
