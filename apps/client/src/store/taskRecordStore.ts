@@ -20,7 +20,7 @@ export interface TaskRecord {
   updated_at: string;
   author_id: string;
   title: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: 1 | 2 | 3 | 4 | 5;
   message: string;
   files: FileInfo[];
   topic_id?: string;
@@ -40,7 +40,7 @@ export interface FileInfo {
 
 export interface CreateTaskRecordData {
   title: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: 1 | 2 | 3 | 4 | 5;
   message: string;
   files?: File[];
   topic_id?: string;
@@ -52,7 +52,7 @@ export interface CreateTaskRecordData {
 
 export interface TaskRecordFilters {
   topic_id?: string;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: 1 | 2 | 3 | 4 | 5;
   task_type?: string;
   start_date?: string;
   end_date?: string;
@@ -62,9 +62,11 @@ export interface TaskRecordFilters {
 export interface TaskRecordStats {
   total: number;
   by_difficulty: {
-    easy: number;
-    medium: number;
-    hard: number;
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+    5: number;
   };
   avg_completion_time?: number;
   recent_activity: number; // 最近 7 天的記錄數
@@ -308,9 +310,11 @@ class TaskRecordStore {
       const stats: TaskRecordStats = {
         total: records.length,
         by_difficulty: {
-          easy: records.filter(r => r.difficulty === 'easy').length,
-          medium: records.filter(r => r.difficulty === 'medium').length,
-          hard: records.filter(r => r.difficulty === 'hard').length,
+          1: records.filter(r => r.difficulty === 1).length,
+          2: records.filter(r => r.difficulty === 2).length,
+          3: records.filter(r => r.difficulty === 3).length,
+          4: records.filter(r => r.difficulty === 4).length,
+          5: records.filter(r => r.difficulty === 5).length,
         },
         recent_activity: 0
       };
