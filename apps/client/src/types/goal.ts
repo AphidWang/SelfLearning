@@ -67,9 +67,13 @@ export interface Goal {
   helpResolvedAt?: string; // 幫助解決時間
   replyMessage?: string; // 老師回覆訊息
   replyAt?: string; // 老師回覆時間
-  // 協作相關字段
-  owner?: User; // 主要負責人
-  collaborators?: User[]; // 協作人列表
+  // 協作相關字段 - 只存儲 ID
+  owner_id?: string; // 主要負責人 ID
+  collaborator_ids?: string[]; // 協作人 ID 列表
+  
+  // 前端計算字段 - 不存儲在資料庫，由前端從 userStore 動態組合
+  owner?: User; // 主要負責人（前端組合）
+  collaborators?: User[]; // 協作人列表（前端組合）
 }
 
 export interface Task {
@@ -92,9 +96,13 @@ export interface Task {
   helpResolvedAt?: string; // 幫助解決時間
   replyMessage?: string; // 老師回覆訊息
   replyAt?: string; // 老師回覆時間
-  // 協作相關字段
-  owner?: User; // 主要負責人
-  collaborators?: User[]; // 協作人列表
+  // 協作相關字段 - 只存儲 ID
+  owner_id?: string; // 主要負責人 ID
+  collaborator_ids?: string[]; // 協作人 ID 列表
+  
+  // 前端計算字段 - 不存儲在資料庫，由前端從 userStore 動態組合
+  owner?: User; // 主要負責人（前端組合）
+  collaborators?: User[]; // 協作人列表（前端組合）
 }
 
 export interface Bubble {

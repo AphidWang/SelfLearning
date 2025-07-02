@@ -308,37 +308,76 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         console.log('No users in store, fetching collaborator candidates...');
         try {
           await userState.getCollaboratorCandidates();
-          allUsers = useUserStore.getState().users;
+          allUsers = userState.users;
         } catch (error) {
-          console.warn('Failed to fetch collaborator candidates:', error);
-          // 如果獲取失敗，使用空陣列避免阻塞
+          console.error('Failed to fetch collaborator candidates:', error);
+          // 如果獲取失敗，使用空陣列
           allUsers = [];
         }
       }
-
+      
       console.log('All users from userStore:', allUsers);
 
-      // 組合完整的協作者資訊
-      const collaborators = data.topic_collaborators?.map(tc => {
+      // 將 topic_collaborators 轉換為 collaborators，並加入權限資訊
+      const collaborators = (data.topic_collaborators || []).map(tc => {
         const user = allUsers.find(u => u.id === tc.user_id);
-        if (!user) return null;
+        if (!user) {
+          console.warn(`User not found for collaborator: ${tc.user_id}`);
+          return null;
+        }
         return {
           ...user,
-          permission: tc.permission
+          permission: tc.permission as 'view' | 'edit'
         };
-      }).filter(Boolean) || [];
+      }).filter(Boolean) as (User & { permission: 'view' | 'edit' })[];
 
-      console.log('Final collaborators:', collaborators);
+      // 獲取主題擁有者
+      const owner = allUsers.find(u => u.id === data.owner_id);
+      
+      // **動態組合 Goal 和 Task 的用戶資料**
+      const processedGoals = (data.goals as Goal[]).map(goal => {
+        // 組合 Goal 的 owner 和 collaborators
+        const goalOwner = goal.owner_id ? allUsers.find(u => u.id === goal.owner_id) : undefined;
+        const goalCollaborators = goal.collaborator_ids ? 
+          goal.collaborator_ids.map(id => allUsers.find(u => u.id === id)).filter(Boolean) as User[] : 
+          [];
 
-      return {
+        // 處理 Goal 中的 tasks
+        const processedTasks = goal.tasks.map(task => {
+          const taskOwner = task.owner_id ? allUsers.find(u => u.id === task.owner_id) : undefined;
+          const taskCollaborators = task.collaborator_ids ? 
+            task.collaborator_ids.map(id => allUsers.find(u => u.id === id)).filter(Boolean) as User[] : 
+            [];
+
+          return {
+            ...task,
+            owner: taskOwner,
+            collaborators: taskCollaborators
+          };
+        });
+
+        return {
+          ...goal,
+          owner: goalOwner,
+          collaborators: goalCollaborators,
+          tasks: processedTasks
+        };
+      });
+
+      const finalCollaborators = collaborators;
+      console.log('Final collaborators:', finalCollaborators);
+
+      const topic: Topic = {
         ...data,
-        collaborators: collaborators,
-        topic_collaborators: collaborators  // 保留這個以維持向後兼容
+        goals: processedGoals,
+        owner,
+        collaborators: finalCollaborators
       };
+
+      return topic;
     } catch (error) {
-      console.error('Failed to get topic:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to get topic' });
-      return null;
+      console.error('Error fetching topic:', error);
+      throw error;
     }
   },
 
@@ -1447,30 +1486,36 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         throw new Error('只能指派主題協作者為目標負責人');
       }
 
-      const updatedGoals = topic.goals.map(goal =>
-        goal.id === goalId ? { ...goal, owner } : goal
+      // 更新 goals 結構，只存儲 owner_id
+      const updatedGoals = topic.goals.map(goal => 
+        goal.id === goalId 
+          ? { ...goal, owner_id: owner.id }
+          : goal
       );
 
+      // 更新資料庫
       const { error } = await supabase
         .from('topics')
-        .update({ goals: updatedGoals })
+        .update({ 
+          goals: updatedGoals,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', topicId);
 
       if (error) throw error;
 
       // 更新本地狀態
-      set(state => ({
-        topics: state.topics.map(t =>
-          t.id === topicId
+      set({
+        topics: get().topics.map(t => 
+          t.id === topicId 
             ? { ...t, goals: updatedGoals }
             : t
         )
-      }));
+      });
 
       return true;
     } catch (error) {
-      console.error('Failed to set goal owner:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to set goal owner' });
+      console.error('Error setting goal owner:', error);
       return false;
     }
   },
@@ -1489,37 +1534,43 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         throw new Error('只能指派主題協作者為任務負責人');
       }
 
-      const updatedGoals = topic.goals.map(goal =>
-        goal.id === goalId
+      // 更新 goals 結構，只存儲 owner_id
+      const updatedGoals = topic.goals.map(goal => 
+        goal.id === goalId 
           ? {
               ...goal,
               tasks: goal.tasks.map(task =>
-                task.id === taskId ? { ...task, owner } : task
+                task.id === taskId 
+                  ? { ...task, owner_id: owner.id }
+                  : task
               )
             }
           : goal
       );
 
+      // 更新資料庫
       const { error } = await supabase
         .from('topics')
-        .update({ goals: updatedGoals })
+        .update({ 
+          goals: updatedGoals,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', topicId);
 
       if (error) throw error;
 
       // 更新本地狀態
-      set(state => ({
-        topics: state.topics.map(t =>
-          t.id === topicId
+      set({
+        topics: get().topics.map(t => 
+          t.id === topicId 
             ? { ...t, goals: updatedGoals }
             : t
         )
-      }));
+      });
 
       return true;
     } catch (error) {
-      console.error('Failed to set task owner:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to set task owner' });
+      console.error('Error setting task owner:', error);
       return false;
     }
   },
@@ -1529,45 +1580,52 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
-      // 檢查協作者是否是主題的協作者或擁有者
+      // 檢查 collaborator 是否是主題的協作者或擁有者
       const invitedCollaborators = await get().getTopicInvitedCollaborators(topicId);
-      const isValidCollaborator = invitedCollaborators.some(invited => invited.id === collaborator.id) || 
+      const isValidCollaborator = invitedCollaborators.some(c => c.id === collaborator.id) || 
                                  topic.owner_id === collaborator.id;
       
       if (!isValidCollaborator) {
         throw new Error('只能指派主題協作者為目標協作者');
       }
 
-      const updatedGoals = topic.goals.map(goal =>
-        goal.id === goalId ? { 
-          ...goal, 
-          collaborators: [...(goal.collaborators || []), collaborator].filter((user, index, self) => 
-            // 去重
-            index === self.findIndex((u) => u.id === user.id)
-          ) 
-        } : goal
-      );
+      // 更新 goals 結構，添加到 collaborator_ids
+      const updatedGoals = topic.goals.map(goal => {
+        if (goal.id === goalId) {
+          const currentCollaboratorIds = goal.collaborator_ids || [];
+          if (!currentCollaboratorIds.includes(collaborator.id)) {
+            return { 
+              ...goal, 
+              collaborator_ids: [...currentCollaboratorIds, collaborator.id]
+            };
+          }
+        }
+        return goal;
+      });
 
+      // 更新資料庫
       const { error } = await supabase
         .from('topics')
-        .update({ goals: updatedGoals })
+        .update({ 
+          goals: updatedGoals,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', topicId);
 
       if (error) throw error;
 
       // 更新本地狀態
-      set(state => ({
-        topics: state.topics.map(t =>
-          t.id === topicId
+      set({
+        topics: get().topics.map(t => 
+          t.id === topicId 
             ? { ...t, goals: updatedGoals }
             : t
         )
-      }));
+      });
 
       return true;
     } catch (error) {
-      console.error('Failed to add goal collaborator:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to add goal collaborator' });
+      console.error('Error adding goal collaborator:', error);
       return false;
     }
   },
@@ -1577,30 +1635,41 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
-      const updatedGoals = topic.goals.map(goal =>
-        goal.id === goalId ? { ...goal, collaborators: (goal.collaborators || []).filter(c => c.id !== collaboratorId) } : goal
-      );
+      // 更新 goals 結構，從 collaborator_ids 移除
+      const updatedGoals = topic.goals.map(goal => {
+        if (goal.id === goalId) {
+          const currentCollaboratorIds = goal.collaborator_ids || [];
+          return { 
+            ...goal, 
+            collaborator_ids: currentCollaboratorIds.filter(id => id !== collaboratorId)
+          };
+        }
+        return goal;
+      });
 
+      // 更新資料庫
       const { error } = await supabase
         .from('topics')
-        .update({ goals: updatedGoals })
+        .update({ 
+          goals: updatedGoals,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', topicId);
 
       if (error) throw error;
 
       // 更新本地狀態
-      set(state => ({
-        topics: state.topics.map(t =>
-          t.id === topicId
+      set({
+        topics: get().topics.map(t => 
+          t.id === topicId 
             ? { ...t, goals: updatedGoals }
             : t
         )
-      }));
+      });
 
       return true;
     } catch (error) {
-      console.error('Failed to remove goal collaborator:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to remove goal collaborator' });
+      console.error('Error removing goal collaborator:', error);
       return false;
     }
   },
@@ -1610,46 +1679,60 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
-      // 檢查協作者是否是主題的協作者或擁有者
+      // 檢查 collaborator 是否是主題的協作者或擁有者
       const invitedCollaborators = await get().getTopicInvitedCollaborators(topicId);
-      const isValidCollaborator = invitedCollaborators.some(invited => invited.id === collaborator.id) || 
+      const isValidCollaborator = invitedCollaborators.some(c => c.id === collaborator.id) || 
                                  topic.owner_id === collaborator.id;
       
       if (!isValidCollaborator) {
         throw new Error('只能指派主題協作者為任務協作者');
       }
 
-      const updatedGoals = topic.goals.map(goal =>
-        goal.id === goalId
-          ? {
-              ...goal,
-              tasks: goal.tasks.map(task =>
-                task.id === taskId ? { ...task, collaborators: [...(task.collaborators || []), collaborator] } : task
-              )
-            }
-          : goal
-      );
+      // 更新 goals 結構，添加到 task 的 collaborator_ids
+      const updatedGoals = topic.goals.map(goal => {
+        if (goal.id === goalId) {
+          return {
+            ...goal,
+            tasks: goal.tasks.map(task => {
+              if (task.id === taskId) {
+                const currentCollaboratorIds = task.collaborator_ids || [];
+                if (!currentCollaboratorIds.includes(collaborator.id)) {
+                  return { 
+                    ...task, 
+                    collaborator_ids: [...currentCollaboratorIds, collaborator.id]
+                  };
+                }
+              }
+              return task;
+            })
+          };
+        }
+        return goal;
+      });
 
+      // 更新資料庫
       const { error } = await supabase
         .from('topics')
-        .update({ goals: updatedGoals })
+        .update({ 
+          goals: updatedGoals,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', topicId);
 
       if (error) throw error;
 
       // 更新本地狀態
-      set(state => ({
-        topics: state.topics.map(t =>
-          t.id === topicId
+      set({
+        topics: get().topics.map(t => 
+          t.id === topicId 
             ? { ...t, goals: updatedGoals }
             : t
         )
-      }));
+      });
 
       return true;
     } catch (error) {
-      console.error('Failed to add task collaborator:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to add task collaborator' });
+      console.error('Error adding task collaborator:', error);
       return false;
     }
   },
@@ -1659,27 +1742,49 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('Topic not found');
 
-      const updatedGoals = topic.goals.map(goal =>
-        goal.id === goalId
-          ? {
-              ...goal,
-              tasks: goal.tasks.map(task =>
-                task.id === taskId ? { ...task, collaborators: (task.collaborators || []).filter(c => c.id !== collaboratorId) } : task
-              )
-            }
-          : goal
-      );
+      // 更新 goals 結構，從 task 的 collaborator_ids 移除
+      const updatedGoals = topic.goals.map(goal => {
+        if (goal.id === goalId) {
+          return {
+            ...goal,
+            tasks: goal.tasks.map(task => {
+              if (task.id === taskId) {
+                const currentCollaboratorIds = task.collaborator_ids || [];
+                return { 
+                  ...task, 
+                  collaborator_ids: currentCollaboratorIds.filter(id => id !== collaboratorId)
+                };
+              }
+              return task;
+            })
+          };
+        }
+        return goal;
+      });
 
+      // 更新資料庫
       const { error } = await supabase
         .from('topics')
-        .update({ goals: updatedGoals })
+        .update({ 
+          goals: updatedGoals,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', topicId);
 
       if (error) throw error;
+
+      // 更新本地狀態
+      set({
+        topics: get().topics.map(t => 
+          t.id === topicId 
+            ? { ...t, goals: updatedGoals }
+            : t
+        )
+      });
+
       return true;
     } catch (error) {
-      console.error('Failed to remove task collaborator:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to remove task collaborator' });
+      console.error('Error removing task collaborator:', error);
       return false;
     }
   },
