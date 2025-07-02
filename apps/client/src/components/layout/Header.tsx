@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { UserProfileDialog } from '../user-manager';
 
@@ -32,12 +32,6 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
           onClick={toggleDarkMode}
         >
           {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
-        <button 
-          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
-        >
-          <Bell size={20} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
         </button>
         
         <div className="hidden sm:flex items-center">
