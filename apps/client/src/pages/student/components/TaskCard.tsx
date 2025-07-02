@@ -46,13 +46,6 @@ interface TaskCardProps {
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord, currentUserId }) => {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [hasRecord, setHasRecord] = useState(false); // 追蹤是否已有記錄
-
-  // 初始化時檢查是否已有記錄
-  useEffect(() => {
-    const existingRecords = JSON.parse(localStorage.getItem('taskRecords') || '{}');
-    setHasRecord(!!existingRecords[task.id]);
-  }, [task.id]);
 
   /**
    * 獲取優先權顏色和圖示
@@ -97,15 +90,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
    * 處理完成任務，檢查是否需要記錄
    */
   const handleCompleteTask = () => {
-    if (!hasRecord) {
-      // 檢查 localStorage 是否有記錄
-      const existingRecords = JSON.parse(localStorage.getItem('taskRecords') || '{}');
-      if (!existingRecords[task.id]) {
-        alert('請先記錄一下學習心得再完成任務喔！ 😊');
-        onOpenRecord?.(task);
-        return;
-      }
-    }
     onStatusUpdate('done');
   };
 

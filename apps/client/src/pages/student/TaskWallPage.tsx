@@ -218,14 +218,11 @@ const TaskWallPage: React.FC = () => {
           });
           setShowRecordDialog(true);
         }
-        return;
       }
-
-      // 更新成功後會自動觸發 topics 重新載入，完成收藏會自動更新
     } catch (error) {
       console.error('更新任務狀態失敗:', error);
     }
-  }, [markTaskCompleted, markTaskInProgress, markTaskTodo]);
+  }, [markTaskCompleted, markTaskInProgress, markTaskTodo, topics]);
 
   /**
    * 處理新增任務到目標
@@ -290,8 +287,6 @@ const TaskWallPage: React.FC = () => {
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('taskRecords', JSON.stringify(existingRecords));
-      
-      alert('學習記錄保存成功！繼續加油！ 🎉');
     } catch (error) {
       console.error('保存記錄失敗:', error);
       throw error;
