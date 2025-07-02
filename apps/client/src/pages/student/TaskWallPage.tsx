@@ -5,7 +5,7 @@
  * - 呈現溫暖色調的任務卡牆，類似手作筆記本風格
  * - 顯示待完成任務和進行中任務，以及需要建立任務的目標
  * - 支援卡片翻轉互動和完成動畫
- * - 已完成的任務會移動到右下角收藏堆
+ * - 已完成的任務以星星計數器顯示，帶有動畫效果
  * 
  * 🏗️ 架構設計：
  * - 使用 topicStore 獲取最新的主題/目標/任務資料 [[memory:1599136828095381917]]
@@ -19,6 +19,7 @@
  * - 手作感：輕微紙質紋理、柔軟陰影
  * - 親切字體：手寫風格設計
  * - 卡片造型：便條紙風格，圓角無粗邊框
+ * - 星星計數器：完成任務時的動畫反饋
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -30,7 +31,6 @@ import { subjects } from '../../styles/tokens';
 import { ArrowLeft, Settings, Filter, Star, BookMarked, X } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
-import { CompletedCardsStack } from './components/CompletedCardsStack';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
 import { TaskRecordDialog } from './components/TaskRecordDialog';
 import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
@@ -41,7 +41,6 @@ import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
 interface TaskWallConfig {
   maxVisibleCards: number; // 已停用 - 現在顯示所有卡片
   gridColumns: 'auto' | 2 | 3; // 網格欄數
-  showCompletedStack: boolean; // 是否顯示完成堆疊
   priorityFilter: 'all' | 'high' | 'medium' | 'low'; // 優先權過濾
 }
 
@@ -67,6 +66,45 @@ interface GoalWithContext extends Goal {
   subjectStyle: any;
 }
 
+/**
+ * 星星計數器組件
+ */
+interface StarCounterProps {
+  count: number;
+  isAnimating?: boolean;
+}
+
+const StarCounter: React.FC<StarCounterProps> = ({ count, isAnimating = false }) => {
+  return (
+    <motion.div 
+      className="flex items-center gap-2"
+      animate={isAnimating ? { scale: [1, 1.2, 1] } : {}}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+    >
+      <motion.div
+        animate={isAnimating ? { 
+          rotate: [0, 360],
+          scale: [1, 1.3, 1]
+        } : {}}
+        transition={{ duration: 0.8, ease: "easeInOut" }}
+      >
+        <Star 
+          className="w-6 h-6 fill-yellow-400 text-yellow-400 drop-shadow-sm" 
+        />
+      </motion.div>
+      <motion.span 
+        className="text-lg font-bold text-yellow-600"
+        key={count} // 重新渲染動畫
+        initial={isAnimating ? { scale: 1.5, color: "#F59E0B" } : false}
+        animate={{ scale: 1, color: "#D97706" }}
+        transition={{ duration: 0.3 }}
+      >
+        {count}
+      </motion.span>
+    </motion.div>
+  );
+};
+
 const TaskWallPage: React.FC = () => {
   // Store hooks
   const { 
@@ -88,7 +126,6 @@ const TaskWallPage: React.FC = () => {
   const [config, setConfig] = useState<TaskWallConfig>({
     maxVisibleCards: 12,
     gridColumns: 'auto',
-    showCompletedStack: true,
     priorityFilter: 'all'
   });
   
@@ -96,7 +133,8 @@ const TaskWallPage: React.FC = () => {
   const [showJournalDialog, setShowJournalDialog] = useState(false);
   const [showRecordDialog, setShowRecordDialog] = useState(false);
   const [selectedTaskForRecord, setSelectedTaskForRecord] = useState<TaskWithContext | null>(null);
-  const [completedTasks, setCompletedTasks] = useState<TaskWithContext[]>([]);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [isStarAnimating, setIsStarAnimating] = useState(false);
 
   // 初始化資料載入
   useEffect(() => {
@@ -164,7 +202,7 @@ const TaskWallPage: React.FC = () => {
     });
 
     // 最多保留最近的 10 個已完成任務
-    setCompletedTasks(completedTasksFromDB.slice(0, 10));
+    setCompletedCount(completedTasksFromDB.length);
   }, [topics]);
 
   /**
@@ -184,6 +222,12 @@ const TaskWallPage: React.FC = () => {
       switch (newStatus) {
         case 'done':
           result = await markTaskCompleted(topicId, goalId, taskId, true); // 要求學習記錄
+          
+          // 如果任務成功完成，觸發星星動畫
+          if (result) {
+            setIsStarAnimating(true);
+            setTimeout(() => setIsStarAnimating(false), 1000);
+          }
           break;
         case 'in_progress':
           result = await markTaskInProgress(topicId, goalId, taskId);
@@ -243,24 +287,6 @@ const TaskWallPage: React.FC = () => {
       console.error('新增任務失敗:', error);
     }
   }, [addTask]);
-
-  /**
-   * 處理任務恢復到進行中
-   */
-  const handleRestoreTask = useCallback(async (
-    taskId: string, 
-    goalId: string, 
-    topicId: string
-  ) => {
-    try {
-      // 使用專門的狀態切換函數
-      await markTaskInProgress(topicId, goalId, taskId);
-
-      // 更新成功後會自動觸發 topics 重新載入，完成收藏會自動更新
-    } catch (error) {
-      console.error('恢復任務失敗:', error);
-    }
-  }, [markTaskInProgress]);
 
   /**
    * 處理打開記錄對話框
@@ -464,13 +490,15 @@ const TaskWallPage: React.FC = () => {
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div>
-                  <h1 className="text-3xl font-bold text-amber-900 font-hand">
-                    📝 我的任務牆
-                  </h1>
-                  <p className="text-amber-700 mt-1">
+                  <div className="flex items-center gap-4 mb-1">
+                    <h1 className="text-3xl font-bold text-amber-900 font-hand">
+                      📝 我的任務牆
+                    </h1>
+                    <StarCounter count={completedCount} isAnimating={isStarAnimating} />
+                  </div>
+                  <p className="text-amber-700">
                     {allCards.length} 張卡片 • 
-                    {activeTasks.filter(task => task.status === 'in_progress').length} 個進行中 • 
-                    {completedTasks.length} 個已完成
+                    {activeTasks.filter(task => task.status === 'in_progress').length} 個進行中
                   </p>
                   {/* 錯誤消息顯示 */}
                   {error && (
@@ -549,26 +577,6 @@ const TaskWallPage: React.FC = () => {
                     <option value="low">低優先權</option>
                   </select>
                 </div>
-
-                {/* 完成堆疊開關 */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">顯示完成堆疊</span>
-                  <button
-                    onClick={() => setConfig(prev => ({ 
-                      ...prev, 
-                      showCompletedStack: !prev.showCompletedStack 
-                    }))}
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      config.showCompletedStack 
-                        ? 'bg-amber-500' 
-                        : 'bg-gray-300'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                      config.showCompletedStack ? 'translate-x-6' : 'translate-x-0.5'
-                    }`} />
-                  </button>
-                </div>
               </div>
             </motion.div>
           )}
@@ -595,15 +603,6 @@ const TaskWallPage: React.FC = () => {
             />
           )}
         </div>
-
-        {/* 完成卡片堆疊 */}
-        {config.showCompletedStack && completedTasks.length > 0 && (
-          <CompletedCardsStack 
-            completedTasks={completedTasks}
-            onClearStack={() => setCompletedTasks([])}
-            onRestoreTask={handleRestoreTask}
-          />
-        )}
 
         {/* 日誌記錄 Dialog */}
         <DailyJournalDialog
