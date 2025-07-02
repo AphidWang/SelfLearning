@@ -34,12 +34,14 @@ interface TopicTemplateBrowserProps {
   isOpen: boolean;
   onClose: () => void;
   onTemplateSelected?: (templateId: string) => void;
+  onCreateBlankTopic?: () => void;
 }
 
 export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
   isOpen,
   onClose,
-  onTemplateSelected
+  onTemplateSelected,
+  onCreateBlankTopic
 }) => {
   const {
     templates,
@@ -209,6 +211,32 @@ export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
             <div className="h-full overflow-y-auto p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <AnimatePresence>
+                  {/* 建立空白主題卡片 */}
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-dashed border-indigo-300 rounded-xl overflow-hidden hover:shadow-md hover:border-indigo-400 transition-all group cursor-pointer"
+                    onClick={onCreateBlankTopic}
+                  >
+                    <div className="p-6 text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <BookOpen className="w-8 h-8 text-indigo-600" />
+                      </div>
+                      <h3 className="font-bold text-indigo-900 text-lg mb-2">
+                        建立空白主題
+                      </h3>
+                      <p className="text-indigo-700 text-sm mb-4">
+                        從頭開始建立你的專屬學習主題
+                      </p>
+                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium group-hover:bg-indigo-700 transition-colors">
+                        <ArrowRight className="w-4 h-4" />
+                        開始建立
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* 現有模板卡片 */}
                   {filteredAndSortedTemplates.map((template) => (
                     <TemplateCard
                       key={template.id}

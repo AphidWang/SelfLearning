@@ -3,6 +3,7 @@ import { TopicDashboard } from '../../components/learning-map/TopicDashboard';
 import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
 import { TaskDetailDialog } from '../../components/learning-map/TaskDetailDialog';
 import { TopicDetails } from '../../components/learning-map/TopicDetails';
+import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
 import { useTopicStore } from '../../store/topicStore';
 import PageLayout from '../../components/layout/PageLayout';
 import { Topic, Task, TopicStatus, TopicType } from '../../types/goal';
@@ -23,6 +24,9 @@ export const StudentLearningMap: React.FC = () => {
   const [showTopicCards, setShowTopicCards] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [openedFromDashboard, setOpenedFromDashboard] = useState(false);
+  
+  // Template 相關狀態
+  const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
   
   // Review 相關狀態
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
@@ -74,6 +78,20 @@ export const StudentLearningMap: React.FC = () => {
   };
 
   const handleAddTopic = async () => {
+    // 顯示模板選擇器，而不是直接建立空白主題
+    setShowTopicCards(false);
+    setShowTemplateBrowser(true);
+  };
+
+  const handleTemplateSelected = async (templateId: string) => {
+    // 模板選擇完成後的回調
+    setShowTemplateBrowser(false);
+    // 刷新主題列表以獲取新建立的主題
+    await fetchTopics();
+  };
+
+  const handleCreateBlankTopic = async () => {
+    // 建立空白主題的函數
     const newTopic = {
       title: '新主題',
       description: '請輸入主題描述',
@@ -89,7 +107,7 @@ export const StudentLearningMap: React.FC = () => {
     };
     const addedTopic = await addTopic(newTopic);
     if (addedTopic) {
-      setShowTopicCards(false);
+      setShowTemplateBrowser(false);
       setShowTopicReviewId(addedTopic.id);
     }
   };
@@ -330,6 +348,14 @@ export const StudentLearningMap: React.FC = () => {
           </DraggableDialog>
         </>
       )}
+
+             {/* Template Browser */}
+       <TopicTemplateBrowser
+         isOpen={showTemplateBrowser}
+         onClose={() => setShowTemplateBrowser(false)}
+         onTemplateSelected={handleTemplateSelected}
+         onCreateBlankTopic={handleCreateBlankTopic}
+       />
 
       <div className="h-full p-6">
         <div className="h-[calc(100vh-8rem)]" ref={mapRef}>
