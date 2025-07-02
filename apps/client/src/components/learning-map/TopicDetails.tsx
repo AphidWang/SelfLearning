@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Trash2, Plus, Pencil, Brain, Target, Sparkles, PartyPopper, X, GripVertical, List, Heart, Star } from 'lucide-react';
 import type { Goal, Task } from '../../types/goal';
 import type { Topic } from '../../types/goal';
-import { useTopicStore } from '../../store/topicStore';
+import { useTopicStore, type MarkTaskResult } from '../../store/topicStore';
 import { subjectColors } from '../../styles/tokens';
 import { goalTemplates } from '../../constants/goalTemplates';
 import { SUBJECTS } from '../../constants/subjects';
 import { subjects } from '../../styles/tokens';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import toast from 'react-hot-toast';
 
 interface TopicDetailsProps {
   topic: Topic;
@@ -196,21 +197,26 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
 
   const handleTaskStatusChange = async (goalId: string, task: Task) => {
     try {
-      let success: Task | null;
+      let result: MarkTaskResult;
       
       if (task.status === 'done') {
-        success = await markTaskInProgress(topic.id, goalId, task.id);
+        result = await markTaskInProgress(topic.id, goalId, task.id);
       } else {
-        success = await markTaskCompleted(topic.id, goalId, task.id);
+        result = await markTaskCompleted(topic.id, goalId, task.id);
       }
       
-      if (success) {
+      if (result.success) {
         await onUpdate?.();
       } else {
-        // 錯誤信息已在 store 中設置
+        if (result.requiresRecord) {
+          toast.error('請先記錄學習心得再標記完成！');
+        } else {
+          toast.error(result.message);
+        }
       }
     } catch (error) {
       console.error('更新任務狀態失敗:', error);
+      toast.error('系統錯誤，請稍後再試');
     }
   };
 

@@ -33,6 +33,11 @@ import { supabase, authService } from '../services/supabase';
 import { useUserStore } from './userStore';
 import { taskRecordStore } from './taskRecordStore';
 
+// Result 型別定義
+export type MarkTaskResult = 
+  | { success: true; task: Task }
+  | { success: false; message: string; requiresRecord?: boolean };
+
 // 簡化的狀態管理類型
 
 interface TopicStore {
@@ -106,9 +111,9 @@ interface TopicStore {
   getAvailableUsers: () => User[];
 
   // 專門的狀態切換函數（推薦使用）
-  markTaskCompleted: (topicId: string, goalId: string, taskId: string, requireRecord?: boolean) => Promise<Task | null>;
-  markTaskInProgress: (topicId: string, goalId: string, taskId: string) => Promise<Task | null>;
-  markTaskTodo: (topicId: string, goalId: string, taskId: string) => Promise<Task | null>;
+  markTaskCompleted: (topicId: string, goalId: string, taskId: string, requireRecord?: boolean) => Promise<MarkTaskResult>;
+  markTaskInProgress: (topicId: string, goalId: string, taskId: string) => Promise<MarkTaskResult>;
+  markTaskTodo: (topicId: string, goalId: string, taskId: string) => Promise<MarkTaskResult>;
   
   // 學習記錄檢查
   hasTaskRecord: (taskId: string) => Promise<boolean>;
@@ -1774,51 +1779,78 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   // 專門的狀態切換函數（推薦使用）
-  markTaskCompleted: async (topicId, goalId, taskId, requireRecord = true) => {
+  markTaskCompleted: async (topicId, goalId, taskId, requireRecord = true): Promise<MarkTaskResult> => {
     try {
       // 如果需要檢查學習記錄
       if (requireRecord) {
         const hasRecord = await get().hasTaskRecord(taskId);
         if (!hasRecord) {
-          set({ error: '請先記錄學習心得再標記完成！完成任務需要反思學習過程。' });
-          return null;
+          return { 
+            success: false, 
+            message: '請先記錄學習心得再標記完成！完成任務需要反思學習過程。',
+            requiresRecord: true
+          };
         }
       }
 
       // 執行狀態切換
-      return await get()._updateTask(topicId, goalId, taskId, { 
+      const updatedTask = await get()._updateTask(topicId, goalId, taskId, { 
         status: 'done',
         completedAt: new Date().toISOString()
       });
+
+      if (!updatedTask) {
+        return { success: false, message: '更新任務失敗' };
+      }
+
+      return { success: true, task: updatedTask };
     } catch (error) {
       console.error('Failed to mark task completed:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to mark task completed' });
-      return null;
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : '標記任務完成失敗' 
+      };
     }
   },
 
-  markTaskInProgress: async (topicId, goalId, taskId) => {
+  markTaskInProgress: async (topicId, goalId, taskId): Promise<MarkTaskResult> => {
     try {
-      return await get()._updateTask(topicId, goalId, taskId, { 
+      const updatedTask = await get()._updateTask(topicId, goalId, taskId, { 
         status: 'in_progress'
       });
+
+      if (!updatedTask) {
+        return { success: false, message: '更新任務失敗' };
+      }
+
+      return { success: true, task: updatedTask };
     } catch (error) {
       console.error('Failed to mark task in progress:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to mark task in progress' });
-      return null;
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : '標記任務進行中失敗' 
+      };
     }
   },
 
-  markTaskTodo: async (topicId, goalId, taskId) => {
+  markTaskTodo: async (topicId, goalId, taskId): Promise<MarkTaskResult> => {
     try {
-      return await get()._updateTask(topicId, goalId, taskId, { 
+      const updatedTask = await get()._updateTask(topicId, goalId, taskId, { 
         status: 'todo',
         completedAt: undefined
       });
+
+      if (!updatedTask) {
+        return { success: false, message: '更新任務失敗' };
+      }
+
+      return { success: true, task: updatedTask };
     } catch (error) {
       console.error('Failed to mark task todo:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to mark task todo' });
-      return null;
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : '標記任務待處理失敗' 
+      };
     }
   },
 

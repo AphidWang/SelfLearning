@@ -6651,7 +6651,7 @@ __metadata:
     react-dom: "npm:18"
     react-firebase-hooks: "npm:^5.1.1"
     react-hook-form: "npm:^7.51.0"
-    react-hot-toast: "npm:^2.4.1"
+    react-hot-toast: "npm:^2.5.2"
     react-markdown: "npm:^9.0.1"
     react-router-dom: "npm:^6.22.2"
     react-xarrows: "npm:^2.0.2"
@@ -8328,7 +8328,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-hot-toast@npm:^2.4.1":
+"react-hot-toast@npm:^2.5.2":
   version: 2.5.2
   resolution: "react-hot-toast@npm:2.5.2"
   dependencies:

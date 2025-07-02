@@ -8,7 +8,8 @@ import {
   Battery, BatteryMedium, BatteryLow,
   Target, Upload, PauseCircle
 } from 'lucide-react';
-import { useTopicStore } from '../../store/topicStore';
+import { useTopicStore, type MarkTaskResult } from '../../store/topicStore';
+import toast from 'react-hot-toast';
 
 interface TaskDetailProps {
   task: Task;
@@ -73,16 +74,28 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   }, []);
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
+    let result: MarkTaskResult;
+    
     switch (newStatus) {
       case 'done':
-        await markTaskCompleted(topicId, goalId, task.id);
+        result = await markTaskCompleted(topicId, goalId, task.id);
         break;
       case 'in_progress':
-        await markTaskInProgress(topicId, goalId, task.id);
+        result = await markTaskInProgress(topicId, goalId, task.id);
         break;
       case 'todo':
-        await markTaskTodo(topicId, goalId, task.id);
+        result = await markTaskTodo(topicId, goalId, task.id);
         break;
+      default:
+        return;
+    }
+
+    if (!result.success) {
+      if (result.requiresRecord) {
+        toast.error('請先記錄學習心得再標記完成！');
+      } else {
+        toast.error(result.message);
+      }
     }
   };
 

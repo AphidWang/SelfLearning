@@ -4,7 +4,7 @@ import { Target, ChevronRight, Plus, Calendar, ArrowRight, Sparkles, BookOpen, L
 import { AIAssistant } from '../../components/goals/AIAssistant';
 import { ActionItem } from '../../components/goals/ActionItem';
 import { goalTemplates } from '../../constants/goalTemplates';
-import { useTopicStore } from '../../store/topicStore';
+import { useTopicStore, type MarkTaskResult } from '../../store/topicStore';
 import type { Task } from '../../types/goal';
 import type { Topic } from '../../types/goal';
 import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { FloatingAssistant } from '../../components/assistant/FloatingAssistant';
 import { useAssistant } from '../../hooks/useAssistant';
 import { supabase } from '../../services/supabase';
+import toast from 'react-hot-toast';
 
 const StudentPlanning: React.FC = () => {
   const { topics, updateTopic, updateTaskInfo, markTaskCompleted, markTaskInProgress, markTaskTodo, fetchTopics, createTopic, addGoal } = useTopicStore();
@@ -138,18 +139,24 @@ const StudentPlanning: React.FC = () => {
 
   const handleTaskStatusChange = async (topicId: string, goalId: string, task: Task) => {
     try {
-      let updatedTask: Task | null;
+      let result: MarkTaskResult;
+      
       if (task.status === 'done') {
-        updatedTask = await markTaskTodo(topicId, goalId, task.id);
+        result = await markTaskTodo(topicId, goalId, task.id);
       } else {
-        updatedTask = await markTaskCompleted(topicId, goalId, task.id);
+        result = await markTaskCompleted(topicId, goalId, task.id);
       }
-      if (!updatedTask) {
-        // 錯誤信息已在 store 中設置
+      
+      if (!result.success) {
+        if (result.requiresRecord) {
+          toast.error('請先記錄學習心得再標記完成！');
+        } else {
+          toast.error(result.message);
+        }
       }
     } catch (err) {
       console.error('Error updating task status:', err);
-      setError(err instanceof Error ? err.message : '更新任務狀態時發生錯誤');
+      toast.error('系統錯誤，請稍後再試');
     }
   };
 
