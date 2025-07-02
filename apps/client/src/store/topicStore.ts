@@ -243,10 +243,50 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       console.log('📍 fetchTopics - 合併後總主題數:', uniqueTopics.length);
 
-      // 為每個主題獲取完整結構
+      // 為每個主題獲取完整結構（包括協作者）
       const topicsWithStructure = await Promise.all(
         uniqueTopics.map(async (topic) => {
           try {
+            // 獲取協作者資訊
+            let collaborators = [];
+            let owner = null;
+            try {
+              // 暫時使用簡化的擁有者資訊（用戶資料在 auth schema 中，稍後會改進）
+              if (topic.owner_id) {
+                owner = {
+                  id: topic.owner_id,
+                  name: 'Owner',
+                  email: '',
+                  avatar: null
+                };
+              }
+
+              // 獲取協作者列表
+              const { data: collaboratorData, error: collabError } = await supabase
+                .from('topic_collaborators')
+                .select(`
+                  user_id,
+                  permission,
+                  invited_at
+                `)
+                .eq('topic_id', topic.id);
+
+              if (!collabError && collaboratorData) {
+                // 使用簡化的協作者資訊（稍後會改進用戶資料獲取）
+                collaborators = collaboratorData.map(collab => ({
+                  id: collab.user_id,
+                  name: `User-${collab.user_id.slice(0, 8)}`,
+                  email: '',
+                  avatar: null,
+                  permission: collab.permission,
+                  invited_at: collab.invited_at
+                }));
+                console.log(`📍 fetchTopics - 主題 ${topic.id} 協作者:`, collaborators.length);
+              }
+            } catch (collabError) {
+              console.warn(`獲取主題 ${topic.id} 協作者失敗:`, collabError);
+            }
+
             // 獲取 goals
             const { data: goals, error: goalsError } = await supabase
               .from('goals')
@@ -257,7 +297,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
             if (goalsError) {
               console.warn(`獲取主題 ${topic.id} 的目標失敗:`, goalsError);
-              return { ...topic, goals: [], progress: 0 };
+              return { ...topic, goals: [], progress: 0, owner, collaborators };
             }
 
             // 為每個 goal 獲取 tasks
@@ -292,11 +332,13 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
             return {
               ...topic,
               goals: goalsWithTasks,
-              progress
+              progress,
+              owner,
+              collaborators
             };
           } catch (topicError) {
             console.warn(`處理主題 ${topic.id} 時發生異常:`, topicError);
-            return { ...topic, goals: [], progress: 0 };
+            return { ...topic, goals: [], progress: 0, owner: null, collaborators: [] };
           }
         })
       );
@@ -331,6 +373,46 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       if (topicError) throw topicError;
       if (!topic) return null;
 
+      // 獲取協作者資訊
+      let collaborators = [];
+      let owner = null;
+      try {
+        // 暫時使用簡化的擁有者資訊
+        if (topic.owner_id) {
+          owner = {
+            id: topic.owner_id,
+            name: 'Owner',
+            email: '',
+            avatar: null
+          };
+        }
+
+        // 獲取協作者列表
+        const { data: collaboratorData, error: collabError } = await supabase
+          .from('topic_collaborators')
+          .select(`
+            user_id,
+            permission,
+            invited_at
+          `)
+          .eq('topic_id', id);
+
+        if (!collabError && collaboratorData) {
+          // 使用簡化的協作者資訊
+          collaborators = collaboratorData.map(collab => ({
+            id: collab.user_id,
+            name: `User-${collab.user_id.slice(0, 8)}`,
+            email: '',
+            avatar: null,
+            permission: collab.permission,
+            invited_at: collab.invited_at
+          }));
+          console.log(`📍 getTopic - 主題 ${id} 協作者:`, collaborators.length);
+        }
+      } catch (collabError) {
+        console.warn(`獲取主題 ${id} 協作者失敗:`, collabError);
+      }
+
       // 獲取目標
       const { data: goals, error: goalsError } = await supabase
         .from('goals')
@@ -341,7 +423,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       if (goalsError) {
         console.warn(`獲取主題 ${id} 的目標失敗:`, goalsError);
-        return { ...topic, goals: [], progress: 0 };
+        return { ...topic, goals: [], progress: 0, owner, collaborators };
       }
 
       // 為每個 goal 獲取 tasks
@@ -371,7 +453,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       return {
         ...topic,
         goals: goalsWithTasks,
-        progress
+        progress,
+        owner,
+        collaborators
       };
     } catch (error: any) {
       console.error('獲取主題失敗:', error);
@@ -1353,18 +1437,73 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
   addCollaborator: async (topicId: string, userId: string, permission: 'view' | 'edit') => {
     try {
+      // 先檢查是否已經是協作者
+      const { data: existingCollaborator, error: checkError } = await supabase
+        .from('topic_collaborators')
+        .select('id, permission')
+        .eq('topic_id', topicId)
+        .eq('user_id', userId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        // PGRST116 是 "not found" 錯誤，這是正常的（表示用戶不是協作者）
+        console.error('檢查協作者狀態失敗:', checkError);
+        return false;
+      }
+
+      if (existingCollaborator) {
+        // 如果已經存在，更新權限
+        console.log(`📍 addCollaborator - 用戶 ${userId} 已是協作者，更新權限為 ${permission}`);
+        const { error: updateError } = await supabase
+          .from('topic_collaborators')
+          .update({ permission })
+          .eq('topic_id', topicId)
+          .eq('user_id', userId);
+
+        if (updateError) {
+          console.error('更新協作者權限失敗:', updateError);
+          return false;
+        }
+        return true;
+      }
+
+      // 如果不存在，新增協作者
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('topic_collaborators')
         .insert([{
           topic_id: topicId,
           user_id: userId,
           permission,
-          invited_by: (await supabase.auth.getUser()).data.user?.id
+          invited_by: user?.id
         }]);
 
-      return !error;
+      if (error) {
+        // 處理可能的 409 衝突錯誤
+        if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('already exists')) {
+          console.warn(`📍 addCollaborator - 檢測到重複插入，嘗試更新權限`);
+          // 如果是重複鍵錯誤，嘗試更新權限
+          const { error: updateError } = await supabase
+            .from('topic_collaborators')
+            .update({ permission })
+            .eq('topic_id', topicId)
+            .eq('user_id', userId);
+
+          if (updateError) {
+            console.error('處理重複協作者時更新權限失敗:', updateError);
+            return false;
+          }
+          return true;
+        }
+        
+        console.error('添加協作者失敗:', error);
+        return false;
+      }
+
+      console.log(`📍 addCollaborator - 成功添加協作者 ${userId} 到主題 ${topicId}`);
+      return true;
     } catch (error) {
-      console.error('添加協作者失敗:', error);
+      console.error('添加協作者異常:', error);
       return false;
     }
   },
