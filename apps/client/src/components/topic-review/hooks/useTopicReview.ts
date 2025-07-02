@@ -59,9 +59,6 @@ export const useTopicReview = (topicId: string) => {
       async () => {
         console.log('📥 useTopicReview - refreshTopic started');
         
-        // 先強制刷新用戶列表，確保頭像資料是最新的
-        await getCollaboratorCandidates(true);
-        
         const fetchedTopic = await getTopic(topicId);
         if (!fetchedTopic) {
           throw new Error('無法載入主題資料');
@@ -81,7 +78,7 @@ export const useTopicReview = (topicId: string) => {
         retryDelay: 500,
       }
     ),
-    [topicId, getTopic, getCollaboratorCandidates, wrapAsync]
+    [topicId, getTopic, wrapAsync]
   );
 
   // 當協作者更新時刷新頁面
@@ -125,7 +122,7 @@ export const useTopicReview = (topicId: string) => {
   // 計算衍生數據
   const derivedData = useMemo(() => {
     const { topic } = state;
-    if (!topic) return { owner: undefined, collaborators: [], availableUsers: [] };
+    if (!topic) return { owner: undefined, collaborators: [], availableUsers: [], totalUsers: 0 };
 
     const owner = topic.owner;
     // 處理協作者數據 - topic.collaborators 是從 getTopic 返回的完整用戶信息
@@ -145,30 +142,43 @@ export const useTopicReview = (topicId: string) => {
       totalUsers: users.length
     });
 
-    return { owner, collaborators, availableUsers };
+    return { owner, collaborators, availableUsers, totalUsers: users.length };
   }, [state.topic, users]);
 
-  // 監聽 users 變化
+  // 初始化時載入用戶和主題數據
   useEffect(() => {
-    if (!users.length) {
-      getCollaboratorCandidates();
-    }
-  }, [users.length, getCollaboratorCandidates]);
+    const initializeData = async () => {
+      // 確保用戶數據存在
+      if (!users.length) {
+        await getCollaboratorCandidates();
+      }
+      
+      // 載入主題數據
+      if (!state.topic) {
+        await refreshTopic();
+      }
+    };
+    
+    initializeData();
+  }, [topicId]); // 只依賴 topicId，避免循環
 
-  // 初始化 topic
+  // 更新衍生數據到 state（只在實際變化時更新）
   useEffect(() => {
-    if (!state.topic) {
-      refreshTopic();
-    }
-  }, [state.topic, refreshTopic]);
-
-  // 更新衍生數據到 state
-  useEffect(() => {
-    setState(prev => ({
-      ...prev,
-      ...derivedData
-    }));
-  }, [derivedData]);
+    setState(prev => {
+      // 檢查是否真的有變化
+      const hasChanged = 
+        prev.owner?.id !== derivedData.owner?.id ||
+        prev.collaborators.length !== derivedData.collaborators.length ||
+        prev.availableUsers.length !== derivedData.availableUsers.length;
+      
+      if (!hasChanged) return prev;
+      
+      return {
+        ...prev,
+        ...derivedData
+      };
+    });
+  }, [derivedData.owner?.id, derivedData.collaborators.length, derivedData.availableUsers.length]); // 只依賴關鍵識別符
 
   // Actions
   const setSelectedGoal = (goalId: string | null) => {

@@ -113,19 +113,22 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     return users.filter(u => !ids.has(u.id));
   }, [users, owner?.id, collaborators]);
 
-  // 監聽 users 變化
+  // 初始化資料
   useEffect(() => {
-    if (!users.length) {
-      getCollaboratorCandidates();
-    }
-  }, [users.length, getCollaboratorCandidates]);
-
-  // 初始化 topic
-  useEffect(() => {
-    if (!topic) {
-      refreshTopic();
-    }
-  }, [topic, refreshTopic]);
+    const initializeData = async () => {
+      // 確保用戶數據存在
+      if (!users.length) {
+        await getCollaboratorCandidates();
+      }
+      
+      // 載入主題數據
+      if (!topic) {
+        await refreshTopic();
+      }
+    };
+    
+    initializeData();
+  }, [topicId]); // 只依賴 topicId，避免循環
 
   // 處理權限變更
   const handlePermissionChange = (userId: string, permission: 'view' | 'edit' | 'none') => {
@@ -971,9 +974,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     console.log('🔄 TaskDetailPanel - editedTask changed:', editedTask);
   }, [editedTask]);
 
+  // 初始化時設置 editedTask
   useEffect(() => {
-    refreshTopic();
-  }, [refreshTopic]);
+    setEditedTask(task);
+  }, [task.id]); // 只在 task.id 改變時重新設置
 
   const handleSaveDescription = async () => {
     if (isUpdating) return;

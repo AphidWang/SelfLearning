@@ -301,29 +301,22 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       // 使用 userStore 獲取協作者候選人資訊
       const userState = useUserStore.getState();
-      
-      // 最多嘗試 3 次獲取用戶資料
-      let retryCount = 0;
       let allUsers = userState.users;
       
-      while (allUsers.length === 0 && retryCount < 3) {
-        console.log(`Attempting to fetch collaborator candidates (attempt ${retryCount + 1})`);
-        await userState.getCollaboratorCandidates();
-        allUsers = useUserStore.getState().users;
-        retryCount++;
-        
-        if (allUsers.length === 0 && retryCount < 3) {
-          // 等待一小段時間再重試
-          await new Promise(resolve => setTimeout(resolve, 1000));
+      // 只有在沒有用戶資料時才調用一次 getCollaboratorCandidates
+      if (allUsers.length === 0) {
+        console.log('No users in store, fetching collaborator candidates...');
+        try {
+          await userState.getCollaboratorCandidates();
+          allUsers = useUserStore.getState().users;
+        } catch (error) {
+          console.warn('Failed to fetch collaborator candidates:', error);
+          // 如果獲取失敗，使用空陣列避免阻塞
+          allUsers = [];
         }
       }
 
       console.log('All users from userStore:', allUsers);
-
-      if (allUsers.length === 0) {
-        console.error('Failed to fetch users after multiple attempts');
-        throw new Error('無法獲取用戶資料');
-      }
 
       // 組合完整的協作者資訊
       const collaborators = data.topic_collaborators?.map(tc => {
