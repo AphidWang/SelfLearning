@@ -380,13 +380,59 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
                   if (tasksError) {
                     console.warn(`獲取目標 ${goal.id} 的任務失敗:`, tasksError);
-                    return { ...goal, tasks: [] };
+                    return { ...goal, tasks: [], owner: null, collaborators: [] };
                   }
 
-                  return { ...goal, tasks: tasks || [] };
+                  // 收集所有需要查詢的用戶ID（goal 和 tasks）
+                  const goalAndTaskUserIds: string[] = [];
+                  
+                  // Goal owner
+                  if (goal.owner_id) {
+                    goalAndTaskUserIds.push(goal.owner_id);
+                  }
+                  
+                  // Goal collaborators
+                  if (goal.collaborator_ids && Array.isArray(goal.collaborator_ids)) {
+                    goalAndTaskUserIds.push(...goal.collaborator_ids);
+                  }
+                  
+                  // Task owners and collaborators
+                  (tasks || []).forEach(task => {
+                    if (task.owner_id) {
+                      goalAndTaskUserIds.push(task.owner_id);
+                    }
+                    if (task.collaborator_ids && Array.isArray(task.collaborator_ids)) {
+                      goalAndTaskUserIds.push(...task.collaborator_ids);
+                    }
+                  });
+
+                  // 獲取用戶資料
+                  const goalTaskUsersMap = await getUsersData([...new Set(goalAndTaskUserIds)]);
+
+                  // 為 goal 設置 owner 和 collaborators
+                  const goalOwner = goal.owner_id && goalTaskUsersMap[goal.owner_id] ? goalTaskUsersMap[goal.owner_id] : null;
+                  const goalCollaborators = (goal.collaborator_ids || [])
+                    .map(id => goalTaskUsersMap[id])
+                    .filter(Boolean);
+
+                  // 為每個 task 設置 owner 和 collaborators
+                  const tasksWithUsers = (tasks || []).map(task => ({
+                    ...task,
+                    owner: task.owner_id && goalTaskUsersMap[task.owner_id] ? goalTaskUsersMap[task.owner_id] : null,
+                    collaborators: (task.collaborator_ids || [])
+                      .map(id => goalTaskUsersMap[id])
+                      .filter(Boolean)
+                  }));
+
+                  return { 
+                    ...goal, 
+                    tasks: tasksWithUsers,
+                    owner: goalOwner,
+                    collaborators: goalCollaborators
+                  };
                 } catch (taskError) {
                   console.warn(`獲取目標 ${goal.id} 的任務時發生異常:`, taskError);
-                  return { ...goal, tasks: [] };
+                  return { ...goal, tasks: [], owner: null, collaborators: [] };
                 }
               })
             );
@@ -516,10 +562,56 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
           if (tasksError) {
             console.warn(`獲取目標 ${goal.id} 的任務失敗:`, tasksError);
-            return { ...goal, tasks: [] };
+            return { ...goal, tasks: [], owner: null, collaborators: [] };
           }
 
-          return { ...goal, tasks: tasks || [] };
+          // 收集所有需要查詢的用戶ID（goal 和 tasks）
+          const goalAndTaskUserIds: string[] = [];
+          
+          // Goal owner
+          if (goal.owner_id) {
+            goalAndTaskUserIds.push(goal.owner_id);
+          }
+          
+          // Goal collaborators
+          if (goal.collaborator_ids && Array.isArray(goal.collaborator_ids)) {
+            goalAndTaskUserIds.push(...goal.collaborator_ids);
+          }
+          
+          // Task owners and collaborators
+          (tasks || []).forEach(task => {
+            if (task.owner_id) {
+              goalAndTaskUserIds.push(task.owner_id);
+            }
+            if (task.collaborator_ids && Array.isArray(task.collaborator_ids)) {
+              goalAndTaskUserIds.push(...task.collaborator_ids);
+            }
+          });
+
+          // 獲取用戶資料
+          const goalTaskUsersMap = await getUsersData([...new Set(goalAndTaskUserIds)]);
+
+          // 為 goal 設置 owner 和 collaborators
+          const goalOwner = goal.owner_id && goalTaskUsersMap[goal.owner_id] ? goalTaskUsersMap[goal.owner_id] : null;
+          const goalCollaborators = (goal.collaborator_ids || [])
+            .map(id => goalTaskUsersMap[id])
+            .filter(Boolean);
+
+          // 為每個 task 設置 owner 和 collaborators
+          const tasksWithUsers = (tasks || []).map(task => ({
+            ...task,
+            owner: task.owner_id && goalTaskUsersMap[task.owner_id] ? goalTaskUsersMap[task.owner_id] : null,
+            collaborators: (task.collaborator_ids || [])
+              .map(id => goalTaskUsersMap[id])
+              .filter(Boolean)
+          }));
+
+          return { 
+            ...goal, 
+            tasks: tasksWithUsers,
+            owner: goalOwner,
+            collaborators: goalCollaborators
+          };
         })
       );
 
@@ -1397,9 +1489,53 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   setTaskOwner: async (topicId: string, goalId: string, taskId: string, userId: string) => {
     try {
-      return await get().updateTaskCompat(topicId, goalId, taskId, {
-        assignedTo: [userId]
-      });
+      // 更新數據庫中的 task owner_id
+      const { data: updatedTask, error } = await supabase
+        .from('tasks')
+        .update({ owner_id: userId })
+        .eq('id', taskId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('設置任務負責人失敗:', error);
+        return null;
+      }
+
+      // 更新本地 store
+      const topics = get().topics;
+      const topicIndex = topics.findIndex(t => t.id === topicId);
+      if (topicIndex >= 0) {
+        const goalIndex = topics[topicIndex].goals.findIndex(g => g.id === goalId);
+        if (goalIndex >= 0) {
+          const taskIndex = topics[topicIndex].goals[goalIndex].tasks?.findIndex(t => t.id === taskId) ?? -1;
+          if (taskIndex >= 0) {
+            // 獲取用戶信息並設置 owner
+            const usersMap = await getUsersData([userId]);
+            const updatedGoals = [...topics[topicIndex].goals];
+            const updatedTasks = [...(updatedGoals[goalIndex].tasks || [])];
+            updatedTasks[taskIndex] = {
+              ...updatedTasks[taskIndex],
+              owner: usersMap[userId] || null
+            };
+            updatedGoals[goalIndex] = {
+              ...updatedGoals[goalIndex],
+              tasks: updatedTasks
+            };
+            
+            const updatedTopics = [...topics];
+            updatedTopics[topicIndex] = {
+              ...updatedTopics[topicIndex],
+              goals: updatedGoals
+            };
+            
+            set({ topics: updatedTopics });
+          }
+        }
+      }
+
+      console.log(`📍 setTaskOwner - 成功設置任務 ${taskId} 負責人為 ${userId}`);
+      return updatedTask as Task;
     } catch (error: any) {
       console.error('設定任務負責人失敗:', error);
       return null;
@@ -1411,8 +1547,43 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   addTaskCollaborator: async (topicId: string, goalId: string, taskId: string, userId: string) => {
     try {
-      // TODO: 實作任務協作者功能
-      console.warn('addTaskCollaborator 功能尚未實作');
+      // 獲取當前 task 的協作者列表
+      const { data: currentTask, error: getError } = await supabase
+        .from('tasks')
+        .select('collaborator_ids')
+        .eq('id', taskId)
+        .single();
+
+      if (getError) {
+        console.error('獲取任務協作者失敗:', getError);
+        return false;
+      }
+
+      const currentCollaborators = currentTask.collaborator_ids || [];
+      
+      // 檢查是否已經是協作者
+      if (currentCollaborators.includes(userId)) {
+        console.log(`用戶 ${userId} 已是任務 ${taskId} 的協作者`);
+        return true;
+      }
+
+      // 添加新的協作者
+      const updatedCollaborators = [...currentCollaborators, userId];
+      
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ collaborator_ids: updatedCollaborators })
+        .eq('id', taskId);
+
+      if (updateError) {
+        console.error('更新任務協作者失敗:', updateError);
+        return false;
+      }
+
+      // 更新本地 store
+      await get().refreshTopic(topicId);
+      
+      console.log(`📍 addTaskCollaborator - 成功添加協作者 ${userId} 到任務 ${taskId}`);
       return true;
     } catch (error: any) {
       console.error('添加任務協作者失敗:', error);
@@ -1683,11 +1854,45 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   setGoalOwner: async (topicId: string, goalId: string, userId: string) => {
     try {
-      // TODO: 實作目標負責人功能，目前使用兼容方法
-      console.warn('setGoalOwner 功能尚未完全實作，使用基本更新');
-      return await get().updateGoalCompat(topicId, goalId, {
-        // 暫時使用 description 存儲負責人信息，之後需要添加專用字段
-      });
+      // 更新數據庫中的 goal owner_id
+      const { data: updatedGoal, error } = await supabase
+        .from('goals')
+        .update({ owner_id: userId })
+        .eq('id', goalId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('設置目標負責人失敗:', error);
+        return null;
+      }
+
+      // 更新本地 store
+      const topics = get().topics;
+      const topicIndex = topics.findIndex(t => t.id === topicId);
+      if (topicIndex >= 0) {
+        const goalIndex = topics[topicIndex].goals.findIndex(g => g.id === goalId);
+        if (goalIndex >= 0) {
+          // 獲取用戶信息並設置 owner
+          const usersMap = await getUsersData([userId]);
+          const updatedGoals = [...topics[topicIndex].goals];
+          updatedGoals[goalIndex] = {
+            ...updatedGoals[goalIndex],
+            owner: usersMap[userId] || null
+          };
+          
+          const updatedTopics = [...topics];
+          updatedTopics[topicIndex] = {
+            ...updatedTopics[topicIndex],
+            goals: updatedGoals
+          };
+          
+          set({ topics: updatedTopics });
+        }
+      }
+
+      console.log(`📍 setGoalOwner - 成功設置目標 ${goalId} 負責人為 ${userId}`);
+      return updatedGoal as Goal;
     } catch (error: any) {
       console.error('設定目標負責人失敗:', error);
       return null;
@@ -1699,8 +1904,43 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   addGoalCollaborator: async (topicId: string, goalId: string, userId: string) => {
     try {
-      // TODO: 實作目標協作者功能
-      console.warn('addGoalCollaborator 功能尚未實作');
+      // 獲取當前 goal 的協作者列表
+      const { data: currentGoal, error: getError } = await supabase
+        .from('goals')
+        .select('collaborator_ids')
+        .eq('id', goalId)
+        .single();
+
+      if (getError) {
+        console.error('獲取目標協作者失敗:', getError);
+        return false;
+      }
+
+      const currentCollaborators = currentGoal.collaborator_ids || [];
+      
+      // 檢查是否已經是協作者
+      if (currentCollaborators.includes(userId)) {
+        console.log(`用戶 ${userId} 已是目標 ${goalId} 的協作者`);
+        return true;
+      }
+
+      // 添加新的協作者
+      const updatedCollaborators = [...currentCollaborators, userId];
+      
+      const { error: updateError } = await supabase
+        .from('goals')
+        .update({ collaborator_ids: updatedCollaborators })
+        .eq('id', goalId);
+
+      if (updateError) {
+        console.error('更新目標協作者失敗:', updateError);
+        return false;
+      }
+
+      // 更新本地 store
+      await get().refreshTopic(topicId);
+      
+      console.log(`📍 addGoalCollaborator - 成功添加協作者 ${userId} 到目標 ${goalId}`);
       return true;
     } catch (error: any) {
       console.error('添加目標協作者失敗:', error);
