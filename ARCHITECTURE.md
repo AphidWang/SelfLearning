@@ -113,13 +113,20 @@ src/
    - Implement proper data fetching
    - Handle loading states
 
-3. **Styling Approach**
+3. **Error Handling**
+   - Use unified error handling system (`ErrorContext` + `useAsyncOperation`)
+   - Avoid users getting stuck in loading or error states
+   - Provide friendly error dialogs with retry mechanisms
+   - All API calls and async operations should use consistent error handling
+   - Include detailed error information for debugging while maintaining user-friendly messages
+
+4. **Styling Approach**
    - Use Tailwind CSS utilities
    - Follow design system tokens
    - Maintain dark mode support
    - Ensure accessibility
 
-4. **Testing Strategy**
+5. **Testing Strategy**
    - Component unit tests
    - Integration testing
    - Accessibility testing

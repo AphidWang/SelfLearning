@@ -16,6 +16,7 @@ import MentorCurriculum from './pages/mentor/MentorCurriculum';
 import MentorTaskPlanner from './pages/mentor/MentorTaskPlanner.tsx';
 import CourseBluePrint from './pages/mentor/CourseBluePrint';
 import { CurriculumProvider } from './context/CurriculumContext';
+import { ErrorProvider } from './context/ErrorContext';
 import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
 import TopicMindMapPage from './pages/student/TopicMindMapPage.tsx';
@@ -31,10 +32,11 @@ import { AuthCallback } from './pages/AuthCallback.tsx';
 
 function App() {
   return (
-    <AuthProvider>
-      <CurriculumProvider>
-        <UserProvider>
-          <Router>
+    <ErrorProvider>
+      <AuthProvider>
+        <CurriculumProvider>
+          <UserProvider>
+            <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
@@ -72,10 +74,11 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-          </Router>
-        </UserProvider>
-      </CurriculumProvider>
-    </AuthProvider>
+            </Router>
+          </UserProvider>
+        </CurriculumProvider>
+      </AuthProvider>
+    </ErrorProvider>
   );
 }
 

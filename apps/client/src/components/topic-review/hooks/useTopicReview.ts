@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTopicStore } from '../../../store/topicStore';
 import { useUserStore } from '../../../store/userStore';
+import { useAsyncOperation, ErrorPatterns } from '../../../utils/errorHandler';
 import type { Topic, Goal, Task, User } from '../../../types/goal';
 
 interface Collaborator extends User {
@@ -35,6 +36,7 @@ export const useTopicReview = (topicId: string) => {
   } = useTopicStore();
   
   const { getCollaboratorCandidates, users } = useUserStore();
+  const { wrapAsync } = useAsyncOperation();
   
   const [state, setState] = useState<TopicReviewState>({
     topic: null,
@@ -52,32 +54,56 @@ export const useTopicReview = (topicId: string) => {
   });
 
   // 異步載入主題數據
-  const refreshTopic = useCallback(async () => {
-    console.log('📥 useTopicReview - refreshTopic started');
-    const fetchedTopic = await getTopic(topicId);
-    if (!fetchedTopic) return;
+  const refreshTopic = useCallback(
+    wrapAsync(
+      async () => {
+        console.log('📥 useTopicReview - refreshTopic started');
+        const fetchedTopic = await getTopic(topicId);
+        if (!fetchedTopic) {
+          throw new Error('無法載入主題資料');
+        }
 
-    setState(prev => ({
-      ...prev,
-      topic: fetchedTopic,
-      editedTopic: fetchedTopic,
-    }));
-  }, [topicId, getTopic]);
+        setState(prev => ({
+          ...prev,
+          topic: fetchedTopic,
+          editedTopic: fetchedTopic,
+        }));
+        
+        return fetchedTopic;
+      },
+      {
+        context: '載入主題資料',
+        retryCount: 1,
+        retryDelay: 500,
+      }
+    ),
+    [topicId, getTopic, wrapAsync]
+  );
 
   // 當協作者更新時刷新頁面
-  const handleCollaborationUpdate = useCallback(async () => {
-    console.log('🔄 useTopicReview - handleCollaborationUpdate triggered');
-    setState(prev => ({ ...prev, isUpdating: true, pendingOperation: 'collaboration' }));
-    
-    try {
-      // 確保協作者候選人列表是最新的
-      await getCollaboratorCandidates();
-      // 刷新主題數據（包含最新的協作者信息）
-      await refreshTopic();
-    } finally {
-      setState(prev => ({ ...prev, isUpdating: false, pendingOperation: null }));
-    }
-  }, [refreshTopic, getCollaboratorCandidates]);
+  const handleCollaborationUpdate = useCallback(
+    wrapAsync(
+      async () => {
+        console.log('🔄 useTopicReview - handleCollaborationUpdate triggered');
+        setState(prev => ({ ...prev, isUpdating: true, pendingOperation: 'collaboration' }));
+        
+        try {
+          // 確保協作者候選人列表是最新的
+          await getCollaboratorCandidates();
+          // 刷新主題數據（包含最新的協作者信息）
+          await refreshTopic();
+        } finally {
+          setState(prev => ({ ...prev, isUpdating: false, pendingOperation: null }));
+        }
+      },
+      {
+        context: '更新協作者資訊',
+        showSuccess: true,
+        successMessage: '協作者資訊已更新',
+      }
+    ),
+    [refreshTopic, getCollaboratorCandidates, wrapAsync]
+  );
 
   // 通用的更新處理函數，確保所有更新都會同步狀態
   const handleTopicUpdate = useCallback(async (updateFn: () => Promise<any>) => {
