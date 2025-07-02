@@ -113,6 +113,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCollaboratorManager, setShowCollaboratorManager] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [showAddGoal, setShowAddGoal] = useState(false);
 
   // 計算當前選中的目標和任務
   const { selectedGoal, selectedTask } = useMemo(() => {
@@ -209,6 +211,22 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     setNewTaskTitle('');
     setShowAddTask(false);
   }, [newTaskTitle, selectedGoal, topic.id, addTask, handleUpdate]);
+
+  // 新增目標
+  const handleAddGoal = useCallback(async () => {
+    if (!newGoalTitle.trim()) return;
+    
+    await handleUpdate(async () => {
+      await addGoal(topic.id, {
+        title: newGoalTitle,
+        status: 'todo',
+        description: '',
+        tasks: []
+      });
+    });
+    setNewGoalTitle('');
+    setShowAddGoal(false);
+  }, [newGoalTitle, topic.id, addGoal, handleUpdate]);
 
   // 設置負責人
   const handleSetOwner = useCallback(async (user: UserType) => {
@@ -537,9 +555,85 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
           {/* 目標網格視圖 */}
           <div className="mt-4">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">目標進度</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">目標進度</h4>
+              <button
+                onClick={() => setShowAddGoal(!showAddGoal)}
+                className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
+                title="新增目標"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 新增目標輸入 */}
+            {showAddGoal && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="p-4 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-900/20 dark:to-blue-800/10 backdrop-blur-sm">
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={newGoalTitle}
+                        onChange={(e) => setNewGoalTitle(e.target.value)}
+                        placeholder="輸入新目標標題..."
+                        className="w-full px-4 py-3 text-sm font-medium bg-white/80 dark:bg-gray-800/80 border-0 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 backdrop-blur-sm transition-all"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && newGoalTitle.trim()) {
+                            handleAddGoal();
+                          }
+                          if (e.key === 'Escape') {
+                            setShowAddGoal(false);
+                            setNewGoalTitle('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <div className="absolute inset-0 rounded-lg ring-1 ring-blue-200/50 dark:ring-blue-700/50 pointer-events-none" />
+                    </div>
+                    
+                    <div className="flex items-center justify-end">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setShowAddGoal(false);
+                            setNewGoalTitle('');
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md transition-all"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleAddGoal}
+                          disabled={isUpdating || !newGoalTitle.trim()}
+                          className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                        >
+                          {isUpdating ? (
+                            <>
+                              <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                              新增中
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3 h-3" />
+                              新增目標
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             <div className="grid grid-cols-1 gap-2">
-              {topic.goals?.map((goal, index) => {
+              {topic.goals && topic.goals.length > 0 ? topic.goals.map((goal, index) => {
                 const totalTasks = goal.tasks.length;
                 const completedTasks = goal.tasks.filter(t => t.status === 'done').length;
                 const inProgressTasks = goal.tasks.filter(t => t.status === 'in_progress').length;
@@ -572,7 +666,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                   <div
                     key={goal.id}
                     className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${goalStatusBg} hover:brightness-95 dark:hover:brightness-110`}
-                    onClick={() => onTaskSelect?.(goal.tasks[0].id, goal.id)}
+                    onClick={() => onTaskSelect?.(goal.tasks.length > 0 ? goal.tasks[0].id : '', goal.id)}
                   >
                     {/* 編號和標題 */}
                     <div className="flex items-center gap-2 flex-1">
@@ -604,7 +698,17 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="text-center py-8">
+                  <Target className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                    尚未建立任何目標
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    點擊上方 + 新增第一個目標
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
