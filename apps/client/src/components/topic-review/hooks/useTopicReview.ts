@@ -58,6 +58,10 @@ export const useTopicReview = (topicId: string) => {
     wrapAsync(
       async () => {
         console.log('📥 useTopicReview - refreshTopic started');
+        
+        // 先強制刷新用戶列表，確保頭像資料是最新的
+        await getCollaboratorCandidates(true);
+        
         const fetchedTopic = await getTopic(topicId);
         if (!fetchedTopic) {
           throw new Error('無法載入主題資料');
@@ -77,7 +81,7 @@ export const useTopicReview = (topicId: string) => {
         retryDelay: 500,
       }
     ),
-    [topicId, getTopic, wrapAsync]
+    [topicId, getTopic, getCollaboratorCandidates, wrapAsync]
   );
 
   // 當協作者更新時刷新頁面
@@ -89,7 +93,7 @@ export const useTopicReview = (topicId: string) => {
         
         try {
           // 確保協作者候選人列表是最新的
-          await getCollaboratorCandidates();
+          await getCollaboratorCandidates(true);
           // 刷新主題數據（包含最新的協作者信息）
           await refreshTopic();
         } finally {
@@ -98,8 +102,7 @@ export const useTopicReview = (topicId: string) => {
       },
       {
         context: '更新協作者資訊',
-        showSuccess: true,
-        successMessage: '協作者資訊已更新',
+        showSuccess: false, // 不顯示成功提示
       }
     ),
     [refreshTopic, getCollaboratorCandidates, wrapAsync]

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, User as UserIcon, Mail, Edit3, Loader2, Lock, Eye, EyeOff, Crown, GraduationCap, Heart, Shield } from 'lucide-react';
+import { X, Save, User as UserIcon, Mail, Edit3, Loader2, Lock, Eye, EyeOff, Crown, GraduationCap, Heart, Shield, Upload, Palette } from 'lucide-react';
 import { useUserStore } from '../../store/userStore';
 import { UserAvatar } from '../learning-map/UserAvatar';
 import { AvatarSelectionDialog } from './AvatarSelectionDialog';
+import { AvatarUpload } from './AvatarUpload';
 import type { User } from '../../types/goal';
-import { authService } from '../../services/auth';
+import { authService, avatarService } from '../../services/supabase';
 
 interface UserProfileDialogProps {
   isOpen: boolean;
@@ -50,6 +51,8 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAvatarDialog, setShowAvatarDialog] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [avatarMode, setAvatarMode] = useState<'preset' | 'upload'>('preset'); // 頭像模式
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string>(''); // 上傳的頭像 URL
   
   const isCreateMode = !user;
 
@@ -125,6 +128,39 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
 
   const handleAvatarSelect = (avatar: string, color: string) => {
     setFormData(prev => ({ ...prev, avatar }));
+    setAvatarMode('preset');
+    setUploadedAvatarUrl(''); // 清除上傳的頭像
+  };
+
+  // 處理頭像上傳成功
+  const handleAvatarUploadSuccess = (avatarUrl: string) => {
+    setUploadedAvatarUrl(avatarUrl);
+    setFormData(prev => ({ ...prev, avatar: avatarUrl }));
+    setAvatarMode('upload');
+  };
+
+  // 處理頭像上傳錯誤
+  const handleAvatarUploadError = (error: string) => {
+    console.error('Avatar upload error:', error);
+    // 錯誤處理已在 AvatarUpload 組件中完成
+  };
+
+  // 切換頭像模式
+  const handleAvatarModeChange = (mode: 'preset' | 'upload') => {
+    setAvatarMode(mode);
+    if (mode === 'preset') {
+      // 恢復到原始頭像或預設頭像
+      setFormData(prev => ({ 
+        ...prev, 
+        avatar: user?.avatar || '' 
+      }));
+      setUploadedAvatarUrl('');
+    } else {
+      // 如果有上傳的頭像就使用，否則清空
+      if (uploadedAvatarUrl) {
+        setFormData(prev => ({ ...prev, avatar: uploadedAvatarUrl }));
+      }
+    }
   };
 
   // 處理角色多選
@@ -208,22 +244,84 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
 
             <div className="flex-1 p-6 overflow-y-auto">
               <form onSubmit={handleSubmit} className="space-y-4">
-              {/* 頭像預覽和選擇 */}
-              <div className="text-center">
-                <div className="inline-block relative">
-                  <UserAvatar user={previewUser} size="lg" className="mx-auto" />
-                  <button
-                    type="button"
-                    onClick={() => setShowAvatarDialog(true)}
-                    className="absolute -bottom-1 -right-1 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-colors"
-                    title="更換頭像"
-                  >
-                    <Edit3 className="w-3 h-3" />
-                  </button>
+              {/* 頭像設置區域 */}
+              <div className="space-y-4">
+                {/* 頭像預覽 */}
+                <div className="text-center">
+                  <div className="inline-block relative">
+                    <UserAvatar user={previewUser} size="lg" className="mx-auto" />
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  點擊右下角按鈕更換頭像
-                </p>
+
+                {/* 頭像模式選擇 */}
+                <div className="flex justify-center">
+                  <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                    <button
+                      type="button"
+                      onClick={() => handleAvatarModeChange('preset')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        avatarMode === 'preset'
+                          ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Palette className="w-4 h-4" />
+                      預設頭像
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAvatarModeChange('upload')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        avatarMode === 'upload'
+                          ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      上傳照片
+                    </button>
+                  </div>
+                </div>
+
+                {/* 頭像設置內容 */}
+                <AnimatePresence mode="wait">
+                  {avatarMode === 'preset' ? (
+                    <motion.div
+                      key="preset"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="text-center"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setShowAvatarDialog(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        選擇預設頭像
+                      </button>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        從多種風格的預設頭像中選擇
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="upload"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                    >
+                      <AvatarUpload
+                        currentAvatar={uploadedAvatarUrl || (avatarMode === 'upload' ? formData.avatar : '')}
+                        onUploadSuccess={handleAvatarUploadSuccess}
+                        onUploadError={handleAvatarUploadError}
+                        userId={user?.id || 'temp'}
+                        disabled={loading}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* 暱稱 */}

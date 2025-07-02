@@ -162,7 +162,10 @@ interface UserStore {
   updateCurrentUser: (updates: Partial<User>) => Promise<void>;
   
   // 協作相關 (不需要管理員權限)
-  getCollaboratorCandidates: () => Promise<void>;
+  getCollaboratorCandidates: (force?: boolean) => Promise<void>;
+  
+  // 強制刷新用戶列表 (清除緩存)
+  forceRefreshUsers: () => Promise<void>;
   
   // 管理員功能 (通過 server API)
   getUsers: () => Promise<void>;
@@ -251,9 +254,9 @@ export const useUserStore = create<UserStore>((set, get) => {
     },
 
     // 協作相關功能 - 不需要管理員權限
-    getCollaboratorCandidates: async () => {
+    getCollaboratorCandidates: async (force = false) => {
       const { loading } = get();
-      if (loading) return;
+      if (loading && !force) return;
 
       set({ loading: true, error: null });
       try {
@@ -425,7 +428,19 @@ export const useUserStore = create<UserStore>((set, get) => {
       currentUser: null,
       loading: false,
       error: null
-    })
+    }),
+
+    // 強制刷新用戶列表 (清除緩存)
+    forceRefreshUsers: async () => {
+      set({ loading: true, error: null });
+      try {
+        const candidates = await adminUserApi.getCollaboratorCandidates();
+        set({ users: candidates, loading: false });
+      } catch (error: any) {
+        set({ loading: false, error: error.message || '強制刷新用戶列表失敗' });
+        throw error;
+      }
+    }
   };
 
   return store;

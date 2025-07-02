@@ -11,6 +11,7 @@ interface UserContextType {
   logout: () => Promise<void>;
   isLoading: boolean;
   error: string | null;
+  refreshUser: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -31,30 +32,45 @@ function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     
-    const initializeAuth = async () => {
-      try {
-        const user = await authService.getCurrentUser();
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch (error) {
-        console.error('Failed to initialize auth:', error);
-        if (isMounted) {
-          setCurrentUser(null);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+      const initializeAuth = async () => {
+    try {
+      console.log('🔄 [UserContext] 初始化認證狀態...');
+      const user = await authService.getCurrentUser();
+      
+      if (isMounted) {
+        console.log('✅ [UserContext] 初始化完成', {
+          hasUser: !!user,
+          userId: user?.id,
+          roles: user?.roles
+        });
+        setCurrentUser(user);
       }
-    };
+    } catch (error) {
+      console.error('❌ [UserContext] 初始化失敗:', error);
+      if (isMounted) {
+        setCurrentUser(null);
+      }
+    } finally {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }
+  };
 
     initializeAuth();
 
     // 監聽認證狀態變化
     const { data: { subscription } } = authService.onAuthStateChange((user) => {
       if (isMounted) {
+        console.log('🔄 [UserContext] 認證狀態變化', {
+          hasUser: !!user,
+          userId: user?.id,
+          roles: user?.roles
+        });
+        
         setCurrentUser(user);
+        setIsLoading(false); // 確保載入狀態更新
+        
         // 儲存到 localStorage 供初始化使用
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
@@ -107,6 +123,21 @@ function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      console.log('🔄 [UserContext] 手動刷新用戶資料...');
+      const user = await authService.getCurrentUser();
+      console.log('✅ [UserContext] 用戶資料刷新完成', {
+        hasUser: !!user,
+        userId: user?.id,
+        roles: user?.roles
+      });
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('❌ [UserContext] 刷新用戶資料失敗:', error);
+    }
+  };
+
   const value = {
     currentUser,
     setCurrentUser,
@@ -114,7 +145,8 @@ function UserProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     isLoading,
-    error
+    error,
+    refreshUser
   };
 
   if (isLoading) {

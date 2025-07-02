@@ -17,13 +17,21 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) => {
-  const { currentUser, logout } = useUser();
+  const { currentUser, logout, isLoading } = useUser();
   const location = useLocation();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   
   // 根據當前路由決定顯示的導航項目
   const getNavigationItems = () => {
     const pathname = location.pathname;
+    
+    // 如果用戶資料還在載入或者沒有用戶，返回空的導航項目
+    if (isLoading || !currentUser) {
+      return {
+        items: [],
+        viewType: 'student'
+      };
+    }
     
     // 獲取用戶的所有角色（支援新舊格式）
     const userRoles = currentUser?.roles || (currentUser?.role ? [currentUser.role] : ['student']);
@@ -210,7 +218,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           {/* Navigation items */}
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="space-y-1 px-2">
-              {items.map((item) => (
+              {isLoading ? (
+                <li className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                  載入中...
+                </li>
+              ) : items.length === 0 ? (
+                <li className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                  {!currentUser ? '未登入' : '權限不足'}
+                </li>
+              ) : (
+                items.map((item) => (
                 <li key={item.path}>
                   <NavLink
                     to={item.path}
@@ -228,7 +245,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
                     {!isCollapsed && item.name}
                   </NavLink>
                 </li>
-              ))}
+              ))
+              )}
             </ul>
           </nav>
 
@@ -236,7 +254,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center">
               {/* 可點擊的頭像區域 */}
-              {currentUser && (
+              {!isLoading && currentUser && (
                 <button
                   onClick={() => setShowProfileDialog(true)}
                   className={`rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
@@ -261,7 +279,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
                 </button>
               )}
               
-              {!isCollapsed && currentUser && (
+              {!isCollapsed && !isLoading && currentUser && (
                 <>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -288,7 +306,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       </div>
       
       {/* User Profile Dialog */}
-      {currentUser && (
+      {!isLoading && currentUser && (
         <UserProfileDialog
           isOpen={showProfileDialog}
           onClose={() => setShowProfileDialog(false)}

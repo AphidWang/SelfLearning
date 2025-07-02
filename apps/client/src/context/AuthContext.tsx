@@ -9,6 +9,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 import { tokenManager, TokenRefreshEvent } from '../services/tokenManager';
 import { authService } from '../services/auth';
 import type { User } from '../types/goal';
@@ -253,6 +254,64 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
     
     return fallback;
+  }
+
+  return <>{children}</>;
+};
+
+// 角色保護路由組件
+interface RoleProtectedRouteProps {
+  children: ReactNode;
+  requiredRoles: string[];
+  fallbackPath?: string;
+}
+
+export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({ 
+  children, 
+  requiredRoles,
+  fallbackPath 
+}) => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div>正在驗證權限...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // 檢查用戶角色（支援新舊格式）
+  const userRoles = user.roles || (user.role ? [user.role] : ['student']);
+  const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role as any));
+
+  if (!hasRequiredRole) {
+    // 根據用戶的角色決定重定向路徑
+    if (fallbackPath) {
+      return <Navigate to={fallbackPath} replace />;
+    }
+
+    // 預設重定向邏輯
+    const primaryRole = userRoles[0];
+    
+    if (primaryRole === 'admin') {
+      return <Navigate to="/admin/users" replace />;
+    } else if (primaryRole === 'mentor') {
+      return <Navigate to="/mentor" replace />;
+    } else {
+      return <Navigate to="/student" replace />;
+    }
   }
 
   return <>{children}</>;

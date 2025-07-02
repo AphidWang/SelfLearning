@@ -14,10 +14,20 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    if (isAuthenticated && currentUser) {
-      navigate(currentUser.role === 'student' ? '/student' : '/mentor');
+    if (isAuthenticated && currentUser?.role) {
+      // 根據用戶的主要角色決定重定向
+      const userRoles = currentUser.roles || (currentUser.role ? [currentUser.role] : ['student']);
+      const primaryRole = userRoles[0];
+      
+      if (primaryRole === 'admin') {
+        navigate('/admin/users');
+      } else if (primaryRole === 'mentor') {
+        navigate('/mentor');
+      } else {
+        navigate('/student');
+      }
     }
-  }, [isAuthenticated, currentUser, navigate]);
+  }, [isAuthenticated, currentUser?.role, currentUser?.roles, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
