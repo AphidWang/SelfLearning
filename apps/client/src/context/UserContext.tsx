@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useMemo } from 'react';
 import { authService } from '../services/auth';
 import type { User } from '../types/goal';
 import { trackEvent } from '../utils/analytics';
@@ -100,7 +100,7 @@ function UserProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       
-      setCurrentUser(user);
+      // 不需要手動設置 currentUser，onAuthStateChange 會處理
       trackEvent('login_success', 'auth');
       return true;
     } catch (err) {
@@ -138,7 +138,7 @@ function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const value = {
+  const value = useMemo(() => ({
     currentUser,
     setCurrentUser,
     isAuthenticated: !!currentUser,
@@ -147,7 +147,7 @@ function UserProvider({ children }: { children: ReactNode }) {
     isLoading,
     error,
     refreshUser
-  };
+  }), [currentUser, isLoading, error]);
 
   if (isLoading) {
     return null;

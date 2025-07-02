@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, User, KeyRound, Mail } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { authService } from '../services/auth';
@@ -12,22 +12,44 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login, isAuthenticated, currentUser } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
+  const hasRedirected = useRef(false);
 
   React.useEffect(() => {
+    // 重置重定向標誌（組件重新掛載時）
+    hasRedirected.current = false;
+    
+    return () => {
+      // 組件卸載時重置
+      hasRedirected.current = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    // 如果已經重定向過，就不再重定向
+    if (hasRedirected.current) return;
+    
     if (isAuthenticated && currentUser?.role) {
       // 根據用戶的主要角色決定重定向
       const userRoles = currentUser.roles || (currentUser.role ? [currentUser.role] : ['student']);
       const primaryRole = userRoles[0];
       
+      let targetPath = '';
       if (primaryRole === 'admin') {
-        navigate('/admin/users');
+        targetPath = '/admin/users';
       } else if (primaryRole === 'mentor') {
-        navigate('/mentor');
+        targetPath = '/mentor';
       } else {
-        navigate('/student');
+        targetPath = '/student';
+      }
+      
+      // 只有當前路徑是登入頁面時才重定向
+      if (location.pathname === '/login' || location.pathname === '/') {
+        hasRedirected.current = true;
+        navigate(targetPath, { replace: true });
       }
     }
-  }, [isAuthenticated, currentUser?.role, currentUser?.roles, navigate]);
+  }, [isAuthenticated, currentUser?.role, currentUser?.id, navigate, location.pathname]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
