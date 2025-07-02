@@ -54,10 +54,45 @@ const adminApiCall = async (endpoint: string, options?: RequestInit) => {
   return response.json();
 };
 
+// 普通用戶 API 調用函數（不需要管理員權限）
+const userApiCall = async (endpoint: string, options?: RequestInit) => {
+  let token = localStorage.getItem('token');
+  
+  if (!token) {
+    try {
+      token = await authService.getToken();
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+    } catch (error) {
+      console.warn('Failed to get token from Supabase session:', error);
+    }
+  }
+  
+  const response = await fetch(`${ADMIN_API_BASE}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : '',
+      ...options?.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Network error' }));
+    throw new Error(error.message || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
 // 管理員用戶 API 服務 (只用於管理其他用戶)
 const adminUserApi = {
   // 獲取所有用戶 (管理員功能)
   getUsers: () => adminApiCall(''),
+  
+  // 獲取協作者候選人 (普通用戶功能)
+  getCollaboratorCandidates: () => userApiCall('/collaborator-candidates'),
   
   // 根據 ID 獲取用戶 (管理員功能)
   getUser: (id: string) => adminApiCall(`/${id}`),
@@ -125,6 +160,9 @@ interface UserStore {
   // 普通用戶操作 (直接使用 Supabase)
   getCurrentUser: () => Promise<User | null>;
   updateCurrentUser: (updates: Partial<User>) => Promise<void>;
+  
+  // 協作相關 (不需要管理員權限)
+  getCollaboratorCandidates: () => Promise<void>;
   
   // 管理員功能 (通過 server API)
   getUsers: () => Promise<void>;
@@ -208,6 +246,21 @@ export const useUserStore = create<UserStore>((set, get) => {
         set({ currentUser: userData, loading: false });
       } catch (error: any) {
         set({ loading: false, error: error.message || '更新用戶失敗' });
+        throw error;
+      }
+    },
+
+    // 協作相關功能 - 不需要管理員權限
+    getCollaboratorCandidates: async () => {
+      const { loading } = get();
+      if (loading) return;
+
+      set({ loading: true, error: null });
+      try {
+        const candidates = await adminUserApi.getCollaboratorCandidates();
+        set({ users: candidates, loading: false });
+      } catch (error: any) {
+        set({ loading: false, error: error.message || '獲取協作者候選人失敗' });
         throw error;
       }
     },

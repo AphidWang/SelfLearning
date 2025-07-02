@@ -299,7 +299,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       console.log('Topic data from DB:', JSON.stringify(data, null, 2));
 
-      // 使用 userStore 獲取用戶資訊
+      // 使用 userStore 獲取協作者候選人資訊
       const userState = useUserStore.getState();
       
       // 最多嘗試 3 次獲取用戶資料
@@ -307,8 +307,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       let allUsers = userState.users;
       
       while (allUsers.length === 0 && retryCount < 3) {
-        console.log(`Attempting to fetch users (attempt ${retryCount + 1})`);
-        await userState.getUsers();
+        console.log(`Attempting to fetch collaborator candidates (attempt ${retryCount + 1})`);
+        await userState.getCollaboratorCandidates();
         allUsers = useUserStore.getState().users;
         retryCount++;
         

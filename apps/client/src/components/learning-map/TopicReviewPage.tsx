@@ -55,8 +55,8 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     removeGoalCollaborator
   } = useTopicStore();
   
-  // 使用 userStore 獲取用戶數據，遵循架構分層原則
-  const { getUsers, users } = useUserStore();
+  // 使用 userStore 獲取協作者候選人數據，遵循架構分層原則
+  const { getCollaboratorCandidates, users } = useUserStore();
   
   const [topic, setTopic] = useState<Topic | null>(null);
   const weeklyStats = useTopicRadialMapStats(topicId);
@@ -87,15 +87,15 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     setPendingOperation('collaboration');
     try {
       await refreshTopic();
-      // 只在需要時重新獲取用戶
+      // 只在需要時重新獲取協作者候選人
       if (!users.length) {
-        await getUsers();
+        await getCollaboratorCandidates();
       }
     } finally {
       setIsUpdating(false);
       setPendingOperation(null);
     }
-  }, [refreshTopic, getUsers, users.length]);
+  }, [refreshTopic, getCollaboratorCandidates, users.length]);
 
   // 直接從 topic 拿 owner/collaborators
   const owner = useMemo(() => topic?.owner, [topic?.owner]);
@@ -116,9 +116,9 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   // 監聽 users 變化
   useEffect(() => {
     if (!users.length) {
-      getUsers();
+      getCollaboratorCandidates();
     }
-  }, [users.length, getUsers]);
+  }, [users.length, getCollaboratorCandidates]);
 
   // 初始化 topic
   useEffect(() => {
@@ -943,7 +943,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   owner,
   collaborators
 }) => {
-  const { updateTask, updateTaskHelp, deleteTask, setTaskOwner, addTaskCollaborator, removeTaskCollaborator, getTopic } = useTopicStore();
+  const { updateTaskInfo, updateTaskHelp, deleteTask, setTaskOwner, addTaskCollaborator, removeTaskCollaborator, getTopic, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTopicStore();
   const [isUpdating, setIsUpdating] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -991,7 +991,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       setIsEditing(false);
 
       // 後端更新
-      const result = await updateTask(topicId, goal.id, editedTask.id, editedTask);
+      const result = await updateTaskInfo(topicId, goal.id, editedTask.id, {
+        title: editedTask.title,
+        description: editedTask.description
+      });
       if (!result) {
         // 如果更新失敗，回滾到原始狀態
         setEditedTask(prevTask);
@@ -1014,14 +1017,17 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       setIsUpdating(true);
       setPendingOperation('status');
       
-      // 後端更新
-      const result = await updateTask(topicId, goal.id, task.id, {
-        ...task,
-        status,
-        completedAt: status === 'done' ? new Date().toISOString() : undefined
-      });
+      // 後端更新 - 使用狀態切換方法
+      let result;
+      if (status === 'done') {
+        result = await markTaskCompleted(topicId, goal.id, task.id);
+      } else if (status === 'in_progress') {
+        result = await markTaskInProgress(topicId, goal.id, task.id);
+      } else {
+        result = await markTaskTodo(topicId, goal.id, task.id);
+      }
 
-      if (!result) {
+      if (!result.success) {
         alert('更新狀態失敗，請稍後再試');
       } else {
         // 刷新整個主題數據

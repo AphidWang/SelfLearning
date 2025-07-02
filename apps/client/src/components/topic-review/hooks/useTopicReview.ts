@@ -34,7 +34,7 @@ export const useTopicReview = (topicId: string) => {
     getCompletionRate,
   } = useTopicStore();
   
-  const { getUsers, users } = useUserStore();
+  const { getCollaboratorCandidates, users } = useUserStore();
   
   const [state, setState] = useState<TopicReviewState>({
     topic: null,
@@ -70,14 +70,14 @@ export const useTopicReview = (topicId: string) => {
     setState(prev => ({ ...prev, isUpdating: true, pendingOperation: 'collaboration' }));
     
     try {
-      // 確保用戶列表是最新的
-      await getUsers();
+      // 確保協作者候選人列表是最新的
+      await getCollaboratorCandidates();
       // 刷新主題數據（包含最新的協作者信息）
       await refreshTopic();
     } finally {
       setState(prev => ({ ...prev, isUpdating: false, pendingOperation: null }));
     }
-  }, [refreshTopic, getUsers]);
+  }, [refreshTopic, getCollaboratorCandidates]);
 
   // 通用的更新處理函數，確保所有更新都會同步狀態
   const handleTopicUpdate = useCallback(async (updateFn: () => Promise<any>) => {
@@ -122,9 +122,9 @@ export const useTopicReview = (topicId: string) => {
   // 監聽 users 變化
   useEffect(() => {
     if (!users.length) {
-      getUsers();
+      getCollaboratorCandidates();
     }
-  }, [users.length, getUsers]);
+  }, [users.length, getCollaboratorCandidates]);
 
   // 初始化 topic
   useEffect(() => {

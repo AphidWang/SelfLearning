@@ -56,6 +56,28 @@ router.get('/debug/status', async (req: Request, res: Response) => {
   }
 });
 
+// 獲取協作者候選人 - 只需要基本認證，不需要 admin 權限
+router.get('/collaborator-candidates', authenticateSupabaseToken, async (req: Request, res: Response) => {
+  try {
+    // 獲取所有用戶的基本信息，用於協作邀請
+    const users = await userService.getUsers();
+    
+    // 只返回必要的公開信息，不包含敏感資料
+    const candidates = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      avatar: user.avatar,
+      color: user.color,
+      role: user.role,
+      roles: user.roles
+    }));
+    
+    res.json(candidates);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || '獲取協作者候選人失敗' });
+  }
+});
+
 // 需要管理員權限的中間件
 const adminAuthMiddleware = [authenticateSupabaseToken, requireAdmin];
 

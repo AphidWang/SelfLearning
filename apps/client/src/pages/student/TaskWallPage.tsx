@@ -121,66 +121,71 @@ const StarCounter: React.FC<StarCounterProps> = ({ count, isAnimating = false, o
       );
     }
     
-    // 彩色星星 (小) - 上五下四排列
+    // 彩色星星 (小) - 上五下四排列，顯示在大星星右邊
     const topRowCount = Math.min(5, coloredStars);
     const bottomRowCount = coloredStars - topRowCount;
     
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
         {/* 彩虹星星區域 */}
         {rainbowStars > 0 && (
-          <div className="flex gap-1 mb-1">
+          <div className="flex gap-1">
             {stars}
           </div>
         )}
         
-        {/* 上排彩色星星 */}
-        {topRowCount > 0 && (
-          <div className="flex gap-1 justify-center">
-            {Array.from({ length: topRowCount }).map((_, i) => (
-              <motion.div
-                key={`colored-top-${i}`}
-                animate={isAnimating ? { 
-                  rotate: [0, 360],
-                  scale: [1, 1.3, 1]
-                } : {}}
-                transition={{ duration: 0.6, ease: "easeInOut", delay: (rainbowStars * 0.1) + (i * 0.1) }}
-              >
-                <Star 
-                  className="w-5 h-5 drop-shadow-sm" 
-                  style={{
-                    color: starColors[i],
-                    fill: starColors[i],
-                    filter: `drop-shadow(0 0 4px ${starColors[i]}80)`
-                  }}
-                />
-              </motion.div>
-            ))}
-          </div>
-        )}
-        
-        {/* 下排彩色星星 */}
-        {bottomRowCount > 0 && (
-          <div className="flex gap-1 justify-center">
-            {Array.from({ length: bottomRowCount }).map((_, i) => (
-              <motion.div
-                key={`colored-bottom-${i}`}
-                animate={isAnimating ? { 
-                  rotate: [0, 360],
-                  scale: [1, 1.3, 1]
-                } : {}}
-                transition={{ duration: 0.6, ease: "easeInOut", delay: (rainbowStars * 0.1) + ((i + topRowCount) * 0.1) }}
-              >
-                <Star 
-                  className="w-5 h-5 drop-shadow-sm" 
-                  style={{
-                    color: starColors[i + topRowCount],
-                    fill: starColors[i + topRowCount],
-                    filter: `drop-shadow(0 0 4px ${starColors[i + topRowCount]}80)`
-                  }}
-                />
-              </motion.div>
-            ))}
+        {/* 彩色星星區域 - 右邊 */}
+        {coloredStars > 0 && (
+          <div className="flex flex-col gap-1">
+            {/* 上排彩色星星 */}
+            {topRowCount > 0 && (
+              <div className="flex gap-1 justify-center">
+                {Array.from({ length: topRowCount }).map((_, i) => (
+                  <motion.div
+                    key={`colored-top-${i}`}
+                    animate={isAnimating ? { 
+                      rotate: [0, 360],
+                      scale: [1, 1.3, 1]
+                    } : {}}
+                    transition={{ duration: 0.6, ease: "easeInOut", delay: (rainbowStars * 0.1) + (i * 0.1) }}
+                  >
+                    <Star 
+                      className="w-5 h-5 drop-shadow-sm" 
+                      style={{
+                        color: starColors[i],
+                        fill: starColors[i],
+                        filter: `drop-shadow(0 0 4px ${starColors[i]}80)`
+                      }}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+            
+            {/* 下排彩色星星 */}
+            {bottomRowCount > 0 && (
+              <div className="flex gap-1 justify-center">
+                {Array.from({ length: bottomRowCount }).map((_, i) => (
+                  <motion.div
+                    key={`colored-bottom-${i}`}
+                    animate={isAnimating ? { 
+                      rotate: [0, 360],
+                      scale: [1, 1.3, 1]
+                    } : {}}
+                    transition={{ duration: 0.6, ease: "easeInOut", delay: (rainbowStars * 0.1) + ((i + topRowCount) * 0.1) }}
+                  >
+                    <Star 
+                      className="w-5 h-5 drop-shadow-sm" 
+                      style={{
+                        color: starColors[i + topRowCount],
+                        fill: starColors[i + topRowCount],
+                        filter: `drop-shadow(0 0 4px ${starColors[i + topRowCount]}80)`
+                      }}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -445,7 +450,7 @@ const TaskWallPage: React.FC = () => {
     error
   } = useTopicStore();
   
-  const { users, getUsers } = useUserStore();
+  const { users, getCollaboratorCandidates } = useUserStore();
   const { currentUser } = useUser();
 
   // 組件狀態
@@ -472,7 +477,7 @@ const TaskWallPage: React.FC = () => {
       try {
         await Promise.all([
           fetchTopics(),
-          getUsers()
+          getCollaboratorCandidates()
         ]);
       } catch (error) {
         console.error('初始化資料失敗:', error);
@@ -480,7 +485,7 @@ const TaskWallPage: React.FC = () => {
     };
 
     initializeData();
-  }, [fetchTopics, getUsers]);
+  }, [fetchTopics, getCollaboratorCandidates]);
 
   // 自動清除錯誤消息
   useEffect(() => {
