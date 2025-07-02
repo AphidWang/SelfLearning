@@ -54,7 +54,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onBack,
   onHelpRequest
 }) => {
-  const { updateTaskInfo, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTopicStore();
+  const { updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo } = useTopicStore();
   const [comment, setComment] = useState('');
   const [mood, setMood] = useState<MoodLevel | null>(null);
   const [energy, setEnergy] = useState<EnergyLevel | null>(null);

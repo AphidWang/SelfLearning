@@ -26,82 +26,109 @@ export interface User {
 
 export interface Topic {
   id: string;
+  owner_id: string;
   title: string;
   description?: string;
-  type?: TopicType;
-  status: TopicStatus;
-  due_date?: string; // 對應 Supabase schema
-  goals: Goal[];
+  subject?: string;
   category?: string;
-  template_type?: string; // 對應 Supabase schema
-  subject?: SubjectType;
-  progress?: number;
-  focus_element?: { type: 'goal' | 'task', id: string }; // 對應 Supabase schema
-  bubbles?: Bubble[];
-  
-  // Supabase 相關字段
+  status: TopicStatus;
+  type?: TopicType;
+  topic_type?: TopicType; // 別名，向後兼容
   template_id?: string;
   template_version?: number;
-  owner_id: string;
-  is_collaborative?: boolean; // 對應 Supabase schema
-  show_avatars?: boolean; // 對應 Supabase schema
-  created_at: string;
-  updated_at: string;
+  is_collaborative: boolean;
+  show_avatars: boolean;
+  due_date?: string;
+  focus_element?: any;
+  bubbles?: Bubble[];
+  
+  // 版本控制
+  version: number;
+  created_at?: string;
+  updated_at?: string;
+  
+  // 關聯數據（從其他表 JOIN 來的）
+  goals?: Goal[];
+  topic_collaborators?: any[];
+  progress?: number; // 計算得出的進度
   
   // 前端額外欄位 (從查詢時會填入)
   owner?: User; // 擁有者資訊
   template?: TopicTemplate; // 來源模板資訊
-  topic_collaborators?: TopicCollaborator[]; // 協作者列表
   collaborators?: User[]; // 從 topic_collaborators 轉換而來的協作者列表
 }
 
 export interface Goal {
   id: string;
+  topic_id: string;
   title: string;
   description?: string;
-  tasks: Task[];
-  order?: number;
-  status?: GoalStatus; // 改為 GoalStatus 類型
-  needHelp?: boolean; // 是否需要幫助
-  helpMessage?: string; // 幫助訊息
-  helpResolvedAt?: string; // 幫助解決時間
-  replyMessage?: string; // 老師回覆訊息
-  replyAt?: string; // 老師回覆時間
+  status: GoalStatus;
+  priority: TaskPriority;
+  order_index: number;
+  
+  // 協作相關
+  need_help?: boolean;
+  help_message?: string;
+  help_resolved_at?: string;
+  
+  // 版本控制
+  version: number;
+  created_at?: string;
+  updated_at?: string;
+  
+  // 關聯數據
+  tasks?: Task[];
+  
   // 協作相關字段 - 只存儲 ID
-  owner_id?: string; // 主要負責人 ID
   collaborator_ids?: string[]; // 協作人 ID 列表
   
   // 前端計算字段 - 不存儲在資料庫，由前端從 userStore 動態組合
-  owner?: User; // 主要負責人（前端組合）
+  owner?: User; // 負責人（前端組合）
   collaborators?: User[]; // 協作人列表（前端組合）
 }
 
 export interface Task {
   id: string;
+  goal_id: string;
   title: string;
   description?: string;
   status: TaskStatus;
-  dueDate?: string;
-  priority?: TaskPriority;
-  category?: string;
-  role?: TaskRole;
-  estimatedTime?: string;
-  completedAt?: string;
-  assignedTo?: string;
-  notes?: string;
-  order?: number;
-  challenge?: number;
-  needHelp?: boolean; // 是否需要幫助
-  helpMessage?: string; // 幫助訊息
-  helpResolvedAt?: string; // 幫助解決時間
-  replyMessage?: string; // 老師回覆訊息
-  replyAt?: string; // 老師回覆時間
-  // 協作相關字段 - 只存儲 ID
-  owner_id?: string; // 主要負責人 ID
-  collaborator_ids?: string[]; // 協作人 ID 列表
+  priority: TaskPriority;
+  order_index: number;
   
-  // 前端計算字段 - 不存儲在資料庫，由前端從 userStore 動態組合
-  owner?: User; // 主要負責人（前端組合）
+  // 協作相關
+  need_help: boolean;
+  help_message?: string;
+  reply_message?: string;
+  reply_at?: string;
+  replied_by?: string;
+  
+  // 完成相關
+  completed_at?: string;
+  completed_by?: string;
+  
+  // 時間追蹤
+  estimated_minutes?: number;
+  actual_minutes?: number;
+  
+  // 版本控制
+  version: number;
+  created_at?: string;
+  updated_at?: string;
+  
+  // 舊字段兼容（逐步移除）
+  category?: string;
+  role?: string;
+  estimatedTime?: number; // 映射到 estimated_minutes
+  notes?: string; // 映射到 description
+  challenge?: string;
+  dueDate?: string;
+  assignedTo?: string[];
+  order?: number; // 映射到 order_index
+  
+  // 前端計算字段 - 不存儲在資料庫，由前端動態組合
+  owner?: User; // 負責人（前端組合）
   collaborators?: User[]; // 協作人列表（前端組合）
 }
 
@@ -212,4 +239,45 @@ export interface CopyTemplateParams {
   title?: string; // 可覆寫標題
   description?: string; // 可覆寫描述
   is_public?: boolean; // 是否設為公開
+}
+
+// 版本控制相關類型
+export interface VersionControlResult {
+  success: boolean;
+  current_version: number;
+  message: string;
+}
+
+// 數據庫函數返回結果類型
+export interface SafeUpdateResult {
+  success: boolean;
+  current_version: number;
+  message: string;
+}
+
+// Topic 查詢結果類型（包含完整結構）
+export interface TopicWithStructure {
+  topic_data: Topic;
+  goals_data: Goal[];
+  tasks_data: Task[];
+}
+
+// 活躍任務查詢結果類型
+export interface ActiveTaskResult {
+  task_id: string;
+  task_title: string;
+  task_description?: string;
+  task_status: TaskStatus;
+  task_priority: TaskPriority;
+  task_need_help: boolean;
+  task_version: number;
+  task_created_at: string;
+  task_updated_at: string;
+  goal_id: string;
+  goal_title: string;
+  goal_status: GoalStatus;
+  topic_id: string;
+  topic_title: string;
+  topic_subject?: string;
+  topic_status: TopicStatus;
 }

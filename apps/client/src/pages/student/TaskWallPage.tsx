@@ -320,9 +320,9 @@ const CompletedTasksDialog: React.FC<CompletedTasksDialogProps> = ({
                         目標：{task.goalTitle}
                       </p>
                       
-                      {task.completedAt && (
+                      {task.completed_at && (
                         <p className="text-xs text-gray-500">
-                          完成於 {new Date(task.completedAt).toLocaleDateString('zh-TW', {
+                          完成於 {new Date(task.completed_at).toLocaleDateString('zh-TW', {
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric',
@@ -442,9 +442,9 @@ const TaskWallPage: React.FC = () => {
     fetchTopics, 
     topics, 
     addTask,
-    markTaskCompleted,
-    markTaskInProgress,
-    markTaskTodo,
+    markTaskCompletedCompat: markTaskCompleted,
+    markTaskInProgressCompat: markTaskInProgress,
+    markTaskTodoCompat: markTaskTodo,
     clearError,
     loading, 
     error
@@ -531,8 +531,8 @@ const TaskWallPage: React.FC = () => {
 
     // 按完成時間排序（最新的在前）
     completedTasksFromDB.sort((a, b) => {
-      const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
-      const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+      const aTime = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+      const bTime = b.completed_at ? new Date(b.completed_at).getTime() : 0;
       return bTime - aTime;
     });
 
@@ -628,11 +628,13 @@ const TaskWallPage: React.FC = () => {
     taskTitle: string
   ) => {
     try {
-      await addTask(topicId, goalId, {
+      await addTask(goalId, {
         title: taskTitle,
         status: 'todo',
         description: '',
-        priority: 'medium'
+        priority: 'medium',
+        order_index: 0,
+        need_help: false
       });
     } catch (error) {
       console.error('新增任務失敗:', error);

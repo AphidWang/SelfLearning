@@ -43,10 +43,10 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   const [showTypeSelect, setShowTypeSelect] = useState(false);
   const [editedTopic, setEditedTopic] = useState<Topic>({
     ...topic,
-    template_type: topic.template_type || '學習主題',
+    topic_type: topic.topic_type || '學習目標',
     subject: topic.subject || SUBJECTS.CUSTOM
   });
-  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopic, getActiveGoals, updateTaskInfo, markTaskCompleted, markTaskInProgress, reorderTasks, fetchTopics } = useTopicStore();
+  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopicCompat: updateTopic, getActiveGoals, updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, reorderTasks, fetchTopics } = useTopicStore();
   const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [showGoalsOverview, setShowGoalsOverview] = useState(false);
   const [selectedGoalForTasks, setSelectedGoalForTasks] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
   useEffect(() => {
     setEditedTopic({
       ...topic,
-      template_type: topic.template_type || '學習主題',
+      topic_type: topic.topic_type || '學習目標',
       subject: topic.subject || SUBJECTS.CUSTOM
     });
   }, [topic]);
@@ -99,8 +99,8 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     const activeGoal = activeGoals.find(g => g.id === goal.id);
     if (!activeGoal) return 0;
     
-    const totalTasks = activeGoal.tasks.length;
-    const completedTasks = activeGoal.tasks.filter(task => task.status === 'done').length;
+    const totalTasks = activeGoal.tasks?.length || 0;
+    const completedTasks = activeGoal.tasks?.filter(task => task.status === 'done').length || 0;
     return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   };
 
@@ -121,14 +121,14 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
           alert('刪除主題失敗，請稍後再試');
         }
       } else if (deleteTarget.type === 'goal' && deleteTarget.goalId) {
-        const success = await deleteGoal(deleteTarget.topicId, deleteTarget.goalId);
+        const success = await deleteGoal(deleteTarget.goalId);
         if (success) {
           await onUpdate?.();
         } else {
           alert('刪除目標失敗，請稍後再試');
         }
       } else if (deleteTarget.type === 'task' && deleteTarget.goalId && deleteTarget.taskId) {
-        const success = await deleteTask(deleteTarget.topicId, deleteTarget.goalId, deleteTarget.taskId);
+        const success = await deleteTask(deleteTarget.taskId);
         if (success) {
           await onUpdate?.();
         } else {
@@ -150,7 +150,9 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     try {
       const success = await addGoal(topic.id, {
         title: newGoalTitle,
-        tasks: []
+        status: 'todo',
+        priority: 'medium',
+        order_index: topic.goals?.length || 0
       });
       
       if (success) {
@@ -170,9 +172,12 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     if (!newTaskTitle.trim()) return;
     
     try {
-      const success = await addTask(topic.id, goalId, {
+      const success = await addTask(goalId, {
         title: newTaskTitle,
-        status: 'todo'
+        status: 'todo',
+        priority: 'medium',
+        order_index: 0,
+        need_help: false
       });
       
       if (success) {
@@ -241,18 +246,20 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     const destGoalId = destination.droppableId;
 
     if (sourceGoalId === destGoalId) {
-      reorderTasks(topic.id, sourceGoalId, source.index, destination.index);
+      reorderTasks(sourceGoalId, source.index, destination.index);
     } else {
       const sourceGoal = activeGoals.find(goal => goal.id === sourceGoalId);
       const destGoal = activeGoals.find(goal => goal.id === destGoalId);
       
       if (sourceGoal && destGoal) {
-        const task = sourceGoal.tasks[source.index];
-        deleteTask(topic.id, sourceGoalId, task.id);
-        addTask(topic.id, destGoalId, {
-          ...task,
-          order: destination.index
-        });
+        const task = sourceGoal.tasks?.[source.index];
+        if (task) {
+          deleteTask(task.id);
+          addTask(destGoalId, {
+            ...task,
+            order_index: destination.index
+          });
+        }
       }
     }
   };
@@ -312,40 +319,40 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
                     <button
                       onClick={handleTypeSelectClick}
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
-                        editedTopic.template_type === '學習主題' ? 'bg-purple-100 text-purple-800' :
-                        editedTopic.template_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
-                        editedTopic.template_type === '專案計畫' ? 'bg-green-100 text-green-800' :
+                        editedTopic.topic_type === '學習目標' ? 'bg-purple-100 text-purple-800' :
+                        editedTopic.topic_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
+                        editedTopic.topic_type === '專案計畫' ? 'bg-green-100 text-green-800' :
                         'bg-orange-100 text-orange-800'
                       }`}
                     >
-                      {editedTopic.template_type === '學習主題' ? <Brain className="h-3 w-3" /> :
-                       editedTopic.template_type === '個人成長' ? <Target className="h-3 w-3" /> :
-                       editedTopic.template_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
+                      {editedTopic.topic_type === '學習目標' ? <Brain className="h-3 w-3" /> :
+                       editedTopic.topic_type === '個人成長' ? <Target className="h-3 w-3" /> :
+                       editedTopic.topic_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
                        <PartyPopper className="h-3 w-3" />}
-                      {editedTopic.template_type || '選擇類型'}
+                                              {editedTopic.topic_type || '選擇類型'}
                       <ChevronDown className="h-3 w-3" />
                     </button>
                     {showTypeSelect && (
                       <div className="absolute z-10 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
                         <div className="py-1">
-                          {['學習主題', '個人成長', '專案計畫', '其他'].map((type) => (
+                          {(['學習目標', '個人成長', '專案計畫', '活動規劃'] as const).map((type) => (
                             <button
                               key={type}
                               onClick={() => {
-                                const updatedTopic = {...editedTopic, template_type: type};
+                                const updatedTopic = {...editedTopic, topic_type: type};
                                 setEditedTopic(updatedTopic);
                                 updateTopic(topic.id, updatedTopic);
                                 setShowTypeSelect(false);
                               }}
                               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dropdown-option ${
-                                type === '學習主題' ? 'text-purple-800' :
+                                type === '學習目標' ? 'text-purple-800' :
                                 type === '個人成長' ? 'text-blue-800' :
                                 type === '專案計畫' ? 'text-green-800' :
                                 'text-orange-800'
                               }`}
                             >
                               <div className="flex items-center gap-1.5">
-                                {type === '學習主題' ? <Brain className="h-3 w-3" /> :
+                                {type === '學習目標' ? <Brain className="h-3 w-3" /> :
                                  type === '個人成長' ? <Target className="h-3 w-3" /> :
                                  type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
                                  <PartyPopper className="h-3 w-3" />}
@@ -394,16 +401,16 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
               ) : (
                 <>
                   <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
-                    topic.template_type === '學習主題' ? 'bg-purple-100 text-purple-800' :
-                    topic.template_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
-                    topic.template_type === '專案計畫' ? 'bg-green-100 text-green-800' :
+                    topic.topic_type === '學習目標' ? 'bg-purple-100 text-purple-800' :
+                    topic.topic_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
+                    topic.topic_type === '專案計畫' ? 'bg-green-100 text-green-800' :
                     'bg-orange-100 text-orange-800'
                   }`}>
-                    {topic.template_type === '學習主題' ? <Brain className="h-3 w-3" /> :
-                     topic.template_type === '個人成長' ? <Target className="h-3 w-3" /> :
-                     topic.template_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
+                    {topic.topic_type === '學習目標' ? <Brain className="h-3 w-3" /> :
+                     topic.topic_type === '個人成長' ? <Target className="h-3 w-3" /> :
+                     topic.topic_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
                      <PartyPopper className="h-3 w-3" />}
-                    {topic.template_type}
+                    {topic.topic_type}
                   </span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
                     subjects.getSubjectStyle(topic.subject || '').bg
@@ -476,9 +483,9 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
         <div className="mb-3">
           <div className="grid grid-cols-2 gap-3">
             {activeGoals.map((goal, index) => {
-              const totalTasks = goal.tasks.length;
-              const completedTasks = goal.tasks.filter(task => task.status === 'done').length;
-              const inProgressTasks = goal.tasks.filter(task => task.status === 'in_progress').length;
+              const totalTasks = goal.tasks?.length || 0;
+              const completedTasks = goal.tasks?.filter(task => task.status === 'done').length || 0;
+              const inProgressTasks = goal.tasks?.filter(task => task.status === 'in_progress').length || 0;
               const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
               
               // 決定目標狀態顏色
@@ -514,7 +521,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
                   }`}
                                      onClick={() => {
                      // 點擊目標時展開任務列表
-                     const firstTask = goal.tasks[0];
+                     const firstTask = goal.tasks?.[0];
                      if (firstTask) {
                        onTaskClick?.(firstTask.id || `${goal.id}-0`, goal.id);
                      }
@@ -591,8 +598,8 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
               </div>
               <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                 {activeGoals.map((goal, index) => {
-                  const totalTasks = goal.tasks.length;
-                  const completedTasks = goal.tasks.filter(task => task.status === 'done').length;
+                  const totalTasks = goal.tasks?.length || 0;
+                  const completedTasks = goal.tasks?.filter(task => task.status === 'done').length || 0;
                   const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
                   
                   const isMarked = markedGoals.has(goal.id);

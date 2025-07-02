@@ -9,9 +9,9 @@ interface CurriculumDialogProps {
 }
 
 const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, onClose }) => {
-  const { topics, updateTask } = useTopicStore();
+  const { topics, updateTaskCompat: updateTask } = useTopicStore();
   const topic = topics.find(t => t.id === topicId);
-  const goal = topic?.goals.find(g => g.id === goalId);
+  const goal = topic?.goals?.find(g => g.id === goalId);
 
   useEffect(() => {
     // 確保有初始化主題數據
@@ -39,10 +39,10 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
   const toggleTaskStatus = async (taskId: string, task: Task) => {
     try {
       const newStatus = task.status === 'done' ? 'todo' : 'done';
-      const updatedTask = await updateTask(goal.id, taskId, {
+      const updatedTask = await updateTask(topicId, goalId, taskId, {
         ...task,
         status: newStatus,
-        completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
+        completed_at: newStatus === 'done' ? new Date().toISOString() : undefined
       });
       if (!updatedTask) {
         throw new Error('Failed to update task status');
@@ -55,7 +55,7 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
   const editTaskTitle = (taskId: string, task: Task) => {
     const title = window.prompt('修改任務名稱', task.title);
     if (title !== null && title !== task.title) {
-      updateTask(topicId, goalId, { ...task, title });
+      updateTask(topicId, goalId, task.id, { ...task, title });
     }
   };
 
@@ -74,7 +74,7 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
           <p className="text-gray-600 dark:text-gray-300 mb-6">{goal.description}</p>
         )}
         <div className="space-y-6">
-          {goal.tasks.map(task => (
+          {goal.tasks?.map(task => (
             <div key={task.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">

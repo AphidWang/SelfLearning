@@ -279,6 +279,31 @@ class TaskRecordStore {
   }
 
   /**
+   * 檢查特定任務是否有記錄
+   */
+  async hasRecord(taskId: string): Promise<boolean> {
+    try {
+      const { data, error } = await httpInterceptor.wrapSupabaseQuery(
+        async () => supabase
+          .from('task_records')
+          .select('id')
+          .eq('task_id', taskId)
+          .limit(1)
+      );
+
+      if (error) {
+        console.error('檢查任務記錄失敗:', error);
+        return false;
+      }
+
+      return !!(data && data.length > 0);
+    } catch (error) {
+      console.error('hasRecord 錯誤:', error);
+      return false;
+    }
+  }
+
+  /**
    * 獲取任務記錄統計
    */
   async getTaskRecordStats(filters?: TaskRecordFilters): Promise<TaskRecordStats> {

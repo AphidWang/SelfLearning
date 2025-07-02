@@ -100,9 +100,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     setTaskOwner, addTaskCollaborator, removeTaskCollaborator,
     addGoal, toggleTopicCollaborative, inviteTopicCollaborator,
     removeTopicCollaborator,
-    markTaskCompleted,
-    markTaskInProgress,
-    markTaskTodo
+    markTaskCompletedCompat: markTaskCompleted,
+    markTaskInProgressCompat: markTaskInProgress,
+    markTaskTodoCompat: markTaskTodo,
+    updateGoalCompat
   } = useTopicStore();
 
   // 編輯狀態
@@ -121,7 +122,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     if (!topic || !selectedGoalId) return { selectedGoal: null, selectedTask: null };
     
     const goal = topic.goals?.find(g => g.id === selectedGoalId);
-    const task = selectedTaskId && goal ? goal.tasks.find(t => t.id === selectedTaskId) : null;
+    const task = selectedTaskId && goal && goal.tasks ? goal.tasks.find(t => t.id === selectedTaskId) : null;
     
     return { selectedGoal: goal || null, selectedTask: task };
   }, [topic, selectedGoalId, selectedTaskId]);
@@ -164,9 +165,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     if (!selectedGoal) return;
     
     await handleUpdate(async () => {
-      await updateGoal(topic.id, selectedGoal.id, { status });
+      await updateGoalCompat(topic.id, selectedGoal.id, { status });
     });
-  }, [selectedGoal, topic.id, updateGoal, handleUpdate]);
+  }, [selectedGoal, topic.id, updateGoalCompat, handleUpdate]);
 
   // 編輯保存處理
   const handleSaveEdit = useCallback(async () => {
@@ -201,16 +202,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     if (!newTaskTitle.trim() || !selectedGoal) return;
     
     await handleUpdate(async () => {
-      await addTask(topic.id, selectedGoal.id, {
+      await addTask(selectedGoal.id, {
         title: newTaskTitle,
         status: 'todo',
         description: '',
-        priority: 'medium'
+        priority: 'medium',
+        order_index: (selectedGoal.tasks?.length || 0) + 1,
+        need_help: false
       });
     });
     setNewTaskTitle('');
     setShowAddTask(false);
-  }, [newTaskTitle, selectedGoal, topic.id, addTask, handleUpdate]);
+  }, [newTaskTitle, selectedGoal, addTask, handleUpdate]);
 
   // 新增目標
   const handleAddGoal = useCallback(async () => {
@@ -221,7 +224,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         title: newGoalTitle,
         status: 'todo',
         description: '',
-        tasks: []
+        priority: 'medium',
+        order_index: (topic.goals?.length || 0) + 1
       });
     });
     setNewGoalTitle('');
@@ -232,11 +236,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   const handleSetOwner = useCallback(async (user: UserType) => {
     if (selectedTask && selectedGoal) {
       await handleUpdate(async () => {
-        await setTaskOwner(topic.id, selectedGoal.id, selectedTask.id, user);
+        await setTaskOwner(topic.id, selectedGoal.id, selectedTask.id, user.id);
       });
     } else if (selectedGoal) {
       await handleUpdate(async () => {
-        await setGoalOwner(topic.id, selectedGoal.id, user);
+        await setGoalOwner(topic.id, selectedGoal.id, user.id);
       });
     }
   }, [selectedTask, selectedGoal, topic.id, setTaskOwner, setGoalOwner, handleUpdate]);
@@ -245,11 +249,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   const handleAddCollaborator = useCallback(async (user: UserType) => {
     if (selectedTask && selectedGoal) {
       await handleUpdate(async () => {
-        await addTaskCollaborator(topic.id, selectedGoal.id, selectedTask.id, user);
+        await addTaskCollaborator(topic.id, selectedGoal.id, selectedTask.id, user.id);
       });
     } else if (selectedGoal) {
       await handleUpdate(async () => {
-        await addGoalCollaborator(topic.id, selectedGoal.id, user);
+        await addGoalCollaborator(topic.id, selectedGoal.id, user.id);
       });
     }
   }, [selectedTask, selectedGoal, topic.id, addTaskCollaborator, addGoalCollaborator, handleUpdate]);
@@ -271,8 +275,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
   // 渲染協作者管理 - 使用 CollaborationManager 組件
   const renderCollaboratorManager = () => {
-    const currentOwner = selectedTask?.owner || selectedGoal?.owner;
-    const currentCollaborators = selectedTask?.collaborators || selectedGoal?.collaborators || [];
+    const currentOwner = selectedTask?.owner || (selectedGoal as any)?.owner;
+    const currentCollaborators = selectedTask?.collaborators || (selectedGoal as any)?.collaborators || [];
     
     // 可選擇的用戶：Topic 協作者 + 擁有者（如果存在）
     const selectableUsers = [...collaborators];
@@ -311,8 +315,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
   // 如果選中目標，顯示目標詳情
   if (selectedGoal) {
-    const completedTasks = selectedGoal.tasks.filter(t => t.status === 'done').length;
-    const totalTasks = selectedGoal.tasks.length;
+    const completedTasks = (selectedGoal.tasks || []).filter(t => t.status === 'done').length;
+    const totalTasks = selectedGoal.tasks?.length || 0;
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
     return (
@@ -423,7 +427,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                任務列表 ({selectedGoal.tasks.length})
+                任務列表 ({selectedGoal.tasks?.length || 0})
               </h4>
               <button
                 onClick={() => setShowAddTask(!showAddTask)}
@@ -466,7 +470,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
             {/* 任務列表 */}
             <div className="space-y-2">
-              {selectedGoal.tasks.map((task) => (
+              {(selectedGoal.tasks || []).map((task) => (
                 <div
                   key={task.id}
                   className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
@@ -480,7 +484,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                   <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
                     {task.title}
                   </span>
-                  {task.needHelp && (
+                  {task.need_help && (
                     <Flag className="w-3 h-3 text-orange-500" />
                   )}
                 </div>
@@ -489,7 +493,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
           </div>
 
           {/* 需要幫助標記 */}
-          {selectedGoal.needHelp && (
+          {selectedGoal.need_help && (
             <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
               <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
                 <Flag className="w-4 h-4" />
@@ -509,8 +513,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   if (selectedGoalId === 'TOPIC') {
     const totalGoals = topic.goals?.length || 0;
     const completedGoals = topic.goals?.filter(g => g.status === 'complete').length || 0;
-    const totalTasks = topic.goals?.reduce((sum, g) => sum + g.tasks.length, 0) || 0;
-    const completedTasks = topic.goals?.reduce((sum, g) => sum + g.tasks.filter(t => t.status === 'done').length, 0) || 0;
+    const totalTasks = topic.goals?.reduce((sum, g) => sum + (g.tasks?.length || 0), 0) || 0;
+    const completedTasks = topic.goals?.reduce((sum, g) => sum + (g.tasks?.filter(t => t.status === 'done').length || 0), 0) || 0;
 
     return (
       <motion.div
@@ -634,9 +638,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
             <div className="grid grid-cols-1 gap-2">
               {topic.goals && topic.goals.length > 0 ? topic.goals.map((goal, index) => {
-                const totalTasks = goal.tasks.length;
-                const completedTasks = goal.tasks.filter(t => t.status === 'done').length;
-                const inProgressTasks = goal.tasks.filter(t => t.status === 'in_progress').length;
+                const totalTasks = goal.tasks?.length || 0;
+                const completedTasks = (goal.tasks || []).filter(t => t.status === 'done').length;
+                const inProgressTasks = (goal.tasks || []).filter(t => t.status === 'in_progress').length;
                 const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
                 // 決定目標狀態顏色
@@ -666,7 +670,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                   <div
                     key={goal.id}
                     className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${goalStatusBg} hover:brightness-95 dark:hover:brightness-110`}
-                    onClick={() => onTaskSelect?.(goal.tasks.length > 0 ? goal.tasks[0].id : '', goal.id)}
+                    onClick={() => onTaskSelect?.((goal.tasks && goal.tasks.length > 0) ? goal.tasks[0].id : '', goal.id)}
                   >
                     {/* 編號和標題 */}
                     <div className="flex items-center gap-2 flex-1">
@@ -834,7 +838,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 }) => {
   const { 
     updateTaskInfo, deleteTask, setTaskOwner, addTaskCollaborator,
-    removeTaskCollaborator, markTaskCompleted, markTaskInProgress, markTaskTodo
+          removeTaskCollaborator, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo
   } = useTopicStore();
   
   // 編輯狀態
@@ -902,21 +906,21 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   // 刪除任務
   const handleDeleteTask = useCallback(async () => {
     await handleUpdate(async () => {
-      await deleteTask(topic.id, goal.id, task.id);
+      await deleteTask(task.id);
     });
     setShowDeleteConfirm(false);
-  }, [task, goal, topic.id, deleteTask, handleUpdate]);
+  }, [task, deleteTask, handleUpdate]);
 
   // 協作者管理
   const handleSetOwner = useCallback(async (user: UserType) => {
     await handleUpdate(async () => {
-      await setTaskOwner(topic.id, goal.id, task.id, user);
+      await setTaskOwner(topic.id, goal.id, task.id, user.id);
     });
   }, [task, goal, topic.id, setTaskOwner, handleUpdate]);
 
   const handleAddCollaborator = useCallback(async (user: UserType) => {
     await handleUpdate(async () => {
-      await addTaskCollaborator(topic.id, goal.id, task.id, user);
+      await addTaskCollaborator(topic.id, goal.id, task.id, user.id);
     });
   }, [task, goal, topic.id, addTaskCollaborator, handleUpdate]);
 
@@ -992,7 +996,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           <CheckCircle2 className="w-4 h-4" style={{ color: subjectStyle.accent }} />
           <span className="text-sm font-medium text-gray-500 dark:text-gray-400">任務詳情</span>
           <div className="flex-1" />
-          {task.needHelp && (
+          {task.need_help && (
             <motion.div
               className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full"
               initial={{ scale: 0 }}
@@ -1092,12 +1096,12 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         </div>
 
         {/* 時間資訊 */}
-        {task.completedAt && (
+        {task.completed_at && (
           <div className="mb-3">
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">完成時間</h4>
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
               <CheckCircle2 className="w-4 h-4" />
-              <span>{new Date(task.completedAt).toLocaleDateString()}</span>
+              <span>{new Date(task.completed_at).toLocaleDateString()}</span>
             </div>
           </div>
         )}

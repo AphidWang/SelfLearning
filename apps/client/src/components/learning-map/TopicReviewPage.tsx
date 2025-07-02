@@ -43,13 +43,12 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     toggleTopicCollaborative,
     inviteTopicCollaborator,
     removeTopicCollaborator,
-    getTopicInvitedCollaborators,
     getActiveGoals,
-    updateTopic,
+    updateTopicCompat: updateTopic,
     deleteTopic,
     addTask, 
     deleteTask, 
-    updateGoal,
+    updateGoalCompat,
     setGoalOwner,
     addGoalCollaborator,
     removeGoalCollaborator
@@ -199,13 +198,13 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     
     // 計算需要幫助的目標數量
     activeGoals.forEach(goal => {
-      if (goal.needHelp) {
+      if (goal.need_help) {
         count++;
       }
       
       // 計算需要幫助的任務數量
-      goal.tasks.forEach(task => {
-        if (task.needHelp) {
+      (goal.tasks || []).forEach(task => {
+        if (task.need_help) {
           count++;
         }
       });
@@ -810,9 +809,9 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   }, [refreshPanelTopic, topic]);
   
   // 根據選擇顯示不同內容
-  const selectedGoal = selectedGoalId && selectedGoalId !== 'TOPIC' ? topic?.goals.find(goal => goal.id === selectedGoalId) : null;
+  const selectedGoal = selectedGoalId && selectedGoalId !== 'TOPIC' ? topic?.goals?.find(goal => goal.id === selectedGoalId) : null;
   const selectedTask = selectedTaskId && selectedGoal ? 
-    selectedGoal.tasks.find(task => task.id === selectedTaskId) : null;
+    selectedGoal?.tasks?.find(task => task.id === selectedTaskId) : null;
 
   if (selectedTask && selectedGoal && topic) {
     // 顯示任務詳情
@@ -835,9 +834,9 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
 
   if (selectedGoal && topic) {
     // 顯示目標詳情
-    const totalTasks = selectedGoal.tasks.length;
-    const completedTasks = selectedGoal.tasks.filter(task => task.status === 'done').length;
-    const inProgressTasks = selectedGoal.tasks.filter(task => task.status === 'in_progress').length;
+    const totalTasks = selectedGoal.tasks?.length || 0;
+    const completedTasks = selectedGoal.tasks?.filter(task => task.status === 'done').length || 0;
+    const inProgressTasks = selectedGoal.tasks?.filter(task => task.status === 'in_progress').length || 0;
     const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
     return (
@@ -858,13 +857,17 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
         users={users}
         owner={owner}
         collaborators={collaborators}
-        addTask={addTask}
-        deleteTask={deleteTask}
-        updateGoal={updateGoal}
-        deleteGoal={deleteGoal}
+        addTask={(goalId, task) => addTask(goalId, task)}
+        deleteTask={(taskId) => deleteTask(taskId)}
+        updateGoal={(topicId, goalId, updates) => {
+          // 使用直接調用避免 TypeScript 緩存問題
+          const { updateGoalCompat } = useTopicStore.getState();
+          return updateGoalCompat(topicId, goalId, updates);
+        }}
+        deleteGoal={(goalId) => deleteGoal(goalId)}
         getCompletionRate={getCompletionRate}
-        setGoalOwner={setGoalOwner}
-        addGoalCollaborator={addGoalCollaborator}
+        setGoalOwner={(topicId, goalId, owner) => setGoalOwner(topicId, goalId, owner.id)}
+        addGoalCollaborator={(topicId, goalId, collaborator) => addGoalCollaborator(topicId, goalId, collaborator.id)}
         removeGoalCollaborator={removeGoalCollaborator}
         getTopic={getTopic}
       />
@@ -946,7 +949,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   owner,
   collaborators
 }) => {
-  const { updateTaskInfo, updateTaskHelp, deleteTask, setTaskOwner, addTaskCollaborator, removeTaskCollaborator, getTopic, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTopicStore();
+  const { updateTaskInfo, updateTaskHelp, deleteTask, setTaskOwner, addTaskCollaborator, removeTaskCollaborator, getTopic, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo } = useTopicStore();
   const [isUpdating, setIsUpdating] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -955,14 +958,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [comment, setComment] = useState('');
   const [challenge, setChallenge] = useState<1 | 2 | 3 | 4 | 5 | undefined>(task.challenge as 1 | 2 | 3 | 4 | 5 | undefined);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
-  const [helpMessage, setHelpMessage] = useState(task.helpMessage || '');
+  const [helpMessage, setHelpMessage] = useState(task.help_message || '');
 
   const refreshTopic = useCallback(async () => {
     console.log('📥 TaskDetailPanel - refreshTopic started');
     const fetchedTopic = await getTopic(topicId);
     if (fetchedTopic) {
-      const updatedGoal = fetchedTopic.goals.find(g => g.id === goal.id);
-      const updatedTask = updatedGoal?.tasks.find(t => t.id === task.id);
+      const updatedGoal = fetchedTopic.goals?.find(g => g.id === goal.id);
+      const updatedTask = updatedGoal?.tasks?.find(t => t.id === task.id);
       if (updatedTask) {
         console.log('📦 TaskDetailPanel - Setting new task:', updatedTask);
         setEditedTask(updatedTask);
@@ -1056,13 +1059,13 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       setIsUpdating(true);
       setPendingOperation('help');
       // 先更新 UI
-      const prevHelpMessage = task.helpMessage;
-      const prevNeedHelp = task.needHelp;
-      setEditedTask(prev => ({
-        ...prev,
-        needHelp: true,
-        helpMessage
-      }));
+      const prevHelpMessage = task.help_message;
+      const prevNeedHelp = task.need_help;
+              setEditedTask(prev => ({
+          ...prev,
+          need_help: true,
+          help_message: helpMessage
+        }));
       setShowHelpDialog(false);
 
       // 後端更新
@@ -1073,8 +1076,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         // 如果更新失敗，回滾到原始狀態
         setEditedTask(prev => ({
           ...prev,
-          needHelp: prevNeedHelp,
-          helpMessage: prevHelpMessage
+          need_help: prevNeedHelp,
+          help_message: prevHelpMessage
         }));
         alert('更新求助狀態失敗，請稍後再試');
       } finally {
@@ -1095,8 +1098,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       // 先更新 UI
       setEditedTask(prev => ({
         ...prev,
-        needHelp: false,
-        helpMessage: ''
+        need_help: false,
+        help_message: ''
       }));
       setShowHelpDialog(false);
 
@@ -1105,11 +1108,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       await refreshTopic();
     } catch (error) {
       // 如果更新失敗，回滾到原始狀態
-      setEditedTask(prev => ({
-        ...prev,
-        needHelp: task.needHelp,
-        helpMessage: task.helpMessage
-      }));
+              setEditedTask(prev => ({
+          ...prev,
+          need_help: task.need_help,
+          help_message: task.help_message
+        }));
       alert('更新求助狀態失敗，請稍後再試');
     } finally {
       setIsUpdating(false);
@@ -1125,7 +1128,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       setPendingOperation('delete');
       
       // 後端更新
-      const success = await deleteTask(topicId, goal.id, task.id);
+      const success = await deleteTask(task.id);
       if (!success) {
         alert('刪除任務失敗，請稍後再試');
       } else {
@@ -1153,7 +1156,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       setPendingOperation('owner');
       
       // 後端更新
-      const success = await setTaskOwner(topicId, goal.id, task.id, user);
+      const success = await setTaskOwner(topicId, goal.id, task.id, user.id);
       if (!success) {
         alert('設置任務負責人失敗，請稍後再試');
       } else {
@@ -1178,7 +1181,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       setPendingOperation('collaborator');
       
       // 後端更新
-      const success = await addTaskCollaborator(topicId, goal.id, task.id, user);
+      const success = await addTaskCollaborator(topicId, goal.id, task.id, user.id);
       if (!success) {
         alert('新增協作者失敗，請稍後再試');
       } else {
@@ -1266,7 +1269,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               
               {/* 操作按鈕 */}
               <div className="flex items-center gap-2">
-                {task.needHelp && (
+                {task.need_help && (
                   <motion.div
                     className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full"
                     initial={{ scale: 0 }}
@@ -1279,7 +1282,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 <button
                   onClick={() => setShowHelpDialog(true)}
                   className="p-1.5 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
-                  title={task.needHelp ? '查看/更新求助訊息' : '請求幫助'}
+                  title={task.need_help ? '查看/更新求助訊息' : '請求幫助'}
                 >
                   <HelpCircle className="w-3 h-3" />
                 </button>
@@ -1307,10 +1310,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 
           {/* 幫助狀態顯示 */}
           <HelpMessageDisplay
-            needHelp={task.needHelp}
-            helpMessage={task.helpMessage}
-            replyMessage={task.replyMessage}
-            replyAt={task.replyAt}
+            needHelp={task.need_help}
+            helpMessage={task.help_message}
+            replyMessage={task.reply_message}
+            replyAt={task.reply_at}
             className="mb-3 opacity-90"
             compact={true}
           />
@@ -1603,17 +1606,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             <div className="flex items-center gap-2 mb-3">
               <HelpCircle className="w-5 h-5 text-orange-600" />
               <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                {task.needHelp ? '更新求助訊息' : '請求幫助'}
+                {task.need_help ? '更新求助訊息' : '請求幫助'}
               </h4>
             </div>
 
-            {task.needHelp && task.helpResolvedAt && (
-              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-xs text-green-700">
-                  上次解決時間: {new Date(task.helpResolvedAt).toLocaleDateString()}
-                </p>
-              </div>
-            )}
+
 
             <textarea
               value={helpMessage}
@@ -1630,7 +1627,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               >
                 取消
               </button>
-              {task.needHelp && (
+              {task.need_help && (
                 <button
                   onClick={handleHelpResolve}
                   className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors"
@@ -1643,7 +1640,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 disabled={!helpMessage.trim()}
                 className="px-3 py-1 text-sm bg-orange-600 text-white hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
-                {task.needHelp ? '更新' : '求助'}
+                {task.need_help ? '更新' : '求助'}
               </button>
             </div>
           </motion.div>
@@ -1718,12 +1715,12 @@ interface GoalDetailPanelProps {
   users: User[];
   owner?: User;
   collaborators?: Collaborator[];
-  addTask: (topicId: string, goalId: string, task: Omit<Task, 'id'>) => Promise<Task | null>;
-  deleteTask: (topicId: string, goalId: string, taskId: string) => Promise<boolean>;
+  addTask: (goalId: string, task: Omit<Task, 'id' | 'goal_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Task | null>;
+  deleteTask: (taskId: string) => Promise<boolean>;
   updateGoal: (topicId: string, goalId: string, updates: Partial<Goal>) => Promise<Goal | null>;
-  deleteGoal: (topicId: string, goalId: string) => Promise<boolean>;
+  deleteGoal: (goalId: string) => Promise<boolean>;
   getCompletionRate: (topicId: string) => number;
-  setGoalOwner: (topicId: string, goalId: string, owner: User) => Promise<boolean>;
+  setGoalOwner: (topicId: string, goalId: string, owner: User) => Promise<Goal | null>;
   addGoalCollaborator: (topicId: string, goalId: string, collaborator: User) => Promise<boolean>;
   removeGoalCollaborator: (topicId: string, goalId: string, collaboratorId: string) => Promise<boolean>;
   getTopic: (id: string) => Promise<Topic | null>;
@@ -1758,7 +1755,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
     const [isUpdating, setIsUpdating] = useState(false);
     const [pendingOperation, setPendingOperation] = useState<string | null>(null);
     const [showHelpDialog, setShowHelpDialog] = useState(false);
-    const [helpMessage, setHelpMessage] = useState(goal.helpMessage || '');
+    const [helpMessage, setHelpMessage] = useState(goal.help_message || '');
     const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [isEditingGoal, setIsEditingGoal] = useState(false);
@@ -1767,7 +1764,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
   const refreshTopic = useCallback(async () => {
     const fetchedTopic = await getTopic(topicId);
     if (fetchedTopic) {
-      const updatedGoal = fetchedTopic.goals.find(g => g.id === goal.id);
+      const updatedGoal = fetchedTopic.goals?.find(g => g.id === goal.id);
       if (updatedGoal) {
         setEditedGoal(updatedGoal);
       }
@@ -1788,8 +1785,8 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
       setPendingOperation('owner');
       
       // 後端更新
-      const success = await setGoalOwner(topicId, goal.id, user);
-      if (!success) {
+      const result = await setGoalOwner(topicId, goal.id, user);
+      if (!result) {
         alert('設置目標負責人失敗，請稍後再試');
       } else {
         // 刷新整個主題數據
@@ -1874,15 +1871,16 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
         setPendingOperation('add');
         
         const newTask = {
-          id: `task-${Date.now()}`,
           title: newTaskTitle.trim(),
           description: '',
           status: 'todo' as const,
-          order: goal.tasks.length
+          priority: 'medium' as const,
+          order_index: goal.tasks?.length || 0,
+          need_help: false
         };
         
         // 後端更新
-        const success = await addTask(topicId, goal.id, newTask);
+        const success = await addTask(goal.id, newTask);
         if (!success) {
           alert('新增任務失敗，請稍後再試');
         } else {
@@ -1919,7 +1917,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
       setPendingOperation('delete');
       
       // 後端更新
-      const success = await deleteTask(topicId, goal.id, taskToDelete.id);
+      const success = await deleteTask(taskToDelete.id);
       if (!success) {
         alert('刪除任務失敗，請稍後再試');
       } else {
@@ -1946,7 +1944,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
       setPendingOperation('delete');
       
       // 後端更新
-      const success = await deleteGoal(topicId, goal.id);
+      const success = await deleteGoal(goal.id);
       if (!success) {
         alert('刪除目標失敗，請稍後再試');
       } else {
@@ -2003,7 +2001,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
         
         {/* 操作按鈕 */}
         <div className="flex items-center gap-2">
-          {goal.needHelp && (
+          {goal.need_help && (
             <motion.div
               className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full"
               initial={{ scale: 0 }}
@@ -2016,7 +2014,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           <button
             onClick={() => setShowHelpDialog(true)}
             className="p-1.5 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
-            title={goal.needHelp ? '查看/更新求助訊息' : '請求幫助'}
+            title={goal.need_help ? '查看/更新求助訊息' : '請求幫助'}
           >
             <HelpCircle className="w-3 h-3" />
           </button>
@@ -2120,10 +2118,8 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
 
         {/* 幫助狀態顯示 */}
         <HelpMessageDisplay
-          needHelp={goal.needHelp}
-          helpMessage={goal.helpMessage}
-          replyMessage={goal.replyMessage}
-          replyAt={goal.replyAt}
+          needHelp={goal.need_help}
+          helpMessage={goal.help_message}
           className="mb-4 opacity-90"
           compact={true}
         />
@@ -2132,8 +2128,8 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
         {topic?.is_collaborative && (
           <CollaborationManager
             title="目標協作"
-            owner={goal.owner}
-            collaborators={goal.collaborators}
+            owner={owner}
+            collaborators={collaborators}
             availableUsers={[
               ...(topic.owner ? [topic.owner] : []),
               ...(topic.collaborators || [])
@@ -2165,7 +2161,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
           </button>
         </div>
         <div className="space-y-2">
-          {goal.tasks.slice(0, 5).map((task) => {
+          {(goal.tasks || []).slice(0, 5).map((task) => {
             return (
               <div
                 key={task.id}
@@ -2194,13 +2190,13 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
                     
                     {/* 顯示幫助和回覆狀態 */}
                     <div className="flex items-center gap-1 mt-1">
-                      {task.needHelp && (
+                      {task.need_help && (
                         <span className="inline-flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">
                           <AlertTriangle className="w-2.5 h-2.5" />
                           求助
                         </span>
                       )}
-                      {task.replyMessage && (
+                      {task.reply_message && (
                         <span className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
                           <MessageSquare className="w-2.5 h-2.5" />
                           已回覆
@@ -2219,12 +2215,12 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
               </div>
             );
           })}
-          {goal.tasks.length > 5 && (
+          {(goal.tasks?.length || 0) > 5 && (
             <div className="text-center text-xs text-gray-500 py-1">
-              還有 {goal.tasks.length - 5} 個任務...
+              還有 {(goal.tasks?.length || 0) - 5} 個任務...
             </div>
           )}
-          {goal.tasks.length === 0 && (
+          {(goal.tasks?.length || 0) === 0 && (
             <div className="text-center text-xs text-gray-500 py-4">
               此目標還沒有任務
             </div>
@@ -2260,14 +2256,14 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
             <div className="flex items-center gap-2 mb-3">
               <HelpCircle className="w-5 h-5 text-orange-600" />
               <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                {goal.needHelp ? '更新求助訊息' : '請求幫助'}
+                {goal.need_help ? '更新求助訊息' : '請求幫助'}
               </h4>
             </div>
 
-            {goal.needHelp && goal.helpResolvedAt && (
+            {goal.need_help && goal.help_resolved_at && (
               <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-xs text-green-700">
-                  上次解決時間: {new Date(goal.helpResolvedAt).toLocaleDateString()}
+                  上次解決時間: {new Date(goal.help_resolved_at).toLocaleDateString()}
                 </p>
               </div>
             )}
@@ -2287,7 +2283,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
               >
                 取消
               </button>
-              {goal.needHelp && (
+              {goal.need_help && (
                 <button
                   onClick={handleHelpResolve}
                   className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors"
@@ -2300,7 +2296,7 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
                 disabled={!helpMessage.trim()}
                 className="px-3 py-1 text-sm bg-orange-600 text-white hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
-                {goal.needHelp ? '更新' : '求助'}
+                {goal.need_help ? '更新' : '求助'}
               </button>
             </div>
           </motion.div>
@@ -2437,7 +2433,10 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
       const newGoal = {
         title: newGoalTitle.trim(),
         description: newGoalDescription.trim(),
-        tasks: []
+        status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: topic.goals?.length || 0,
+        need_help: false
       };
       
       // 後端更新
@@ -2474,7 +2473,7 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
       setPendingOperation('delete');
       
       // 後端更新
-      const success = await deleteGoal(topicId, selectedGoalToDelete.id);
+      const success = await deleteGoal(selectedGoalToDelete.id);
       if (!success) {
         alert('刪除目標失敗，請稍後再試');
       } else {
@@ -2576,12 +2575,12 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
   }, [topicId, removeTopicCollaborator, onCollaborationUpdate]);
 
   const progress = getCompletionRate(topic.id);
-  const totalGoals = topic.goals.length;
-  const completedGoals = topic.goals.filter(goal => {
-    const totalTasks = goal.tasks.length;
-    const completedTasks = goal.tasks.filter(task => task.status === 'done').length;
+  const totalGoals = topic.goals?.length || 0;
+  const completedGoals = topic.goals?.filter(goal => {
+    const totalTasks = goal.tasks?.length || 0;
+    const completedTasks = goal.tasks?.filter(task => task.status === 'done').length || 0;
     return totalTasks > 0 && completedTasks === totalTasks;
-  }).length;
+  }).length || 0;
 
   console.log('🔍 Topic Panel Data:', {
     owner,
@@ -2742,7 +2741,7 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
 
         {/* 目標列表 */}
         <div className="space-y-2">
-          {topic.goals.map(goal => (
+          {topic.goals?.map(goal => (
             <div
               key={goal.id}
               className="group relative rounded-xl border border-gray-200 dark:border-gray-700 p-3 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"

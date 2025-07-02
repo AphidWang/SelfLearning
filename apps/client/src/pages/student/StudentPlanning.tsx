@@ -18,7 +18,7 @@ import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 
 const StudentPlanning: React.FC = () => {
-  const { topics, updateTopic, updateTaskInfo, markTaskCompleted, markTaskInProgress, markTaskTodo, fetchTopics, createTopic, addGoal } = useTopicStore();
+  const { topics, updateTopicCompat: updateTopic, updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo, fetchTopics, createTopic, addGoal } = useTopicStore();
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [showNewTopicModal, setShowNewTopicModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);

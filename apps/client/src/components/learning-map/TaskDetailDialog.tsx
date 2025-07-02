@@ -28,7 +28,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   onBack,
   onHelpRequest
 }) => {
-  const { updateTaskInfo, markTaskCompleted, markTaskInProgress, getTopic } = useTopicStore();
+  const { updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, getTopic } = useTopicStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
@@ -75,8 +75,8 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
       const fetchedTopic = await getTopic(topicId);
       if (fetchedTopic) {
         setTopic(fetchedTopic);
-        const goal = fetchedTopic.goals.find(g => g.id === goalId);
-        const foundTask = goal?.tasks.find(t => t.id === task.id);
+        const goal = fetchedTopic.goals?.find(g => g.id === goalId);
+        const foundTask = goal?.tasks?.find(t => t.id === task.id);
         if (foundTask) {
           setEditedTask(foundTask);
         }

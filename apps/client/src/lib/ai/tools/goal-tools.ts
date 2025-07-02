@@ -56,7 +56,7 @@ export const createTaskTool: Tool<{ task_name: string; goal_id: string }, Task> 
       title: params.task_name,
       status: 'todo'
     };
-    topicStore.addTask(selectedTopicId, params.goal_id, newTask);
+    topicStore.addTask(params.goal_id, newTask);
     return newTask;
   }
 };
@@ -97,7 +97,7 @@ export const completeTopicTool: Tool<void, boolean> = {
     const topic = topicStore.topics.find(t => t.id === selectedTopicId);
     if (!topic) return false;
 
-    topicStore.updateTopic(selectedTopicId, {
+    topicStore.updateTopicCompat(selectedTopicId, {
       ...topic,
       status: 'completed'
     });
@@ -117,7 +117,7 @@ export const markAsBookmarkTool: Tool<void, boolean> = {
     const topic = topicStore.topics.find(t => t.id === selectedTopicId);
     if (!topic) return false;
 
-    topicStore.updateTopic(selectedTopicId, {
+    topicStore.updateTopicCompat(selectedTopicId, {
       ...topic,
       status: 'archived'
     });

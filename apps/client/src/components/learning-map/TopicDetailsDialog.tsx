@@ -90,7 +90,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
     if (!newTaskTitle.trim() || !currentGoal) return;
     
     try {
-      const success = await addTask(topic.id, currentGoal.id, {
+      const success = await addTask(currentGoal.id, {
         title: newTaskTitle,
         status: 'todo'
       } as Task);
@@ -133,7 +133,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   const focusedGoals = getFocusedGoalsForTopic(topic.id);
   const goals = getActiveGoals(topic.id);
   const totalGoals = goals.length;
-  const completedGoalsCount = goals.filter(g => g.tasks.every(t => t.status === 'done')).length;
+  const completedGoalsCount = goals.filter(g => g?.tasks?.every(t => t.status === 'done')).length;
   const progress = getCompletionRate(topic.id);
 
   // 當前顯示的目標索引
@@ -637,16 +637,16 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex gap-2">
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
-                      topic.template_type === '學習目標' ? 'bg-purple-100 text-purple-800' :
-                      topic.template_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
-                      topic.template_type === '專案計畫' ? 'bg-green-100 text-green-800' :
+                      topic.topic_type === '學習目標' ? 'bg-purple-100 text-purple-800' :
+                      topic.topic_type === '個人成長' ? 'bg-blue-100 text-blue-800' :
+                      topic.topic_type === '專案計畫' ? 'bg-green-100 text-green-800' :
                       'bg-orange-100 text-orange-800'
                     }`}>
-                      {topic.template_type === '學習目標' ? <Brain className="h-3 w-3" /> :
-                       topic.template_type === '個人成長' ? <Target className="h-3 w-3" /> :
-                       topic.template_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
+                      {topic.topic_type === '學習目標' ? <Brain className="h-3 w-3" /> :
+                       topic.topic_type === '個人成長' ? <Target className="h-3 w-3" /> :
+                       topic.topic_type === '專案計畫' ? <Sparkles className="h-3 w-3" /> :
                        <PartyPopper className="h-3 w-3" />}
-                      {topic.template_type}
+                      {topic.topic_type}
                     </span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
                       subjects.getSubjectStyle(topic.subject || '').bg
@@ -686,9 +686,9 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                         <div className="flex-1 min-w-0">
                           <div className="font-medium mb-1 line-clamp-2">{currentGoal?.title}</div>
                           <div className="text-xs text-gray-500">
-                            {currentGoal?.tasks.filter(t => t.status === 'in_progress').length > 0 
-                              ? `${currentGoal?.tasks.filter(t => t.status === 'in_progress').length} 個進行中`
-                              : `${currentGoal?.tasks.filter(t => t.status === 'todo').length || 0} 個待開始`
+                            {(currentGoal?.tasks || []).filter(t => t.status === 'in_progress').length > 0 
+                              ? `${(currentGoal?.tasks || []).filter(t => t.status === 'in_progress').length} 個進行中`
+                              : `${(currentGoal?.tasks || []).filter(t => t.status === 'todo').length || 0} 個待開始`
                             }
                           </div>
                         </div>
@@ -772,7 +772,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
                   
                   {/* 任務列表 */}
                   <div className="space-y-2">
-                    {currentGoal?.tasks.map((task, index) => (
+                    {(currentGoal?.tasks || []).map((task, index) => (
                         <div 
                           key={task.id || `${currentGoal?.id}-${index}`}
                           className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all"
