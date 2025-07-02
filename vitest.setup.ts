@@ -48,7 +48,7 @@ Object.defineProperty(global, 'crypto', {
 interface QueryFilter {
   column: string;
   value: string;
-  operator: 'eq';
+  operator: 'eq' | 'neq';
 }
 
 interface QueryState {
@@ -62,7 +62,11 @@ interface QueryState {
 // Mock Supabase client
 const mockData = {
   topics: new Map(),
-  topic_templates: new Map()
+  topics_new: new Map(),
+  goals: new Map(),
+  tasks: new Map(),
+  topic_templates: new Map(),
+  topic_collaborators: new Map()
 };
 
 function createQueryBuilder(table: string) {
@@ -83,30 +87,77 @@ function createQueryBuilder(table: string) {
       query.filters.push({ column, value, operator: 'eq' });
       return builder;
     },
+    neq: (column: string, value: string) => {
+      query.filters.push({ column, value, operator: 'neq' });
+      return builder;
+    },
+    order: (column: string, options?: { ascending?: boolean }) => {
+      // 暫時忽略排序，返回 builder
+      return builder;
+    },
     single: () => {
       query.returnSingle = true;
       return builder;
     },
     then: async (callback) => {
       let result;
-      if (table === 'topics') {
+      const tableName = table as keyof typeof mockData;
+      
+      if (mockData[tableName]) {
         if (query.filters.length > 0) {
-          const filter = query.filters[0];
-          result = mockData.topics.get(filter.value);
+          if (query.filters.some(f => f.operator === 'eq')) {
+            // 如果有 eq 過濾器，獲取特定記錄
+            const eqFilter = query.filters.find(f => f.operator === 'eq');
+            result = mockData[tableName].get(eqFilter!.value);
+            
+            // 應用 neq 過濾器
+            const neqFilters = query.filters.filter(f => f.operator === 'neq');
+            if (result && neqFilters.length > 0) {
+              for (const neqFilter of neqFilters) {
+                if (result[neqFilter.column] === neqFilter.value) {
+                  result = undefined; // 排除這個結果
+                  break;
+                }
+              }
+            }
+            
+            // 如果是查詢 topics_new，需要附加 goals 和 tasks
+            if ((table === 'topics_new' || table === 'topics') && result) {
+              const topicGoals = Array.from(mockData.goals.values()).filter(goal => 
+                goal.topic_id === result.id && goal.status !== 'archived'
+              );
+              
+              // 為每個 goal 附加 tasks
+              const goalsWithTasks = topicGoals.map(goal => {
+                const goalTasks = Array.from(mockData.tasks.values()).filter(task => 
+                  task.goal_id === goal.id && task.status !== 'archived'
+                );
+                return { ...goal, tasks: goalTasks };
+              });
+              
+              result = { ...result, goals: goalsWithTasks };
+            }
+          } else {
+            // 如果只有 neq 過濾器，獲取所有記錄並過濾
+            let allResults = Array.from(mockData[tableName].values());
+            
+            for (const filter of query.filters) {
+              if (filter.operator === 'neq') {
+                allResults = allResults.filter(item => item[filter.column] !== filter.value);
+              } else if (filter.operator === 'eq') {
+                allResults = allResults.filter(item => item[filter.column] === filter.value);
+              }
+            }
+            
+            result = allResults;
+          }
         } else {
-          result = Array.from(mockData.topics.values());
-        }
-      } else if (table === 'topic_templates') {
-        if (query.filters.length > 0) {
-          const filter = query.filters[0];
-          result = mockData.topic_templates.get(filter.value);
-        } else {
-          result = Array.from(mockData.topic_templates.values());
+          result = Array.from(mockData[tableName].values());
         }
       }
 
       return callback({
-        data: query.returnSingle ? result : [result],
+        data: query.returnSingle ? result : (Array.isArray(result) ? result : [result]),
         error: null
       });
     }
@@ -136,6 +187,16 @@ const mockSupabaseClient = {
         }
       },
       error: null
+    }),
+    onAuthStateChange: vi.fn(() => {
+      // 返回一個 unsubscribe 函數
+      return {
+        data: {
+          subscription: {
+            unsubscribe: vi.fn()
+          }
+        }
+      };
     })
   },
   from: vi.fn((table) => {
@@ -144,25 +205,46 @@ const mockSupabaseClient = {
         return createQueryBuilder(table);
       },
       insert: (data) => {
+        const baseId = `test-${table}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const newData = {
-          id: 'test-id',
+          id: baseId,
           ...data,
-          goals: data.goals || [],
-          bubbles: data.bubbles || [],
+          version: 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
 
-        if (table === 'topics') {
-          mockData.topics.set(newData.id, {
-            ...newData,
-            topic_collaborators: []
-          });
-        } else if (table === 'topic_templates') {
-          mockData.topic_templates.set(newData.id, {
-            ...newData,
-            topic_template_collaborators: []
-          });
+        // 對於 topics，添加空的 goals 和 bubbles
+        if (table === 'topics' || table === 'topics_new') {
+          newData.goals = data.goals || [];
+          newData.bubbles = data.bubbles || [];
+        }
+        
+        // 對於 goals，確保設置 topic_id
+        if (table === 'goals' && data.topic_id) {
+          newData.topic_id = data.topic_id;
+        }
+        
+        // 對於 tasks，確保設置 goal_id
+        if (table === 'tasks' && data.goal_id) {
+          newData.goal_id = data.goal_id;
+        }
+
+        const tableName = table as keyof typeof mockData;
+        if (mockData[tableName]) {
+          if (table === 'topics' || table === 'topics_new') {
+            mockData[tableName].set(newData.id, {
+              ...newData,
+              topic_collaborators: []
+            });
+          } else if (table === 'topic_templates') {
+            mockData[tableName].set(newData.id, {
+              ...newData,
+              topic_template_collaborators: []
+            });
+          } else {
+            mockData[tableName].set(newData.id, newData);
+          }
         }
 
         return {
@@ -178,36 +260,19 @@ const mockSupabaseClient = {
       },
       update: (updates) => ({
         eq: (column: string, value: string) => {
+          const tableName = table as keyof typeof mockData;
           let existing;
-          if (table === 'topics') {
-            existing = mockData.topics.get(value);
+          
+          if (mockData[tableName]) {
+            existing = mockData[tableName].get(value);
             if (existing) {
               const updated = {
                 ...existing,
                 ...updates,
+                version: (existing.version || 1) + 1,
                 updated_at: new Date().toISOString()
               };
-              mockData.topics.set(value, updated);
-              return {
-                select: () => ({
-                  single: () => ({
-                    then: async (callback) => callback({
-                      data: updated,
-                      error: null
-                    })
-                  })
-                })
-              };
-            }
-          } else if (table === 'topic_templates') {
-            existing = mockData.topic_templates.get(value);
-            if (existing) {
-              const updated = {
-                ...existing,
-                ...updates,
-                updated_at: new Date().toISOString()
-              };
-              mockData.topic_templates.set(value, updated);
+              mockData[tableName].set(value, updated);
               return {
                 select: () => ({
                   single: () => ({
@@ -220,6 +285,7 @@ const mockSupabaseClient = {
               };
             }
           }
+          
           return {
             select: () => ({
               single: () => ({
@@ -234,10 +300,9 @@ const mockSupabaseClient = {
       }),
       delete: () => ({
         eq: (column: string, value: string) => {
-          if (table === 'topics') {
-            mockData.topics.delete(value);
-          } else if (table === 'topic_templates') {
-            mockData.topic_templates.delete(value);
+          const tableName = table as keyof typeof mockData;
+          if (mockData[tableName]) {
+            mockData[tableName].delete(value);
           }
           return {
             then: async (callback) => callback({
@@ -250,6 +315,88 @@ const mockSupabaseClient = {
     };
 
     return builder;
+  }),
+  
+  // 添加 RPC 函數 mock
+  rpc: vi.fn((functionName: string, params: any = {}) => {
+    return {
+      then: async (callback) => {
+        let result;
+        
+        switch (functionName) {
+          case 'safe_update_topic':
+            const topic = mockData.topics_new.get(params.topic_id);
+            if (topic && topic.version === params.expected_version) {
+              const updated = {
+                ...topic,
+                ...params.updates,
+                version: topic.version + 1,
+                updated_at: new Date().toISOString()
+              };
+              mockData.topics_new.set(params.topic_id, updated);
+              result = updated;
+            } else {
+              return callback({
+                data: null,
+                error: { message: 'Version conflict' }
+              });
+            }
+            break;
+            
+          case 'safe_update_goal':
+            const goal = mockData.goals.get(params.goal_id);
+            if (goal && goal.version === params.expected_version) {
+              const updated = {
+                ...goal,
+                ...params.updates,
+                version: goal.version + 1,
+                updated_at: new Date().toISOString()
+              };
+              mockData.goals.set(params.goal_id, updated);
+              result = updated;
+            } else {
+              return callback({
+                data: null,
+                error: { message: 'Version conflict' }
+              });
+            }
+            break;
+            
+          case 'safe_update_task':
+            const task = mockData.tasks.get(params.task_id);
+            if (task && task.version === params.expected_version) {
+              const updated = {
+                ...task,
+                ...params.updates,
+                version: task.version + 1,
+                updated_at: new Date().toISOString()
+              };
+              mockData.tasks.set(params.task_id, updated);
+              result = updated;
+            } else {
+              return callback({
+                data: null,
+                error: { message: 'Version conflict' }
+              });
+            }
+            break;
+            
+          case 'get_active_tasks_for_user':
+            result = Array.from(mockData.tasks.values()).filter(task => 
+              task.status === 'todo' || task.status === 'in_progress'
+            );
+            break;
+            
+          default:
+            result = null;
+        }
+        
+        return callback({
+          data: result,
+          error: null
+        });
+      }
+    };
   })
 };
 
@@ -261,7 +408,11 @@ vi.mock('@supabase/supabase-js', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockData.topics.clear();
+  mockData.topics_new.clear();
+  mockData.goals.clear();
+  mockData.tasks.clear();
   mockData.topic_templates.clear();
+  mockData.topic_collaborators.clear();
   
   localStorageMock.getItem.mockReset();
   localStorageMock.setItem.mockReset();

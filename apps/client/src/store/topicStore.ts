@@ -24,8 +24,64 @@ import {
 } from '../types/goal';
 import type { TopicCollaborator } from '@self-learning/types';
 import { supabase, authService } from '../services/supabase';
-import { useUserStore } from './userStore';
 import { taskRecordStore } from './taskRecordStore';
+
+// 輔助函數：獲取用戶真實資料
+const getUsersData = async (userIds: string[]): Promise<{[key: string]: User}> => {
+  if (userIds.length === 0) return {};
+  
+  try {
+    // 獲取 userStore 實例並載入用戶資料
+    const { useUserStore } = await import('./userStore');
+    const userStore = useUserStore.getState();
+    
+    // 確保用戶資料已載入
+    if (userStore.users.length === 0) {
+      await userStore.getCollaboratorCandidates();
+    }
+    
+    // 從用戶列表中查找對應的用戶
+    const userMap: {[key: string]: User} = {};
+    userStore.users.forEach(user => {
+      if (userIds.includes(user.id)) {
+        userMap[user.id] = user;
+      }
+    });
+    
+    // 對於找不到的用戶，創建簡化版本
+    userIds.forEach(id => {
+      if (!userMap[id]) {
+        userMap[id] = {
+          id,
+          name: `User-${id.slice(0, 8)}`,
+          email: '',
+          avatar: undefined,
+          role: 'student',
+          roles: ['student']
+        };
+      }
+    });
+    
+    return userMap;
+  } catch (error) {
+    console.warn('獲取用戶資料失敗，使用簡化資訊:', error);
+    
+    // 如果出錯，返回簡化的用戶資料
+    const fallbackUsers: {[key: string]: User} = {};
+    userIds.forEach(id => {
+      fallbackUsers[id] = {
+        id,
+        name: `User-${id.slice(0, 8)}`,
+        email: '',
+        avatar: undefined,
+        role: 'student',
+        roles: ['student']
+      };
+    });
+    
+    return fallbackUsers;
+  }
+};
 
 // Result 型別定義
 export type MarkTaskResult = 
@@ -248,19 +304,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         uniqueTopics.map(async (topic) => {
           try {
             // 獲取協作者資訊
-            let collaborators = [];
-            let owner = null;
+            let collaborators: (User & { permission: string; invited_at: string })[] = [];
+            let owner: User | null = null;
             try {
-              // 暫時使用簡化的擁有者資訊（用戶資料在 auth schema 中，稍後會改進）
-              if (topic.owner_id) {
-                owner = {
-                  id: topic.owner_id,
-                  name: 'Owner',
-                  email: '',
-                  avatar: null
-                };
-              }
-
               // 獲取協作者列表
               const { data: collaboratorData, error: collabError } = await supabase
                 .from('topic_collaborators')
@@ -271,13 +317,34 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
                 `)
                 .eq('topic_id', topic.id);
 
+              // 收集所有需要查詢的用戶ID
+              const userIds: string[] = [];
+              if (topic.owner_id) {
+                userIds.push(topic.owner_id);
+              }
               if (!collabError && collaboratorData) {
-                // 使用簡化的協作者資訊（稍後會改進用戶資料獲取）
+                userIds.push(...collaboratorData.map(c => c.user_id));
+              }
+
+              // 一次性獲取所有用戶資料
+              const usersMap = await getUsersData(userIds);
+
+              // 設置擁有者資訊
+              if (topic.owner_id && usersMap[topic.owner_id]) {
+                owner = usersMap[topic.owner_id];
+              }
+
+              // 設置協作者資訊
+              if (!collabError && collaboratorData) {
                 collaborators = collaboratorData.map(collab => ({
-                  id: collab.user_id,
-                  name: `User-${collab.user_id.slice(0, 8)}`,
-                  email: '',
-                  avatar: null,
+                  ...(usersMap[collab.user_id] || {
+                    id: collab.user_id,
+                    name: `User-${collab.user_id.slice(0, 8)}`,
+                    email: '',
+                    avatar: undefined,
+                    role: 'student',
+                    roles: ['student']
+                  }),
                   permission: collab.permission,
                   invited_at: collab.invited_at
                 }));
@@ -374,19 +441,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       if (!topic) return null;
 
       // 獲取協作者資訊
-      let collaborators = [];
-      let owner = null;
+      let collaborators: (User & { permission: string; invited_at: string })[] = [];
+      let owner: User | null = null;
       try {
-        // 暫時使用簡化的擁有者資訊
-        if (topic.owner_id) {
-          owner = {
-            id: topic.owner_id,
-            name: 'Owner',
-            email: '',
-            avatar: null
-          };
-        }
-
         // 獲取協作者列表
         const { data: collaboratorData, error: collabError } = await supabase
           .from('topic_collaborators')
@@ -397,13 +454,34 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
           `)
           .eq('topic_id', id);
 
+        // 收集所有需要查詢的用戶ID
+        const userIds: string[] = [];
+        if (topic.owner_id) {
+          userIds.push(topic.owner_id);
+        }
         if (!collabError && collaboratorData) {
-          // 使用簡化的協作者資訊
+          userIds.push(...collaboratorData.map(c => c.user_id));
+        }
+
+        // 一次性獲取所有用戶資料
+        const usersMap = await getUsersData(userIds);
+
+        // 設置擁有者資訊
+        if (topic.owner_id && usersMap[topic.owner_id]) {
+          owner = usersMap[topic.owner_id];
+        }
+
+        // 設置協作者資訊
+        if (!collabError && collaboratorData) {
           collaborators = collaboratorData.map(collab => ({
-            id: collab.user_id,
-            name: `User-${collab.user_id.slice(0, 8)}`,
-            email: '',
-            avatar: null,
+            ...(usersMap[collab.user_id] || {
+              id: collab.user_id,
+              name: `User-${collab.user_id.slice(0, 8)}`,
+              email: '',
+              avatar: undefined,
+              role: 'student',
+              roles: ['student']
+            }),
             permission: collab.permission,
             invited_at: collab.invited_at
           }));

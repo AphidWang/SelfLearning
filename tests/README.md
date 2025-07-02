@@ -2,6 +2,19 @@
 
 這個資料夾包含所有的測試檔案，用於測試 SelfLearningPlatform 的各個功能模組。
 
+## 🚀 重大更新: Topic Store 遷移後測試狀況
+
+### ✅ **工作正常的測試**
+```bash
+yarn test tests/test-topic-template-store.test.ts  # 7/7 通過
+yarn test tests/test-basic-topic-store.test.ts     # 4/4 通過
+```
+
+### ⚠️ **需要完善的測試**
+```bash
+yarn test tests/test-topic-store.test.ts  # 1/10 通過 (Mock 設置複雜)
+```
+
 ## 運行測試
 
 ### 運行所有測試
@@ -11,8 +24,9 @@ yarn test
 
 ### 運行特定測試檔案
 ```bash
-yarn test tests/test-topic-store.test.ts
-yarn test tests/test-topic-template-store.test.ts
+yarn test tests/test-topic-template-store.test.ts  # ✅ 正常
+yarn test tests/test-basic-topic-store.test.ts     # ✅ 正常  
+yarn test tests/test-topic-store.test.ts           # ❌ 需要修復
 ```
 
 ### 監視模式運行測試
@@ -22,18 +36,25 @@ yarn test --watch
 
 ## 測試檔案說明
 
-### `test-topic-store.test.ts`
-測試 Topic Store 的功能，包括：
-- 基本 CRUD 操作（創建、讀取、更新、刪除主題）
-- 目標管理（新增、更新、刪除目標）
-- 任務管理（新增、更新、刪除任務）
-- 協作功能（切換協作狀態）
+### `test-basic-topic-store.test.ts` ✅ 
+測試 Topic Store 的基本功能：
+- 初始狀態檢查
+- API 方法存在性檢查
+- 版本控制方法檢查
+- 快速查詢方法檢查
 
-### `test-topic-template-store.test.ts`
+### `test-topic-template-store.test.ts` ✅
 測試 Topic Template Store 的功能，包括：
 - 基本 CRUD 操作（創建、讀取、更新、刪除模板）
 - 目標管理（新增、更新、刪除目標）
 - 公開設定（切換公開狀態）
+
+### `test-topic-store.test.ts` ⚠️
+測試 Topic Store 的完整功能（**目前需要複雜 mock 設置**）：
+- 基本 CRUD 操作（創建、讀取、更新、刪除主題）
+- 目標管理（新增、更新、刪除目標）
+- 任務管理（新增、更新、刪除任務）
+- 協作功能（切換協作狀態）
 
 ## 類型修復說明
 

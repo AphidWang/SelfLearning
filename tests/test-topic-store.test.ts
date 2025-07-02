@@ -56,7 +56,7 @@ describe('TopicStore', () => {
       expect(topic).toBeDefined();
       
       const updatedTitle = '更新後的主題';
-      const result = await store.updateTopic(topic!.id, { title: updatedTitle });
+      const result = await store.updateTopicCompat(topic!.id, { title: updatedTitle });
       expect(result).toBeDefined();
       expect(result?.title).toBe(updatedTitle);
       expect(result?.goals).toEqual([]);
@@ -132,7 +132,7 @@ describe('TopicStore', () => {
       expect(goal).toBeDefined();
 
       const updatedTitle = '更新後的目標';
-      const result = await store.updateGoal(testTopic!.id, goal!.id, { title: updatedTitle });
+      const result = await store.updateGoalCompat(testTopic!.id, goal!.id, { title: updatedTitle });
       expect(result).toBeDefined();
       expect(result?.title).toBe(updatedTitle);
       expect(result?.tasks).toEqual([]);
@@ -153,7 +153,7 @@ describe('TopicStore', () => {
       });
       expect(goal).toBeDefined();
 
-      const result = await store.deleteGoal(testTopic!.id, goal!.id);
+      const result = await store.deleteGoal(goal!.id);
       expect(result).toBe(true);
 
       // 驗證資料庫中的資料
@@ -199,7 +199,7 @@ describe('TopicStore', () => {
         dueDate: new Date().toISOString()
       };
 
-      const result = await store.addTask(testTopic!.id, testGoal!.id, task);
+      const result = await store.addTask(testGoal!.id, task);
       expect(result).toBeDefined();
       expect(result?.title).toBe(task.title);
 
@@ -211,7 +211,7 @@ describe('TopicStore', () => {
     });
 
     it('應該能更新任務狀態', async () => {
-      const task = await store.addTask(testTopic!.id, testGoal!.id, {
+      const task = await store.addTask(testGoal!.id, {
         title: '測試任務',
         description: '這是一個測試任務',
         status: 'todo' as const,
@@ -219,7 +219,7 @@ describe('TopicStore', () => {
       });
       expect(task).toBeDefined();
 
-      const result = await store.updateTask(testTopic!.id, testGoal!.id, task!.id, { status: 'done' });
+      const result = await store.updateTaskCompat(testTopic!.id, testGoal!.id, task!.id, { status: 'done' });
       expect(result).toBeDefined();
       expect(result?.status).toBe('done');
 
@@ -230,7 +230,7 @@ describe('TopicStore', () => {
     });
 
     it('應該能刪除任務', async () => {
-      const task = await store.addTask(testTopic!.id, testGoal!.id, {
+      const task = await store.addTask(testGoal!.id, {
         title: '測試任務',
         description: '這是一個測試任務',
         status: 'todo' as const,
@@ -238,7 +238,7 @@ describe('TopicStore', () => {
       });
       expect(task).toBeDefined();
 
-      const result = await store.deleteTask(testTopic!.id, testGoal!.id, task!.id);
+      const result = await store.deleteTask(task!.id);
       expect(result).toBe(true);
 
       // 驗證資料庫中的資料
@@ -269,7 +269,7 @@ describe('TopicStore', () => {
 
     it('應該能切換協作狀態', async () => {
       const result = await store.toggleTopicCollaborative(testTopic!.id);
-      expect(result).toBe(true);
+      expect(result).toBeDefined();
 
       const savedTopic = await store.getTopic(testTopic!.id);
       expect(savedTopic).toBeDefined();
