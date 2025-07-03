@@ -1033,10 +1033,16 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   markTaskCompleted: async (taskId: string, expectedVersion: number, requireRecord = true) => {
     try {
+      console.log('🎯 開始標記任務完成:', { taskId, expectedVersion, requireRecord });
+      
       // 檢查是否需要學習記錄
       if (requireRecord) {
+        console.log('📝 檢查是否有學習記錄');
         const hasRecord = await get().hasTaskRecord(taskId);
+        console.log('📊 學習記錄檢查結果:', { hasRecord });
+        
         if (!hasRecord) {
+          console.log('⚠️ 缺少學習記錄，需要先記錄');
           return {
             success: false,
             message: '請先記錄學習心得',
@@ -1046,8 +1052,13 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       }
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('用戶未認證');
+      if (!user) {
+        console.error('❌ 用戶未認證');
+        throw new Error('用戶未認證');
+      }
+      console.log('👤 已取得用戶資訊:', { userId: user.id });
 
+      console.log('📤 準備更新任務狀態');
       const updatedTask = await get().updateTask(taskId, expectedVersion, {
         status: 'done',
         completed_by: user.id,
@@ -1055,14 +1066,18 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       });
 
       if (updatedTask) {
+        console.log('✅ 任務更新成功:', { taskId: updatedTask.id, status: updatedTask.status });
         return { success: true, task: updatedTask };
       }
 
+      console.error('❌ 更新任務失敗: 無法更新任務狀態');
       return { success: false, message: '更新任務失敗' };
     } catch (error: any) {
       if (error instanceof VersionConflictError) {
+        console.error('❌ 版本衝突:', error.message);
         return { success: false, message: error.message };
       }
+      console.error('❌ 標記任務完成失敗:', error);
       return { success: false, message: error.message || '標記任務完成失敗' };
     }
   },
