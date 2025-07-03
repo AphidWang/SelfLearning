@@ -427,12 +427,20 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
                     .filter(Boolean);
 
                   // 為每個 task 設置 owner 和 collaborators
-                  const tasksWithUsers = (tasks || []).map(task => ({
-                    ...task,
-                    owner: task.owner_id && goalTaskUsersMap[task.owner_id] ? goalTaskUsersMap[task.owner_id] : null,
-                    collaborators: (task.collaborator_ids || [])
-                      .map(id => goalTaskUsersMap[id])
-                      .filter(Boolean)
+                  const tasksWithUsers = await Promise.all((tasks || []).map(async task => {
+                    // 獲取任務記錄
+                    const records = await taskRecordStore.getUserTaskRecords({
+                      task_id: task.id
+                    });
+
+                    return {
+                      ...task,
+                      owner: task.owner_id && goalTaskUsersMap[task.owner_id] ? goalTaskUsersMap[task.owner_id] : null,
+                      collaborators: (task.collaborator_ids || [])
+                        .map(id => goalTaskUsersMap[id])
+                        .filter(Boolean),
+                      records: records || []
+                    };
                   }));
 
                   return { 
@@ -615,12 +623,20 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
             .filter(Boolean);
 
           // 為每個 task 設置 owner 和 collaborators
-          const tasksWithUsers = (tasks || []).map(task => ({
-            ...task,
-            owner: task.owner_id && goalTaskUsersMap[task.owner_id] ? goalTaskUsersMap[task.owner_id] : null,
-            collaborators: (task.collaborator_ids || [])
-              .map(id => goalTaskUsersMap[id])
-              .filter(Boolean)
+          const tasksWithUsers = await Promise.all((tasks || []).map(async task => {
+            // 獲取任務記錄
+            const records = await taskRecordStore.getUserTaskRecords({
+              task_id: task.id
+            });
+
+            return {
+              ...task,
+              owner: task.owner_id && goalTaskUsersMap[task.owner_id] ? goalTaskUsersMap[task.owner_id] : null,
+              collaborators: (task.collaborator_ids || [])
+                .map(id => goalTaskUsersMap[id])
+                .filter(Boolean),
+              records: records || []
+            };
           }));
 
           return { 

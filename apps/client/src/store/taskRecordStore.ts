@@ -133,16 +133,20 @@ class TaskRecordStore {
     try {
       let query = supabase
         .from('task_records')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
-      // 應用篩選條件
+      // 如果有指定 task_id，使用複合索引
+      if (filters?.task_id) {
+        query = query.eq('task_id', filters.task_id).order('created_at', { ascending: false });
+      } else {
+        // 其他情況使用一般的時間排序
+        query = query.order('created_at', { ascending: false });
+      }
+
+      // 應用其他篩選條件
       if (filters) {
         if (filters.topic_id) {
           query = query.eq('topic_id', filters.topic_id);
-        }
-        if (filters.task_id) {
-          query = query.eq('task_id', filters.task_id);
         }
         if (filters.difficulty) {
           query = query.eq('difficulty', filters.difficulty);
