@@ -461,9 +461,10 @@ const CutePromptDialog: React.FC<CutePromptDialogProps> = ({
 interface TopicCardProps {
   data: TopicCardData;
   onClick: (topicId: string) => void;
+  isLoading?: boolean;
 }
 
-const TopicCard: React.FC<TopicCardProps> = ({ data, onClick }) => {
+const TopicCard: React.FC<TopicCardProps> = ({ data, onClick, isLoading }) => {
   const { topic, subjectStyle, totalGoals, completedGoals, totalTasks, completedTasks, inProgressTasks, needHelpCount, collaborators, overallProgress } = data;
 
   // 根據目標狀態決定圖標
@@ -478,7 +479,7 @@ const TopicCard: React.FC<TopicCardProps> = ({ data, onClick }) => {
 
   return (
     <motion.div
-      className="group cursor-pointer"
+      className="group cursor-pointer relative"
       onClick={() => onClick(topic.id)}
       whileHover={{ y: -3, scale: 1.01 }}
       whileTap={{ scale: 0.98 }}
@@ -489,8 +490,15 @@ const TopicCard: React.FC<TopicCardProps> = ({ data, onClick }) => {
         mass: 1
       }}
     >
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <LoadingDots />
+        </div>
+      )}
       <div 
-        className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg border-2 p-6 h-[320px] flex flex-col transition-all duration-300 hover:shadow-2xl"
+        className={`bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg border-2 p-6 h-[320px] flex flex-col transition-all duration-300 hover:shadow-2xl ${
+          isLoading ? 'opacity-90' : ''
+        }`}
         style={{ 
           borderColor: subjectStyle.accent + '40',
           boxShadow: `0 10px 30px ${subjectStyle.accent}15, 0 0 0 1px ${subjectStyle.accent}20`
@@ -639,9 +647,10 @@ interface TopicGridProps {
   onTopicClick: (topicId: string) => void;
   isLoading?: boolean;
   isViewModeChanging?: boolean;
+  loadingTopicId: string | null;
 }
 
-const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, isLoading, isViewModeChanging }) => {
+const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, isLoading, isViewModeChanging, loadingTopicId }) => {
   if (isLoading || isViewModeChanging) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
@@ -672,6 +681,7 @@ const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, isLoading, 
           <TopicCard 
             data={topicData} 
             onClick={onTopicClick}
+            isLoading={topicData.topic.id === loadingTopicId}
           />
         </motion.div>
       ))}
@@ -719,6 +729,7 @@ export const TaskWallPage = () => {
   const [completedCount, setCompletedCount] = useState(0);
   const [isStarAnimating, setIsStarAnimating] = useState(false);
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
+  const [loadingTopicId, setLoadingTopicId] = useState<string | null>(null);
 
   // 初始化資料載入
   useEffect(() => {
@@ -1145,7 +1156,12 @@ export const TaskWallPage = () => {
    */
   const handleTopicClick = useCallback((topicId: string) => {
     if (!topicId) return;
+    setLoadingTopicId(topicId);
     setShowTopicReviewId(topicId);
+    
+    setTimeout(() => {
+      setLoadingTopicId(null);
+    }, 500);
   }, []);
 
   // 修改切換視圖模式的處理函數
@@ -1369,10 +1385,14 @@ export const TaskWallPage = () => {
               </div>
             ) : (
               <TopicGrid
-                topics={topicCards}
+                topics={topicCards.map(card => ({
+                  ...card,
+                  isLoading: card.topic.id === loadingTopicId
+                }))}
                 onTopicClick={handleTopicClick}
                 isLoading={isLoading}
                 isViewModeChanging={isViewModeChanging}
+                loadingTopicId={loadingTopicId}
               />
             )
           )}
@@ -1430,22 +1450,21 @@ export const TaskWallPage = () => {
         />
 
         {/* 主題詳細檢視 */}
-        <AnimatePresence>
-          {showTopicReviewId && (
-            <TopicReviewPage
-              topicId={showTopicReviewId}
-              onClose={() => setShowTopicReviewId(null)}
-              onTaskClick={(taskId, goalId) => {
-                console.log('Task clicked:', taskId, goalId);
-                // 可以在這裡實現從主題檢視跳到任務詳情的邏輯
-              }}
-              onGoalClick={(goalId) => {
-                console.log('Goal clicked:', goalId);
-              }}
-            />
-          )}
-        </AnimatePresence>
-
+        {showTopicReviewId && (
+          <TopicReviewPage
+            topicId={showTopicReviewId}
+            onClose={() => {
+              setShowTopicReviewId(null);
+              setLoadingTopicId(null);
+            }}
+            onTaskClick={(taskId, goalId) => {
+              console.log('Task clicked:', taskId, goalId);
+            }}
+            onGoalClick={(goalId) => {
+              console.log('Goal clicked:', goalId);
+            }}
+          />
+        )}
 
       </div>
     </PageLayout>

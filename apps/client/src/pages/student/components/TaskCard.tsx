@@ -22,7 +22,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Star, Pause, User as UserIcon } from 'lucide-react';
+import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Activity, Pause, User as UserIcon, Timer } from 'lucide-react';
 import type { Task, TaskStatus } from '../../../types/goal';
 
 /**
@@ -189,11 +189,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
             </div>
           </div>
 
-          {/* 裝飾性元素和狀態指示器 */}
-          {task.status === 'in_progress' ? (
-            <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-purple-500 shadow-md"></div>
-          ) : (
-            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-white/60 shadow-inner"></div>
+          {/* 狀態指示器 */}
+          {task.status === 'in_progress' && (
+            <div className="absolute top-2 right-2 text-lg transform hover:scale-125 transition-transform">
+              🦕
+            </div>
           )}
         </motion.div>
 
