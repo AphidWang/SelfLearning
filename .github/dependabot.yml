@@ -6,9 +6,13 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     groups:
-      dependencies:
-        patterns:
-          - "*"
+      dev-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/apps/server"
@@ -16,9 +20,13 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     groups:
-      dependencies:
-        patterns:
-          - "*"
+      dev-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/packages/types"
@@ -26,6 +34,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     groups:
-      dependencies:
-        patterns:
-          - "*" 
+      dev-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"] 
