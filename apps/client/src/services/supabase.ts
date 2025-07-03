@@ -153,8 +153,6 @@ export const avatarService = {
     return { isValid: true };
   },
 
-
-
   /**
    * 生成頭像文件路徑
    */
@@ -198,18 +196,47 @@ export const avatarService = {
 
     console.log('Upload success, file path:', data.path);
 
-    // 獲取原始 URL
-    const { data: originalUrlData } = supabase.storage
+    // 獲取原始 URL 並等待檔案可訪問
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 秒
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      const { data: originalUrlData } = supabase.storage
+        .from(this.BUCKET_NAME)
+        .getPublicUrl(data.path);
+
+      console.log('Original URL:', originalUrlData.publicUrl);
+
+      try {
+        // 測試檔案是否可訪問
+        const response = await fetch(originalUrlData.publicUrl, { method: 'HEAD' });
+        if (response.ok) {
+          console.log('File is accessible');
+          return {
+            path: data.path,
+            url: originalUrlData.publicUrl
+          };
+        }
+      } catch (e) {
+        console.log(`Retry ${retryCount + 1}/${maxRetries}: File not accessible yet`);
+      }
+
+      // 等待後重試
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      retryCount++;
+    }
+
+    // 如果重試後仍然無法訪問，仍然返回 URL
+    // 因為檔案已經上傳成功，只是 CDN 同步需要時間
+    const { data: finalUrlData } = supabase.storage
       .from(this.BUCKET_NAME)
       .getPublicUrl(data.path);
 
-    console.log('Original URL:', originalUrlData.publicUrl);
-
-    // Image Transformation 需要 Pro 計劃，直接使用原始 URL
-    console.log('Using original URL (Image Transformation requires Pro plan)');
+    console.log('Returning URL after retries');
     return {
       path: data.path,
-      url: originalUrlData.publicUrl
+      url: finalUrlData.publicUrl
     };
   },
 
