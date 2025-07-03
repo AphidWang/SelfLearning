@@ -37,6 +37,7 @@ import { TaskRecordDialog } from './components/TaskRecordDialog';
 import { TopicReviewPage } from '../../components/topic-review/TopicReviewPage';
 import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
 import { LoadingDots } from '../../components/shared/LoadingDots';
+import { TaskRecordHistoryDialog } from './components/TaskRecordHistoryDialog';
 
 /**
  * 任務牆配置介面
@@ -740,6 +741,8 @@ export const TaskWallPage = () => {
   const [isStarAnimating, setIsStarAnimating] = useState(false);
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
   const [loadingTopicId, setLoadingTopicId] = useState<string | null>(null);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [selectedTaskForHistory, setSelectedTaskForHistory] = useState<TaskWithContext | null>(null);
 
   // 初始化資料載入
   useEffect(() => {
@@ -1224,6 +1227,12 @@ export const TaskWallPage = () => {
     await fetchTopics();
   }, [fetchTopics]);
 
+  // 處理打開歷史記錄
+  const handleOpenHistory = useCallback((task: TaskWithContext) => {
+    setSelectedTaskForHistory(task);
+    setShowHistoryDialog(true);
+  }, []);
+
   // 載入狀態
   if (loading) {
     return (
@@ -1422,6 +1431,7 @@ export const TaskWallPage = () => {
                 onTaskStatusUpdate={handleTaskStatusUpdate}
                 onAddTaskToGoal={handleAddTaskToGoal}
                 onOpenRecord={handleOpenRecord}
+                onOpenHistory={handleOpenHistory}
                 onRecordSuccess={handleRecordSuccess}
                 currentUserId={currentUser?.id}
                 isLoading={isLoading}
@@ -1515,6 +1525,22 @@ export const TaskWallPage = () => {
             }}
           />
         )}
+
+        {/* 歷史記錄對話框 */}
+        <TaskRecordHistoryDialog
+          isOpen={showHistoryDialog}
+          onClose={() => {
+            setShowHistoryDialog(false);
+            setSelectedTaskForHistory(null);
+          }}
+          task={{
+            id: selectedTaskForHistory?.id || '',
+            title: selectedTaskForHistory?.title || '',
+            records: selectedTaskForHistory?.records || [],
+            topicTitle: selectedTaskForHistory?.topicTitle,
+            subjectStyle: selectedTaskForHistory?.subjectStyle
+          }}
+        />
 
       </div>
     </PageLayout>
