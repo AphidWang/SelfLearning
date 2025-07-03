@@ -267,30 +267,33 @@ export const avatarService = {
   /**
    * 獲取圖片轉換後的 URL (利用 Supabase Image Transformation)
    */
-  getTransformedImageUrl(path: string, options: { width?: number; height?: number; quality?: number } = {}): string {
+  getTransformedImageUrl(path: string, options: { width?: number; height?: number; quality?: number } = {}): Promise<string> {
     const { width = 200, height = 200, quality = 80 } = options;
     
-    try {
-      const { data } = supabase.storage
-        .from(this.BUCKET_NAME)
-        .getPublicUrl(path, {
-          transform: {
-            width,
-            height,
-            resize: 'cover',
-            quality
-          }
-        });
+    return new Promise(async (resolve, reject) => {
+      try {
+        const { data: transformData } = supabase.storage
+          .from(this.BUCKET_NAME)
+          .getPublicUrl(path, {
+            transform: {
+              width,
+              height,
+              resize: 'cover',
+              quality
+            }
+          });
+        
+        // 測試轉換後的 URL 是否可用
+        const transformResponse = await fetch(transformData.publicUrl, { method: 'HEAD' });
+        if (transformResponse.ok) {
+          return resolve(transformData.publicUrl);
+        }
+        throw new Error('圖片轉換失敗');
 
-      console.log('Generated transform URL:', data.publicUrl);
-      return data.publicUrl;
-    } catch (error) {
-      console.warn('Transform URL generation failed:', error);
-      // 降級到原始 URL
-      const { data: fallbackData } = supabase.storage
-        .from(this.BUCKET_NAME)
-        .getPublicUrl(path);
-      return fallbackData.publicUrl;
-    }
+      } catch (error) {
+        console.error('Image transform failed:', error);
+        reject(new Error('圖片轉換失敗，請稍後再試'));
+      }
+    });
   }
 };
