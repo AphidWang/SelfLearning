@@ -50,5 +50,5 @@ jobs:
           yarn dlx @sentry/cli releases files $SENTRY_RELEASE upload-sourcemaps dist/ --url-prefix '~/assets' --validate
           yarn dlx @sentry/cli releases finalize $SENTRY_RELEASE
 
-      - name: Deploy
-        run: ./your-deploy-script.sh 
+#      - name: Deploy
+#        run: ./your-deploy-script.sh 
