@@ -2,6 +2,16 @@ import { supabase } from '../services/supabase';
 
 export type MoodType = 'excited' | 'happy' | 'okay' | 'tired' | 'stressed';
 
+export interface CompletedTask {
+  id: string;
+  title: string;
+  type: 'recorded' | 'completed';
+  difficulty?: number;
+  time: string;
+  category?: string;
+  assignedTo?: string;
+}
+
 export interface DailyJournal {
   id: string;
   user_id: string;
@@ -11,6 +21,7 @@ export interface DailyJournal {
   content: string;
   has_voice_note: boolean;
   voice_note_url?: string;
+  completed_tasks: CompletedTask[];
   created_at: string;
   updated_at: string;
 }
@@ -22,6 +33,7 @@ export interface CreateJournalEntry {
   has_voice_note: boolean;
   voice_note_url?: string;
   date?: string; // 如果不提供，使用今天
+  completed_tasks?: CompletedTask[]; // 如果不提供，會自動從資料庫獲取
 }
 
 class JournalStore {
@@ -33,6 +45,17 @@ class JournalStore {
 
       const journalDate = entry.date || new Date().toISOString().split('T')[0];
 
+      // 如果沒有提供 completed_tasks，使用資料庫函數獲取
+      let completed_tasks = entry.completed_tasks;
+      if (!completed_tasks) {
+        const { data: tasksData } = await supabase
+          .rpc('get_completed_tasks_for_date', {
+            target_date: journalDate,
+            target_user_id: user.id
+          });
+        completed_tasks = tasksData || [];
+      }
+
       const journalData = {
         user_id: user.id,
         date: journalDate,
@@ -40,7 +63,8 @@ class JournalStore {
         motivation_level: entry.motivation_level,
         content: entry.content,
         has_voice_note: entry.has_voice_note,
-        voice_note_url: entry.voice_note_url
+        voice_note_url: entry.voice_note_url,
+        completed_tasks
       };
 
       // 使用 upsert 來處理一天只能有一篇日記的邏輯
