@@ -30,7 +30,7 @@ export const initSentry = () => {
     Sentry.init({
       dsn: "https://d347fd97a10246c0312bbf9411fc63dd@o4509603489316864.ingest.us.sentry.io/4509603494100993",
       environment: import.meta.env.MODE,
-      debug: true, // 強制開啟 debug
+      debug: import.meta.env.MODE === 'development',
       sendDefaultPii: true,
       
       integrations: [
