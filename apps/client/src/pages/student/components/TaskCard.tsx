@@ -35,16 +35,27 @@ interface TaskWithContext extends Task {
   goalId: string;
   goalTitle: string;
   subjectStyle: any;
+  records: {
+    id: string;
+    created_at: string;
+    title: string;
+    message: string;
+    difficulty: number;
+    completion_time?: number;
+    files?: any[];
+    tags?: string[];
+  }[];
 }
 
 interface TaskCardProps {
   task: TaskWithContext;
   onStatusUpdate: (newStatus: TaskStatus) => void;
   onOpenRecord?: (task: TaskWithContext) => void;
+  onRecordSuccess?: () => void;
   currentUserId?: string;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord, currentUserId }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord, onRecordSuccess, currentUserId }) => {
   const [isFlipped, setIsFlipped] = useState(false);
 
   /**
@@ -180,11 +191,33 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
               )}
             </div>
 
+            {/* 學習記錄數量 - 只在有記錄時顯示 */}
+            <div className="flex justify-end mb-2">
+              {(task.records?.length || 0) > 0 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenRecord?.(task);
+                  }}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:scale-110 hover:shadow-md"
+                  style={{
+                    backgroundColor: task.subjectStyle.accent + 'CC',
+                    color: 'white'
+                  }}
+                  title={`${task.records?.length} 則學習記錄`}
+                >
+                  +{task.records?.length}
+                </button>
+              )}
+            </div>
+
             {/* 底部：目標資訊 */}
             <div className="mt-auto pt-2 border-t border-gray-200/50">
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <Target className="w-3 h-3" />
-                <span className="truncate">{task.goalTitle}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1 text-xs text-gray-500">
+                  <Target className="w-3 h-3" />
+                  <span className="truncate">{task.goalTitle}</span>
+                </div>
               </div>
             </div>
           </div>

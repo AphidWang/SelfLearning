@@ -23,19 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TaskCard } from './TaskCard';
 import { GoalCard } from './GoalCard';
 import { LoadingDots } from '../../../components/shared/LoadingDots';
-import type { TaskStatus, Task, Goal } from '../../../types/goal';
-
-/**
- * 擴展的任務介面，包含主題和目標資訊
- */
-interface TaskWithContext extends Task {
-  topicId: string;
-  topicTitle: string;
-  topicSubject: string;
-  goalId: string;
-  goalTitle: string;
-  subjectStyle: any;
-}
+import type { TaskStatus, Task, Goal, TaskWithContext } from '../../../types/goal';
 
 /**
  * 擴展的目標介面，包含主題資訊
@@ -74,7 +62,8 @@ interface TaskWallGridProps {
     topicId: string,
     taskTitle: string
   ) => void;
-  onOpenRecord?: (task: TaskWithContext) => void;
+  onOpenRecord: (task: TaskWithContext) => void;
+  onRecordSuccess?: () => void;
   currentUserId?: string;
   isLoading?: boolean;
 }
@@ -85,6 +74,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   onTaskStatusUpdate,
   onAddTaskToGoal,
   onOpenRecord,
+  onRecordSuccess,
   currentUserId,
   isLoading = false
 }) => {
@@ -231,6 +221,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
                   )
                 }
                 onOpenRecord={onOpenRecord}
+                onRecordSuccess={onRecordSuccess}
                 currentUserId={currentUserId}
               />
             ) : (

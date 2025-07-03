@@ -2,6 +2,10 @@ import { createRoot } from 'react-dom/client';
 import React from 'react';
 import App from './App.tsx';
 import './index.css';
+import { initSentry } from './config/sentry';
+
+// 初始化 Sentry 錯誤監控
+initSentry();
 
 // 暫時抑制 react-beautiful-dnd 的 defaultProps 警告
 const originalWarn = console.warn;

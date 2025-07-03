@@ -59,6 +59,16 @@ interface TaskWithContext extends Task {
   goalId: string;
   goalTitle: string;
   subjectStyle: any;
+  records: {
+    id: string;
+    created_at: string;
+    title: string;
+    message: string;
+    difficulty: number;
+    completion_time?: number;
+    files?: any[];
+    tags?: string[];
+  }[];
 }
 
 /**
@@ -785,7 +795,17 @@ export const TaskWallPage = () => {
               topicSubject: topic.subject || '未分類',
               goalId: goal.id,
               goalTitle: goal.title,
-              subjectStyle
+              subjectStyle,
+              records: (task.records || []).map(record => ({
+                id: record.id,
+                created_at: record.created_at || new Date().toISOString(),
+                title: task.title,
+                message: record.content || '',
+                difficulty: 3,
+                completion_time: undefined,
+                files: [],
+                tags: []
+              }))
             });
           }
         });
@@ -839,7 +859,17 @@ export const TaskWallPage = () => {
                   topicSubject: topics.find(t => t.id === topicId)?.subject || '未分類',
                   goalId,
                   goalTitle: topics.find(t => t.id === topicId)?.goals?.find(g => g.id === goalId)?.title || '',
-                  subjectStyle: subjects.getSubjectStyle(topics.find(t => t.id === topicId)?.subject || '')
+                  subjectStyle: subjects.getSubjectStyle(topics.find(t => t.id === topicId)?.subject || ''),
+                  records: (task.records || []).map(record => ({
+                    id: record.id,
+                    created_at: record.created_at || new Date().toISOString(),
+                    title: task.title,
+                    message: record.content || '',
+                    difficulty: 3,
+                    completion_time: undefined,
+                    files: [],
+                    tags: []
+                  }))
                 });
                 setShowPromptDialog(true);
               }
@@ -931,7 +961,10 @@ export const TaskWallPage = () => {
    * 處理打開記錄對話框
    */
   const handleOpenRecord = useCallback((task: TaskWithContext) => {
-    setSelectedTaskForRecord(task);
+    setSelectedTaskForRecord({
+      ...task,
+      records: task.records // 已經是新格式，不需要再轉換
+    });
     setShowRecordDialog(true);
   }, []);
 
@@ -987,7 +1020,17 @@ export const TaskWallPage = () => {
               topicSubject: topic.subject || '未分類',
               goalId: goal.id,
               goalTitle: goal.title,
-              subjectStyle
+              subjectStyle,
+              records: (task.records || []).map(record => ({
+                id: record.id,
+                created_at: record.created_at || new Date().toISOString(),
+                title: task.title,
+                message: record.content || '',
+                difficulty: 3,
+                completion_time: undefined,
+                files: [],
+                tags: []
+              }))
             });
           }
         });
@@ -1172,6 +1215,14 @@ export const TaskWallPage = () => {
     await new Promise(resolve => setTimeout(resolve, 500));
     setIsViewModeChanging(false);
   };
+
+  // 在 TaskWallPage 組件中添加刷新函數
+  const handleRecordSuccess = useCallback(async () => {
+    setShowRecordDialog(false);
+    setSelectedTaskForRecord(null);
+    // 重新獲取最新數據
+    await fetchTopics();
+  }, [fetchTopics]);
 
   // 載入狀態
   if (loading) {
@@ -1371,6 +1422,7 @@ export const TaskWallPage = () => {
                 onTaskStatusUpdate={handleTaskStatusUpdate}
                 onAddTaskToGoal={handleAddTaskToGoal}
                 onOpenRecord={handleOpenRecord}
+                onRecordSuccess={handleRecordSuccess}
                 currentUserId={currentUser?.id}
                 isLoading={isLoading}
               />
@@ -1420,18 +1472,16 @@ export const TaskWallPage = () => {
         {/* 任務記錄 Dialog */}
         <TaskRecordDialog
           isOpen={showRecordDialog}
-          taskTitle={selectedTaskForRecord?.title || ''}
-          topic_id={selectedTaskForRecord?.topicId}
-          task_id={selectedTaskForRecord?.id}
-          task_type="task"
+          task={{
+            id: selectedTaskForRecord?.id || '',
+            title: selectedTaskForRecord?.title || '',
+            description: selectedTaskForRecord?.description
+          }}
           onClose={() => {
             setShowRecordDialog(false);
             setSelectedTaskForRecord(null);
           }}
-          onSuccess={() => {
-            setShowRecordDialog(false);
-            setSelectedTaskForRecord(null);
-          }}
+          onRecordSuccess={handleRecordSuccess}
         />
 
         {/* 溫馨提示 Dialog */}

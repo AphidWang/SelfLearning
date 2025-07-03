@@ -34,6 +34,14 @@ interface JournalEntry {
   date: string;
 }
 
+interface CompletedTask {
+  id: string;
+  title: string;
+  category: string;
+  assignedTo: string;
+  time: string;
+}
+
 interface DailyJournalDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -131,7 +139,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [showHistoryConfirm, setShowHistoryConfirm] = useState(false);
   const [todayTaskRecords, setTodayTaskRecords] = useState<TaskRecord[]>([]);
-  const [todayCompletedTasks, setTodayCompletedTasks] = useState<Task[]>([]);
+  const [todayCompletedTasks, setTodayCompletedTasks] = useState<CompletedTask[]>([]);
 
   // 獲取今天的任務資料
   useEffect(() => {
@@ -153,20 +161,21 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
         setTodayTaskRecords(records);
 
         // 從 topics 中獲取今天完成的任務
-        const completedTasks: Task[] = [];
+        const completedTasks: CompletedTask[] = [];
         topics.forEach(topic => {
           topic.goals?.forEach(goal => {
             goal.tasks?.forEach(task => {
-              if (task.status === 'done' && task.completedAt) {
-                const completedDate = new Date(task.completedAt);
+              if (task.status === 'done' && task.completed_at) {
+                const completedDate = new Date(task.completed_at);
                 completedDate.setHours(0, 0, 0, 0);
                 if (completedDate.getTime() === today.getTime()) {
                   completedTasks.push({
-                    ...task,
-                    // 加入額外資訊方便顯示
+                    id: task.id,
+                    title: task.title,
                     category: topic.title,
-                    assignedTo: goal.title
-                  } as Task);
+                    assignedTo: goal.title,
+                    time: task.completed_at
+                  });
                 }
               }
             });
@@ -206,7 +215,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
         type: 'completed',
         category: task.category,
         assignedTo: task.assignedTo,
-        time: task.completedAt
+        time: task.time
       });
     });
 
@@ -495,7 +504,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
                 />
               </div>
 
-              {/* 語音記錄 */}
+              {/* 語音記錄 - 暫時隱藏
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-3">語音記錄 (選擇性)</h3>
                 <div className="flex items-center gap-3">
@@ -528,6 +537,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
                   )}
                 </div>
               </div>
+              */}
 
               {/* 儲存按鈕 */}
               <motion.button
