@@ -51,11 +51,12 @@ interface TaskCardProps {
   task: TaskWithContext;
   onStatusUpdate: (newStatus: TaskStatus) => void;
   onOpenRecord?: (task: TaskWithContext) => void;
+  onOpenHistory?: (task: TaskWithContext) => void;
   onRecordSuccess?: () => void;
   currentUserId?: string;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord, onRecordSuccess, currentUserId }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord, onOpenHistory, onRecordSuccess, currentUserId }) => {
   const [isFlipped, setIsFlipped] = useState(false);
 
   /**
@@ -191,15 +192,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
               )}
             </div>
 
-            {/* 學習記錄數量 - 只在有記錄時顯示 */}
+            {/* 學習記錄數量 */}
             <div className="flex justify-end mb-2">
               {(task.records?.length || 0) > 0 && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    onOpenRecord?.(task);
+                    onOpenHistory?.(task);
                   }}
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:scale-110 hover:shadow-md"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:scale-110 hover:shadow-md"
                   style={{
                     backgroundColor: task.subjectStyle.accent + 'CC',
                     color: 'white'
