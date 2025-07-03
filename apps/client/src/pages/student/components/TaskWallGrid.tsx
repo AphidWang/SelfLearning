@@ -62,7 +62,8 @@ interface TaskWallGridProps {
     topicId: string,
     taskTitle: string
   ) => void;
-  onOpenRecord: (task: TaskWithContext) => void;
+  onOpenRecord?: (task: TaskWithContext) => void;
+  onOpenHistory?: (task: TaskWithContext) => void;
   onRecordSuccess?: () => void;
   currentUserId?: string;
   isLoading?: boolean;
@@ -74,6 +75,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   onTaskStatusUpdate,
   onAddTaskToGoal,
   onOpenRecord,
+  onOpenHistory,
   onRecordSuccess,
   currentUserId,
   isLoading = false
@@ -221,6 +223,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
                   )
                 }
                 onOpenRecord={onOpenRecord}
+                onOpenHistory={onOpenHistory}
                 onRecordSuccess={onRecordSuccess}
                 currentUserId={currentUserId}
               />
