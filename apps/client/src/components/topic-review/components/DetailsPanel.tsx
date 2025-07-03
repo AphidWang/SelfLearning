@@ -439,33 +439,68 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
             {/* 新增任務輸入 */}
             {showAddTask && (
-              <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <input
-                  type="text"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  placeholder="任務標題..."
-                  className="w-full p-2 border border-gray-300 rounded mb-2"
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddTask()}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleAddTask}
-                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-                  >
-                    新增
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAddTask(false);
-                      setNewTaskTitle('');
-                    }}
-                    className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm"
-                  >
-                    取消
-                  </button>
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="p-4 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-900/20 dark:to-blue-800/10 backdrop-blur-sm">
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        placeholder="輸入新任務標題..."
+                        className="w-full px-4 py-3 text-sm font-medium bg-white/80 dark:bg-gray-800/80 border-0 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 backdrop-blur-sm transition-all"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && newTaskTitle.trim()) {
+                            handleAddTask();
+                          }
+                          if (e.key === 'Escape') {
+                            setShowAddTask(false);
+                            setNewTaskTitle('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <div className="absolute inset-0 rounded-lg ring-1 ring-blue-200/50 dark:ring-blue-700/50 pointer-events-none" />
+                    </div>
+                    
+                    <div className="flex items-center justify-end">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setShowAddTask(false);
+                            setNewTaskTitle('');
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md transition-all"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleAddTask}
+                          disabled={isUpdating || !newTaskTitle.trim()}
+                          className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                        >
+                          {isUpdating ? (
+                            <>
+                              <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                              新增中
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3 h-3" />
+                              新增任務
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* 任務列表 */}
@@ -716,31 +751,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             </div>
           </div>
 
-          {/* 協作資訊 */}
-          {topic.is_collaborative && (
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">協作模式</h4>
-              <div className="space-y-2">
-                {topic.owner && (
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      擁有者：{topic.owner.name}
-                    </span>
-                  </div>
-                )}
-                {topic.collaborators && topic.collaborators.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {topic.collaborators.length} 位協作者
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* 協作管理 */}
           <TopicCollaborationManager
             topic={{
@@ -774,6 +784,31 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }}
             isUpdating={isUpdating}
           />
+
+          {/* 協作資訊 */}
+          {topic.is_collaborative && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">協作模式</h4>
+              <div className="space-y-2">
+                {topic.owner && (
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      擁有者：{topic.owner.name}
+                    </span>
+                  </div>
+                )}
+                {topic.collaborators && topic.collaborators.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {topic.collaborators.length} 位協作者
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 學科資訊 */}
           {topic.subject && (
