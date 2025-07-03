@@ -18,10 +18,11 @@
  * - 進場動畫：從透明度0到100，輕微彈跳效果
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TaskCard } from './TaskCard';
 import { GoalCard } from './GoalCard';
+import { LoadingDots } from '../../../components/shared/LoadingDots';
 import type { TaskStatus, Task, Goal } from '../../../types/goal';
 
 /**
@@ -75,6 +76,7 @@ interface TaskWallGridProps {
   ) => void;
   onOpenRecord?: (task: TaskWithContext) => void;
   currentUserId?: string;
+  isLoading?: boolean;
 }
 
 export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
@@ -83,8 +85,36 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   onTaskStatusUpdate,
   onAddTaskToGoal,
   onOpenRecord,
-  currentUserId
+  currentUserId,
+  isLoading = false
 }) => {
+  const [showLoading, setShowLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isLoading) {
+        setShowLoading(false);
+        setIsInitialLoad(false);
+      }
+    }, isInitialLoad ? 500 : 1500); // 初次載入 0.5 秒，之後操作 1.5 秒
+    
+    return () => clearTimeout(timer);
+  }, [isLoading, isInitialLoad]);
+
+  if (showLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <LoadingDots 
+          isLoading={isLoading} 
+          minLoadingTime={500}
+          colors={['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57']}
+          size={8}
+        />
+      </div>
+    );
+  }
+
   /**
    * 計算網格欄數
    * 根據配置和螢幕尺寸動態調整
@@ -101,26 +131,35 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
 
   /**
    * 卡片進場動畫變體
-   * 輕微的彈跳效果，模擬手貼便條紙的感覺
+   * 更快速靈動的效果，模擬手貼便條紙的輕快感覺
    */
   const cardVariants = {
-    hidden: {
+    hidden: (index: number) => ({
       opacity: 0,
-      scale: 0.8,
-      y: 20,
-      rotate: 0
-    },
-    visible: {
+      scale: 0.85,
+      y: 30 + Math.random() * 10,
+      rotate: (Math.random() - 0.5) * 4,
+    }),
+    visible: (index: number) => ({
       opacity: 1,
       scale: 1,
       y: 0,
-      rotate: 0
-    },
+      rotate: (Math.random() - 0.5) * 2,
+      transition: {
+        type: "spring" as const,
+        damping: 20,
+        stiffness: 300,
+        mass: 0.8,
+        delay: index * 0.02,
+      }
+    }),
     exit: {
       opacity: 0,
-      scale: 0.9,
+      scale: 0.92,
+      y: -10,
       transition: {
-        duration: 0.2
+        duration: 0.15,
+        ease: "easeOut" as const
       }
     }
   };
@@ -133,8 +172,9 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.05,
-        delayChildren: 0.1
+        staggerChildren: 0.02, // 大幅縮短 stagger
+        delayChildren: 0.05, // 減少初始延遲
+        duration: 0.3
       }
     }
   };
@@ -157,16 +197,25 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
             variants={cardVariants}
             custom={index}
             layout
+            layoutId={`${card.type}-${card.data.id}`}
             initial="hidden"
             animate="visible"
             exit="exit"
             whileHover={{
-              scale: 1.02,
+              scale: 1.05,
+              y: -8,
               rotate: 0, // 懸停時回正
               transition: {
                 type: "spring",
-                damping: 25,
-                stiffness: 400
+                damping: 15,
+                stiffness: 500,
+                duration: 0.2
+              }
+            }}
+            whileTap={{
+              scale: 0.98,
+              transition: {
+                duration: 0.1
               }
             }}
           >
@@ -204,9 +253,18 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
       {cards.length === config.maxVisibleCards && (
         <motion.div
           className="col-span-full flex justify-center py-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: cards.length * 0.05 + 0.3 }}
+          initial={{ opacity: 0, y: 20, scale: 0.9 }}
+          animate={{ 
+            opacity: 1, 
+            y: 0, 
+            scale: 1,
+            transition: {
+              type: "spring",
+              damping: 20,
+              stiffness: 200,
+              delay: cards.length * 0.02 + 0.1
+            }
+          }}
         >
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">

@@ -29,12 +29,14 @@ import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
 import { TaskRecordDialog } from './components/TaskRecordDialog';
+import { TopicReviewPage } from '../../components/topic-review/TopicReviewPage';
 import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
+import { LoadingDots } from '../../components/shared/LoadingDots';
 
 /**
  * 任務牆配置介面
@@ -44,6 +46,7 @@ interface TaskWallConfig {
   gridColumns: 'auto' | 2 | 3; // 網格欄數
   priorityFilter: 'all' | 'high' | 'medium' | 'low'; // 優先權過濾
   showCompletedStack: boolean;
+  viewMode: 'tasks' | 'topics'; // 新增：視圖模式切換
 }
 
 /**
@@ -66,6 +69,22 @@ interface GoalWithContext extends Goal {
   topicTitle: string;
   topicSubject: string;
   subjectStyle: any;
+}
+
+/**
+ * 主題卡片數據介面
+ */
+interface TopicCardData {
+  topic: Topic;
+  subjectStyle: any;
+  totalGoals: number;
+  completedGoals: number;
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  needHelpCount: number;
+  collaborators: any[];
+  overallProgress: number;
 }
 
 /**
@@ -436,7 +455,235 @@ const CutePromptDialog: React.FC<CutePromptDialogProps> = ({
   );
 };
 
-const TaskWallPage: React.FC = () => {
+/**
+ * 主題卡片組件
+ */
+interface TopicCardProps {
+  data: TopicCardData;
+  onClick: (topicId: string) => void;
+}
+
+const TopicCard: React.FC<TopicCardProps> = ({ data, onClick }) => {
+  const { topic, subjectStyle, totalGoals, completedGoals, totalTasks, completedTasks, inProgressTasks, needHelpCount, collaborators, overallProgress } = data;
+
+  // 根據目標狀態決定圖標
+  const getStatusIcon = () => {
+    if (overallProgress === 100) return CheckCircle2;
+    if (inProgressTasks > 0) return Play;
+    if (totalTasks === 0) return Target;
+    return Clock;
+  };
+
+  const StatusIcon = getStatusIcon();
+
+  return (
+    <motion.div
+      className="group cursor-pointer"
+      onClick={() => onClick(topic.id)}
+      whileHover={{ y: -3, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ 
+        type: "spring",
+        stiffness: 400,
+        damping: 30,
+        mass: 1
+      }}
+    >
+      <div 
+        className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg border-2 p-6 h-[320px] flex flex-col transition-all duration-300 hover:shadow-2xl"
+        style={{ 
+          borderColor: subjectStyle.accent + '40',
+          boxShadow: `0 10px 30px ${subjectStyle.accent}15, 0 0 0 1px ${subjectStyle.accent}20`
+        }}
+      >
+        {/* 頂部標題區 */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div 
+                  className="px-3 py-1 rounded-full text-xs font-medium"
+                  style={{ 
+                    backgroundColor: subjectStyle.accent + '20',
+                    color: subjectStyle.accent
+                  }}
+                >
+                  {topic.subject || '未分類'}
+                </div>
+                {topic.is_collaborative && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-600 rounded-full text-xs">
+                    <Users className="w-3 h-3" />
+                    協作
+                  </div>
+                )}
+                {/* 協作者頭像移到這裡 */}
+                {topic.is_collaborative && collaborators.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <div className="flex -space-x-2">
+                      {collaborators.slice(0, 3).map((collaborator, index) => (
+                        <div
+                          key={collaborator.id}
+                          className="w-5 h-5 rounded-full border-2 border-white bg-gradient-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-[10px] font-bold"
+                          style={{ zIndex: 10 - index }}
+                        >
+                          {collaborator.name?.charAt(0) || '?'}
+                        </div>
+                      ))}
+                      {collaborators.length > 3 && (
+                        <div className="w-5 h-5 rounded-full border-2 border-white bg-gray-400 flex items-center justify-center text-white text-[10px] font-bold">
+                          +{collaborators.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 line-clamp-2 leading-tight">
+              {topic.title}
+            </h3>
+          </div>
+          <div className="flex-shrink-0 ml-3">
+            <StatusIcon 
+              className="w-6 h-6" 
+              style={{ color: subjectStyle.accent }}
+            />
+          </div>
+        </div>
+
+        {/* 中央進度環 */}
+        <div className="flex-1 flex items-center justify-center my-3">
+          <div className="relative">
+            {/* 外圈 */}
+            <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 96 96">
+              <circle
+                cx="48"
+                cy="48"
+                r="40"
+                stroke={subjectStyle.accent + '20'}
+                strokeWidth="8"
+                fill="none"
+              />
+              <circle
+                cx="48"
+                cy="48"
+                r="40"
+                stroke={subjectStyle.accent}
+                strokeWidth="8"
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={`${overallProgress * 2.51} 251.2`}
+                style={{
+                  transition: 'stroke-dasharray 0.5s ease-in-out'
+                }}
+              />
+            </svg>
+            {/* 中央百分比 */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl font-bold text-gray-800">
+                {Math.round(overallProgress)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 底部統計資訊 */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-1 text-gray-600">
+              <Flag className="w-4 h-4" />
+              <span>{completedGoals}/{totalGoals} 目標</span>
+            </div>
+            <div className="flex items-center gap-1 text-gray-600">
+              <Target className="w-4 h-4" />
+              <span>{completedTasks}/{totalTasks} 任務</span>
+            </div>
+          </div>
+
+          {/* 進行中任務和需要幫助 */}
+          <div className="flex items-center justify-between">
+            {inProgressTasks > 0 && (
+              <div 
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+                style={{ 
+                  backgroundColor: subjectStyle.accent + '20',
+                  color: subjectStyle.accent
+                }}
+              >
+                <Play className="w-3 h-3" />
+                {inProgressTasks} 進行中
+              </div>
+            )}
+            
+            {needHelpCount > 0 && (
+              <motion.div 
+                className="flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-600 rounded-full text-xs font-medium"
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                ⚠️ {needHelpCount} 需要幫助
+              </motion.div>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+/**
+ * 主題網格組件
+ */
+interface TopicGridProps {
+  topics: TopicCardData[];
+  onTopicClick: (topicId: string) => void;
+  isLoading?: boolean;
+  isViewModeChanging?: boolean;
+}
+
+const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, isLoading, isViewModeChanging }) => {
+  if (isLoading || isViewModeChanging) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <LoadingDots 
+          colors={['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57']}
+          size={8}
+          minLoadingTime={500}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+      {topics.map((topicData, index) => (
+        <motion.div
+          key={topicData.topic.id}
+          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ 
+            duration: 0.2, 
+            delay: index * 0.05,
+            type: "spring",
+            stiffness: 400,
+            damping: 25
+          }}
+        >
+          <TopicCard 
+            data={topicData} 
+            onClick={onTopicClick}
+          />
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
+export const TaskWallPage = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isTopicLoading, setIsTopicLoading] = useState(false);
+  const [isViewModeChanging, setIsViewModeChanging] = useState(false);
+  
   // Store hooks
   const { 
     fetchTopics, 
@@ -458,7 +705,8 @@ const TaskWallPage: React.FC = () => {
     maxVisibleCards: 12,
     gridColumns: 'auto',
     priorityFilter: 'all',
-    showCompletedStack: true
+    showCompletedStack: true,
+    viewMode: 'tasks'
   });
   
   const [showSettings, setShowSettings] = useState(false);
@@ -470,21 +718,25 @@ const TaskWallPage: React.FC = () => {
   const [completedTasks, setCompletedTasks] = useState<TaskWithContext[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [isStarAnimating, setIsStarAnimating] = useState(false);
+  const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
 
   // 初始化資料載入
   useEffect(() => {
-    const initializeData = async () => {
+    const fetchData = async () => {
+      setIsLoading(true);
       try {
         await Promise.all([
           fetchTopics(),
           getCollaboratorCandidates()
         ]);
       } catch (error) {
-        console.error('初始化資料失敗:', error);
+        console.error('Failed to load task wall data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-
-    initializeData();
+    
+    fetchData();
   }, [fetchTopics, getCollaboratorCandidates]);
 
   // 自動清除錯誤消息
@@ -809,14 +1061,101 @@ const TaskWallPage: React.FC = () => {
   }, [activeTasks, config]);
 
   /**
-   * 合併任務和目標卡片，用於統一顯示
+   * 只顯示任務卡片
    */
   const allCards = useMemo(() => {
-    const taskCards = filteredTasks.map(task => ({ type: 'task' as const, data: task }));
-    const goalCards = goalsNeedingTasks.map(goal => ({ type: 'goal' as const, data: goal }));
-    
-    return [...taskCards, ...goalCards];
-  }, [filteredTasks, goalsNeedingTasks]);
+    return filteredTasks.map(task => ({ type: 'task' as const, data: task }));
+  }, [filteredTasks]);
+
+  /**
+   * 處理主題數據，計算各種統計資訊
+   */
+  const topicCards = useMemo((): TopicCardData[] => {
+    if (!topics) return [];
+
+    return topics
+      .filter(topic => topic.status !== 'archived')
+      .map(topic => {
+        const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+        
+        // 計算目標統計
+        const activeGoals = (topic.goals || []).filter(goal => goal.status !== 'archived');
+        const totalGoals = activeGoals.length;
+        const completedGoals = activeGoals.filter(goal => {
+          const goalTasks = (goal.tasks || []).filter(task => task.status !== 'archived');
+          return goalTasks.length > 0 && goalTasks.every(task => task.status === 'done');
+        }).length;
+
+        // 計算任務統計
+        let totalTasks = 0;
+        let completedTasks = 0;
+        let inProgressTasks = 0;
+        let needHelpCount = 0;
+
+        activeGoals.forEach(goal => {
+          const goalTasks = (goal.tasks || []).filter(task => task.status !== 'archived');
+          totalTasks += goalTasks.length;
+          
+          goalTasks.forEach(task => {
+            if (task.status === 'done') {
+              completedTasks++;
+            } else if (task.status === 'in_progress') {
+              inProgressTasks++;
+            }
+            
+            if (task.need_help) {
+              needHelpCount++;
+            }
+          });
+        });
+
+        // 計算整體進度
+        const overallProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+        // 獲取協作者資訊
+        const collaborators = topic.is_collaborative ? (topic.collaborators || []) : [];
+
+        return {
+          topic,
+          subjectStyle,
+          totalGoals,
+          completedGoals,
+          totalTasks,
+          completedTasks,
+          inProgressTasks,
+          needHelpCount,
+          collaborators,
+          overallProgress
+        };
+      })
+      .sort((a, b) => {
+        // 排序邏輯：進行中任務多的在前，然後按進度，最後按更新時間
+        if (a.inProgressTasks !== b.inProgressTasks) {
+          return b.inProgressTasks - a.inProgressTasks;
+        }
+        if (a.overallProgress !== b.overallProgress) {
+          return a.overallProgress - b.overallProgress; // 進度低的在前（需要更多關注）
+        }
+        return b.topic.id.localeCompare(a.topic.id); // 新的在前
+      });
+  }, [topics]);
+
+  /**
+   * 處理主題點擊 - 開啟 TopicReviewPage
+   */
+  const handleTopicClick = useCallback((topicId: string) => {
+    if (!topicId) return;
+    setShowTopicReviewId(topicId);
+  }, []);
+
+  // 修改切換視圖模式的處理函數
+  const handleViewModeChange = async (mode: 'tasks' | 'topics') => {
+    setIsViewModeChanging(true);
+    setConfig(prev => ({ ...prev, viewMode: mode }));
+    // 模擬載入延遲
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setIsViewModeChanging(false);
+  };
 
   // 載入狀態
   if (loading) {
@@ -879,10 +1218,11 @@ const TaskWallPage: React.FC = () => {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
+                
                 <div>
                   <div className="flex items-center gap-4 mb-1">
                     <h1 className="text-3xl font-bold text-amber-900 font-hand">
-                      📝 我的任務牆
+                      {config.viewMode === 'tasks' ? '⭐ 我的任務牆' : '🐦 我的主題牆'}
                     </h1>
                     <StarCounter 
                       count={completedCount} 
@@ -891,20 +1231,55 @@ const TaskWallPage: React.FC = () => {
                     />
                   </div>
                   <p className="text-amber-700">
-                    {allCards.length} 張卡片 • 
-                    {activeTasks.filter(task => task.status === 'in_progress').length} 個進行中
+                    {config.viewMode === 'tasks' ? (
+                      <>
+                        {allCards.length} 張卡片 • 
+                        {activeTasks.filter(task => task.status === 'in_progress').length} 個進行中
+                      </>
+                    ) : (
+                      <>
+                        {topicCards.length} 個主題 • 
+                        {topicCards.reduce((sum, topic) => sum + topic.inProgressTasks, 0)} 個任務進行中
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4">
+                {/* 可愛模式切換按鈕 */}
+                <button
+                  onClick={() => handleViewModeChange(config.viewMode === 'tasks' ? 'topics' : 'tasks')}
+                  className="flex items-center bg-white/95 rounded-full shadow-lg border-2 border-indigo-300 overflow-hidden mr-4 hover:bg-indigo-50/50 transition-colors"
+                  title={`切換到${config.viewMode === 'tasks' ? '主題' : '任務'}模式`}
+                >
+                  <div className={`px-4 py-3 transition-all duration-300 flex items-center gap-3 ${
+                    config.viewMode === 'tasks'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                      : 'text-slate-700'
+                  }`}>
+                    <span className="text-lg">⭐</span>
+                    <span className="text-sm font-bold">任務</span>
+                  </div>
+                  <div className="w-px h-8 bg-indigo-200"></div>
+                  <div className={`px-4 py-3 transition-all duration-300 flex items-center gap-3 ${
+                    config.viewMode === 'topics'
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg'
+                      : 'text-slate-700'
+                  }`}>
+                    <span className="text-lg">🐦</span>
+                    <span className="text-sm font-bold">主題</span>
+                  </div>
+                </button>
+
                 <button
                   onClick={() => setShowJournalDialog(true)}
-                  className="p-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 text-white hover:from-purple-500 hover:to-pink-500 transition-all shadow-md hover:shadow-lg"
+                  className="p-3 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 text-white hover:from-purple-500 hover:to-pink-500 transition-all shadow-md hover:shadow-lg hover:scale-110"
                   title="寫今日學習日記"
                 >
                   <BookMarked className="w-5 h-5" />
                 </button>
+                
                 <button
                   onClick={() => setShowSettings(!showSettings)}
                   className="p-2 rounded-full bg-white/80 text-amber-700 hover:bg-white transition-colors shadow-sm"
@@ -965,23 +1340,41 @@ const TaskWallPage: React.FC = () => {
 
         {/* 主要內容區域 */}
         <div className="max-w-7xl mx-auto px-4 pb-20">
-          {allCards.length === 0 ? (
-            // 空狀態
-            <div className="text-center py-20">
-              <div className="text-6xl mb-4">🎉</div>
-              <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
-              <p className="text-amber-600">所有任務都完成了，該享受成就感了！</p>
-            </div>
+          {config.viewMode === 'tasks' ? (
+            // 任務模式
+            filteredTasks.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-6xl mb-4">🎉</div>
+                <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
+                <p className="text-amber-600">所有任務都完成了，該享受成就感了！</p>
+              </div>
+            ) : (
+              <TaskWallGrid
+                cards={allCards}
+                config={config}
+                onTaskStatusUpdate={handleTaskStatusUpdate}
+                onAddTaskToGoal={handleAddTaskToGoal}
+                onOpenRecord={handleOpenRecord}
+                currentUserId={currentUser?.id}
+                isLoading={isLoading}
+              />
+            )
           ) : (
-            // 卡片網格
-            <TaskWallGrid
-              cards={allCards}
-              config={config}
-              onTaskStatusUpdate={handleTaskStatusUpdate}
-              onAddTaskToGoal={handleAddTaskToGoal}
-              onOpenRecord={handleOpenRecord}
-              currentUserId={currentUser?.id}
-            />
+            // 主題模式
+            topicCards.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-6xl mb-4">📚</div>
+                <h3 className="text-2xl font-bold text-amber-800 mb-2">還沒有主題</h3>
+                <p className="text-amber-600">建立你的第一個學習主題吧！</p>
+              </div>
+            ) : (
+              <TopicGrid
+                topics={topicCards}
+                onTopicClick={handleTopicClick}
+                isLoading={isLoading}
+                isViewModeChanging={isViewModeChanging}
+              />
+            )
           )}
         </div>
 
@@ -1035,6 +1428,25 @@ const TaskWallPage: React.FC = () => {
           title="需要記錄學習心得 📝"
           message="記錄一下這次的學習過程和收穫，這樣任務就能完成了！分享你的學習感想吧~ 😊"
         />
+
+        {/* 主題詳細檢視 */}
+        <AnimatePresence>
+          {showTopicReviewId && (
+            <TopicReviewPage
+              topicId={showTopicReviewId}
+              onClose={() => setShowTopicReviewId(null)}
+              onTaskClick={(taskId, goalId) => {
+                console.log('Task clicked:', taskId, goalId);
+                // 可以在這裡實現從主題檢視跳到任務詳情的邏輯
+              }}
+              onGoalClick={(goalId) => {
+                console.log('Goal clicked:', goalId);
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+
       </div>
     </PageLayout>
   );
