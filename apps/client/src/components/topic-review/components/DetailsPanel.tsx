@@ -592,6 +592,40 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             </div>
           </div>
 
+          {/* 協作管理 */}
+          <TopicCollaborationManager
+            topic={{
+              id: topic.id,
+              is_collaborative: topic.is_collaborative ?? false,
+              owner: topic.owner
+            }}
+            availableUsers={availableUsers}
+            collaborators={collaborators.map(c => ({ user: c, permission: 'edit' as const }))}
+            onInviteCollaborator={async (userId, permission) => {
+              await handleUpdate(async () => {
+                return await inviteTopicCollaborator(topic.id, userId, permission);
+              });
+              return true;
+            }}
+            onRemoveCollaborator={async (userId) => {
+              await handleUpdate(async () => {
+                return await removeTopicCollaborator(topic.id, userId);
+              });
+              return true;
+            }}
+            onToggleCollaborative={async () => {
+              await handleUpdate(async () => {
+                if (topic.is_collaborative) {
+                  return await disableTopicCollaboration(topic.id);
+                } else {
+                  return await enableTopicCollaboration(topic.id);
+                }
+              });
+              return true;
+            }}
+            isUpdating={isUpdating}
+          />
+
           {/* 目標網格視圖 */}
           <div className="mt-4">
             <div className="flex items-center justify-between mb-2">
@@ -751,64 +785,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             </div>
           </div>
 
-          {/* 協作管理 */}
-          <TopicCollaborationManager
-            topic={{
-              id: topic.id,
-              is_collaborative: topic.is_collaborative ?? false,
-              owner: topic.owner
-            }}
-            availableUsers={availableUsers}
-            collaborators={collaborators.map(c => ({ user: c, permission: 'edit' as const }))}
-            onInviteCollaborator={async (userId, permission) => {
-              await handleUpdate(async () => {
-                return await inviteTopicCollaborator(topic.id, userId, permission);
-              });
-              return true;
-            }}
-            onRemoveCollaborator={async (userId) => {
-              await handleUpdate(async () => {
-                return await removeTopicCollaborator(topic.id, userId);
-              });
-              return true;
-            }}
-            onToggleCollaborative={async () => {
-              await handleUpdate(async () => {
-                if (topic.is_collaborative) {
-                  return await disableTopicCollaboration(topic.id);
-                } else {
-                  return await enableTopicCollaboration(topic.id);
-                }
-              });
-              return true;
-            }}
-            isUpdating={isUpdating}
-          />
 
-          {/* 協作資訊 */}
-          {topic.is_collaborative && (
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">協作模式</h4>
-              <div className="space-y-2">
-                {topic.owner && (
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      擁有者：{topic.owner.name}
-                    </span>
-                  </div>
-                )}
-                {topic.collaborators && topic.collaborators.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {topic.collaborators.length} 位協作者
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* 學科資訊 */}
           {topic.subject && (
