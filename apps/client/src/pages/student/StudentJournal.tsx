@@ -58,6 +58,9 @@ const StudentJournal: React.FC = () => {
   const [journals, setJournals] = useState<DailyJournal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedJournal, setSelectedJournal] = useState<DailyJournal | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [moodStats, setMoodStats] = useState<Record<MoodType, number>>({
@@ -151,6 +154,31 @@ const StudentJournal: React.FC = () => {
         console.error('刪除日記失敗:', error);
         alert('刪除失敗');
       }
+    }
+  };
+
+  const handleViewJournal = (journal: DailyJournal) => {
+    setSelectedJournal(journal);
+    setShowViewDialog(true);
+  };
+
+  const isToday = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const handleEditJournal = async (journal: DailyJournal) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const todayJournal = await journalStore.getJournalByDate(today);
+      
+      if (todayJournal) {
+        setSelectedJournal(todayJournal);
+        setShowEditDialog(true);
+      }
+    } catch (error) {
+      console.error('載入今日日誌失敗:', error);
     }
   };
 
@@ -358,15 +386,17 @@ const StudentJournal: React.FC = () => {
               {journals.map((journal, index) => {
                 const moodConfig = MOOD_CONFIG[journal.mood];
                 const motivationConfig = getMotivationConfig(journal.motivation_level);
+                const isJournalToday = isToday(journal.date);
                 
                 return (
                   <motion.div
                     key={journal.id}
-                    className="bg-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group"
+                    className="bg-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                     whileHover={{ y: -5 }}
+                    onClick={() => handleViewJournal(journal)}
                   >
                     {/* 日期和操作 */}
                     <div className="flex items-center justify-between mb-4">
@@ -377,17 +407,28 @@ const StudentJournal: React.FC = () => {
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-1 text-gray-400 hover:text-blue-500 transition-colors">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteJournal(journal.id)}
-                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {isJournalToday && (
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditJournal(journal);
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteJournal(journal.id);
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* 心情和動力 */}
@@ -496,7 +537,10 @@ const StudentJournal: React.FC = () => {
             transition={{ delay: 0.5 }}
           >
             <button
-              onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentPage(Math.max(0, currentPage - 1));
+              }}
               disabled={currentPage === 0}
               className="p-2 rounded-xl bg-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
             >
@@ -507,7 +551,10 @@ const StudentJournal: React.FC = () => {
               {[...Array(totalPages)].map((_, index) => (
                 <button
                   key={index}
-                  onClick={() => setCurrentPage(index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentPage(index);
+                  }}
                   className={`w-10 h-10 rounded-xl font-semibold transition-colors ${
                     currentPage === index
                       ? 'bg-purple-500 text-white'
@@ -520,7 +567,10 @@ const StudentJournal: React.FC = () => {
             </div>
             
             <button
-              onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentPage(Math.min(totalPages - 1, currentPage + 1));
+              }}
               disabled={currentPage === totalPages - 1}
               className="p-2 rounded-xl bg-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
             >
@@ -535,10 +585,43 @@ const StudentJournal: React.FC = () => {
         isOpen={showNewDialog}
         onClose={() => {
           setShowNewDialog(false);
-          // 關閉時重新載入資料
+        }}
+        mode="edit"
+        onSave={async (entry) => {
+          await journalStore.saveJournalEntry({
+            mood: entry.mood,
+            motivation_level: entry.motivationLevel,
+            content: entry.content,
+            has_voice_note: entry.hasVoiceNote,
+            completed_tasks: entry.completedTasks
+          });
           loadJournals();
           loadStats();
         }}
+      />
+
+      {/* 檢視日記對話框 */}
+      <DailyJournalDialog
+        isOpen={showViewDialog}
+        onClose={() => {
+          setShowViewDialog(false);
+          setSelectedJournal(null);
+        }}
+        mode="view"
+        initialData={selectedJournal || undefined}
+      />
+
+      {/* 編輯日記對話框 */}
+      <DailyJournalDialog
+        isOpen={showEditDialog}
+        onClose={() => {
+          setShowEditDialog(false);
+          setSelectedJournal(null);
+          loadJournals();
+          loadStats();
+        }}
+        mode="edit"
+        initialData={selectedJournal || undefined}
       />
       </div>
     </PageLayout>

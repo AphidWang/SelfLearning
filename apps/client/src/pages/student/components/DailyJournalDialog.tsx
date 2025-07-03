@@ -17,8 +17,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mic, Save, Smile, Zap, Heart, BookOpen, History, CheckCircle, Play, Clock } from 'lucide-react';
-import { journalStore, type MoodType, type CreateJournalEntry } from '../../../store/journalStore';
+import { X, Mic, Save, Smile, Zap, Heart, BookOpen, History, CheckCircle, Play } from 'lucide-react';
+import { journalStore, type MoodType, type CreateJournalEntry, type CompletedTask, type DailyJournal } from '../../../store/journalStore';
 import { taskRecordStore, type TaskRecord } from '../../../store/taskRecordStore';
 import { useTopicStore } from '../../../store/topicStore';
 import { useNavigate } from 'react-router-dom';
@@ -32,21 +32,34 @@ interface JournalEntry {
   content: string;
   hasVoiceNote: boolean;
   date: string;
-}
-
-interface CompletedTask {
-  id: string;
-  title: string;
-  category: string;
-  assignedTo: string;
-  time: string;
+  completedTasks?: CompletedTask[];
 }
 
 interface DailyJournalDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave?: (entry: JournalEntry) => Promise<void>; // 改為可選，因為我們會直接用 store
+  onSave?: (entry: JournalEntry) => Promise<void>;
+  mode?: 'edit' | 'view';
+  initialData?: DailyJournal;
 }
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return '';
+  
+  const date = new Date(dateString);
+  const today = new Date();
+  const diffTime = today.getTime() - date.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return '今天';
+  if (diffDays === 1) return '昨天';
+  if (diffDays < 7) return `${diffDays} 天前`;
+  
+  return date.toLocaleDateString('zh-TW', {
+    month: 'long',
+    day: 'numeric'
+  });
+};
 
 const MOOD_OPTIONS = [
   {
@@ -127,7 +140,9 @@ const MOTIVATION_OPTIONS = [
 export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   isOpen,
   onClose,
-  onSave
+  onSave,
+  mode = 'edit',
+  initialData
 }) => {
   const navigate = useNavigate();
   const { topics } = useTopicStore();
@@ -141,9 +156,28 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   const [todayTaskRecords, setTodayTaskRecords] = useState<TaskRecord[]>([]);
   const [todayCompletedTasks, setTodayCompletedTasks] = useState<CompletedTask[]>([]);
 
+  // 初始化資料
+  useEffect(() => {
+    if (initialData) {
+      setSelectedMood(initialData.mood);
+      setMotivationLevel(initialData.motivation_level);
+      setJournalContent(initialData.content);
+      setHasVoiceNote(initialData.has_voice_note);
+      if (mode === 'view') {
+        setTodayCompletedTasks(initialData.completed_tasks || []);
+      }
+    } else {
+      // 重置表單
+      setSelectedMood(null);
+      setMotivationLevel(null);
+      setJournalContent('');
+      setHasVoiceNote(false);
+    }
+  }, [initialData, mode, isOpen]);
+
   // 獲取今天的任務資料
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || mode === 'view') return;
 
     const fetchTodayTasks = async () => {
       try {
@@ -172,9 +206,10 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
                   completedTasks.push({
                     id: task.id,
                     title: task.title,
+                    type: 'completed',
+                    time: task.completed_at,
                     category: topic.title,
-                    assignedTo: goal.title,
-                    time: task.completed_at
+                    assignedTo: goal.title
                   });
                 }
               }
@@ -188,7 +223,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
     };
 
     fetchTodayTasks();
-  }, [isOpen, topics]);
+  }, [isOpen, mode, topics]);
 
   // 合併今天有做過的任務（記錄 + 完成）
   const todayActiveTasks = useMemo(() => {
@@ -200,7 +235,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
         taskMap.set(record.task_id, {
           id: record.task_id,
           title: record.title,
-          type: 'recorded',
+          type: 'recorded' as const,
           difficulty: record.difficulty,
           time: record.created_at
         });
@@ -209,14 +244,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
 
     // 加入完成的任務
     todayCompletedTasks.forEach(task => {
-      taskMap.set(task.id, {
-        id: task.id,
-        title: task.title,
-        type: 'completed',
-        category: task.category,
-        assignedTo: task.assignedTo,
-        time: task.time
-      });
+      taskMap.set(task.id, task);
     });
 
     return Array.from(taskMap.values()).sort((a, b) => 
@@ -225,23 +253,17 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   }, [todayTaskRecords, todayCompletedTasks]);
 
   const handleSave = async () => {
-    if (!selectedMood) {
-      alert('請選擇今天的心情！');
-      return;
-    }
-
-    if (!motivationLevel) {
-      alert('請選擇今天的學習動力！');
-      return;
-    }
-
+    // 型別保護
+    if (!selectedMood || !motivationLevel) return;
+    
     setIsSaving(true);
     try {
       const entry: CreateJournalEntry = {
         mood: selectedMood,
         motivation_level: motivationLevel,
         content: journalContent,
-        has_voice_note: hasVoiceNote
+        has_voice_note: hasVoiceNote,
+        completed_tasks: todayActiveTasks
       };
 
       // 使用 store 儲存或呼叫外部回調
@@ -251,7 +273,8 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
           motivationLevel,
           content: journalContent,
           hasVoiceNote,
-          date: new Date().toISOString()
+          date: new Date().toISOString(),
+          completedTasks: todayActiveTasks
         });
       } else {
         await journalStore.saveJournalEntry(entry);
@@ -302,7 +325,17 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              if (mode === 'edit' && (selectedMood || motivationLevel || journalContent.trim())) {
+                if (confirm('確定要關閉嗎？已輸入的內容將會遺失')) {
+                  onClose();
+                }
+              } else {
+                onClose();
+              }
+            }
+          }}
         >
           <motion.div
             className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
@@ -314,60 +347,80 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
           >
             {/* 標題區 */}
             <div 
-              className="relative p-6 rounded-t-3xl text-white text-center"
+              className="relative p-4 rounded-t-3xl text-white text-center"
               style={{
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
               }}
             >
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                type="button"
+                className="absolute top-2 right-2 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
               
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <BookOpen className="w-6 h-6" />
-                <h2 className="text-xl font-bold">今日學習日記</h2>
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <BookOpen className="w-5 h-5" />
+                <h2 className="text-lg font-bold">
+                  {mode === 'view' ? '日誌內容' : '今日學習日記'}
+                </h2>
               </div>
-              <p className="text-white/80 text-sm">
-                記錄今天的學習心情和收穫
+              <p className="text-white/80 text-xs">
+                {mode === 'view' ? formatDate(initialData?.date || '') : '記錄今天的學習心情和收穫'}
               </p>
 
-              {/* History 按鈕 */}
-              <button
-                onClick={handleViewHistory}
-                className="absolute top-4 left-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors group"
-                title="查看歷史記錄"
-              >
-                <History className="w-5 h-5" />
-              </button>
+              {/* History 按鈕 - 只在編輯模式顯示 */}
+              {mode === 'edit' && (
+                <button
+                  onClick={handleViewHistory}
+                  className="absolute top-2 left-2 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors group"
+                  title="查看歷史記錄"
+                >
+                  <History className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 space-y-4">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSave();
+                }}
+                className="space-y-4"
+              >
               {/* 心情選擇 */}
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Smile className="w-5 h-5 text-purple-500" />
-                  <h3 className="text-lg font-semibold text-gray-800">今天的心情</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <Smile className="w-4 h-4 text-purple-500" />
+                  <h3 className="text-base font-semibold text-gray-800">
+                    {mode === 'view' ? '心情' : '今天的心情'}
+                  </h3>
                 </div>
                 
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-1">
                   {MOOD_OPTIONS.map((mood) => (
                     <motion.button
                       key={mood.type}
-                      onClick={() => setSelectedMood(mood.type)}
-                      className={`relative p-3 rounded-2xl transition-all duration-200 ${
+                      onClick={(e) => {
+                        e.preventDefault(); // 防止表單提交
+                        if (mode === 'edit') {
+                          setSelectedMood(mood.type);
+                        }
+                      }}
+                      className={`relative p-2 rounded-xl transition-all duration-200 ${
                         selectedMood === mood.type 
                           ? 'scale-110 shadow-lg' 
-                          : 'hover:scale-105 shadow-sm'
+                          : mode === 'edit' ? 'hover:scale-105 shadow-sm' : 'opacity-50'
                       }`}
                       style={{
                         backgroundColor: selectedMood === mood.type ? mood.color : mood.bgColor,
-                        color: selectedMood === mood.type ? 'white' : mood.color
+                        color: selectedMood === mood.type ? 'white' : mood.color,
+                        cursor: mode === 'view' ? 'default' : 'pointer'
                       }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={mode === 'edit' ? { scale: 1.05 } : {}}
+                      whileTap={mode === 'edit' ? { scale: 0.95 } : {}}
                     >
                       <div className="text-2xl mb-1">{mood.emoji}</div>
                       <div className="text-xs font-medium">{mood.label}</div>
@@ -389,27 +442,35 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
 
               {/* 學習動力 */}
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Zap className="w-5 h-5 text-yellow-500" />
-                  <h3 className="text-lg font-semibold text-gray-800">學習動力</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-yellow-500" />
+                  <h3 className="text-base font-semibold text-gray-800">
+                    {mode === 'view' ? '學習動力' : '今天的學習動力'}
+                  </h3>
                 </div>
                 
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-1">
                   {MOTIVATION_OPTIONS.map((motivation) => (
                     <motion.button
                       key={motivation.level}
-                      onClick={() => setMotivationLevel(motivation.level)}
-                      className={`relative p-2 rounded-2xl transition-all duration-200 min-h-[80px] flex flex-col justify-center ${
+                      onClick={(e) => {
+                        e.preventDefault(); // 防止表單提交
+                        if (mode === 'edit') {
+                          setMotivationLevel(motivation.level);
+                        }
+                      }}
+                      className={`relative p-2 rounded-xl transition-all duration-200 min-h-[70px] flex flex-col justify-center ${
                         motivationLevel === motivation.level 
                           ? 'scale-110 shadow-lg' 
-                          : 'hover:scale-105 shadow-sm'
+                          : mode === 'edit' ? 'hover:scale-105 shadow-sm' : 'opacity-50'
                       }`}
                       style={{
                         backgroundColor: motivationLevel === motivation.level ? motivation.color : motivation.bgColor,
-                        color: motivationLevel === motivation.level ? 'white' : motivation.color
+                        color: motivationLevel === motivation.level ? 'white' : motivation.color,
+                        cursor: mode === 'view' ? 'default' : 'pointer'
                       }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={mode === 'edit' ? { scale: 1.05 } : {}}
+                      whileTap={mode === 'edit' ? { scale: 0.95 } : {}}
                     >
                       <div className="text-xl mb-1">{motivation.emoji}</div>
                       <div className="text-xs font-medium leading-tight text-center">{motivation.label}</div>
@@ -429,16 +490,18 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
                 </div>
               </div>
 
-              {/* 今天做過的任務 */}
-              {todayActiveTasks.length > 0 && (
+              {/* 完成的任務 */}
+              {todayCompletedTasks.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <h3 className="text-lg font-semibold text-gray-800">今天做過的任務</h3>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <h3 className="text-base font-semibold text-gray-800">
+                      {mode === 'view' ? '完成的任務' : '今天做過的任務'}
+                    </h3>
                   </div>
                   
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {todayActiveTasks.map((task, index) => (
+                  <div className="space-y-1 max-h-28 overflow-y-auto">
+                    {todayCompletedTasks.map((task, index) => (
                       <motion.div
                         key={task.id || index}
                         initial={{ opacity: 0, y: 10 }}
@@ -495,81 +558,64 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
 
               {/* 文字記錄 */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">今天學了什麼？</h3>
+                <h3 className="text-base font-semibold text-gray-800 mb-2">
+                  {mode === 'view' ? '學習心得' : '今天學了什麼？'}
+                </h3>
                 <textarea
                   value={journalContent}
-                  onChange={(e) => setJournalContent(e.target.value)}
-                  placeholder="寫下今天的學習心得、收穫或想法... 可以是很簡單的幾句話喔！"
-                  className="w-full h-32 p-4 border-2 border-gray-200 rounded-2xl focus:border-purple-400 focus:outline-none resize-none text-sm leading-relaxed"
+                  onChange={(e) => mode === 'edit' && setJournalContent(e.target.value)}
+                  placeholder={mode === 'view' ? '' : "寫下今天的學習心得、收穫或想法... 可以是很簡單的幾句話喔！"}
+                  className={`w-full h-24 p-3 border-2 rounded-xl focus:outline-none resize-none text-sm leading-relaxed ${
+                    mode === 'edit' && !journalContent.trim() 
+                      ? 'border-amber-200 bg-amber-50' 
+                      : 'border-gray-200 focus:border-purple-400'
+                  }`}
+                  readOnly={mode === 'view'}
                 />
               </div>
 
-              {/* 語音記錄 - 暫時隱藏
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">語音記錄 (選擇性)</h3>
-                <div className="flex items-center gap-3">
-                  <motion.button
-                    onClick={handleVoiceRecord}
-                    className={`flex items-center gap-2 px-4 py-3 rounded-2xl font-medium transition-all ${
-                      isRecording 
-                        ? 'bg-red-500 text-white' 
-                        : hasVoiceNote
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    animate={isRecording ? { scale: [1, 1.05, 1] } : {}}
-                    transition={isRecording ? { repeat: Infinity, duration: 1 } : {}}
-                  >
-                    <Mic className="w-4 h-4" />
-                    {isRecording ? '錄音中...' : hasVoiceNote ? '已錄音' : '錄一段話'}
-                  </motion.button>
-                  
-                  {hasVoiceNote && (
-                    <motion.div
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="text-sm text-green-600 font-medium"
-                    >
-                      ✨ 語音已錄製
-                    </motion.div>
-                  )}
+              {/* 語音記錄指示器 */}
+              {hasVoiceNote && (
+                <div className="flex items-center gap-1 text-purple-500 text-xs">
+                  <Mic className="w-3 h-3" />
+                  <span>有語音記錄</span>
                 </div>
-              </div>
-              */}
+              )}
 
-              {/* 儲存按鈕 */}
-              <motion.button
-                onClick={handleSave}
-                disabled={isSaving || !selectedMood || !motivationLevel}
-                className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all ${
-                  !selectedMood || !motivationLevel || isSaving
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg'
-                }`}
-                whileHover={!isSaving && selectedMood && motivationLevel ? { scale: 1.02 } : {}}
-                whileTap={!isSaving && selectedMood && motivationLevel ? { scale: 0.98 } : {}}
-              >
-                {isSaving ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    儲存中...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    <Save className="w-5 h-5" />
-                    儲存今日記錄
-                  </div>
-                )}
-              </motion.button>
+              {/* 儲存按鈕 - 只在編輯模式顯示 */}
+              {mode === 'edit' && (
+                <motion.button
+                  type="submit"
+                  disabled={isSaving || !selectedMood || !motivationLevel || !journalContent.trim()}
+                  className={`w-full py-3 rounded-xl font-semibold text-base transition-all ${
+                    !selectedMood || !motivationLevel || !journalContent.trim() || isSaving
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg'
+                  }`}
+                  whileHover={!isSaving && selectedMood && motivationLevel ? { scale: 1.02 } : {}}
+                  whileTap={!isSaving && selectedMood && motivationLevel ? { scale: 0.98 } : {}}
+                >
+                  {isSaving ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      儲存中...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <Save className="w-5 h-5" />
+                      儲存今日記錄
+                    </div>
+                  )}
+                </motion.button>
+              )}
+              </form>
             </div>
           </motion.div>
         </motion.div>
       )}
 
       {/* 歷史記錄確認對話框 */}
-      {showHistoryConfirm && (
+      {showHistoryConfirm && mode === 'edit' && (
         <motion.div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-60 flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
