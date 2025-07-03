@@ -58,7 +58,7 @@
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, Clock, User, Users, Flag, Target, CheckCircle2, 
   Edit, Save, X, Plus, Trash2, ChevronLeft, PlayCircle, 
@@ -72,6 +72,8 @@ import { CollaborationManager } from '../../learning-map/CollaborationManager';
 import { TaskRecordInterface } from './TaskRecordInterface';
 import { TopicCollaborationManager } from './TopicCollaborationManager';
 import { GoalStatusManager } from './GoalStatusManager';
+import { TaskStatusManager } from './TaskStatusManager';
+import toast from 'react-hot-toast';
 
 interface DetailsPanelProps {
   topic: Topic;
@@ -128,11 +130,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   }, [topic, selectedGoalId, selectedTaskId]);
 
   // 通用更新處理函數
-  const handleUpdate = useCallback(async (updateFn: () => Promise<any>) => {
+  const handleUpdate = useCallback(async (updateFn: () => Promise<any>, skipCollaboratorRefresh = false) => {
     setIsUpdating(true);
     try {
       await updateFn();
-      await onUpdateNotify();
+      // 只在需要時觸發完整的更新通知
+      if (!skipCollaboratorRefresh) {
+        await onUpdateNotify();
+      }
     } catch (error) {
       console.error('更新失敗:', error);
       alert('操作失敗，請稍後再試');
@@ -140,25 +145,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
       setIsUpdating(false);
     }
   }, [onUpdateNotify]);
-
-  // 任務狀態更新
-  const handleTaskStatusUpdate = useCallback(async (status: TaskStatus) => {
-    if (!selectedTask || !selectedGoal) return;
-    
-    await handleUpdate(async () => {
-      switch (status) {
-        case 'done':
-          await markTaskCompleted(topic.id, selectedGoal.id, selectedTask.id);
-          break;
-        case 'in_progress':
-          await markTaskInProgress(topic.id, selectedGoal.id, selectedTask.id);
-          break;
-        case 'todo':
-          await markTaskTodo(topic.id, selectedGoal.id, selectedTask.id);
-          break;
-      }
-    });
-  }, [selectedTask, selectedGoal, topic.id, markTaskCompleted, markTaskInProgress, markTaskTodo, handleUpdate]);
 
   // 目標狀態更新  
   const handleGoalStatusUpdate = useCallback(async (status: GoalStatus) => {
@@ -864,13 +850,17 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [showRecordInterface, setShowRecordInterface] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPromptDialog, setShowPromptDialog] = useState(false);
 
   // 通用更新處理函數
-  const handleUpdate = useCallback(async (updateFn: () => Promise<any>) => {
+  const handleUpdate = useCallback(async (updateFn: () => Promise<any>, skipCollaboratorRefresh = false) => {
     setIsUpdating(true);
     try {
       await updateFn();
-      await onUpdateNotify();
+      // 只在需要時觸發完整的更新通知
+      if (!skipCollaboratorRefresh) {
+        await onUpdateNotify();
+      }
     } catch (error) {
       console.error('更新失敗:', error);
       alert('操作失敗，請稍後再試');
@@ -882,18 +872,42 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   // 任務狀態更新
   const handleTaskStatusUpdate = useCallback(async (status: TaskStatus) => {
     await handleUpdate(async () => {
-      switch (status) {
-        case 'done':
-          await markTaskCompleted(topic.id, goal.id, task.id);
-          break;
-        case 'in_progress':
-          await markTaskInProgress(topic.id, goal.id, task.id);
-          break;
-        case 'todo':
-          await markTaskTodo(topic.id, goal.id, task.id);
-          break;
+      try {
+        console.log('🔄 開始更新任務狀態:', { status, taskId: task.id });
+        let success = false;
+        let result;
+        switch (status) {
+          case 'todo':
+            result = await markTaskTodo(topic.id, goal.id, task.id);
+            success = result.success;
+            break;
+          case 'in_progress':
+            result = await markTaskInProgress(topic.id, goal.id, task.id);
+            success = result.success;
+            break;
+          case 'done':
+            result = await markTaskCompleted(topic.id, goal.id, task.id);
+            success = result.success;
+            break;
+        }
+        console.log('📝 任務狀態更新結果:', { success, result });
+        
+        if (!success) {
+          if (result?.requiresRecord) {
+            console.log('⚠️ 需要先記錄學習心得');
+            setShowPromptDialog(true);
+          } else {
+            console.error('❌ 更新任務狀態失敗:', result?.message);
+            toast.error(result?.message || '更新失敗');
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('❌ 更新任務狀態失敗:', error);
+        toast.error('系統錯誤，請稍後再試');
+        throw error;
       }
-    });
+    }, false); // 移除 skipCollaboratorRefresh，讓狀態可以正確更新
   }, [task, goal, topic.id, markTaskCompleted, markTaskInProgress, markTaskTodo, handleUpdate]);
 
   // 編輯保存處理
@@ -967,6 +981,23 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     );
   };
 
+  if (showPromptDialog) {
+    return (
+      <CutePromptDialog
+        isOpen={showPromptDialog}
+        onClose={() => {
+          setShowPromptDialog(false);
+        }}
+        onConfirm={() => {
+          setShowPromptDialog(false);
+          setShowRecordInterface(true);
+        }}
+        title="需要記錄學習心得 📝"
+        message="記錄一下這次的學習過程和收穫，這樣任務就能完成了！分享你的學習感想吧~ 😊"
+      />
+    );
+  }
+
   if (showRecordInterface) {
     return (
       <motion.div
@@ -1027,21 +1058,6 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 
       {/* 可滾動內容區 */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-10">
-        {/* 任務狀態信息 */}
-        <div className="mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">來自目標: {goal.title}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              task.status === 'done' ? 'bg-green-100 text-green-700' :
-              task.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :
-              'bg-gray-100 text-gray-600'
-            }`}>
-              {task.status === 'done' ? '已完成' :
-               task.status === 'in_progress' ? '進行中' : '待開始'}
-            </span>
-          </div>
-        </div>
-
         {/* 主要編輯區 */}
         <div 
           className="rounded-xl p-4 border-2 mb-4 shadow-sm" 
@@ -1111,6 +1127,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           )}
         </div>
 
+        {/* 任務狀態管理 */}
+        <TaskStatusManager
+          currentStatus={task.status}
+          onStatusChange={handleTaskStatusUpdate}
+          isUpdating={isUpdating}
+          className="mb-4"
+        />
+
         {/* 時間資訊 */}
         {task.completed_at && (
           <div className="mb-3">
@@ -1122,7 +1146,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           </div>
         )}
 
-        {/* 協作者管理 - 只在協作模式下顯示 */}
+        {/* 協作者管理 */}
         {topic.is_collaborative && renderCollaboratorManager()}
       </div>
 
@@ -1198,5 +1222,76 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         </motion.div>
       )}
     </motion.div>
+  );
+};
+
+// 溫馨提示 Dialog 組件
+interface CutePromptDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+}
+
+const CutePromptDialog: React.FC<CutePromptDialogProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="absolute inset-0 bg-black/30 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.div
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-amber-200 dark:border-amber-800 p-6 w-full max-w-md relative z-50"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 rounded-xl">
+              <Sparkles className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white">{title}</h3>
+            </div>
+          </div>
+          
+          <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm leading-relaxed">
+            {message}
+          </p>
+          
+          <div className="flex gap-3 justify-center">
+            <motion.button
+              onClick={onClose}
+              className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              等等再說
+            </motion.button>
+            <motion.button
+              onClick={onConfirm}
+              className="px-6 py-3 bg-gradient-to-r from-amber-400 to-orange-400 text-white rounded-2xl font-medium hover:from-amber-500 hover:to-orange-500 transition-all shadow-lg"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              好的！記錄一下 ✨
+            </motion.button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 };
