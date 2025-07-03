@@ -31,27 +31,19 @@ jobs:
         id: get-sha
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Upload sourcemaps to Sentry
-        uses: getsentry/action-sentry-cli@v2
+      - name: Install Sentry CLI
+        run: yarn global add @sentry/cli
+
+      - name: Create Sentry release & upload sourcemaps
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-        with:
-          environment: production
-          version: ${{ steps.get-sha.outputs.sha }}
         run: |
-          # Create release
-          sentry-cli releases new ${{ steps.get-sha.outputs.sha }}
-          
-          # Upload sourcemaps
-          sentry-cli releases files ${{ steps.get-sha.outputs.sha }} upload-sourcemaps \
-            --url-prefix "~/assets" \
-            --validate \
-            dist/
-          
-          # Finalize release
-          sentry-cli releases finalize ${{ steps.get-sha.outputs.sha }}
+          export SENTRY_RELEASE=${{ steps.get-sha.outputs.sha }}
+          sentry-cli releases new $SENTRY_RELEASE
+          sentry-cli releases files $SENTRY_RELEASE upload-sourcemaps dist/ --url-prefix '~/assets' --validate
+          sentry-cli releases finalize $SENTRY_RELEASE
 
       - name: Deploy
         run: ./your-deploy-script.sh 
