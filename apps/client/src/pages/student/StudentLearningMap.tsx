@@ -183,11 +183,6 @@ export const StudentLearningMap: React.FC = () => {
     console.log('Help requested for task:', taskId);
   };
 
-  // 處理數據更新（刷新地圖）
-  const handleUpdate = async () => {
-    await fetchTopics();
-  };
-
   // 過濾出有任務的目標，並轉換為地圖點
   const tasks = topics
     .filter(topic => topic.goals?.some(goal => (goal.tasks?.length ?? 0) > 0))
@@ -347,7 +342,6 @@ export const StudentLearningMap: React.FC = () => {
             onTaskClick={handleTaskClick}
             onGoalClick={(goalId) => console.log('Goal clicked:', goalId)}
             onShowReview={(topicId) => setShowTopicReviewId(topicId)}
-            onUpdate={handleUpdate}
           />
         </DraggableDialog>
       )}

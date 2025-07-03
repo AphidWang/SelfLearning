@@ -8,6 +8,7 @@ import { StatsPanel } from './components/StatsPanel';
 import { DetailsPanel } from './components/DetailsPanel';
 import { useTopicReview } from './hooks/useTopicReview';
 import { useTopicStats } from './hooks/useTopicStats';
+import { LoadingDots } from '../shared/LoadingDots';
 
 interface TopicReviewPageProps {
   topicId: string;
@@ -54,7 +55,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   if (!state.topic) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <LoadingDots />
       </div>
     );
   }
@@ -232,11 +233,6 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.4 }}
               >
-                {state.isUpdating && (
-                  <div className="absolute inset-0 bg-white/30 dark:bg-gray-800/30 flex items-center justify-center z-50">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                  </div>
-                )}
                 <TopicRadialMap
                   key={`radial-${state.topic.id}-${state.topic.updated_at || Date.now()}`}
                   topicId={topicId}

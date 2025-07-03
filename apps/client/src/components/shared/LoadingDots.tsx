@@ -9,10 +9,12 @@ interface LoadingDotsProps {
   minLoadingTime?: number;
 }
 
+const defaultColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
+
 export const LoadingDots: React.FC<LoadingDotsProps> = ({
   isLoading = true,
-  color = '#FDA4AF',
-  colors,
+  color,
+  colors = defaultColors,
   size = 8,
   minLoadingTime = 500
 }) => {
@@ -63,8 +65,7 @@ export const LoadingDots: React.FC<LoadingDotsProps> = ({
     ease: "easeInOut" as const
   };
 
-  const defaultColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
-  const dotsColors = colors || (color ? Array(4).fill(color) : defaultColors);
+  const dotsColors = color ? Array(4).fill(color) : colors;
 
   return (
     <motion.div
