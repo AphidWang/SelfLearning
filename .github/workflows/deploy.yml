@@ -1,0 +1,57 @@
+name: Deploy Frontend with Sentry Sourcemap Upload
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Get commit SHA
+        id: get-sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Upload sourcemaps to Sentry
+        uses: getsentry/action-sentry-cli@v2
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        with:
+          environment: production
+          version: ${{ steps.get-sha.outputs.sha }}
+        run: |
+          # Create release
+          sentry-cli releases new ${{ steps.get-sha.outputs.sha }}
+          
+          # Upload sourcemaps
+          sentry-cli releases files ${{ steps.get-sha.outputs.sha }} upload-sourcemaps \
+            --url-prefix "~/assets" \
+            --validate \
+            dist/
+          
+          # Finalize release
+          sentry-cli releases finalize ${{ steps.get-sha.outputs.sha }}
+
+      - name: Deploy
+        run: ./your-deploy-script.sh 
