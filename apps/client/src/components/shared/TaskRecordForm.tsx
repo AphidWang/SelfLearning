@@ -4,10 +4,11 @@
  * 🎯 功能說明：
  * - 通用的學習記錄表單，可在多個地方復用
  * - 支援挑戰程度選擇、學習心得輸入、檔案上傳
+ * - 顯示歷史記錄，並自動載入上次的難度設定
  * - 直接集成 taskRecordStore 進行資料存儲
  * 
  * 🎨 設計特色：
- * - 基於 TaskDetailDialog 的精美設計
+ * - 單欄垂直佈局，歷史記錄可展開收起
  * - 響應式佈局
  * - 統一的視覺風格
  * 
@@ -20,12 +21,25 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Paperclip, PenTool, Mic, Star, Zap, X
+  Paperclip, PenTool, Star, Zap, X
 } from 'lucide-react';
 import { taskRecordStore, CreateTaskRecordData } from '../../store/taskRecordStore';
+import { RecordHistory } from './RecordHistory';
 
 // 挑戰程度類型，使用 1-5 數字等級
 type ChallengeLevel = 1 | 2 | 3 | 4 | 5;
+
+// 任務記錄接口
+interface TaskRecord {
+  id: string;
+  created_at: string;
+  title: string;
+  message: string;
+  difficulty: number;
+  completion_time?: number;
+  files?: any[];
+  tags?: string[];
+}
 
 interface TaskRecordFormProps {
   // 任務資訊
@@ -33,6 +47,9 @@ interface TaskRecordFormProps {
   taskId?: string;
   topicId?: string;
   goalId?: string;
+  
+  // 歷史記錄
+  previousRecords?: TaskRecord[];
   
   // 回調函數
   onSuccess?: () => void;
@@ -46,6 +63,7 @@ interface TaskRecordFormProps {
   className?: string;
   showCancelButton?: boolean;
   buttonText?: string;
+  showHistoryButton?: boolean; // 是否顯示歷史記錄按鈕
   
   // 狀態處理按鈕
   showStatusButtons?: boolean;
@@ -58,6 +76,7 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
   taskId,
   topicId,
   goalId,
+  previousRecords = [],
   onSuccess,
   onCancel,
   initialChallenge,
@@ -65,14 +84,21 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
   className = '',
   showCancelButton = false,
   buttonText = '保存學習記錄',
+  showHistoryButton = true,
   showStatusButtons = false,
   onStatusUpdate,
   isUpdating = false
 }) => {
-  const [challenge, setChallenge] = useState<ChallengeLevel | undefined>(initialChallenge);
+  // 自動設定上次的難度
+  const lastDifficulty = previousRecords.length > 0 
+    ? (previousRecords[0].difficulty as ChallengeLevel) 
+    : initialChallenge;
+
+  const [challenge, setChallenge] = useState<ChallengeLevel | undefined>(lastDifficulty);
   const [comment, setComment] = useState(initialMessage);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = useCallback(async () => {
@@ -96,13 +122,17 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
         topic_id: topicId,
         task_id: taskId,
         task_type: 'task',
-        tags: challenge ? [`難度${challenge}星`] : []
+        completion_time: Math.floor(Date.now() / 1000),
+        tags: [
+          `難度${challenge}星`,
+          ...(attachments.length > 0 ? ['有附件'] : []),
+          comment.length > 500 ? '詳細記錄' : '簡短記錄'
+        ]
       };
 
       await taskRecordStore.createTaskRecord(recordData);
       
-      // 重置表單
-      setChallenge(undefined);
+      // 重置表單，但保留難度設定
       setComment('');
       setAttachments([]);
       
@@ -131,14 +161,19 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
   }, []);
 
   return (
-    <div className={`flex flex-col space-y-3 ${className}`}>
-      {/* 挑戰程度 - 重新設計為色彩豐富的樣式 */}
+    <div className={`space-y-4 p-4 pb-6 ${className}`}>
+      {/* 挑戰程度 */}
       <div className="p-3 bg-gradient-to-br from-orange-50/90 to-red-50/90 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl border border-orange-200/50 dark:border-orange-700/50">
-        <div className="flex items-center gap-2 mb-3">
-          <Zap size={16} className="text-orange-600 dark:text-orange-400" />
+        <div className="flex items-center gap-2 mb-2">
+          <Zap size={14} className="text-orange-600 dark:text-orange-400" />
           <h4 className="text-sm font-semibold text-orange-800 dark:text-orange-300">挑戰程度</h4>
+          {lastDifficulty && (
+            <span className="text-xs text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
+              上次：{lastDifficulty}星
+            </span>
+          )}
         </div>
-        <div className="flex justify-center gap-1.5">
+        <div className="flex justify-center gap-1">
           {Array.from({ length: 5 }, (_, i) => (
             <button
               key={i}
@@ -154,20 +189,20 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
           ))}
         </div>
         {challenge && (
-          <p className="text-center text-xs text-orange-700 dark:text-orange-300 mt-2 font-medium">
-            {challenge === 1 && "很簡單"}
-            {challenge === 2 && "有點簡單"}
-            {challenge === 3 && "剛剛好"}
-            {challenge === 4 && "有點困難"}
-            {challenge === 5 && "很有挑戰"}
+          <p className="text-center text-xs text-orange-700 dark:text-orange-300 mt-1 font-medium">
+            {challenge === 1 && "很簡單 😊"}
+            {challenge === 2 && "有點簡單 🙂"}
+            {challenge === 3 && "剛剛好 😐"}
+            {challenge === 4 && "有點困難 😅"}
+            {challenge === 5 && "很有挑戰 😤"}
           </p>
         )}
       </div>
 
-      {/* 學習心得 - 改為更開放的設計 */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <PenTool size={16} className="text-purple-600 dark:text-purple-400" />
+      {/* 學習心得 */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <PenTool size={14} className="text-purple-600 dark:text-purple-400" />
           <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-300">學習心得</h4>
         </div>
         <div className="relative">
@@ -175,22 +210,13 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="今天學到了什麼？有什麼想法想記錄下來嗎？✨"
-            className="w-full min-h-[120px] p-4 text-sm border-2 border-purple-200/60 dark:border-purple-700/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 backdrop-blur-sm resize-none transition-all hover:border-purple-300 dark:hover:border-purple-600"
-            style={{
-              backgroundImage: 'linear-gradient(135deg, rgba(168, 85, 247, 0.02) 0%, rgba(236, 72, 153, 0.02) 100%)'
-            }}
+            className="w-full min-h-[100px] p-3 text-sm border-2 border-purple-200/60 dark:border-purple-700/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 backdrop-blur-sm resize-none transition-all hover:border-purple-300 dark:hover:border-purple-600"
           />
-          <button 
-            className="absolute bottom-3 right-3 p-2 rounded-lg hover:bg-purple-100/80 dark:hover:bg-purple-800/40 transition-colors"
-            title="語音輸入 (即將推出)"
-          >
-            <Mic size={18} className="text-purple-500/70 hover:text-purple-600 dark:hover:text-purple-400" />
-          </button>
         </div>
       </div>
 
       {/* 附件區域 */}
-      <div className="p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl">
+      <div className="p-2 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl">
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">附件</h4>
           <button
@@ -211,62 +237,95 @@ export const TaskRecordForm: React.FC<TaskRecordFormProps> = ({
         />
 
         {attachments.length > 0 ? (
-          <div className="space-y-1 max-h-16 overflow-y-auto">
+          <div className="space-y-1 max-h-20 overflow-y-auto">
             {attachments.map((file, index) => (
-              <div key={index} className="flex items-center justify-between p-1.5 bg-white dark:bg-gray-800 rounded text-xs">
+              <div key={index} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded text-sm">
                 <span className="truncate flex-1">{file.name}</span>
                 <button
                   onClick={() => removeAttachment(index)}
-                  className="p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                  className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                 >
-                  <X size={10} />
+                  <X size={12} />
                 </button>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
+          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
             點擊附件圖標來上傳檔案
           </div>
         )}
       </div>
 
+      {/* 歷史記錄區域 */}
+      {showHistoryButton && previousRecords.length > 0 && (
+        <div className="border-t pt-3">
+          {!showHistory ? (
+            <div className="text-center">
+              <button
+                onClick={() => setShowHistory(true)}
+                className="text-sm text-blue-600 hover:text-blue-800 transition-colors px-4 py-1.5 rounded-lg hover:bg-blue-50"
+              >
+                看看之前的記錄 ({previousRecords.length} 則)
+              </button>
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.3 }}
+            >
+              <RecordHistory
+                records={previousRecords}
+                initiallyExpanded={true}
+                maxInitialItems={10}
+              />
+              <div className="text-center mt-3">
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  收起歷史記錄
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      )}
+
       {/* 按鈕組 */}
-      <div className="flex gap-2 mt-3">
-        {/* 返回/取消按鈕 - 統一顯示 */}
+      <div className="flex gap-3 pt-4 mt-2 border-t">
         {(showCancelButton || showStatusButtons) && (
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md"
+            className="flex-1 px-4 py-3 text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-xl hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all shadow-md"
           >
             返回
           </button>
         )}
 
         {showStatusButtons ? (
-          /* 狀態更新按鈕 */
           <>
             <button
               onClick={() => onStatusUpdate?.('in_progress')}
               disabled={isUpdating}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-lg hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md disabled:opacity-50"
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 text-white rounded-xl hover:from-blue-500 hover:via-indigo-600 hover:to-purple-600 transition-all shadow-md disabled:opacity-50"
             >
               {isUpdating ? '更新中...' : '進行中'}
             </button>
             <button
               onClick={() => onStatusUpdate?.('done')}
               disabled={isUpdating}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md disabled:opacity-50"
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-xl hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md disabled:opacity-50"
             >
               {isUpdating ? '更新中...' : '完成'}
             </button>
           </>
         ) : (
-          /* 保存按鈕 */
           <button
             onClick={handleSave}
             disabled={isSaving || !comment.trim()}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-lg hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 text-white rounded-xl hover:from-emerald-500 hover:via-teal-600 hover:to-cyan-600 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             {isSaving ? (
               <>
