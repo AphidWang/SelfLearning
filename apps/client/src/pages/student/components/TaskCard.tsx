@@ -162,16 +162,24 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
 
             {/* 中間：任務標題 */}
             <div className="flex-1 flex flex-col justify-center">
-              <div className="flex items-start gap-2 mb-2">
+              <div className="mb-2">
                 <h3 
                   className="text-lg font-bold text-gray-800 leading-tight line-clamp-2 flex-1"
-                  style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}
+                  style={{ fontFamily: 'system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif' }}
                 >
                   {task.title}
                 </h3>
+              </div>
+              {/* 任務描述（如果有） */}
+              {task.description && (
+                <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+                  {task.description}
+                </p>
+              )}
+              <div style={{ marginTop: 'auto' }}>
                 {shouldShowOwnerTag && (
                   <div 
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium flex-shrink-0"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 mb-1 self-start"
                     style={{ 
                       backgroundColor: task.owner!.color + '20',
                       color: task.owner!.color,
@@ -183,13 +191,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                   </div>
                 )}
               </div>
-              
-              {/* 任務描述（如果有） */}
-              {task.description && (
-                <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
-                  {task.description}
-                </p>
-              )}
             </div>
 
             {/* 學習記錄數量 */}
