@@ -1,3 +1,31 @@
+/**
+ * 🗺️ 學習地圖架構
+ * 
+ * 核心組件層次：
+ * StudentLearningMap (主頁面)
+ * ├── PageLayout
+ * │   └── InteractiveMap (背景地圖)
+ * │       ├── 🔥 營火 → DailyReviewCarousel
+ * │       ├── 📮 信箱 → TopicDashboardDialog  
+ * │       ├── 🏠 房子 → TopicProgressDialog
+ * │       └── 📌 主題點 → TopicDetailsDialog
+ * │
+ * ├── TopicTemplateBrowser (模板選擇器)
+ * └── 多個浮動 Dialog (使用 DraggableDialog 包裝)
+ * 
+ * 主要狀態：
+ * - showDailyReview: 每日回顧輪播
+ * - showTopicCards: 主題卡片面板
+ * - showProgress: 進度總覽面板
+ * - showTemplateBrowser: 模板選擇器
+ * - showTopicReviewId: 主題詳細檢視
+ * - selectedTopicId: 當前選中的主題
+ * - selectedTaskId: 當前選中的任務
+ * - openedFromDashboard: 是否從儀表板開啟
+ * - mapRect: 地圖容器位置尺寸
+ * - dialogPosition: 可拖拽 Dialog 位置
+ */
+
 import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { TopicDashboard } from '../../components/learning-map/TopicDashboard';
 import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
@@ -54,7 +82,9 @@ export const StudentLearningMap: React.FC = () => {
   // 當有 selectedTaskId 時，從所有主題中尋找該任務
   const taskInfo = selectedTaskId ? (() => {
     for (const topic of topics) {
+      if (!topic.goals) continue;
       for (const goal of topic.goals) {
+        if (!goal.tasks) continue;
         const task = goal.tasks.find(t => t.id === selectedTaskId);
         if (task) {
           return { task, goal, topic };
@@ -160,26 +190,42 @@ export const StudentLearningMap: React.FC = () => {
 
   // 過濾出有任務的目標，並轉換為地圖點
   const tasks = topics
-    .filter(topic => topic.goals.some(goal => goal.tasks.length > 0))
+    .filter(topic => topic.goals?.some(goal => (goal.tasks?.length ?? 0) > 0))
     .map((topic, index, filteredTopics) => {
-      // 計算位置：將目標均勻分布在地圖上
       const totalTopics = filteredTopics.length;
-      const x = (index / totalTopics) * 80 + 10; // 10-90% 的範圍
-      const y = 50; // 固定在中間高度
+      const x = (index / totalTopics) * 80 + 10;
+      const y = 50;
       
       return {
         id: topic.id,
         label: topic.title,
         subject: topic.subject || '未分類',
-        completed: topic.goals.every(goal => 
-          goal.tasks.every(task => task.status === 'done')
-        ),
+        completed: topic.goals?.every(goal => 
+          goal.tasks?.every(task => task.status === 'done')
+        ) ?? false,
         position: { x, y },
         topicId: topic.id
       };
     });
 
   const activeTopic = topics.find(topic => topic.status === 'active');
+
+  const handleAddGoal = async () => {
+    if (!selectedTopic?.goals) return;
+    
+    try {
+      const newGoal = await useTopicStore.getState().addGoal(selectedTopic.id, {
+        title: '新目標',
+        description: '',
+        status: 'todo',
+        tasks: [],
+        order_index: selectedTopic.goals.length,
+        priority: 'medium'
+      });
+    } catch (error) {
+      console.error('新增目標失敗:', error);
+    }
+  };
 
   return (
     <PageLayout title="學習地圖">
