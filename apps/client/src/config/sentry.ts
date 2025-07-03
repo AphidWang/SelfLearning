@@ -13,84 +13,44 @@
 
 import * as Sentry from '@sentry/react';
 import { useEffect } from 'react';
+import { useLocation, useNavigationType, createRoutesFromChildren, matchRoutes } from 'react-router-dom';
 
 // Sentry DSN - 請替換為你的實際 DSN
-const SENTRY_DSN = process.env.VITE_SENTRY_DSN || '';
+const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || '';
 
 // 是否為開發環境
-const isDevelopment = process.env.NODE_ENV === 'development';
+const isDevelopment = import.meta.env.MODE === 'development';
 
 /**
  * 初始化 Sentry
  */
 export const initSentry = () => {
-  // 如果沒有 DSN，則不初始化 Sentry
-  if (!SENTRY_DSN) {
-    console.log('Sentry DSN not found, skipping initialization');
-    return;
+  console.log('開始初始化 Sentry...');
+  try {
+    Sentry.init({
+      dsn: "https://d347fd97a10246c0312bbf9411fc63dd@o4509603489316864.ingest.us.sentry.io/4509603494100993",
+      environment: import.meta.env.MODE,
+      debug: true, // 強制開啟 debug
+      sendDefaultPii: true,
+      
+      integrations: [
+        Sentry.reactRouterV6BrowserTracingIntegration({
+          useEffect,
+          useLocation,
+          useNavigationType,
+          createRoutesFromChildren,
+          matchRoutes
+        }),
+      ],
+    });
+    
+    // 測試 Sentry 是否正常運作
+    Sentry.captureMessage('Sentry 初始化測試', 'info');
+    console.log('Sentry 初始化成功！');
+  } catch (error) {
+    console.error('Sentry 初始化失敗：', error);
   }
-
-  Sentry.init({
-    // Sentry DSN
-    dsn: SENTRY_DSN,
-    
-    // 環境設定
-    environment: isDevelopment ? 'development' : 'production',
-    
-    // 錯誤採樣率 (1.0 = 100%)
-    sampleRate: isDevelopment ? 1.0 : 0.1,
-    
-    // 關閉 Performance Monitoring
-    tracesSampleRate: 0,
-    
-    // 開發環境啟用 debug
-    debug: isDevelopment,
-    
-    // 自動捕捉設定
-    autoSessionTracking: true,
-    
-    // 整合設定
-    integrations: [
-      // React Router 整合
-      Sentry.reactRouterV6BrowserTracingIntegration({
-        useEffect,
-      }),
-      
-      // 重播錯誤整合（可選）
-      Sentry.replayIntegration({
-        maskAllText: true,
-        blockAllMedia: true,
-      }),
-    ],
-    
-    // 重播採樣率（關閉以節省配額）
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
-    
-    // 過濾不需要的錯誤
-    beforeSend(event, hint) {
-      // 過濾開發環境的某些錯誤
-      if (isDevelopment) {
-        // 過濾 HMR 相關錯誤
-        const error = hint.originalException;
-        if (error && typeof error === 'object' && 'message' in error) {
-          const message = String(error.message);
-          if (message.includes('Loading chunk') || message.includes('ChunkLoadError')) {
-            return null;
-          }
-        }
-      }
-      
-      return event;
-    },
-    
-    // 設定發佈版本（可選）
-    release: process.env.VITE_APP_VERSION || 'unknown',
-  });
 };
-
-// 導出 Sentry 實例以便在其他地方使用
-export { Sentry };
 
 // 手動報告錯誤的輔助函數
 export const reportError = (error: Error, context?: Record<string, any>) => {
@@ -112,4 +72,7 @@ export const setUser = (user: { id: string; email?: string; username?: string })
 // 清除用戶資訊（登出時使用）
 export const clearUser = () => {
   Sentry.setUser(null);
-}; 
+};
+
+// 導出 ErrorBoundary 供 App.tsx 使用
+export const ErrorBoundary = Sentry.ErrorBoundary; 

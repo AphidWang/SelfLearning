@@ -61,6 +61,14 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
             </button>
           )}
         </div>
+        <button
+          className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+          onClick={() => {
+            throw new Error("使用者主動回報的問題！");
+          }}
+        >
+          回報問題
+        </button>
       </div>
     </header>
     {currentUser && (

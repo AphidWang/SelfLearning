@@ -26,7 +26,7 @@ import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
 import { UserAdminPage } from './pages/admin/UserAdminPage';
 import { AuthCallback } from './pages/AuthCallback.tsx';
-import { Sentry } from './config/sentry';
+import { ErrorBoundary } from './config/sentry';
 import { SentryTestButton } from './components/shared/SentryTestButton';
 
 // import { initGA } from './utils/analytics';
@@ -67,7 +67,7 @@ const SmartRedirect: React.FC = () => {
 
 function App() {
   return (
-    <Sentry.ErrorBoundary
+    <ErrorBoundary
       fallback={({ error, resetError }) => (
         <div className="flex items-center justify-center min-h-screen bg-gray-50">
           <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
@@ -225,7 +225,7 @@ function App() {
       </AuthProvider>
     </ErrorProvider>
     <SentryTestButton />
-  </Sentry.ErrorBoundary>
+  </ErrorBoundary>
   );
 }
 
