@@ -35,6 +35,10 @@ jobs:
       - name: Build project
         run: yarn build
 
+      - name: List build output
+        run: |
+          ls -R ./dist
+
       - name: Get commit SHA
         id: get-sha
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
