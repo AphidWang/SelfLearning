@@ -92,7 +92,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 
       try {
         await actions.handleTopicUpdate(async () => {
-          const updatedTopic = await updateTopic(topicId, updates);
+          const updatedTopic = await updateTopic(topicId, state.topic!.version, updates);
           if (!updatedTopic) {
             throw new Error('更新失敗');
           }
@@ -260,7 +260,12 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
               selectedGoalId={state.selectedGoalId}
               selectedTaskId={state.selectedTaskId}
               subjectStyle={subjectStyle}
-              onUpdateNotify={actions.handleCollaborationUpdate}
+              onUpdateNotify={async () => {
+                const result = await actions.handleCollaborationUpdate();
+                if (result === null) {
+                  console.warn('Collaboration update returned null');
+                }
+              }}
               availableUsers={computed.availableUsers}
               collaborators={computed.collaborators}
               onTaskSelect={handleDetailsPanelTaskSelect}

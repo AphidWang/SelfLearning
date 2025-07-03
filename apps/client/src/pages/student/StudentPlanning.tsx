@@ -100,8 +100,10 @@ const StudentPlanning: React.FC = () => {
 
   const handleAddToSchedule = (topicId: string, goalId: string, taskId: string) => {
     const topic = useTopicStore.getState().topics.find(t => t.id === topicId);
-    const goal = topic?.goals.find(g => g.id === goalId);
-    const task = goal?.tasks.find(t => t.id === taskId);
+    if (!topic?.goals) return;
+    const goal = topic.goals.find(g => g.id === goalId);
+    if (!goal?.tasks) return;
+    const task = goal.tasks.find(t => t.id === taskId);
     if (!task) return;
 
     updateTaskInfo(topicId, goalId, taskId, {
@@ -247,7 +249,7 @@ const StudentPlanning: React.FC = () => {
   };
 
   const handleAddGoal = async () => {
-    if (!selectedTopic) return;
+    if (!selectedTopic?.goals) return;
     
     try {
       const newGoal = await useTopicStore.getState().addGoal(selectedTopic.id, {
@@ -255,7 +257,8 @@ const StudentPlanning: React.FC = () => {
         description: '',
         status: 'todo',
         tasks: [],
-        order: selectedTopic.goals.length
+        order_index: selectedTopic.goals.length,
+        priority: 'medium'
       });
 
       if (newGoal) {
@@ -637,17 +640,17 @@ const StudentPlanning: React.FC = () => {
                   <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">已完成項目</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {selectedTopic.goals.reduce((acc, goal) => 
-                        acc + goal.tasks.filter(task => task.status === 'done').length, 0
-                      )}
+                      {selectedTopic?.goals?.reduce((acc, goal) => 
+                        acc + (goal.tasks?.filter(task => task.status === 'done').length || 0), 0
+                      ) || 0}
                     </p>
                   </div>
                   <div className="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">待辦項目</p>
                     <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                      {selectedTopic.goals.reduce((acc, goal) => 
-                        acc + goal.tasks.filter(task => task.status === 'todo').length, 0
-                      )}
+                      {selectedTopic?.goals?.reduce((acc, goal) => 
+                        acc + (goal.tasks?.filter(task => task.status === 'todo').length || 0), 0
+                      ) || 0}
                     </p>
                   </div>
                 </div>
@@ -668,7 +671,7 @@ const StudentPlanning: React.FC = () => {
                   </div>
 
                   <div className="space-y-3">
-                    {selectedTopic.goals.map(goal => (
+                    {selectedTopic?.goals?.map(goal => (
                       <GoalItem
                         key={goal.id}
                         goal={goal}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, easeInOut } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { UserAvatar, UserAvatarGroup } from '../learning-map/UserAvatar';
@@ -83,7 +83,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   onGoalClick,
   className = ""
 }) => {
-  const { getTopic, getActiveGoals, getCompletionRate, toggleAvatarDisplay } = useTopicStore();
+  const { getTopic, getActiveGoals, getCompletionRate } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
   const isInitialRender = useRef(true);
   const [shouldAnimate, setShouldAnimate] = useState(showAnimations);
@@ -140,11 +140,12 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     let inProgressTasks = 0;
     
     goals.forEach(goal => {
+      if (!goal.tasks) return;
       goal.tasks.forEach(task => {
         totalTasks++;
         if (task.status === 'done') {
           completedTasks++;
-          if (isThisWeek(task.completedAt)) {
+          if (isThisWeek(task.completed_at)) {
             newlyCompleted++;
           }
         } else if (task.status === 'in_progress') {
@@ -242,9 +243,12 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
   const handleToggleAvatars = useCallback(() => {
     if (topic) {
-      toggleAvatarDisplay(topic.id);
+      setTopic({
+        ...topic,
+        show_avatars: !topic.show_avatars
+      });
     }
-  }, [topic, toggleAvatarDisplay]);
+  }, [topic]);
 
   const handleMapLoad = useCallback(() => {
     updateMapSize();
@@ -336,7 +340,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     initial: shouldAnimate ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 1 },
     animate: { scale: 1, opacity: 1 },
     transition: shouldAnimate ? { 
-      type: "spring",
+      type: "spring" as const,
       stiffness: 200,
       damping: 20,
       mass: 0.5,
@@ -351,7 +355,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     transition: {
       repeat: Infinity,
       duration: 1.5,
-      ease: "easeInOut",
+      ease: easeInOut,
       repeatType: "reverse" as const
     }
   }), []);
@@ -548,9 +552,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               />
               
               {/* 目標到任務的連接線 */}
-              {goal.tasks.map((task, taskIndex) => {
-                const taskPos = getTaskPosition(taskIndex, goal.tasks.length, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
-                const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completedAt);
+              {goal.tasks?.map((task, taskIndex) => {
+                const taskPos = getTaskPosition(taskIndex, goal.tasks?.length || 0, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
+                const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completed_at);
                 
                 // 檢查是否在主延伸線上（topic-goal 的延長線）
                 const extensionAngle = goalPos.angle + Math.PI;
@@ -708,8 +712,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
           const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
           const { x, y } = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
-          const goalCompletedTasks = goal.tasks.filter(t => t.status === 'done').length;
-          const goalProgress = goal.tasks.length > 0 ? (goalCompletedTasks / goal.tasks.length) * 100 : 0;
+          const goalCompletedTasks = goal.tasks?.filter(t => t.status === 'done').length || 0;
+          const goalProgress = (goal.tasks?.length || 0) > 0 ? (goalCompletedTasks / (goal.tasks?.length || 1)) * 100 : 0;
           const isSelected = selectedGoalId === goal.id && !selectedTaskId; // 只有在沒有選中任務時才顯示目標選中
           
           // 根據目標狀態決定圖標、顏色和樣式
@@ -845,7 +849,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               </foreignObject>
               
               {/* 目標的需要幫助指示器 */}
-              {goal.needHelp && (
+              {goal.need_help && (
                 <motion.circle
                   cx={x + Math.min(45, Math.min(width, height) * 0.10)}
                   cy={y + Math.min(45, Math.min(width, height) * 0.10)}
@@ -866,7 +870,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                 </motion.circle>
               )}
               
-              {goal.needHelp && (
+              {goal.need_help && (
                 <foreignObject
                   x={x + Math.min(45, Math.min(width, height) * 0.10) - Math.min(10, Math.min(width, height) * 0.025)}
                   y={y + Math.min(45, Math.min(width, height) * 0.10) - Math.min(10, Math.min(width, height) * 0.025)}
@@ -937,9 +941,9 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
           const goalPos = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
           
-          return goal.tasks.map((task, taskIndex) => {
-            const { x, y } = getTaskPosition(taskIndex, goal.tasks.length, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
-            const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completedAt);
+          return goal.tasks?.map((task, taskIndex) => {
+            const { x, y } = getTaskPosition(taskIndex, goal.tasks?.length || 0, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
+            const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completed_at);
             const isSelected = selectedTaskId === task.id;
             
             let taskColor = '#6b7280'; // 默認灰色
@@ -1057,7 +1061,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                 </foreignObject>
                 
                 {/* 任務的需要幫助指示器 */}
-                {task.needHelp && (
+                {task.need_help && (
                   <motion.circle
                     cx={x + Math.min(18, Math.min(width, height) * 0.045)}
                     cy={y + Math.min(18, Math.min(width, height) * 0.045)}
@@ -1078,7 +1082,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                   </motion.circle>
                 )}
                 
-                {task.needHelp && (
+                {task.need_help && (
                   <foreignObject
                     x={x + Math.min(18, Math.min(width, height) * 0.045) - Math.min(6, Math.min(width, height) * 0.015)}
                     y={y + Math.min(18, Math.min(width, height) * 0.045) - Math.min(6, Math.min(width, height) * 0.015)}
@@ -1151,11 +1155,12 @@ export const useTopicRadialMapStats = (topicId: string) => {
     let inProgressTasks = 0;
     
     goals.forEach(goal => {
+      if (!goal.tasks) return;
       goal.tasks.forEach(task => {
         totalTasks++;
         if (task.status === 'done') {
           completedTasks++;
-          if (isThisWeek(task.completedAt)) {
+          if (isThisWeek(task.completed_at)) {
             newlyCompleted++;
           }
         } else if (task.status === 'in_progress') {

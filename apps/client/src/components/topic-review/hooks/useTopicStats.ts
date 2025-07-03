@@ -10,39 +10,31 @@ export const useTopicStats = (topicId: string, topic: Topic | null) => {
   // 計算需要幫助的項目數量
   const needHelpCount = useMemo(() => {
     if (!topic) return 0;
-    
-    const activeGoals = getActiveGoals(topicId);
     let count = 0;
     
-    // 計算需要幫助的目標數量
-    activeGoals.forEach(goal => {
-      if (goal.needHelp) {
-        count++;
-      }
-      
-      // 計算需要幫助的任務數量
-      goal.tasks.forEach(task => {
-        if (task.needHelp) {
+    topic.goals?.forEach(goal => {
+      goal.tasks?.forEach(task => {
+        if (task.need_help) {
           count++;
         }
       });
     });
     
     return count;
-  }, [topic, topicId, getActiveGoals]);
+  }, [topic]);
 
   // 記憶化 goals 以避免不必要的重新渲染
   const memoizedGoals = useMemo(() => {
-    if (!topic) return [];
+    if (!topic?.goals) return [];
     return topic.goals;
   }, [topic?.goals]);
 
-  const totalGoals = topic?.goals.length || 0;
+  const totalGoals = topic?.goals?.length || 0;
   const completedGoals = useMemo(() => {
-    if (!topic) return 0;
+    if (!topic?.goals) return 0;
     return topic.goals.filter(goal => {
-      const totalTasks = goal.tasks.length;
-      const completedTasks = goal.tasks.filter(task => task.status === 'done').length;
+      const totalTasks = goal.tasks?.length || 0;
+      const completedTasks = goal.tasks?.filter(task => task.status === 'done').length || 0;
       return totalTasks > 0 && completedTasks === totalTasks;
     }).length;
   }, [topic?.goals]);
