@@ -889,49 +889,6 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                   </motion.div>
                 </foreignObject>
               )}
-
-              {/* 協作頭像 - 只在協作模式且開啟頭像顯示時顯示 */}
-              {topic.is_collaborative && topic.show_avatars && goal.owner && (
-                <foreignObject
-                  x={x + goalNodeSize * 0}
-                  y={y - goalNodeSize * 1.5}
-                  width={goalNodeSize * 1.2}
-                  height={goalNodeSize * 1.2}
-                  className="pointer-events-none"
-                  style={{ overflow: 'visible' }}
-                >
-                  <motion.div 
-                    className="w-full h-full flex items-start justify-start"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 1.2 + goalIndex * 0.1, duration: 0.3 }}
-                  >
-                    <div className="flex items-center relative">
-                      {goal.owner && (
-                        <>
-                          <div className="w-full h-full">
-                            <UserAvatar 
-                              user={goal.owner} 
-                              size="sm" 
-                              showTooltip={true}
-                              style={{ width: '100%', height: '100%' }}
-                            />
-                          </div>
-                          {goal.collaborators && goal.collaborators.length > 0 && (
-                            <div 
-                              className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold border-2 border-white shadow-lg cursor-help hover:bg-blue-600 transition-colors"
-                              title={`協作者: ${goal.collaborators.map(c => c.name).join(', ')}`}
-                              style={{ zIndex: 1000 }}
-                            >
-                              +{goal.collaborators.length}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
-                </foreignObject>
-              )}
             </motion.g>
           );
         })}
@@ -1101,41 +1058,121 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
                     </motion.div>
                   </foreignObject>
                 )}
-
-                {/* 任務協作頭像 - 只在協作模式且開啟頭像顯示時顯示 */}
-                {topic.is_collaborative && topic.show_avatars && task.owner && (
-                  <foreignObject
-                    x={x + taskNodeSize * 0.1}
-                    y={y - taskNodeSize * 1.9}
-                    width={taskNodeSize * 1.8}
-                    height={taskNodeSize * 1.8}
-                    className="pointer-events-none"
-                    style={{ overflow: 'visible' }}
-                  >
-                    <motion.div 
-                      className="w-full h-full flex items-center justify-center"
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: 1.5 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.3 }}
-                    >
-                      <div className="flex items-center relative">
-                        {task.owner && (
-                          <div className="w-full h-full">
-                            <UserAvatar 
-                              user={task.owner} 
-                              size="xs" 
-                              showTooltip={true}
-                              style={{ width: '100%', height: '100%' }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  </foreignObject>
-                )}
               </motion.g>
             );
           });
+        })}
+
+        {/* 所有協作頭像 - 放在最上層 */}
+        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+          const goalPos = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
+          const { x, y } = goalPos;
+          
+          return (
+            <React.Fragment key={`avatars-${goal.id}`}>
+              {/* 目標協作頭像 */}
+              {topic.is_collaborative && topic.show_avatars && goal.owner && (
+                <foreignObject
+                  x={x + goalNodeSize * 0.3}
+                  y={y - goalNodeSize * 1.3}
+                  width={goalNodeSize * 1.3}
+                  height={goalNodeSize * 1.3}
+                  style={{ overflow: 'visible', zIndex: 1000 }}
+                >
+                  <motion.div 
+                    className="absolute"
+                    style={{
+                      width: `${goalNodeSize * 1.2}px`,
+                      height: `${goalNodeSize * 1.2}px`,
+                      zIndex: 1000
+                    }}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 1.2 + goalIndex * 0.1, duration: 0.3 }}
+                  >
+                    <div className="relative w-full h-full" style={{ zIndex: 1000 }}>
+                      {goal.owner && (
+                        <>
+                          <div className="w-full h-full">
+                            <UserAvatar 
+                              user={goal.owner} 
+                              size="sm" 
+                              showTooltip={true}
+                              style={{ 
+                                width: '100%',
+                                height: '100%',
+                                zIndex: 1000
+                              }}
+                            />
+                          </div>
+                          {goal.collaborators && goal.collaborators.length > 0 && (
+                            <div 
+                              className="absolute -bottom-1 -right-1 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold border-2 border-white shadow-lg cursor-help hover:bg-blue-600 transition-colors"
+                              style={{
+                                width: `${goalNodeSize * 0.4}px`,
+                                height: `${goalNodeSize * 0.4}px`,
+                                zIndex: 1001
+                              }}
+                              title={`協作者: ${goal.collaborators.map(c => c.name).join(', ')}`}
+                            >
+                              +{goal.collaborators.length}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                </foreignObject>
+              )}
+
+              {/* 任務協作頭像 */}
+              {goal.tasks?.map((task, taskIndex) => {
+                const taskPos = getTaskPosition(taskIndex, goal.tasks?.length || 0, x, y, taskRadius, goalPos.angle, centerX, centerY);
+                return (
+                  topic.is_collaborative && topic.show_avatars && task.owner && (
+                    <foreignObject
+                      key={`task-avatar-${task.id}`}
+                      x={taskPos.x + taskNodeSize * 0.3}
+                      y={taskPos.y - taskNodeSize * 1.5}
+                      width={taskNodeSize * 2}
+                      height={taskNodeSize * 2}
+                      style={{ overflow: 'visible', zIndex: 1000 }}
+                    >
+                      <motion.div 
+                        className="absolute"
+                        style={{
+                          width: `${taskNodeSize * 1.8}px`,
+                          height: `${taskNodeSize * 1.8}px`,
+                          zIndex: 1000
+                        }}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 1.5 + goalIndex * 0.1 + taskIndex * 0.05, duration: 0.3 }}
+                      >
+                        <div className="relative w-full h-full" style={{ zIndex: 1000 }}>
+                          {task.owner && (
+                            <div className="w-full h-full">
+                              <UserAvatar 
+                                user={task.owner} 
+                                size="xs" 
+                                showTooltip={true}
+                                style={{ 
+                                  width: '100%',
+                                  height: '100%',
+                                  zIndex: 1000
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    </foreignObject>
+                  )
+                );
+              })}
+            </React.Fragment>
+          );
         })}
         </g>
       </svg>
