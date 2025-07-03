@@ -365,7 +365,10 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
               .select('*')
               .eq('topic_id', topic.id)
               .neq('status', 'archived')
-              .order('order_index', { ascending: true });
+              .order('order_index', { ascending: true })
+              .order('created_at', { ascending: true })
+              .order('title', { ascending: true })
+              .order('id', { ascending: true });  // id 作為最後保證，確保完全唯一的排序
 
             if (goalsError) {
               console.warn(`獲取主題 ${topic.id} 的目標失敗:`, goalsError);
@@ -381,7 +384,10 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
                     .select('*')
                     .eq('goal_id', goal.id)
                     .neq('status', 'archived')
-                    .order('order_index', { ascending: true });
+                    .order('order_index', { ascending: true })
+                    .order('created_at', { ascending: true })
+                    .order('title', { ascending: true })
+                    .order('id', { ascending: true });  // id 作為最後保證，確保完全唯一的排序
 
                   if (tasksError) {
                     console.warn(`獲取目標 ${goal.id} 的任務失敗:`, tasksError);
@@ -548,7 +554,10 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         .select('*')
         .eq('topic_id', id)
         .neq('status', 'archived')
-        .order('order_index', { ascending: true });
+        .order('order_index', { ascending: true })
+        .order('created_at', { ascending: true })
+        .order('title', { ascending: true })
+        .order('id', { ascending: true });  // id 作為最後保證，確保完全唯一的排序
 
       if (goalsError) {
         console.warn(`獲取主題 ${id} 的目標失敗:`, goalsError);
@@ -563,7 +572,10 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
             .select('*')
             .eq('goal_id', goal.id)
             .neq('status', 'archived')
-            .order('order_index', { ascending: true });
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true })
+            .order('title', { ascending: true })
+            .order('id', { ascending: true });  // id 作為最後保證，確保完全唯一的排序
 
           if (tasksError) {
             console.warn(`獲取目標 ${goal.id} 的任務失敗:`, tasksError);
