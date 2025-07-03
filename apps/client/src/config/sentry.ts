@@ -29,19 +29,10 @@ export const initSentry = () => {
   try {
     Sentry.init({
       dsn: "https://d347fd97a10246c0312bbf9411fc63dd@o4509603489316864.ingest.us.sentry.io/4509603494100993",
-      environment: import.meta.env.MODE,
-      debug: import.meta.env.MODE === 'development',
+      environment: "production", // 固定為 production 環境
+      debug: false,
+      tracesSampleRate: 0, // 關閉 Performance Tracing
       sendDefaultPii: true,
-      
-      integrations: [
-        Sentry.reactRouterV6BrowserTracingIntegration({
-          useEffect,
-          useLocation,
-          useNavigationType,
-          createRoutesFromChildren,
-          matchRoutes
-        }),
-      ],
     });
     
     // 測試 Sentry 是否正常運作

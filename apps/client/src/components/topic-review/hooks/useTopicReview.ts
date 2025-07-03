@@ -149,15 +149,18 @@ export const useTopicReview = (topicId: string) => {
   // 初始化時載入用戶和主題數據
   useEffect(() => {
     const initializeData = async () => {
+      console.log('🔄 useTopicReview - initializeData started', { topicId });
+      
+      // 重置主題數據
+      setState(prev => ({ ...prev, topic: null }));
+      
       // 確保用戶數據存在
       if (!users.length) {
         await getCollaboratorCandidates();
       }
       
       // 載入主題數據
-      if (!state.topic) {
-        await refreshTopic();
-      }
+      await refreshTopic();
     };
     
     initializeData();

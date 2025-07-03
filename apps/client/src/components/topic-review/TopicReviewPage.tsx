@@ -53,6 +53,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   }, [state.showSubjectDropdown, actions]);
 
   if (!state.topic) {
+    console.log('TopicReviewPage loading state triggered');
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingDots />
