@@ -112,6 +112,9 @@ export interface Task {
   estimated_minutes?: number;
   actual_minutes?: number;
   
+  // 學習記錄
+  records?: { id: string; content?: string; created_at?: string }[];
+  
   // 版本控制
   version: number;
   created_at?: string;
@@ -280,4 +283,23 @@ export interface ActiveTaskResult {
   topic_title: string;
   topic_subject?: string;
   topic_status: TopicStatus;
+}
+
+export interface TaskWithContext extends Task {
+  topicId: string;
+  topicTitle: string;
+  topicSubject: string;
+  goalId: string;
+  goalTitle: string;
+  subjectStyle: any;
+  records: {
+    id: string;
+    created_at: string;
+    title: string;
+    message: string;
+    difficulty: number;
+    completion_time?: number;
+    files?: any[];
+    tags?: string[];
+  }[];
 }
