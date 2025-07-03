@@ -46,20 +46,22 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     topic_type: topic.topic_type || '學習目標',
     subject: topic.subject || SUBJECTS.CUSTOM
   });
-  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopicCompat: updateTopic, getActiveGoals, updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, reorderTasks, fetchTopics } = useTopicStore();
+  const { deleteTopic, addGoal, deleteGoal, addTask, deleteTask, updateTopicCompat: updateTopic, getActiveGoals, updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, reorderTasks, getTopic } = useTopicStore();
   const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [showGoalsOverview, setShowGoalsOverview] = useState(false);
   const [selectedGoalForTasks, setSelectedGoalForTasks] = useState<string | null>(null);
   const [markedGoals, setMarkedGoals] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchTopics(); // 初始化數據
-  }, []);
-
-  useEffect(() => {
-    const goals = getActiveGoals(topic.id);
-    setActiveGoals(goals);
-  }, [topic.id, topic.goals]);
+    const fetchTopicData = async () => {
+      const topicData = await getTopic(topic.id);
+      if (topicData) {
+        const goals = getActiveGoals(topic.id);
+        setActiveGoals(goals);
+      }
+    };
+    fetchTopicData();
+  }, [topic.id, topic]);
 
   useEffect(() => {
     setEditedTopic({
