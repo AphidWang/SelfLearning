@@ -29,7 +29,10 @@ import {
   ChevronRight,
   BarChart3,
   Edit,
-  Trash2
+  Trash2,
+  CheckCircle,
+  Play,
+  Mic
 } from 'lucide-react';
 import { journalStore, type DailyJournal, type MoodType } from '../../store/journalStore';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
@@ -44,11 +47,11 @@ const MOOD_CONFIG = {
 };
 
 const MOTIVATION_CONFIG = {
-  10: { emoji: '🚀', label: '隨時接受挑戰', color: '#FF6B6B' },
-  8: { emoji: '🐎', label: '想嘗試新事物', color: '#4ECDC4' },
-  6: { emoji: '🐰', label: '還在慢慢暖機', color: '#45B7D1' },
-  4: { emoji: '🐢', label: '好像提不起勁', color: '#96CEB4' },
-  2: { emoji: '🦥', label: '可能需要幫忙', color: '#FECA57' }
+  10: { emoji: '🚀', label: '隨時接受挑戰', color: '#FF6B6B', bgColor: '#FFE5E5' },
+  8: { emoji: '🐎', label: '想嘗試新事物', color: '#4ECDC4', bgColor: '#E5F9F7' },
+  6: { emoji: '🐰', label: '還在慢慢暖機', color: '#45B7D1', bgColor: '#E5F4FD' },
+  4: { emoji: '🐢', label: '好像提不起勁', color: '#96CEB4', bgColor: '#F0F9F4' },
+  2: { emoji: '🦥', label: '可能需要幫忙', color: '#FECA57', bgColor: '#FFF9E5' }
 };
 
 const StudentJournal: React.FC = () => {
@@ -344,112 +347,145 @@ const StudentJournal: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* 日記列表 */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, index) => (
-              <div key={index} className="bg-white rounded-3xl p-6 shadow-lg animate-pulse">
-                <div className="h-4 bg-gray-200 rounded mb-3" />
-                <div className="h-3 bg-gray-200 rounded mb-2" />
-                <div className="h-3 bg-gray-200 rounded w-2/3" />
-              </div>
-            ))}
-          </div>
-        ) : journals.length === 0 ? (
-          <motion.div 
-            className="text-center py-12"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">還沒有日記</h3>
-            <p className="text-gray-500 mb-6">開始記錄你的學習心情吧！</p>
-            <button
-              onClick={() => setShowNewDialog(true)}
-              className="px-6 py-3 bg-purple-500 text-white rounded-2xl font-semibold hover:bg-purple-600 transition-colors"
-            >
-              寫第一篇日記
-            </button>
-          </motion.div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {journals.map((journal, index) => {
-              const moodConfig = MOOD_CONFIG[journal.mood];
-              const motivationConfig = getMotivationConfig(journal.motivation_level);
-              
-              return (
-                <motion.div
-                  key={journal.id}
-                  className="bg-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -5 }}
-                >
-                  {/* 日期和操作 */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600 font-medium">
-                        {formatDate(journal.date)}
-                      </span>
+        {/* 日誌列表 */}
+        <div className="mt-8">
+          {loading ? (
+            <div>載入中...</div>
+          ) : journals.length === 0 ? (
+            <div>還沒有日誌記錄</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {journals.map((journal, index) => {
+                const moodConfig = MOOD_CONFIG[journal.mood];
+                const motivationConfig = getMotivationConfig(journal.motivation_level);
+                
+                return (
+                  <motion.div
+                    key={journal.id}
+                    className="bg-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    whileHover={{ y: -5 }}
+                  >
+                    {/* 日期和操作 */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600 font-medium">
+                          {formatDate(journal.date)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="p-1 text-gray-400 hover:text-blue-500 transition-colors">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteJournal(journal.id)}
+                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1 text-gray-400 hover:text-blue-500 transition-colors">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteJournal(journal.id)}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+
+                    {/* 心情和動力 */}
+                    <div className="flex items-center gap-4 mb-4">
+                      <div 
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+                        style={{ backgroundColor: moodConfig.bgColor }}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                        <span className="text-lg">{moodConfig.emoji}</span>
+                        <span className="text-sm font-medium" style={{ color: moodConfig.color }}>
+                          {moodConfig.label}
+                        </span>
+                      </div>
 
-                  {/* 心情和動力 */}
-                  <div className="flex items-center gap-4 mb-4">
-                    <div 
-                      className="flex items-center gap-2 px-3 py-2 rounded-2xl"
-                      style={{ backgroundColor: moodConfig.bgColor, color: moodConfig.color }}
-                    >
-                      <span className="text-lg">{moodConfig.emoji}</span>
-                      <span className="text-sm font-semibold">{moodConfig.label}</span>
+                      <div 
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+                        style={{ backgroundColor: motivationConfig.bgColor }}
+                      >
+                        <span className="text-lg">{motivationConfig.emoji}</span>
+                        <span className="text-sm font-medium" style={{ color: motivationConfig.color }}>
+                          {motivationConfig.label}
+                        </span>
+                      </div>
                     </div>
-                    
-                    <div 
-                      className="flex items-center gap-2 px-3 py-2 rounded-2xl"
-                      style={{ backgroundColor: motivationConfig.color + '20', color: motivationConfig.color }}
-                    >
-                      <span className="text-lg">{motivationConfig.emoji}</span>
-                      <span className="text-sm font-semibold">{journal.motivation_level}/10</span>
-                    </div>
-                  </div>
 
-                  {/* 內容 */}
-                  <div className="text-gray-700 text-sm leading-relaxed mb-4">
-                    {journal.content ? (
-                      <p className="line-clamp-3">{journal.content}</p>
-                    ) : (
-                      <p className="text-gray-400 italic">這天沒有留下文字記錄</p>
+                    {/* 日誌內容 */}
+                    <div className="mb-4">
+                      <p className="text-gray-600 text-sm line-clamp-3">
+                        {journal.content || '沒有記錄內容'}
+                      </p>
+                    </div>
+
+                    {/* 完成的任務 */}
+                    {journal.completed_tasks && journal.completed_tasks.length > 0 && (
+                      <div className="mt-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <h4 className="text-sm font-medium text-gray-700">完成的任務</h4>
+                        </div>
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {journal.completed_tasks.map((task, taskIndex) => (
+                            <div
+                              key={task.id || taskIndex}
+                              className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-sm"
+                            >
+                              {task.type === 'completed' ? (
+                                <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                              ) : (
+                                <Play className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                              )}
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-800 truncate">
+                                    {task.title}
+                                  </span>
+                                  
+                                  {task.type === 'completed' && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                                      完成
+                                    </span>
+                                  )}
+                                  
+                                  {task.type === 'recorded' && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                      記錄
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {(task.category || task.assignedTo) && (
+                                  <div className="text-xs text-gray-500 truncate">
+                                    {task.category && task.assignedTo 
+                                      ? `${task.category} · ${task.assignedTo}`
+                                      : task.category || task.assignedTo
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </div>
 
-                  {/* 額外資訊 */}
-                  {journal.has_voice_note && (
-                    <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1 rounded-xl w-fit">
-                      <span>🎵</span>
-                      <span>有語音記錄</span>
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
+                    {/* 語音記錄指示器 */}
+                    {journal.has_voice_note && (
+                      <div className="mt-4 flex items-center gap-2 text-purple-500 text-sm">
+                        <Mic className="w-4 h-4" />
+                        <span>有語音記錄</span>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* 分頁 */}
         {totalPages > 1 && (
