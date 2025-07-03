@@ -40,7 +40,8 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     deleteGoal,
     getTopic,
     getCompletionRate,
-    toggleTopicCollaborative,
+    enableTopicCollaboration,
+    disableTopicCollaboration,
     inviteTopicCollaborator,
     removeTopicCollaborator,
     getActiveGoals,
@@ -2388,7 +2389,8 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
     deleteGoal, 
     getTopic, 
     getCompletionRate, 
-    toggleTopicCollaborative,
+    enableTopicCollaboration,
+    disableTopicCollaboration,
     inviteTopicCollaborator,
     removeTopicCollaborator
   } = useTopicStore();
@@ -2503,7 +2505,9 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
       setPendingOperation('collaboration');
       
       // 後端更新
-      const success = await toggleTopicCollaborative(topicId);
+      const success = collaborationAction === 'enable' 
+        ? await enableTopicCollaboration(topicId)
+        : await disableTopicCollaboration(topicId);
       if (!success) {
         alert('更新協作設置失敗，請稍後再試');
       } else {

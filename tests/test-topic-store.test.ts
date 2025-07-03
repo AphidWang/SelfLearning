@@ -1,11 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { useTopicStore } from '@/store/topicStore';
-import { SUBJECTS } from '@/constants/subjects';
-import { Topic } from '@/types/goal';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+import { useTopicStore } from '../apps/client/src/store/topicStore';
+import { SUBJECTS } from '../apps/client/src/constants/subjects';
+import { Topic } from '../apps/client/src/types/goal';
+import { initTestAuth, cleanupTestData } from '../vitest.setup';
 
 describe('TopicStore', () => {
   let store: ReturnType<typeof useTopicStore.getState>;
   let createdTopics: string[] = [];
+  
+  beforeAll(async () => {
+    // 初始化測試認證
+    await initTestAuth();
+    console.log('🔐 測試認證已初始化');
+  });
 
   beforeEach(() => {
     store = useTopicStore.getState();
@@ -15,9 +22,18 @@ describe('TopicStore', () => {
   afterEach(async () => {
     // 清理測試資料
     for (const id of createdTopics) {
-      await store.deleteTopic(id);
+      try {
+        await store.deleteTopic(id);
+      } catch (error) {
+        console.warn(`清理主題 ${id} 失敗:`, error);
+      }
     }
     createdTopics = [];
+  });
+  
+  afterAll(async () => {
+    // 額外清理，確保沒有遺留的測試數據
+    await cleanupTestData();
   });
 
   describe('基本 CRUD 操作', () => {
@@ -30,7 +46,8 @@ describe('TopicStore', () => {
       status: 'active' as const,
       goals: [],
       bubbles: [],
-      is_collaborative: false
+      is_collaborative: false,
+      show_avatars: true
     };
 
     it('應該能創建新主題', async () => {
@@ -94,7 +111,8 @@ describe('TopicStore', () => {
         status: 'active' as const,
         goals: [],
         bubbles: [],
-        is_collaborative: false
+        is_collaborative: false,
+        show_avatars: true
       });
       if (testTopic?.id) createdTopics.push(testTopic.id);
       expect(testTopic).toBeDefined();
@@ -106,6 +124,8 @@ describe('TopicStore', () => {
         title: '測試目標',
         description: '這是一個測試目標',
         status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: 0,
         tasks: []
       };
 
@@ -118,8 +138,8 @@ describe('TopicStore', () => {
       const savedTopic = await store.getTopic(testTopic!.id);
       expect(savedTopic).toBeDefined();
       expect(savedTopic?.goals).toHaveLength(1);
-      expect(savedTopic?.goals[0].title).toBe(goal.title);
-      expect(savedTopic?.goals[0].tasks).toEqual([]);
+      expect(savedTopic?.goals?.[0].title).toBe(goal.title);
+      expect(savedTopic?.goals?.[0].tasks).toEqual([]);
     });
 
     it('應該能更新目標', async () => {
@@ -127,6 +147,8 @@ describe('TopicStore', () => {
         title: '測試目標',
         description: '這是一個測試目標',
         status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: 0,
         tasks: []
       });
       expect(goal).toBeDefined();
@@ -141,7 +163,7 @@ describe('TopicStore', () => {
       const savedTopic = await store.getTopic(testTopic!.id);
       expect(savedTopic).toBeDefined();
       expect(savedTopic?.goals).toHaveLength(1);
-      expect(savedTopic?.goals[0].title).toBe(updatedTitle);
+      expect(savedTopic?.goals?.[0].title).toBe(updatedTitle);
     });
 
     it('應該能刪除目標', async () => {
@@ -149,6 +171,8 @@ describe('TopicStore', () => {
         title: '測試目標',
         description: '這是一個測試目標',
         status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: 0,
         tasks: []
       });
       expect(goal).toBeDefined();
@@ -177,7 +201,8 @@ describe('TopicStore', () => {
         status: 'active' as const,
         goals: [],
         bubbles: [],
-        is_collaborative: false
+        is_collaborative: false,
+        show_avatars: true
       });
       if (testTopic?.id) createdTopics.push(testTopic.id);
       expect(testTopic).toBeDefined();
@@ -186,6 +211,8 @@ describe('TopicStore', () => {
         title: '測試目標',
         description: '這是一個測試目標',
         status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: 0,
         tasks: []
       });
       expect(testGoal).toBeDefined();
@@ -196,6 +223,9 @@ describe('TopicStore', () => {
         title: '測試任務',
         description: '這是一個測試任務',
         status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: 0,
+        need_help: false,
         dueDate: new Date().toISOString()
       };
 
@@ -206,8 +236,8 @@ describe('TopicStore', () => {
       // 驗證資料庫中的資料
       const savedTopic = await store.getTopic(testTopic!.id);
       expect(savedTopic).toBeDefined();
-      expect(savedTopic?.goals[0].tasks).toHaveLength(1);
-      expect(savedTopic?.goals[0].tasks[0].title).toBe(task.title);
+      expect(savedTopic?.goals?.[0].tasks).toHaveLength(1);
+      expect(savedTopic?.goals?.[0].tasks?.[0].title).toBe(task.title);
     });
 
     it('應該能更新任務狀態', async () => {
@@ -215,6 +245,9 @@ describe('TopicStore', () => {
         title: '測試任務',
         description: '這是一個測試任務',
         status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: 0,
+        need_help: false,
         dueDate: new Date().toISOString()
       });
       expect(task).toBeDefined();
@@ -226,7 +259,7 @@ describe('TopicStore', () => {
       // 驗證資料庫中的資料
       const savedTopic = await store.getTopic(testTopic!.id);
       expect(savedTopic).toBeDefined();
-      expect(savedTopic?.goals[0].tasks[0].status).toBe('done');
+      expect(savedTopic?.goals?.[0].tasks?.[0].status).toBe('done');
     });
 
     it('應該能刪除任務', async () => {
@@ -234,6 +267,9 @@ describe('TopicStore', () => {
         title: '測試任務',
         description: '這是一個測試任務',
         status: 'todo' as const,
+        priority: 'medium' as const,
+        order_index: 0,
+        need_help: false,
         dueDate: new Date().toISOString()
       });
       expect(task).toBeDefined();
@@ -244,7 +280,7 @@ describe('TopicStore', () => {
       // 驗證資料庫中的資料
       const savedTopic = await store.getTopic(testTopic!.id);
       expect(savedTopic).toBeDefined();
-      expect(savedTopic?.goals[0].tasks).toHaveLength(0);
+      expect(savedTopic?.goals?.[0].tasks).toHaveLength(0);
     });
   });
 
@@ -261,19 +297,33 @@ describe('TopicStore', () => {
         status: 'active' as const,
         goals: [],
         bubbles: [],
-        is_collaborative: false
+        is_collaborative: false,
+        show_avatars: true
       });
       if (testTopic?.id) createdTopics.push(testTopic.id);
       expect(testTopic).toBeDefined();
     });
 
-    it('應該能切換協作狀態', async () => {
-      const result = await store.toggleTopicCollaborative(testTopic!.id);
+    it('應該能啟用協作狀態', async () => {
+      const result = await store.enableTopicCollaboration(testTopic!.id);
       expect(result).toBeDefined();
 
       const savedTopic = await store.getTopic(testTopic!.id);
       expect(savedTopic).toBeDefined();
       expect(savedTopic?.is_collaborative).toBe(true);
+    });
+
+    it('應該能停用協作狀態', async () => {
+      // 先啟用協作
+      await store.enableTopicCollaboration(testTopic!.id);
+      
+      // 再停用協作
+      const result = await store.disableTopicCollaboration(testTopic!.id);
+      expect(result).toBeDefined();
+
+      const savedTopic = await store.getTopic(testTopic!.id);
+      expect(savedTopic).toBeDefined();
+      expect(savedTopic?.is_collaborative).toBe(false);
     });
   });
 }); 

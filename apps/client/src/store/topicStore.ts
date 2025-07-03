@@ -197,9 +197,14 @@ interface TopicStore {
   removeGoalCollaborator: (topicId: string, goalId: string, userId: string) => Promise<boolean>;
 
   /**
-   * 切換主題協作模式
+   * 啟用主題協作模式
    */
-  toggleTopicCollaborative: (topicId: string) => Promise<Topic | null>;
+  enableTopicCollaboration: (topicId: string) => Promise<Topic | null>;
+
+  /**
+   * 停用主題協作模式
+   */
+  disableTopicCollaboration: (topicId: string) => Promise<Topic | null>;
 
   /**
    * 邀請主題協作者
@@ -643,10 +648,13 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未認證');
 
+      // 過濾掉不屬於 topics_new 表的欄位
+      const { goals, bubbles, progress, owner_id, version, created_at, updated_at, ...dbTopicData } = topicData as any;
+
       const { data, error } = await supabase
         .from('topics_new')
         .insert([{
-          ...topicData,
+          ...dbTopicData,
           owner_id: user.id
         }])
         .select()
@@ -808,7 +816,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       if (error) throw error;
       
-      const result = data[0] as SafeUpdateResult;
+      const result = data as SafeUpdateResult;
       
       if (!result.success) {
         if (result.message === 'Version conflict detected') {
@@ -944,7 +952,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       if (error) throw error;
       
-      const result = data[0] as SafeUpdateResult;
+      const result = data as SafeUpdateResult;
       
       if (!result.success) {
         if (result.message === 'Version conflict detected') {
@@ -1505,14 +1513,14 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       // 更新本地 store
       const topics = get().topics;
       const topicIndex = topics.findIndex(t => t.id === topicId);
-      if (topicIndex >= 0) {
-        const goalIndex = topics[topicIndex].goals.findIndex(g => g.id === goalId);
+      if (topicIndex >= 0 && topics[topicIndex].goals) {
+        const goalIndex = topics[topicIndex].goals!.findIndex(g => g.id === goalId);
         if (goalIndex >= 0) {
-          const taskIndex = topics[topicIndex].goals[goalIndex].tasks?.findIndex(t => t.id === taskId) ?? -1;
+          const taskIndex = topics[topicIndex].goals![goalIndex].tasks?.findIndex(t => t.id === taskId) ?? -1;
           if (taskIndex >= 0) {
             // 獲取用戶信息並設置 owner
             const usersMap = await getUsersData([userId]);
-            const updatedGoals = [...topics[topicIndex].goals];
+            const updatedGoals = [...topics[topicIndex].goals!];
             const updatedTasks = [...(updatedGoals[goalIndex].tasks || [])];
             updatedTasks[taskIndex] = {
               ...updatedTasks[taskIndex],
@@ -1870,12 +1878,12 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       // 更新本地 store
       const topics = get().topics;
       const topicIndex = topics.findIndex(t => t.id === topicId);
-      if (topicIndex >= 0) {
-        const goalIndex = topics[topicIndex].goals.findIndex(g => g.id === goalId);
+      if (topicIndex >= 0 && topics[topicIndex].goals) {
+        const goalIndex = topics[topicIndex].goals!.findIndex(g => g.id === goalId);
         if (goalIndex >= 0) {
           // 獲取用戶信息並設置 owner
           const usersMap = await getUsersData([userId]);
-          const updatedGoals = [...topics[topicIndex].goals];
+          const updatedGoals = [...topics[topicIndex].goals!];
           updatedGoals[goalIndex] = {
             ...updatedGoals[goalIndex],
             owner: usersMap[userId] || null
@@ -1963,21 +1971,29 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   /**
-   * 切換主題協作模式
+   * 啟用主題協作模式
    */
-  toggleTopicCollaborative: async (topicId: string) => {
+  enableTopicCollaboration: async (topicId: string) => {
     try {
-      const topic = await get().getTopic(topicId);
-      if (!topic) {
-        console.error('找不到主題:', topicId);
-        return null;
-      }
-
       return await get().updateTopicCompat(topicId, {
-        is_collaborative: !topic.is_collaborative
+        is_collaborative: true
       });
     } catch (error: any) {
-      console.error('切換協作模式失敗:', error);
+      console.error('啟用協作模式失敗:', error);
+      return null;
+    }
+  },
+
+  /**
+   * 停用主題協作模式
+   */
+  disableTopicCollaboration: async (topicId: string) => {
+    try {
+      return await get().updateTopicCompat(topicId, {
+        is_collaborative: false
+      });
+    } catch (error: any) {
+      console.error('停用協作模式失敗:', error);
       return null;
     }
   },

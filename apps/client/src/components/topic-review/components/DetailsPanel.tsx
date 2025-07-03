@@ -98,7 +98,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     addTask, updateTaskInfo, deleteTask, updateGoal, deleteGoal, 
     setGoalOwner, addGoalCollaborator, removeGoalCollaborator,
     setTaskOwner, addTaskCollaborator, removeTaskCollaborator,
-    addGoal, toggleTopicCollaborative, inviteTopicCollaborator,
+    addGoal, enableTopicCollaboration, disableTopicCollaboration, inviteTopicCollaborator,
     removeTopicCollaborator,
     markTaskCompletedCompat: markTaskCompleted,
     markTaskInProgressCompat: markTaskInProgress,
@@ -764,7 +764,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }}
             onToggleCollaborative={async () => {
               await handleUpdate(async () => {
-                return await toggleTopicCollaborative(topic.id);
+                if (topic.is_collaborative) {
+                  return await disableTopicCollaboration(topic.id);
+                } else {
+                  return await enableTopicCollaboration(topic.id);
+                }
               });
               return true;
             }}

@@ -1,7 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { useTopicStore } from '@/store/topicStore';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { useTopicStore } from '../apps/client/src/store/topicStore';
+import { initTestAuth } from '../vitest.setup';
 
 describe('Topic Store - Basic Tests', () => {
+  beforeAll(async () => {
+    // 初始化測試認證
+    await initTestAuth();
+    console.log('🔐 基本測試認證已初始化');
+  });
+
   it('應該有正確的初始狀態', () => {
     const store = useTopicStore.getState();
     
@@ -38,7 +45,8 @@ describe('Topic Store - Basic Tests', () => {
     expect(typeof store.updateTaskCompat).toBe('function');
     
     // 協作功能
-    expect(typeof store.toggleTopicCollaborative).toBe('function');
+    expect(typeof store.enableTopicCollaboration).toBe('function');
+    expect(typeof store.disableTopicCollaboration).toBe('function');
   });
 
   it('應該有版本控制相關的方法', () => {
