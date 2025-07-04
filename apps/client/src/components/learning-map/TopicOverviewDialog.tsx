@@ -106,11 +106,11 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
     let inProgressTasks = 0;
     
     goals.forEach(goal => {
-      goal.tasks.forEach(task => {
+      (goal.tasks ?? []).forEach(task => {
         totalTasks++;
         if (task.status === 'done') {
           completedTasks++;
-          if (isThisWeek(task.completedAt)) {
+          if (isThisWeek(task.completed_at)) {
             newlyCompleted++;
           }
         } else if (task.status === 'in_progress') {
@@ -234,8 +234,8 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
           {/* 目標時間軸 */}
           <div className="space-y-8">
             {goals.map((goal, goalIndex) => {
-              const goalCompletedTasks = goal.tasks.filter(t => t.status === 'done').length;
-              const goalProgress = goal.tasks.length > 0 ? (goalCompletedTasks / goal.tasks.length) * 100 : 0;
+              const goalCompletedTasks = (goal.tasks ?? []).filter(t => t.status === 'done').length;
+              const goalProgress = (goal.tasks ?? []).length > 0 ? (goalCompletedTasks / (goal.tasks ?? []).length) * 100 : 0;
               
               return (
                 <div key={goal.id} className="relative">
@@ -277,14 +277,14 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
                             {goal.title}
                           </h4>
                           <span className="text-sm text-gray-500">
-                            {goalCompletedTasks}/{goal.tasks.length} 完成
+                            {goalCompletedTasks}/{(goal.tasks ?? []).length} 完成
                           </span>
                         </div>
 
                         {/* 任務列表 */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {goal.tasks.map(task => {
-                            const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completedAt);
+                          {(goal.tasks ?? []).map(task => {
+                            const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completed_at);
                             const statusStyle = getTaskStatusStyle(task.status, isNewlyCompleted);
                             
                             return (

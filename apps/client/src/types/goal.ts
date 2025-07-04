@@ -160,6 +160,29 @@ export interface ActionItem {
 // ===== Supabase 相關類型定義 =====
 
 /**
+ * Template Goal - 模板中的目標結構（JSONB 格式）
+ */
+export interface TemplateGoal {
+  id: string;
+  title: string;
+  description?: string;
+  status: GoalStatus;
+  priority?: TaskPriority;
+  tasks?: TemplateTask[];
+}
+
+/**
+ * Template Task - 模板中的任務結構（JSONB 格式）
+ */
+export interface TemplateTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority?: TaskPriority;
+}
+
+/**
  * Topic Template - mentor 建立的課程模板
  */
 export interface TopicTemplate {
@@ -170,8 +193,8 @@ export interface TopicTemplate {
   category?: string;
   template_type?: string;
   
-  // 結構化資料
-  goals: Goal[];
+  // 結構化資料 - 使用 JSONB 格式的簡化結構
+  goals: TemplateGoal[];
   bubbles?: Bubble[];
   
   // 權限相關

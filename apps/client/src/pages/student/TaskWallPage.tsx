@@ -29,12 +29,13 @@ import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play } from 'lucide-react';
+import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
 import { TaskRecordDialog } from './components/TaskRecordDialog';
 import { TopicReviewPage } from '../../components/topic-review/TopicReviewPage';
+import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
 import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
 import { LoadingDots } from '../../components/shared/LoadingDots';
 import { TaskRecordHistoryDialog } from './components/TaskRecordHistoryDialog';
@@ -656,12 +657,13 @@ const TopicCard: React.FC<TopicCardProps> = ({ data, onClick, isLoading }) => {
 interface TopicGridProps {
   topics: TopicCardData[];
   onTopicClick: (topicId: string) => void;
+  onCreateTopicClick: () => void;
   isLoading?: boolean;
   isViewModeChanging?: boolean;
   loadingTopicId: string | null;
 }
 
-const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, isLoading, isViewModeChanging, loadingTopicId }) => {
+const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, onCreateTopicClick, isLoading, isViewModeChanging, loadingTopicId }) => {
   if (isLoading || isViewModeChanging) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
@@ -696,7 +698,106 @@ const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, isLoading, 
           />
         </motion.div>
       ))}
+      
+      {/* 建立新主題卡片 */}
+      <motion.div
+        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ 
+          duration: 0.2, 
+          delay: topics.length * 0.05,
+          type: "spring",
+          stiffness: 400,
+          damping: 25
+        }}
+      >
+        <CreateTopicCard 
+          onClick={onCreateTopicClick}
+          isLoading={false}
+        />
+      </motion.div>
     </div>
+  );
+};
+
+/**
+ * 建立新主題卡片組件
+ */
+interface CreateTopicCardProps {
+  onClick: () => void;
+  isLoading?: boolean;
+}
+
+const CreateTopicCard: React.FC<CreateTopicCardProps> = ({ onClick, isLoading }) => {
+  return (
+    <motion.div
+      className="group cursor-pointer relative"
+      onClick={onClick}
+      whileHover={{ y: -3, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ 
+        type: "spring",
+        stiffness: 400,
+        damping: 30,
+        mass: 1
+      }}
+    >
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <LoadingDots />
+        </div>
+      )}
+      <div 
+        className={`bg-gradient-to-br from-emerald-50 to-teal-50 backdrop-blur-sm rounded-3xl shadow-lg border-2 border-dashed border-emerald-300 p-6 h-[320px] flex flex-col items-center justify-center transition-all duration-300 hover:shadow-2xl hover:border-emerald-400 ${
+          isLoading ? 'opacity-90' : ''
+        }`}
+        style={{ 
+          boxShadow: `0 10px 30px rgba(16, 185, 129, 0.1), 0 0 0 1px rgba(16, 185, 129, 0.1)`
+        }}
+      >
+        {/* 圖標 */}
+        <motion.div
+          className="w-24 h-24 mb-6 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center"
+          whileHover={{ scale: 1.1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
+          <Plus className="w-12 h-12 text-emerald-600" />
+        </motion.div>
+
+        {/* 標題 */}
+        <h3 className="text-2xl font-bold text-emerald-800 mb-2 text-center">
+          建立新主題
+        </h3>
+
+        {/* 描述 */}
+        <p className="text-emerald-600 text-center mb-4 leading-relaxed">
+          從模板或空白主題開始<br />
+          你的新學習之旅
+        </p>
+
+        {/* 裝飾性圖標 */}
+        <div className="flex items-center gap-3 text-emerald-400">
+          <motion.div
+            animate={{ rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            ✨
+          </motion.div>
+          <motion.div
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            🚀
+          </motion.div>
+          <motion.div
+            animate={{ rotate: [0, -5, 5, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            💡
+          </motion.div>
+        </div>
+      </div>
+    </motion.div>
   );
 };
 
@@ -704,6 +805,7 @@ export const TaskWallPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isTopicLoading, setIsTopicLoading] = useState(false);
   const [isViewModeChanging, setIsViewModeChanging] = useState(false);
+  const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
   
   // Store hooks
   const { 
@@ -1336,6 +1438,7 @@ export const TaskWallPage = () => {
                       <>
                         {topicCards.length} 個主題 • 
                         {topicCards.reduce((sum, topic) => sum + topic.inProgressTasks, 0)} 個任務進行中
+                        {topicCards.length > 0 && ' • 點擊 + 建立新主題'}
                       </>
                     )}
                   </p>
@@ -1463,19 +1566,27 @@ export const TaskWallPage = () => {
               <div className="text-center py-20">
                 <div className="text-6xl mb-4">📚</div>
                 <h3 className="text-2xl font-bold text-amber-800 mb-2">還沒有主題</h3>
-                <p className="text-amber-600">建立你的第一個學習主題吧！</p>
+                <p className="text-amber-600 mb-4">建立你的第一個學習主題吧！</p>
+                <button
+                  onClick={() => setShowTemplateBrowser(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 text-white rounded-2xl font-medium hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg hover:shadow-xl"
+                >
+                  <Plus className="w-5 h-5" />
+                  建立新主題
+                </button>
               </div>
             ) : (
-              <TopicGrid
-                topics={topicCards.map(card => ({
-                  ...card,
-                  isLoading: card.topic.id === loadingTopicId
-                }))}
-                onTopicClick={handleTopicClick}
-                isLoading={isLoading}
-                isViewModeChanging={isViewModeChanging}
-                loadingTopicId={loadingTopicId}
-              />
+                          <TopicGrid
+              topics={topicCards.map(card => ({
+                ...card,
+                isLoading: card.topic.id === loadingTopicId
+              }))}
+              onTopicClick={handleTopicClick}
+              onCreateTopicClick={() => setShowTemplateBrowser(true)}
+              isLoading={isLoading}
+              isViewModeChanging={isViewModeChanging}
+              loadingTopicId={loadingTopicId}
+            />
             )
           )}
         </div>
@@ -1559,6 +1670,23 @@ export const TaskWallPage = () => {
             records: selectedTaskForHistory?.records || [],
             topicTitle: selectedTaskForHistory?.topicTitle,
             subjectStyle: selectedTaskForHistory?.subjectStyle
+          }}
+        />
+
+        {/* 主題模板瀏覽器 */}
+        <TopicTemplateBrowser
+          isOpen={showTemplateBrowser}
+          onClose={() => setShowTemplateBrowser(false)}
+          onTemplateSelected={(templateId) => {
+            console.log('選擇了模板:', templateId);
+            setShowTemplateBrowser(false);
+            // 刷新主題列表
+            fetchTopics();
+          }}
+          onCreateBlankTopic={() => {
+            console.log('建立空白主題');
+            setShowTemplateBrowser(false);
+            // TODO: 實現建立空白主題的邏輯
           }}
         />
 

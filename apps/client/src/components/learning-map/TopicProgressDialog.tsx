@@ -37,7 +37,7 @@ export const TopicProgressDialog: React.FC<TopicProgressDialogProps> = ({
     
     const goals = getActiveGoals(topicId);
     const realCompletedGoals = goals
-      .filter(goal => goal.tasks.every(task => task.status === 'done'));
+      .filter(goal => (goal.tasks ?? []).every(task => task.status === 'done'));
     
     // 用 topicId 的最後一個字元來決定是否回傳空陣列
     if (realCompletedGoals.length === 0) {
@@ -106,13 +106,13 @@ export const TopicProgressDialog: React.FC<TopicProgressDialogProps> = ({
 
     // 先找進行中的目標
     const inProgressGoals = goals.filter(goal => 
-      goal.tasks.some(task => task.status === 'in_progress')
+      (goal.tasks ?? []).some(task => task.status === 'in_progress')
     );
 
     // 再找待開始的目標
     const todoGoals = goals.filter(goal => 
       !inProgressGoals.includes(goal) && 
-      goal.tasks.some(task => task.status === 'todo')
+      (goal.tasks ?? []).some(task => task.status === 'todo')
     );
 
     // 組合目標
@@ -147,7 +147,7 @@ export const TopicProgressDialog: React.FC<TopicProgressDialogProps> = ({
             const completedGoals = getRecentlyCompletedGoals(topic.id);
             const goals = getActiveGoals(topic.id);
             const totalGoals = goals.length;
-            const completedGoalsCount = goals.filter(g => g.tasks.every(t => t.status === 'done')).length;
+            const completedGoalsCount = goals.filter(g => (g.tasks ?? []).every(t => t.status === 'done')).length;
             
             // 當前顯示的目標索引
             const currentIndex = currentGoalIndexes[topic.id] || 0;
@@ -211,9 +211,9 @@ export const TopicProgressDialog: React.FC<TopicProgressDialogProps> = ({
                         >
                           <div className="font-medium mb-1 line-clamp-2">{currentGoal.title}</div>
                           <div className="text-xs text-gray-500">
-                            {currentGoal.tasks.filter(t => t.status === 'in_progress').length > 0 
-                              ? `${currentGoal.tasks.filter(t => t.status === 'in_progress').length} 個進行中`
-                              : `${currentGoal.tasks.filter(t => t.status === 'todo').length} 個待開始`
+                            {(currentGoal.tasks ?? []).filter(t => t.status === 'in_progress').length > 0 
+                              ? `${(currentGoal.tasks ?? []).filter(t => t.status === 'in_progress').length} 個進行中`
+                              : `${(currentGoal.tasks ?? []).filter(t => t.status === 'todo').length} 個待開始`
                             }
                           </div>
                         </div>

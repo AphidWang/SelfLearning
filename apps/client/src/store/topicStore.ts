@@ -1261,9 +1261,125 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   createTopicFromTemplate: async (params) => {
-    // TODO: 實作從模板創建主題
-    console.warn('createTopicFromTemplate 尚未實作');
-    return null;
+    try {
+      const { template_id, title, description, is_collaborative } = params;
+      
+      // 1. 獲取模板資料
+      const { data: template, error: templateError } = await supabase
+        .from('topic_templates')
+        .select('*')
+        .eq('id', template_id)
+        .single();
+
+      if (templateError) throw templateError;
+      if (!template) throw new Error('Template not found');
+
+      const user = await authService.getCurrentUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // 2. 創建新主題
+      const topicData = {
+        title: title || template.title,
+        description: description || template.description,
+        subject: template.subject,
+        category: template.category,
+        type: template.template_type || 'learning',
+        topic_type: template.template_type || 'learning',
+        template_id: template.id,
+        template_version: 1,
+        is_collaborative: is_collaborative || false,
+        show_avatars: true,
+        bubbles: template.bubbles || [],
+        owner_id: user.id,
+        status: 'active'
+      };
+
+      const { data: newTopic, error: topicError } = await supabase
+        .from('topics')
+        .insert(topicData)
+        .select('*')
+        .single();
+
+      if (topicError) throw topicError;
+      if (!newTopic) throw new Error('Failed to create topic');
+
+      // 3. 從模板的 JSONB goals 創建正規化的 goals 和 tasks
+      if (template.goals && Array.isArray(template.goals)) {
+        for (const [goalIndex, templateGoal] of template.goals.entries()) {
+          // 創建 Goal
+          const goalData = {
+            topic_id: newTopic.id,
+            title: templateGoal.title || `Goal ${goalIndex + 1}`,
+            description: templateGoal.description || '',
+            status: templateGoal.status || 'todo',
+            priority: templateGoal.priority || 'medium',
+            order_index: goalIndex,
+            owner_id: user.id,
+            need_help: false
+          };
+
+          const { data: newGoal, error: goalError } = await supabase
+            .from('goals')
+            .insert(goalData)
+            .select('*')
+            .single();
+
+          if (goalError) {
+            console.error('Failed to create goal:', goalError);
+            continue;
+          }
+
+          // 創建 Tasks
+          if (templateGoal.tasks && Array.isArray(templateGoal.tasks)) {
+            for (const [taskIndex, templateTask] of templateGoal.tasks.entries()) {
+              const taskData = {
+                goal_id: newGoal.id,
+                title: templateTask.title || `Task ${taskIndex + 1}`,
+                description: templateTask.description || '',
+                status: templateTask.status === 'idea' ? 'todo' : (templateTask.status || 'todo'),
+                priority: templateTask.priority || 'medium',
+                order_index: taskIndex,
+                owner_id: user.id,
+                need_help: false
+              };
+
+              const { error: taskError } = await supabase
+                .from('tasks')
+                .insert(taskData);
+
+              if (taskError) {
+                console.error('Failed to create task:', taskError);
+              }
+            }
+          }
+        }
+      }
+
+      // 4. 更新模板使用次數
+      await supabase
+        .from('topic_templates')
+        .update({ usage_count: (template.usage_count || 0) + 1 })
+        .eq('id', template_id);
+
+      // 5. 重新獲取完整的主題資料（包含 goals 和 tasks）
+      const fullTopic = await get().getTopic(newTopic.id);
+      
+      if (fullTopic) {
+        // 更新本地 store
+        set(state => ({
+          topics: [fullTopic, ...state.topics]
+        }));
+        
+        console.log(`✅ 成功從模板創建主題: ${fullTopic.title}`);
+        return fullTopic;
+      }
+
+      return newTopic as Topic;
+    } catch (error: any) {
+      console.error('從模板創建主題失敗:', error);
+      set({ error: error.message || '從模板創建主題失敗' });
+      return null;
+    }
   },
 
   // === 向後兼容的方法（自動處理版本控制） ===

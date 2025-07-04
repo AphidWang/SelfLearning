@@ -731,6 +731,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
             <div className="col-span-3 h-full min-h-0">
               <GoalTaskInfoPanel
                 topicId={topicId}
+                topic={topic}
                 selectedGoalId={selectedGoalId}
                 selectedTaskId={selectedTaskId}
                 subjectColor={subjectStyle.accent}
@@ -754,6 +755,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 // GoalTaskInfoPanel 組件
 interface GoalTaskInfoPanelProps {
   topicId: string;
+  topic: Topic; // 添加 topic prop 以避免重複 API 調用
   selectedGoalId: string | null;
   selectedTaskId: string | null;
   subjectColor: string;
@@ -769,6 +771,7 @@ interface GoalTaskInfoPanelProps {
 
 const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
   topicId,
+  topic,
   selectedGoalId,
   selectedTaskId,
   subjectColor,
@@ -794,23 +797,14 @@ const GoalTaskInfoPanel: React.FC<GoalTaskInfoPanelProps> = ({
     updateGoalHelp
   } = useTopicStore();
   
-  const [topic, setTopic] = useState<Topic | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   
-  const refreshPanelTopic = useCallback(async () => {
-    const fetchedTopic = await getTopic(topicId);
-    if (fetchedTopic) {
-      setTopic(fetchedTopic);
-    }
-  }, [topicId, getTopic]);
+  // 移除重複的 API 調用，直接使用父組件傳入的 topic 數據
   
-  useEffect(() => {
-    refreshPanelTopic();
-  }, [refreshPanelTopic, topic]);
-  
-  // 根據選擇顯示不同內容
-  const selectedGoal = selectedGoalId && selectedGoalId !== 'TOPIC' ? topic?.goals?.find(goal => goal.id === selectedGoalId) : null;
+  // 根據選擇顯示不同內容 - 直接從父組件的 topic prop 獲取數據
+  const selectedGoal = selectedGoalId && selectedGoalId !== 'TOPIC' ? 
+    topic?.goals?.find(goal => goal.id === selectedGoalId) : null;
   const selectedTask = selectedTaskId && selectedGoal ? 
     selectedGoal?.tasks?.find(task => task.id === selectedTaskId) : null;
 
@@ -961,18 +955,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [helpMessage, setHelpMessage] = useState(task.help_message || '');
 
+  // 移除重複的 getTopic 調用，改由父組件統一管理數據更新
   const refreshTopic = useCallback(async () => {
-    console.log('📥 TaskDetailPanel - refreshTopic started');
-    const fetchedTopic = await getTopic(topicId);
-    if (fetchedTopic) {
-      const updatedGoal = fetchedTopic.goals?.find(g => g.id === goal.id);
-      const updatedTask = updatedGoal?.tasks?.find(t => t.id === task.id);
-      if (updatedTask) {
-        console.log('📦 TaskDetailPanel - Setting new task:', updatedTask);
-        setEditedTask(updatedTask);
-      }
-    }
-  }, [topicId, goal.id, task.id, getTopic]);
+    console.log('📥 TaskDetailPanel - 通知父組件刷新數據');
+    await onCollaborationUpdate();
+  }, [onCollaborationUpdate]);
 
   useEffect(() => {
     console.log('🔄 TaskDetailPanel - editedTask changed:', editedTask);
@@ -1762,15 +1749,10 @@ const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({
     const [isEditingGoal, setIsEditingGoal] = useState(false);
     const [editedGoal, setEditedGoal] = useState(goal);
 
+  // 移除重複的 getTopic 調用，改由父組件統一管理數據更新  
   const refreshTopic = useCallback(async () => {
-    const fetchedTopic = await getTopic(topicId);
-    if (fetchedTopic) {
-      const updatedGoal = fetchedTopic.goals?.find(g => g.id === goal.id);
-      if (updatedGoal) {
-        setEditedGoal(updatedGoal);
-      }
-    }
-  }, [topicId, goal.id, getTopic]);
+    await onCollaborationUpdate();
+  }, [onCollaborationUpdate]);
 
   // 當 goal 更新時同步 editedGoal
   useEffect(() => {
@@ -2418,12 +2400,10 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
     );
   }, [users, topic?.owner_id, collaborators]);
 
+  // 移除重複的 getTopic 調用，改由父組件統一管理數據更新
   const refreshTopic = useCallback(async () => {
-    const fetchedTopic = await getTopic(topicId);
-    if (fetchedTopic) {
-      // 刷新會由父組件處理
-    }
-  }, [topicId, getTopic]);
+    await onCollaborationUpdate();
+  }, [onCollaborationUpdate]);
 
   const handleAddGoal = async () => {
     if (!newGoalTitle.trim()) return;

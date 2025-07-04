@@ -20,7 +20,8 @@ import type {
   TopicTemplateCollaborator, 
   CopyTemplateParams,
   User,
-  Goal,
+  TemplateGoal,
+  TemplateTask,
   Bubble 
 } from '../types/goal';
 import { supabase } from '../services/supabase';
@@ -54,8 +55,8 @@ interface TopicTemplateStore {
   toggleCollaborative: (templateId: string) => Promise<boolean>;
 
   // 內容管理
-  addGoal: (templateId: string, goal: Omit<Goal, 'id'>) => Promise<Goal | null>;
-  updateGoal: (templateId: string, goalId: string, updates: Partial<Goal>) => Promise<Goal | null>;
+  addGoal: (templateId: string, goal: Omit<TemplateGoal, 'id'>) => Promise<TemplateGoal | null>;
+  updateGoal: (templateId: string, goalId: string, updates: Partial<TemplateGoal>) => Promise<TemplateGoal | null>;
   deleteGoal: (templateId: string, goalId: string) => Promise<boolean>;
   addBubble: (templateId: string, bubble: Omit<Bubble, 'id'>) => Promise<Bubble | null>;
   updateBubble: (templateId: string, bubbleId: string, updates: Partial<Bubble>) => Promise<Bubble | null>;
@@ -146,18 +147,10 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
   fetchPublicTemplates: async () => {
     set({ loading: true, error: null });
     try {
+      // 先嘗試不包含 collaborators 的簡單查詢
       const { data, error } = await supabase
         .from('topic_templates')
-        .select(`
-          *,
-          topic_template_collaborators (
-            id,
-            user_id,
-            permission,
-            invited_by,
-            invited_at
-          )
-        `)
+        .select('*')
         .eq('is_public', true)
         .order('usage_count', { ascending: false });
 
@@ -165,7 +158,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
 
       const templates = data?.map(template => ({
         ...template,
-        collaborators: template.topic_template_collaborators || []
+        collaborators: [] // 暫時設為空陣列
       })) || [];
 
       set({ templates, loading: false });
