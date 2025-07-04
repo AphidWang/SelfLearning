@@ -2,7 +2,7 @@
  * Topic Store - 正規化表格結構 + 版本控制版本
  * 
  * 🏗️ 架構改動：
- * - 從 JSONB 結構改為正規化三層表格：topics_new -> goals -> tasks
+ * - 從 JSONB 結構改為正規化三層表格：topics -> goals -> tasks
  * - 每一層都有獨立的版本控制，使用樂觀鎖定避免並發衝突
  * - 保留現有 API 接口，確保 UI 組件不需要大幅修改
  * 
@@ -228,10 +228,12 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   // === 核心 CRUD 操作 ===
 
   /**
-   * 獲取所有主題（含協作主題）
+   * 獲取所有主題（含協作主題）- 優化版本
    */
   fetchTopics: async () => {
     set({ loading: true, error: null });
+    const perfStart = performance.now();
+    console.log('⚡ fetchTopics 開始執行...');
     try {
       // 檢查用戶認證狀態
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -248,234 +250,279 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       console.log('📍 fetchTopics - 用戶已認證:', user.id);
 
-      // 查詢用戶擁有的主題
-      const { data: ownTopics, error: ownError } = await supabase
-        .from('topics_new')
-        .select('*')
-        .eq('owner_id', user.id)
-        .order('updated_at', { ascending: false });
+      // ===== 優化查詢 1: 並行獲取自有主題和協作主題 =====
+      const topicsStart = performance.now();
+      const [ownTopicsQuery, collabTopicsQuery] = await Promise.all([
+        // 查詢用戶擁有的主題
+        supabase
+          .from('topics')
+          .select('*')
+          .eq('owner_id', user.id)
+          .order('updated_at', { ascending: false }),
+        
+        // 查詢協作主題 - 使用 JOIN 一次查詢完成
+        supabase
+          .from('topic_collaborators')
+          .select(`
+            topic_id,
+            topics!inner(*)
+          `)
+          .eq('user_id', user.id)
+      ]);
 
-      if (ownError) {
-        console.error('獲取自有主題失敗:', ownError);
-        throw new Error(`獲取主題失敗: ${ownError.message}`);
+      if (ownTopicsQuery.error) {
+        console.error('獲取自有主題失敗:', ownTopicsQuery.error);
+        throw new Error(`獲取主題失敗: ${ownTopicsQuery.error.message}`);
       }
 
-      console.log('📍 fetchTopics - 獲取自有主題成功:', ownTopics?.length || 0);
+      const ownTopics = ownTopicsQuery.data || [];
+      console.log('📍 fetchTopics - 獲取自有主題成功:', ownTopics.length);
 
-      // 查詢協作主題 - 修復 join 查詢
+      // 處理協作主題查詢結果
       let collabTopics: any[] = [];
-      try {
-        const { data: collaboratorData, error: collabError } = await supabase
-          .from('topic_collaborators')
-          .select('topic_id')
-          .eq('user_id', user.id);
-
-        if (collabError) {
-          console.warn('獲取協作者數據失敗:', collabError);
-        } else if (collaboratorData && collaboratorData.length > 0) {
-          const topicIds = collaboratorData.map(c => c.topic_id);
-          console.log('📍 fetchTopics - 找到協作主題 IDs:', topicIds);
-          
-          const { data: collabTopicsData, error: topicsError } = await supabase
-            .from('topics_new')
-            .select('*')
-            .in('id', topicIds)
-            .order('updated_at', { ascending: false });
-
-          if (topicsError) {
-            console.warn('獲取協作主題內容失敗:', topicsError);
-          } else {
-            collabTopics = collabTopicsData || [];
-            console.log('📍 fetchTopics - 獲取協作主題成功:', collabTopics.length);
-          }
-        } else {
-          console.log('📍 fetchTopics - 無協作主題');
-        }
-      } catch (error) {
-        console.warn('獲取協作主題失敗，將僅顯示自有主題:', error);
-        // 協作主題獲取失敗時，繼續處理自有主題
+      if (collabTopicsQuery.error) {
+        console.warn('獲取協作主題失敗:', collabTopicsQuery.error);
+      } else {
+        collabTopics = (collabTopicsQuery.data || []).map(item => item.topics);
+        console.log('📍 fetchTopics - 獲取協作主題成功:', collabTopics.length);
       }
 
       // 合併並去重主題
-      const allTopics = [...(ownTopics || []), ...(collabTopics || [])];
+      const allTopics = [...ownTopics, ...collabTopics];
       const uniqueTopics = allTopics.filter((topic, index, self) =>
         index === self.findIndex((t) => t.id === topic.id)
       );
 
       console.log('📍 fetchTopics - 合併後總主題數:', uniqueTopics.length);
+      console.log(`⚡ 主題查詢耗時: ${Math.round(performance.now() - topicsStart)}ms`);
 
-      // 為每個主題獲取完整結構（包括協作者）
-      const topicsWithStructure = await Promise.all(
-        uniqueTopics.map(async (topic) => {
-          try {
-            // 獲取協作者資訊
-            let collaborators: (User & { permission: string; invited_at: string })[] = [];
-            let owner: User | null = null;
-            try {
-              // 獲取協作者列表
-              const { data: collaboratorData, error: collabError } = await supabase
-                .from('topic_collaborators')
-                .select(`
-                  user_id,
-                  permission,
-                  invited_at
-                `)
-                .eq('topic_id', topic.id);
+      if (uniqueTopics.length === 0) {
+        set({ topics: [], loading: false });
+        return;
+      }
 
-              // 收集所有需要查詢的用戶ID
-              const userIds: string[] = [];
-              if (topic.owner_id) {
-                userIds.push(topic.owner_id);
-              }
-              if (!collabError && collaboratorData) {
-                userIds.push(...collaboratorData.map(c => c.user_id));
-              }
+      const topicIds = uniqueTopics.map(t => t.id);
 
-              // 一次性獲取所有用戶資料
-              const usersMap = await getUsersData(userIds);
+      // ===== 優化查詢 2: 批量獲取所有目標和任務 =====
+      const goalsStart = performance.now();
+      const [goalsQuery, collaboratorsQuery] = await Promise.all([
+        // 一次性獲取所有目標
+        supabase
+          .from('goals')
+          .select('*')
+          .in('topic_id', topicIds)
+          .neq('status', 'archived')
+          .order('topic_id')
+          .order('order_index', { ascending: true })
+          .order('created_at', { ascending: true }),
+        
+        // 一次性獲取所有主題協作者
+        supabase
+          .from('topic_collaborators')
+          .select('topic_id, user_id, permission, invited_at')
+          .in('topic_id', topicIds)
+      ]);
 
-              // 設置擁有者資訊
-              if (topic.owner_id && usersMap[topic.owner_id]) {
-                owner = usersMap[topic.owner_id];
-              }
+      if (goalsQuery.error) {
+        console.error('批量獲取目標失敗:', goalsQuery.error);
+        throw new Error(`獲取目標失敗: ${goalsQuery.error.message}`);
+      }
 
-              // 設置協作者資訊
-              if (!collabError && collaboratorData) {
-                collaborators = collaboratorData.map(collab => ({
-                  ...(usersMap[collab.user_id] || {
-                    id: collab.user_id,
-                    name: `User-${collab.user_id.slice(0, 8)}`,
-                    email: '',
-                    avatar: undefined,
-                    role: 'student',
-                    roles: ['student']
-                  }),
-                  permission: collab.permission,
-                  invited_at: collab.invited_at
-                }));
-                console.log(`📍 fetchTopics - 主題 ${topic.id} 協作者:`, collaborators.length);
-              }
-            } catch (collabError) {
-              console.warn(`獲取主題 ${topic.id} 協作者失敗:`, collabError);
-            }
+      const allGoals = goalsQuery.data || [];
+      console.log('📍 fetchTopics - 批量獲取目標成功:', allGoals.length);
+      console.log(`⚡ 目標和協作者查詢耗時: ${Math.round(performance.now() - goalsStart)}ms`);
 
-            // 獲取 goals
-            const { data: goals, error: goalsError } = await supabase
-              .from('goals')
-              .select('*')
-              .eq('topic_id', topic.id)
-              .neq('status', 'archived')
-              .order('order_index', { ascending: true })
-              .order('created_at', { ascending: true })
-              .order('title', { ascending: true })
-              .order('id', { ascending: true });  // id 作為最後保證，確保完全唯一的排序
+      // ===== 優化查詢 3: 批量獲取所有任務 =====
+      const tasksStart = performance.now();
+      let allTasks: any[] = [];
+      if (allGoals.length > 0) {
+        const goalIds = allGoals.map(g => g.id);
+        const tasksQuery = await supabase
+          .from('tasks')
+          .select('*')
+          .in('goal_id', goalIds)
+          .neq('status', 'archived')
+          .order('goal_id')
+          .order('order_index', { ascending: true })
+          .order('created_at', { ascending: true });
 
-            if (goalsError) {
-              console.warn(`獲取主題 ${topic.id} 的目標失敗:`, goalsError);
-              return { ...topic, goals: [], progress: 0, owner, collaborators };
-            }
+        if (tasksQuery.error) {
+          console.warn('批量獲取任務失敗:', tasksQuery.error);
+                } else {
+          allTasks = tasksQuery.data || [];
+          console.log('📍 fetchTopics - 批量獲取任務成功:', allTasks.length);
+        }
+      }
+      console.log(`⚡ 任務查詢耗時: ${Math.round(performance.now() - tasksStart)}ms`);
 
-            // 為每個 goal 獲取 tasks
-            const goalsWithTasks = await Promise.all(
-              (goals || []).map(async (goal) => {
-                try {
-                  const { data: tasks, error: tasksError } = await supabase
-                    .from('tasks')
-                    .select('*')
-                    .eq('goal_id', goal.id)
-                    .neq('status', 'archived')
-                    .order('order_index', { ascending: true })
-                    .order('created_at', { ascending: true })
-                    .order('title', { ascending: true })
-                    .order('id', { ascending: true });  // id 作為最後保證，確保完全唯一的排序
+      // ===== 優化查詢 4: 批量獲取任務記錄 =====
+      const recordsStart = performance.now();
+      let allTaskRecords: any[] = [];
+      if (allTasks.length > 0) {
+        const taskIds = allTasks.map(t => t.id);
+        try {
+          // 批量獲取任務記錄 - 使用新的批量查詢功能
+          allTaskRecords = await taskRecordStore.getUserTaskRecords({ task_ids: taskIds });
+          console.log('📍 fetchTopics - 批量獲取任務記錄成功:', allTaskRecords.length);
+        } catch (error) {
+          console.warn('批量獲取任務記錄失敗:', error);
+        }
+      }
+      console.log(`⚡ 任務記錄查詢耗時: ${Math.round(performance.now() - recordsStart)}ms`);
 
-                  if (tasksError) {
-                    console.warn(`獲取目標 ${goal.id} 的任務失敗:`, tasksError);
-                    return { ...goal, tasks: [], owner: null, collaborators: [] };
-                  }
+      // ===== 優化查詢 5: 批量獲取用戶資料 =====
+      const usersStart = performance.now();
+      const allUserIds = new Set<string>();
+      
+      // 收集所有需要的用戶 ID
+      uniqueTopics.forEach(topic => {
+        if (topic.owner_id) allUserIds.add(topic.owner_id);
+      });
+      
+      (collaboratorsQuery.data || []).forEach(collab => {
+        allUserIds.add(collab.user_id);
+      });
+      
+      allGoals.forEach(goal => {
+        if (goal.owner_id) allUserIds.add(goal.owner_id);
+        if (goal.collaborator_ids && Array.isArray(goal.collaborator_ids)) {
+          goal.collaborator_ids.forEach(id => allUserIds.add(id));
+        }
+      });
+      
+      allTasks.forEach(task => {
+        if (task.owner_id) allUserIds.add(task.owner_id);
+        if (task.collaborator_ids && Array.isArray(task.collaborator_ids)) {
+          task.collaborator_ids.forEach(id => allUserIds.add(id));
+        }
+      });
 
-                  // 收集所有需要查詢的用戶ID（goal 和 tasks）
-                  const goalAndTaskUserIds: string[] = [];
-                  
-                  // Goal owner
-                  if (goal.owner_id) {
-                    goalAndTaskUserIds.push(goal.owner_id);
-                  }
-                  
-                  // Goal collaborators
-                  if (goal.collaborator_ids && Array.isArray(goal.collaborator_ids)) {
-                    goalAndTaskUserIds.push(...goal.collaborator_ids);
-                  }
-                  
-                  // Task owners and collaborators
-                  (tasks || []).forEach(task => {
-                    if (task.owner_id) {
-                      goalAndTaskUserIds.push(task.owner_id);
-                    }
-                    if (task.collaborator_ids && Array.isArray(task.collaborator_ids)) {
-                      goalAndTaskUserIds.push(...task.collaborator_ids);
-                    }
-                  });
+      // 一次性獲取所有用戶資料
+      const usersMap = await getUsersData([...allUserIds]);
+      console.log('📍 fetchTopics - 批量獲取用戶資料成功:', Object.keys(usersMap).length);
+      console.log(`⚡ 用戶資料查詢耗時: ${Math.round(performance.now() - usersStart)}ms`);
 
-                  // 獲取用戶資料
-                  const goalTaskUsersMap = await getUsersData([...new Set(goalAndTaskUserIds)]);
+      // ===== 資料組裝階段 =====
+      const assemblyStart = performance.now();
+      
+      // 建立索引 Map 以提高查詢效率
+      const goalsMap = new Map<string, any[]>();
+      allGoals.forEach(goal => {
+        if (!goalsMap.has(goal.topic_id)) {
+          goalsMap.set(goal.topic_id, []);
+        }
+        goalsMap.get(goal.topic_id)!.push(goal);
+      });
 
-                  // 為 goal 設置 owner 和 collaborators
-                  const goalOwner = goal.owner_id && goalTaskUsersMap[goal.owner_id] ? goalTaskUsersMap[goal.owner_id] : null;
-                  const goalCollaborators = (goal.collaborator_ids || [])
-                    .map(id => goalTaskUsersMap[id])
-                    .filter(Boolean);
+      const tasksMap = new Map<string, any[]>();
+      allTasks.forEach(task => {
+        if (!tasksMap.has(task.goal_id)) {
+          tasksMap.set(task.goal_id, []);
+        }
+        tasksMap.get(task.goal_id)!.push(task);
+      });
 
-                  // 為每個 task 設置 owner 和 collaborators
-                  const tasksWithUsers = await Promise.all((tasks || []).map(async task => {
-                    // 獲取任務記錄
-                    const records = await taskRecordStore.getUserTaskRecords({
-                      task_id: task.id
-                    });
+      const recordsMap = new Map<string, any[]>();
+      allTaskRecords.forEach(record => {
+        if (record.task_id) {
+          if (!recordsMap.has(record.task_id)) {
+            recordsMap.set(record.task_id, []);
+          }
+          recordsMap.get(record.task_id)!.push(record);
+        }
+      });
 
-                    return {
-                      ...task,
-                      owner: task.owner_id && goalTaskUsersMap[task.owner_id] ? goalTaskUsersMap[task.owner_id] : null,
-                      collaborators: (task.collaborator_ids || [])
-                        .map(id => goalTaskUsersMap[id])
-                        .filter(Boolean),
-                      records: records || []
-                    };
-                  }));
+      const collaboratorsMap = new Map<string, any[]>();
+      (collaboratorsQuery.data || []).forEach(collab => {
+        if (!collaboratorsMap.has(collab.topic_id)) {
+          collaboratorsMap.set(collab.topic_id, []);
+        }
+        collaboratorsMap.get(collab.topic_id)!.push(collab);
+      });
 
-                  return { 
-                    ...goal, 
-                    tasks: tasksWithUsers,
-                    owner: goalOwner,
-                    collaborators: goalCollaborators
-                  };
-                } catch (taskError) {
-                  console.warn(`獲取目標 ${goal.id} 的任務時發生異常:`, taskError);
-                  return { ...goal, tasks: [], owner: null, collaborators: [] };
-                }
-              })
-            );
+      // 組裝完整的主題結構
+      const topicsWithStructure = uniqueTopics.map(topic => {
+        try {
+          // 設置主題擁有者和協作者
+          const owner = topic.owner_id && usersMap[topic.owner_id] ? usersMap[topic.owner_id] : null;
+          const topicCollaborators = (collaboratorsMap.get(topic.id) || []).map(collab => ({
+            ...(usersMap[collab.user_id] || {
+              id: collab.user_id,
+              name: `User-${collab.user_id.slice(0, 8)}`,
+              email: '',
+              avatar: undefined,
+              role: 'student',
+              roles: ['student']
+            }),
+            permission: collab.permission,
+            invited_at: collab.invited_at
+          }));
 
-            // 計算進度
-            const allTasks = goalsWithTasks.flatMap(g => g.tasks || []);
-            const completedTasks = allTasks.filter(t => t.status === 'done');
-            const progress = allTasks.length > 0 ? Math.round((completedTasks.length / allTasks.length) * 100) : 0;
+          // 組裝目標和任務
+          const topicGoals = (goalsMap.get(topic.id) || []).map(goal => {
+            const goalOwner = goal.owner_id && usersMap[goal.owner_id] ? usersMap[goal.owner_id] : null;
+            const goalCollaborators = (goal.collaborator_ids || [])
+              .map(id => usersMap[id])
+              .filter(Boolean);
+
+            const goalTasks = (tasksMap.get(goal.id) || []).map(task => {
+              const taskOwner = task.owner_id && usersMap[task.owner_id] ? usersMap[task.owner_id] : null;
+              const taskCollaborators = (task.collaborator_ids || [])
+                .map(id => usersMap[id])
+                .filter(Boolean);
+              
+              const taskRecords = (recordsMap.get(task.id) || []).map(record => ({
+                id: record.id,
+                created_at: record.created_at,
+                title: task.title,
+                message: record.message || '',
+                difficulty: record.difficulty || 3,
+                completion_time: record.completion_time,
+                files: record.files || [],
+                tags: record.tags || []
+              }));
+
+              return {
+                ...task,
+                owner: taskOwner,
+                collaborators: taskCollaborators,
+                records: taskRecords
+              };
+            });
 
             return {
-              ...topic,
-              goals: goalsWithTasks,
-              progress,
-              owner,
-              collaborators
+              ...goal,
+              tasks: goalTasks,
+              owner: goalOwner,
+              collaborators: goalCollaborators
             };
-          } catch (topicError) {
-            console.warn(`處理主題 ${topic.id} 時發生異常:`, topicError);
-            return { ...topic, goals: [], progress: 0, owner: null, collaborators: [] };
-          }
-        })
-      );
+          });
 
+          // 計算進度
+          const allTopicTasks = topicGoals.flatMap(g => g.tasks || []);
+          const completedTasks = allTopicTasks.filter(t => t.status === 'done');
+          const progress = allTopicTasks.length > 0 ? Math.round((completedTasks.length / allTopicTasks.length) * 100) : 0;
+
+          return {
+            ...topic,
+            goals: topicGoals,
+            progress,
+            owner,
+            collaborators: topicCollaborators
+          };
+        } catch (topicError) {
+          console.warn(`處理主題 ${topic.id} 時發生異常:`, topicError);
+          return { ...topic, goals: [], progress: 0, owner: null, collaborators: [] };
+        }
+      });
+
+      console.log(`⚡ 資料組裝耗時: ${Math.round(performance.now() - assemblyStart)}ms`);
       console.log('📍 fetchTopics - 完整結構獲取完成');
+      
+      const totalTime = performance.now() - perfStart;
+      console.log(`⚡ fetchTopics 總耗時: ${Math.round(totalTime)}ms`);
+      console.log(`⚡ 查詢統計: 主題(2) + 目標/協作者(2) + 任務(1) + 記錄(1) + 用戶(1) = 7次查詢`);
+      
       set({ topics: topicsWithStructure, loading: false });
     } catch (error: any) {
       console.error('獲取主題失敗:', error);
@@ -497,7 +544,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     try {
       // 獲取主題基本信息
       const { data: topic, error: topicError } = await supabase
-        .from('topics_new')
+        .from('topics')
         .select('*')
         .eq('id', id)
         .single();
@@ -676,11 +723,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未認證');
 
-      // 過濾掉不屬於 topics_new 表的欄位
+      // 過濾掉不屬於 topics 表的欄位
       const { goals, bubbles, progress, owner_id, version, created_at, updated_at, ...dbTopicData } = topicData as any;
 
       const { data, error } = await supabase
-        .from('topics_new')
+        .from('topics')
         .insert([{
           ...dbTopicData,
           owner_id: user.id
@@ -765,7 +812,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   deleteTopic: async (id: string) => {
     try {
       const { error } = await supabase
-        .from('topics_new')
+        .from('topics')
         .delete()
         .eq('id', id);
 
