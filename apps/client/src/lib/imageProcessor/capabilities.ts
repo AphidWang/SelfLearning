@@ -4,6 +4,7 @@
  */
 
 import type { BrowserCapabilities, ImageCapability } from './types';
+import heic2any from 'heic2any';
 
 export class ImageCapabilities {
   private static _capabilities: BrowserCapabilities | null = null;
@@ -80,8 +81,8 @@ export class ImageCapabilities {
         };
       }
 
-      // 檢查是否能載入 heic2any
-      if (typeof window !== 'undefined' && 'heic2any' in window) {
+      // 檢查是否有 heic2any 模組
+      if (typeof heic2any === 'function') {
         return {
           supported: true,
           name: 'HEIC 解碼'

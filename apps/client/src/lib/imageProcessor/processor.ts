@@ -5,6 +5,7 @@
 
 import type { ProcessorOptions, ProcessorResult } from './types';
 import { ImageCapabilities } from './capabilities';
+import heic2any from 'heic2any';
 import { 
   validateImageFile, 
   getImageDimensions, 
@@ -175,14 +176,9 @@ export class ImageProcessor {
     try {
       onProgress?.(0);
       
-      // 動態載入 heic2any
-      if (typeof window !== 'undefined' && !(window as any).heic2any) {
-        throw new Error('HEIC 轉換庫未載入');
-      }
-
       onProgress?.(25);
       
-      const convertedBlob = await (window as any).heic2any({
+      const convertedBlob = await heic2any({
         blob: file,
         toType: 'image/jpeg',
         quality: 0.9
@@ -192,7 +188,7 @@ export class ImageProcessor {
 
       // 轉換為 File 對象
       const fileName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
-      const convertedFile = new File([convertedBlob], fileName, {
+      const convertedFile = new File([Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob], fileName, {
         type: 'image/jpeg',
         lastModified: Date.now()
       });
