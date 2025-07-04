@@ -8,8 +8,15 @@ try {
   const tokenFile = path.join(process.cwd(), 'temp-token.json');
   tokenData = JSON.parse(fs.readFileSync(tokenFile, 'utf-8'));
   console.log('✅ 已載入測試認證 token');
+  
+  // 檢查 token 是否過期
+  const now = Date.now() / 1000;
+  if (tokenData.expires_at && tokenData.expires_at < now) {
+    console.error('❌ Token 已過期，請重新執行：node tests/test-login.js');
+    process.exit(1);
+  }
 } catch (error) {
-  console.error('❌ 找不到 temp-token.json，請先執行：node test-login.js');
+  console.error('❌ 找不到 temp-token.json，請先執行：node tests/test-login.js');
   process.exit(1);
 }
 
@@ -46,33 +53,61 @@ Object.defineProperty(global, 'crypto', {
 
 // 重要：在模組載入前設置認證 session
 let supabaseClient = null;
+let isAuthInitialized = false;
 
 // 測試用的初始化函數
 export async function initTestAuth() {
+  // 如果已經初始化過，直接返回
+  if (isAuthInitialized && supabaseClient) {
+    // 驗證當前認證狀態
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (user) {
+      console.log('✅ 測試認證已存在:', user.email);
+      return user;
+    }
+  }
+  
   // 動態導入 Supabase 服務（確保環境變數已設置）
   const { supabase } = await import('./apps/client/src/services/supabase');
   supabaseClient = supabase;
   
-  // 設置認證 session
-  const { error } = await supabase.auth.setSession({
-    access_token: tokenData.access_token,
-    refresh_token: tokenData.refresh_token
-  });
-  
-  if (error) {
-    console.error('❌ 設置認證 session 失敗:', error.message);
+  try {
+    // 清除現有 session
+    await supabase.auth.signOut();
+    
+    // 設置新的認證 session
+    const { data, error } = await supabase.auth.setSession({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token
+    });
+    
+    if (error) {
+      console.error('❌ 設置認證 session 失敗:', error.message);
+      
+      // 如果是 refresh token 問題，提示重新生成
+      if (error.message.includes('Refresh Token')) {
+        console.error('💡 請重新執行：node tests/test-login.js');
+        process.exit(1);
+      }
+      
+      throw error;
+    }
+    
+    // 驗證認證狀態
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('❌ 認證驗證失敗:', userError?.message);
+      throw userError || new Error('認證失敗');
+    }
+    
+    isAuthInitialized = true;
+    console.log('✅ 測試認證設置成功:', user.email);
+    return user;
+    
+  } catch (error) {
+    console.error('❌ 認證初始化失敗:', error);
     throw error;
   }
-  
-  // 驗證認證狀態
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    console.error('❌ 認證驗證失敗:', userError?.message);
-    throw userError || new Error('認證失敗');
-  }
-  
-  console.log('✅ 測試認證設置成功:', user.email);
-  return user;
 }
 
 // 清理測試資料的函數
@@ -82,7 +117,7 @@ export async function cleanupTestData() {
   try {
     // 清理測試數據 - 刪除所有測試創建的主題
     const { data: topics } = await supabaseClient
-      .from('topics_new')
+      .from('topics')
       .select('id')
       .like('title', '%測試%');
     
@@ -91,7 +126,7 @@ export async function cleanupTestData() {
       
       for (const topic of topics) {
         await supabaseClient
-          .from('topics_new')
+          .from('topics')
           .delete()
           .eq('id', topic.id);
       }
@@ -112,7 +147,7 @@ beforeEach(async () => {
   localStorageMock.clear.mockImplementation(() => {});
   
   // 確保認證狀態正確
-  if (!supabaseClient) {
+  if (!isAuthInitialized) {
     await initTestAuth();
   }
   

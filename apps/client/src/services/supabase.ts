@@ -21,6 +21,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '../types/goal';
+import { ImageProcessor } from '../lib/imageProcessor';
 
 // Supabase 配置
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -121,36 +122,34 @@ export const authService = {
 
 // 頭像存儲服務
 export const avatarService = {
-  // 支持的圖片格式
-  SUPPORTED_FORMATS: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
+  // 支持的圖片格式 (由 ImageProcessor 處理)
+  SUPPORTED_FORMATS: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'],
   
-  // 最大文件大小 (10MB) - Supabase Image Transformation 會自動優化
-  MAX_FILE_SIZE: 10 * 1024 * 1024,
+  // 最大檔案大小 (50MB，處理後會壓縮)
+  MAX_FILE_SIZE: 50 * 1024 * 1024,
 
-  // 頭像 bucket 名稱 (暫時使用 uploads bucket，生產環境建議創建專用的 avatars bucket)
+  // 頭像 bucket 名稱
   BUCKET_NAME: 'uploads',
 
   /**
-   * 驗證上傳的圖片文件
+   * 驗證上傳的圖片檔案 (使用新的圖片處理模組)
    */
-  validateImageFile(file: File): { isValid: boolean; error?: string } {
-    // 檢查文件類型
-    if (!this.SUPPORTED_FORMATS.includes(file.type)) {
+  async validateImageFile(file: File): Promise<{ isValid: boolean; error?: string }> {
+    try {
+      // 使用新的圖片處理模組進行驗證
+      const { validateImageFile } = await import('../lib/imageProcessor');
+      const result = await validateImageFile(file);
+      
+      return {
+        isValid: result.isValid,
+        error: result.error
+      };
+    } catch (error) {
       return {
         isValid: false,
-        error: `不支持的文件格式。支持格式：${this.SUPPORTED_FORMATS.map(f => f.split('/')[1].toUpperCase()).join(', ')}`
+        error: `驗證失敗: ${error instanceof Error ? error.message : '未知錯誤'}`
       };
     }
-
-    // 檢查文件大小
-    if (file.size > this.MAX_FILE_SIZE) {
-      return {
-        isValid: false,
-        error: `文件大小不能超過 ${(this.MAX_FILE_SIZE / (1024 * 1024)).toFixed(1)}MB`
-      };
-    }
-
-    return { isValid: true };
   },
 
   /**
@@ -163,81 +162,86 @@ export const avatarService = {
   },
 
   /**
-   * 上傳頭像
+   * 上傳頭像 (整合新的圖片處理模組)
    */
-  async uploadAvatar(file: File, userId: string): Promise<{ path: string; url: string }> {
-    // 基本驗證
-    const fileValidation = this.validateImageFile(file);
-    if (!fileValidation.isValid) {
-      throw new Error(fileValidation.error);
-    }
+  async uploadAvatar(
+    file: File, 
+    userId: string,
+    onProgress?: (progress: number) => void
+  ): Promise<{ path: string; url: string; processingInfo?: any }> {
+    try {
+      // 步驟 1: 驗證檔案 (5%)
+      onProgress?.(5);
+      const validation = await this.validateImageFile(file);
+      if (!validation.isValid) {
+        throw new Error(validation.error);
+      }
 
-    // 放寬尺寸驗證，因為 Supabase 會自動處理
-    // 只檢查極端情況 (超過 50MP 或 25MB 的 Supabase 限制)
-    if (file.size > 25 * 1024 * 1024) {
-      throw new Error('檔案太大，無法處理 (超過 25MB)');
-    }
-
-    // 生成文件路徑
-    const path = this.generateAvatarPath(userId, file.name);
-
-    // 上傳到 Supabase Storage
-    const { data, error } = await supabase.storage
-      .from(this.BUCKET_NAME)
-      .upload(path, file, {
-        cacheControl: '3600',
-        upsert: true // 允許覆蓋舊文件
+      // 步驟 2: 使用新的圖片處理模組處理圖片 (5-70%)
+      onProgress?.(10);
+      const processingResult = await ImageProcessor.processImage(file, {
+        maxSize: 4096, // 支援較大尺寸
+        fallbackMaxSize: 2500, // Supabase 限制 (用於 canvas-fallback)
+        quality: 0.8,
+        targetFormat: 'image/jpeg', // 統一轉為 JPEG 以節省空間
+        onProgress: (progress) => {
+          onProgress?.(10 + progress * 0.6); // 10-70%
+        }
       });
 
-    if (error) {
-      console.error('Avatar upload error:', error);
-      throw new Error(`上傳失敗: ${error.message}`);
-    }
+      // 步驟 3: 上傳處理後的檔案 (70-90%)
+      onProgress?.(75);
+      const path = this.generateAvatarPath(userId, processingResult.file.name);
 
-    console.log('Upload success, file path:', data.path);
+      const { data, error } = await supabase.storage
+        .from(this.BUCKET_NAME)
+        .upload(path, processingResult.file, {
+          cacheControl: '3600',
+          upsert: true
+        });
 
-    // 獲取原始 URL 並等待檔案可訪問
-    const maxRetries = 3;
-    const retryDelay = 1000; // 1 秒
-    let retryCount = 0;
-    
-    while (retryCount < maxRetries) {
-      const { data: originalUrlData } = supabase.storage
+      if (error) {
+        console.error('Avatar upload error:', error);
+        throw new Error(`上傳失敗: ${error.message}`);
+      }
+
+      onProgress?.(85);
+
+      // 步驟 4: 獲取公開 URL (90-100%)
+      const { data: urlData } = supabase.storage
         .from(this.BUCKET_NAME)
         .getPublicUrl(data.path);
 
-      console.log('Original URL:', originalUrlData.publicUrl);
+      onProgress?.(100);
 
-      try {
-        // 測試檔案是否可訪問
-        const response = await fetch(originalUrlData.publicUrl, { method: 'HEAD' });
-        if (response.ok) {
-          console.log('File is accessible');
-          return {
-            path: data.path,
-            url: originalUrlData.publicUrl
-          };
+      console.log('頭像上傳成功:', {
+        originalSize: processingResult.originalSize,
+        processedSize: processingResult.processedSize,
+        compressionRatio: ((processingResult.originalSize - processingResult.processedSize) / processingResult.originalSize * 100).toFixed(1) + '%',
+        method: processingResult.method,
+        formatChanged: processingResult.formatChanged,
+        maxSizeUsed: processingResult.method === 'canvas-fallback' ? 2500 : 4096
+      });
+
+      return {
+        path: data.path,
+        url: urlData.publicUrl,
+        processingInfo: {
+          originalSize: processingResult.originalSize,
+          processedSize: processingResult.processedSize,
+          originalDimensions: processingResult.originalDimensions,
+          processedDimensions: processingResult.processedDimensions,
+          method: processingResult.method,
+          formatChanged: processingResult.formatChanged,
+          compressionRatio: ((processingResult.originalSize - processingResult.processedSize) / processingResult.originalSize * 100).toFixed(1) + '%',
+          maxSizeUsed: processingResult.method === 'canvas-fallback' ? 2500 : 4096
         }
-      } catch (e) {
-        console.log(`Retry ${retryCount + 1}/${maxRetries}: File not accessible yet`);
-      }
+      };
 
-      // 等待後重試
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-      retryCount++;
+    } catch (error) {
+      console.error('Avatar upload failed:', error);
+      throw new Error(error instanceof Error ? error.message : '頭像上傳失敗');
     }
-
-    // 如果重試後仍然無法訪問，仍然返回 URL
-    // 因為檔案已經上傳成功，只是 CDN 同步需要時間
-    const { data: finalUrlData } = supabase.storage
-      .from(this.BUCKET_NAME)
-      .getPublicUrl(data.path);
-
-    console.log('Returning URL after retries');
-    return {
-      path: data.path,
-      url: finalUrlData.publicUrl
-    };
   },
 
   /**
@@ -266,6 +270,7 @@ export const avatarService = {
 
   /**
    * 獲取圖片轉換後的 URL (利用 Supabase Image Transformation)
+   * 注意：由於我們已經在客戶端處理了圖片，這個方法主要用於進一步優化
    */
   getTransformedImageUrl(path: string, options: { width?: number; height?: number; quality?: number } = {}): Promise<string> {
     const { width = 200, height = 200, quality = 80 } = options;

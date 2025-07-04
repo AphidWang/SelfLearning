@@ -56,40 +56,40 @@
 -- );
 
 -- ========================================
--- 課程模板系統資料表
+-- 主要表格結構（清理後的版本）
 -- ========================================
 
--- 課程模板表
+-- 用戶表（已存在於 auth schema）
+-- auth.users 表由 Supabase 自動管理
+
+-- 學習主題模板表
 CREATE TABLE IF NOT EXISTS topic_templates (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT,
   subject VARCHAR(100),
   category VARCHAR(100),
-  template_type VARCHAR(50) DEFAULT 'course',
-  goals JSONB DEFAULT '[]'::jsonb,
-  bubbles JSONB DEFAULT '[]'::jsonb,
+  content JSONB NOT NULL DEFAULT '{"goals": [], "bubbles": []}'::jsonb,
   is_public BOOLEAN DEFAULT false,
   is_collaborative BOOLEAN DEFAULT false,
-  copy_count INTEGER DEFAULT 0,
-  usage_count INTEGER DEFAULT 0,
+  tags JSONB DEFAULT '[]'::jsonb,
   created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  version INTEGER DEFAULT 1,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 課程模板協作者表
+-- 主題模板協作者表
 CREATE TABLE IF NOT EXISTS topic_template_collaborators (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   template_id UUID REFERENCES topic_templates(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  permission VARCHAR(20) DEFAULT 'view' CHECK (permission IN ('view', 'edit', 'admin')),
-  invited_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  permission VARCHAR(20) DEFAULT 'edit' CHECK (permission IN ('view', 'edit')),
   invited_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(template_id, user_id)
 );
 
--- 學習主題表
+-- 學習主題表（正規化版本）
 CREATE TABLE IF NOT EXISTS topics (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
@@ -97,76 +97,176 @@ CREATE TABLE IF NOT EXISTS topics (
   subject VARCHAR(100),
   category VARCHAR(100),
   status VARCHAR(50) DEFAULT 'active',
-  goals JSONB DEFAULT '[]'::jsonb,
-  bubbles JSONB DEFAULT '[]'::jsonb,
-  progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
+  type VARCHAR(50) DEFAULT 'learning',
   template_id UUID REFERENCES topic_templates(id) ON DELETE SET NULL,
   template_version INTEGER DEFAULT 1,
   is_collaborative BOOLEAN DEFAULT false,
   show_avatars BOOLEAN DEFAULT true,
   focus_element JSONB,
+  bubbles JSONB DEFAULT '[]'::jsonb,
+  progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
+  due_date TIMESTAMP WITH TIME ZONE,
   owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 學習主題協作者表
+-- 主題協作者表
 CREATE TABLE IF NOT EXISTS topic_collaborators (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  permission VARCHAR(20) DEFAULT 'view' CHECK (permission IN ('view', 'edit')),
-  invited_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  permission VARCHAR(20) DEFAULT 'edit' CHECK (permission IN ('view', 'edit')),
   invited_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(topic_id, user_id)
+);
+
+-- 目標表
+CREATE TABLE IF NOT EXISTS goals (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done', 'archived')),
+  priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+  order_index INTEGER DEFAULT 0,
+  need_help BOOLEAN DEFAULT false,
+  help_message TEXT,
+  help_resolved_at TIMESTAMP WITH TIME ZONE,
+  owner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  collaborator_ids JSONB DEFAULT '[]'::jsonb,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 任務表
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  goal_id UUID REFERENCES goals(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done', 'archived')),
+  priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+  order_index INTEGER DEFAULT 0,
+  need_help BOOLEAN DEFAULT false,
+  help_message TEXT,
+  help_resolved_at TIMESTAMP WITH TIME ZONE,
+  due_date TIMESTAMP WITH TIME ZONE,
+  estimated_time INTEGER, -- 估計時間（分鐘）
+  completion_time INTEGER, -- 實際完成時間（分鐘）
+  completed_at TIMESTAMP WITH TIME ZONE,
+  owner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  collaborator_ids JSONB DEFAULT '[]'::jsonb,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 任務記錄表
+CREATE TABLE IF NOT EXISTS task_records (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  content TEXT,
+  difficulty INTEGER CHECK (difficulty >= 1 AND difficulty <= 5),
+  completion_time INTEGER, -- 完成時間（分鐘）
+  tags JSONB DEFAULT '[]'::jsonb,
+  files JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ========================================
 -- 索引優化
 -- ========================================
 
--- 課程模板索引
+-- topic_templates 索引
 CREATE INDEX IF NOT EXISTS idx_topic_templates_created_by ON topic_templates(created_by);
 CREATE INDEX IF NOT EXISTS idx_topic_templates_public ON topic_templates(is_public) WHERE is_public = true;
 CREATE INDEX IF NOT EXISTS idx_topic_templates_collaborative ON topic_templates(is_collaborative) WHERE is_collaborative = true;
 CREATE INDEX IF NOT EXISTS idx_topic_templates_subject ON topic_templates(subject);
 CREATE INDEX IF NOT EXISTS idx_topic_templates_updated_at ON topic_templates(updated_at DESC);
 
--- 協作者索引
+-- topic_template_collaborators 索引
 CREATE INDEX IF NOT EXISTS idx_template_collaborators_template_id ON topic_template_collaborators(template_id);
 CREATE INDEX IF NOT EXISTS idx_template_collaborators_user_id ON topic_template_collaborators(user_id);
 CREATE INDEX IF NOT EXISTS idx_topic_collaborators_topic_id ON topic_collaborators(topic_id);
 CREATE INDEX IF NOT EXISTS idx_topic_collaborators_user_id ON topic_collaborators(user_id);
 
--- 學習主題索引
+-- topics 索引
 CREATE INDEX IF NOT EXISTS idx_topics_owner_id ON topics(owner_id);
 CREATE INDEX IF NOT EXISTS idx_topics_template_id ON topics(template_id);
 CREATE INDEX IF NOT EXISTS idx_topics_status ON topics(status);
 CREATE INDEX IF NOT EXISTS idx_topics_updated_at ON topics(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_topics_collaborative ON topics(is_collaborative) WHERE is_collaborative = true;
+
+-- goals 索引
+CREATE INDEX IF NOT EXISTS idx_goals_topic_id ON goals(topic_id);
+CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
+CREATE INDEX IF NOT EXISTS idx_goals_owner_id ON goals(owner_id);
+CREATE INDEX IF NOT EXISTS idx_goals_order_index ON goals(order_index);
+CREATE INDEX IF NOT EXISTS idx_goals_updated_at ON goals(updated_at DESC);
+
+-- tasks 索引
+CREATE INDEX IF NOT EXISTS idx_tasks_goal_id ON tasks(goal_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_order_index ON tasks(order_index);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_completed_at ON tasks(completed_at DESC);
+
+-- task_records 索引
+CREATE INDEX IF NOT EXISTS idx_task_records_task_id ON task_records(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_records_topic_id ON task_records(topic_id);
+CREATE INDEX IF NOT EXISTS idx_task_records_user_id ON task_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_task_records_created_at ON task_records(created_at DESC);
+
+-- 複合索引（性能優化）
+CREATE INDEX IF NOT EXISTS idx_goals_topic_status ON goals(topic_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_goal_status ON tasks(goal_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_status_user ON tasks(status, owner_id);
 
 -- ========================================
--- 觸發器和函數
+-- 觸發器函數
 -- ========================================
 
--- 更新 updated_at 觸發器函數
+-- 更新 updated_at 欄位的觸發器函數
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
+    NEW.updated_at = NOW();
+    RETURN NEW;
 END;
-$$ language plpgsql;
+$$ language 'plpgsql';
 
--- 為各表添加 updated_at 觸發器
-DROP TRIGGER IF EXISTS update_topic_templates_updated_at ON topic_templates;
+-- 觸發器
 CREATE TRIGGER update_topic_templates_updated_at
   BEFORE UPDATE ON topic_templates
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_topics_updated_at ON topics;
 CREATE TRIGGER update_topics_updated_at
   BEFORE UPDATE ON topics
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_goals_updated_at
+  BEFORE UPDATE ON goals
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_tasks_updated_at
+  BEFORE UPDATE ON tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_task_records_updated_at
+  BEFORE UPDATE ON task_records
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
@@ -179,6 +279,9 @@ ALTER TABLE topic_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topic_template_collaborators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topic_collaborators ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_records ENABLE ROW LEVEL SECURITY;
 
 -- 清理和重建所有 RLS 政策
 DO $$ 
@@ -396,427 +499,6 @@ END $$;
 -- 最後更新: 2025-01-02
 
 -- ========================================
--- 新正規化架構（遷移後的表格）
--- ========================================
-
--- 正規化學習主題表
-CREATE TABLE IF NOT EXISTS topics_new (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  subject VARCHAR(100),
-  category VARCHAR(100),
-  status VARCHAR(50) DEFAULT 'active',
-  type VARCHAR(50) DEFAULT 'learning',
-  template_id UUID REFERENCES topic_templates(id) ON DELETE SET NULL,
-  template_version INTEGER DEFAULT 1,
-  is_collaborative BOOLEAN DEFAULT false,
-  show_avatars BOOLEAN DEFAULT true,
-  focus_element JSONB,
-  bubbles JSONB DEFAULT '[]'::jsonb,
-  progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
-  due_date TIMESTAMP WITH TIME ZONE,
-  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  version INTEGER NOT NULL DEFAULT 1,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 目標表
-CREATE TABLE IF NOT EXISTS goals (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  topic_id UUID REFERENCES topics_new(id) ON DELETE CASCADE,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  status VARCHAR(50) DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done', 'archived')),
-  priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-  order_index INTEGER DEFAULT 0,
-  need_help BOOLEAN DEFAULT false,
-  help_message TEXT,
-  help_resolved_at TIMESTAMP WITH TIME ZONE,
-  owner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  collaborator_ids JSONB DEFAULT '[]'::jsonb,
-  version INTEGER NOT NULL DEFAULT 1,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 任務表
-CREATE TABLE IF NOT EXISTS tasks (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  goal_id UUID REFERENCES goals(id) ON DELETE CASCADE,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  status VARCHAR(50) DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done', 'archived')),
-  priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-  order_index INTEGER DEFAULT 0,
-  need_help BOOLEAN DEFAULT false,
-  help_message TEXT,
-  help_resolved_at TIMESTAMP WITH TIME ZONE,
-  due_date TIMESTAMP WITH TIME ZONE,
-  estimated_time INTEGER, -- 估計時間（分鐘）
-  completion_time INTEGER, -- 實際完成時間（分鐘）
-  completed_at TIMESTAMP WITH TIME ZONE,
-  owner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  collaborator_ids JSONB DEFAULT '[]'::jsonb,
-  version INTEGER NOT NULL DEFAULT 1,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 任務記錄表
-CREATE TABLE IF NOT EXISTS task_records (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-  topic_id UUID REFERENCES topics_new(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  title VARCHAR(255) NOT NULL,
-  content TEXT,
-  difficulty INTEGER CHECK (difficulty >= 1 AND difficulty <= 5),
-  completion_time INTEGER, -- 完成時間（分鐘）
-  tags JSONB DEFAULT '[]'::jsonb,
-  files JSONB DEFAULT '[]'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ========================================
--- 新表格索引優化
--- ========================================
-
--- topics_new 索引
-CREATE INDEX IF NOT EXISTS idx_topics_new_owner_id ON topics_new(owner_id);
-CREATE INDEX IF NOT EXISTS idx_topics_new_status ON topics_new(status);
-CREATE INDEX IF NOT EXISTS idx_topics_new_updated_at ON topics_new(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_topics_new_collaborative ON topics_new(is_collaborative) WHERE is_collaborative = true;
-
--- goals 索引
-CREATE INDEX IF NOT EXISTS idx_goals_topic_id ON goals(topic_id);
-CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
-CREATE INDEX IF NOT EXISTS idx_goals_owner_id ON goals(owner_id);
-CREATE INDEX IF NOT EXISTS idx_goals_order_index ON goals(order_index);
-CREATE INDEX IF NOT EXISTS idx_goals_updated_at ON goals(updated_at DESC);
-
--- tasks 索引
-CREATE INDEX IF NOT EXISTS idx_tasks_goal_id ON tasks(goal_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_order_index ON tasks(order_index);
-CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
-CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_tasks_completed_at ON tasks(completed_at DESC);
-
--- task_records 索引
-CREATE INDEX IF NOT EXISTS idx_task_records_task_id ON task_records(task_id);
-CREATE INDEX IF NOT EXISTS idx_task_records_topic_id ON task_records(topic_id);
-CREATE INDEX IF NOT EXISTS idx_task_records_user_id ON task_records(user_id);
-CREATE INDEX IF NOT EXISTS idx_task_records_created_at ON task_records(created_at DESC);
-
--- 複合索引（性能優化）
-CREATE INDEX IF NOT EXISTS idx_goals_topic_status ON goals(topic_id, status);
-CREATE INDEX IF NOT EXISTS idx_tasks_goal_status ON tasks(goal_id, status);
-CREATE INDEX IF NOT EXISTS idx_tasks_status_user ON tasks(status, owner_id);
-
--- ========================================
--- 新表格觸發器
--- ========================================
-
--- topics_new 觸發器
-DROP TRIGGER IF EXISTS update_topics_new_updated_at ON topics_new;
-CREATE TRIGGER update_topics_new_updated_at
-  BEFORE UPDATE ON topics_new
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- goals 觸發器
-DROP TRIGGER IF EXISTS update_goals_updated_at ON goals;
-CREATE TRIGGER update_goals_updated_at
-  BEFORE UPDATE ON goals
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- tasks 觸發器
-DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
-CREATE TRIGGER update_tasks_updated_at
-  BEFORE UPDATE ON tasks
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- task_records 觸發器
-DROP TRIGGER IF EXISTS update_task_records_updated_at ON task_records;
-CREATE TRIGGER update_task_records_updated_at
-  BEFORE UPDATE ON task_records
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- ========================================
--- 新表格 RLS 政策
--- ========================================
-
--- 啟用 RLS
-ALTER TABLE topics_new ENABLE ROW LEVEL SECURITY;
-ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task_records ENABLE ROW LEVEL SECURITY;
-
--- 清理舊的 policy（如果存在）
-DO $$ 
-BEGIN
-    -- topics_new policies
-    DROP POLICY IF EXISTS "Users can view own topics_new" ON topics_new;
-    DROP POLICY IF EXISTS "Collaborators can view collaborative topics_new" ON topics_new;
-    DROP POLICY IF EXISTS "Users can create topics_new" ON topics_new;
-    DROP POLICY IF EXISTS "Owners and editors can update topics_new" ON topics_new;
-    DROP POLICY IF EXISTS "Only owners can delete topics_new" ON topics_new;
-
-    -- goals policies
-    DROP POLICY IF EXISTS "Users can view goals from accessible topics" ON goals;
-    DROP POLICY IF EXISTS "Users can create goals in accessible topics" ON goals;
-    DROP POLICY IF EXISTS "Users can update goals in accessible topics" ON goals;
-    DROP POLICY IF EXISTS "Users can delete goals in accessible topics" ON goals;
-
-    -- tasks policies
-    DROP POLICY IF EXISTS "Users can view tasks from accessible goals" ON tasks;
-    DROP POLICY IF EXISTS "Users can create tasks in accessible goals" ON tasks;
-    DROP POLICY IF EXISTS "Users can update tasks in accessible goals" ON tasks;
-    DROP POLICY IF EXISTS "Users can delete tasks in accessible goals" ON tasks;
-
-    -- task_records policies
-    DROP POLICY IF EXISTS "Users can view their own task records" ON task_records;
-    DROP POLICY IF EXISTS "Users can view task records from accessible topics" ON task_records;
-    DROP POLICY IF EXISTS "Users can create task records" ON task_records;
-    DROP POLICY IF EXISTS "Users can update their own task records" ON task_records;
-    DROP POLICY IF EXISTS "Users can delete their own task records" ON task_records;
-END $$;
-
--- 重建 topics_new 的 policy
-DO $$ 
-BEGIN
-    -- 查看權限
-    CREATE POLICY "Users can view own topics_new" ON topics_new
-        FOR SELECT USING ((SELECT auth.uid()) = owner_id);
-
-    CREATE POLICY "Collaborators can view collaborative topics_new" ON topics_new
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM topic_collaborators
-                WHERE topic_id = topics_new.id
-                AND user_id = (SELECT auth.uid())
-            )
-        );
-
-    -- 修改權限
-    CREATE POLICY "Users can create topics_new" ON topics_new
-        FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
-
-    CREATE POLICY "Owners and editors can update topics_new" ON topics_new
-        FOR UPDATE USING (
-            (SELECT auth.uid()) = owner_id OR
-            EXISTS (
-                SELECT 1 FROM topic_collaborators
-                WHERE topic_id = topics_new.id
-                AND user_id = (SELECT auth.uid())
-                AND permission = 'edit'
-            )
-        );
-
-    CREATE POLICY "Only owners can delete topics_new" ON topics_new
-        FOR DELETE USING ((SELECT auth.uid()) = owner_id);
-END $$;
-
--- 重建 goals 的 policy
-DO $$ 
-BEGIN
-    CREATE POLICY "Users can view goals from accessible topics" ON goals
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can create goals in accessible topics" ON goals
-        FOR INSERT WITH CHECK (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can update goals in accessible topics" ON goals
-        FOR UPDATE USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can delete goals in accessible topics" ON goals
-        FOR DELETE USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-END $$;
-
--- 重建 tasks 的 policy
-DO $$ 
-BEGIN
-    CREATE POLICY "Users can view tasks from accessible goals" ON tasks
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can create tasks in accessible goals" ON tasks
-        FOR INSERT WITH CHECK (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can update tasks in accessible goals" ON tasks
-        FOR UPDATE USING (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can delete tasks in accessible goals" ON tasks
-        FOR DELETE USING (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-END $$;
-
--- 重建 task_records 的 policy
-DO $$ 
-BEGIN
-    CREATE POLICY "Users can view their own task records" ON task_records
-        FOR SELECT USING ((SELECT auth.uid()) = user_id);
-
-    CREATE POLICY "Users can view task records from accessible topics" ON task_records
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = task_records.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can create task records" ON task_records
-        FOR INSERT WITH CHECK (
-            (SELECT auth.uid()) = user_id AND
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = task_records.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can update their own task records" ON task_records
-        FOR UPDATE USING ((SELECT auth.uid()) = user_id);
-
-    CREATE POLICY "Users can delete their own task records" ON task_records
-        FOR DELETE USING ((SELECT auth.uid()) = user_id);
-END $$;
-
--- ========================================
 -- 樂觀鎖定函數（版本控制）
 -- ========================================
 
@@ -832,7 +514,7 @@ DECLARE
 BEGIN
   -- 檢查版本號
   SELECT version INTO v_current_version
-  FROM topics_new
+  FROM topics
   WHERE id = p_topic_id;
 
   IF v_current_version IS NULL THEN
@@ -848,7 +530,7 @@ BEGIN
   END IF;
 
   -- 執行更新，版本號+1
-  UPDATE topics_new 
+  UPDATE topics 
   SET 
     title = COALESCE((p_updates->>'title')::VARCHAR, title),
     description = COALESCE(p_updates->>'description', description),
@@ -857,7 +539,7 @@ BEGIN
     version = version + 1,
     updated_at = NOW()
   WHERE id = p_topic_id
-  RETURNING to_jsonb(topics_new.*) INTO v_result;
+  RETURNING to_jsonb(topics.*) INTO v_result;
 
   RETURN jsonb_build_object('success', true, 'data', v_result);
 END;
@@ -995,7 +677,7 @@ BEGIN
     tn.subject
   FROM tasks t
   JOIN goals g ON t.goal_id = g.id
-  JOIN topics_new tn ON g.topic_id = tn.id
+  JOIN topics tn ON g.topic_id = tn.id
   LEFT JOIN topic_collaborators tc ON tn.id = tc.topic_id
   WHERE 
     t.status IN ('todo', 'in_progress')
@@ -1023,632 +705,7 @@ BEGIN
   RETURN QUERY
   WITH topic_info AS (
     SELECT to_jsonb(tn.*) as topic_json
-    FROM topics_new tn
-    WHERE tn.id = p_topic_id
-  ),
-  goals_info AS (
-    SELECT jsonb_agg(to_jsonb(g.*)) as goals_json
-    FROM goals g
-    WHERE g.topic_id = p_topic_id
-    AND g.status != 'archived'
-  ),
-  tasks_info AS (
-    SELECT jsonb_agg(to_jsonb(t.*)) as tasks_json
-    FROM tasks t
-    JOIN goals g ON t.goal_id = g.id
-    WHERE g.topic_id = p_topic_id
-    AND t.status != 'archived'
-    AND g.status != 'archived'
-  )
-  SELECT 
-    ti.topic_json,
-    COALESCE(gi.goals_json, '[]'::jsonb),
-    COALESCE(tsi.tasks_json, '[]'::jsonb)
-  FROM topic_info ti
-  CROSS JOIN goals_info gi
-  CROSS JOIN tasks_info tsi;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ========================================
--- 架構狀態更新
--- ========================================
--- 資料庫架構狀態: ✅ 完整的模板和主題管理系統 + 正規化結構
--- 包含: 舊 JSONB 結構 + 新正規化結構 + 完整 RLS + 版本控制 + 高性能查詢
--- 最後更新: 2025-01-06
-
--- ========================================
--- 新正規化架構（遷移後的表格）
--- ========================================
-
--- 正規化學習主題表
-CREATE TABLE IF NOT EXISTS topics_new (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  subject VARCHAR(100),
-  category VARCHAR(100),
-  status VARCHAR(50) DEFAULT 'active',
-  type VARCHAR(50) DEFAULT 'learning',
-  template_id UUID REFERENCES topic_templates(id) ON DELETE SET NULL,
-  template_version INTEGER DEFAULT 1,
-  is_collaborative BOOLEAN DEFAULT false,
-  show_avatars BOOLEAN DEFAULT true,
-  focus_element JSONB,
-  bubbles JSONB DEFAULT '[]'::jsonb,
-  progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
-  due_date TIMESTAMP WITH TIME ZONE,
-  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  version INTEGER NOT NULL DEFAULT 1,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 目標表
-CREATE TABLE IF NOT EXISTS goals (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  topic_id UUID REFERENCES topics_new(id) ON DELETE CASCADE,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  status VARCHAR(50) DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done', 'archived')),
-  priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-  order_index INTEGER DEFAULT 0,
-  need_help BOOLEAN DEFAULT false,
-  help_message TEXT,
-  help_resolved_at TIMESTAMP WITH TIME ZONE,
-  owner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  collaborator_ids JSONB DEFAULT '[]'::jsonb,
-  version INTEGER NOT NULL DEFAULT 1,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 任務表
-CREATE TABLE IF NOT EXISTS tasks (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  goal_id UUID REFERENCES goals(id) ON DELETE CASCADE,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  status VARCHAR(50) DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done', 'archived')),
-  priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-  order_index INTEGER DEFAULT 0,
-  need_help BOOLEAN DEFAULT false,
-  help_message TEXT,
-  help_resolved_at TIMESTAMP WITH TIME ZONE,
-  due_date TIMESTAMP WITH TIME ZONE,
-  estimated_time INTEGER,
-  completion_time INTEGER,
-  completed_at TIMESTAMP WITH TIME ZONE,
-  owner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  collaborator_ids JSONB DEFAULT '[]'::jsonb,
-  version INTEGER NOT NULL DEFAULT 1,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ========================================
--- 新表格索引優化
--- ========================================
-
--- topics_new 索引
-CREATE INDEX IF NOT EXISTS idx_topics_new_owner_id ON topics_new(owner_id);
-CREATE INDEX IF NOT EXISTS idx_topics_new_status ON topics_new(status);
-CREATE INDEX IF NOT EXISTS idx_topics_new_updated_at ON topics_new(updated_at DESC);
-
--- goals 索引
-CREATE INDEX IF NOT EXISTS idx_goals_topic_id ON goals(topic_id);
-CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
-CREATE INDEX IF NOT EXISTS idx_goals_owner_id ON goals(owner_id);
-
--- tasks 索引
-CREATE INDEX IF NOT EXISTS idx_tasks_goal_id ON tasks(goal_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id);
-
--- 複合索引（性能優化）
-CREATE INDEX IF NOT EXISTS idx_goals_topic_status ON goals(topic_id, status);
-CREATE INDEX IF NOT EXISTS idx_tasks_goal_status ON tasks(goal_id, status);
-
--- ========================================
--- 新表格觸發器
--- ========================================
-
--- topics_new 觸發器
-DROP TRIGGER IF EXISTS update_topics_new_updated_at ON topics_new;
-CREATE TRIGGER update_topics_new_updated_at
-  BEFORE UPDATE ON topics_new
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- goals 觸發器
-DROP TRIGGER IF EXISTS update_goals_updated_at ON goals;
-CREATE TRIGGER update_goals_updated_at
-  BEFORE UPDATE ON goals
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- tasks 觸發器
-DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
-CREATE TRIGGER update_tasks_updated_at
-  BEFORE UPDATE ON tasks
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- ========================================
--- 新表格 RLS 政策
--- ========================================
-
--- 啟用 RLS
-ALTER TABLE topics_new ENABLE ROW LEVEL SECURITY;
-ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task_records ENABLE ROW LEVEL SECURITY;
-
--- 清理舊的 policy（如果存在）
-DO $$ 
-BEGIN
-    -- topics_new policies
-    DROP POLICY IF EXISTS "Users can view own topics" ON topics_new;
-    DROP POLICY IF EXISTS "Collaborators can view collaborative topics" ON topics_new;
-    DROP POLICY IF EXISTS "Users can create topics" ON topics_new;
-    DROP POLICY IF EXISTS "Owners and editors can update topics" ON topics_new;
-    DROP POLICY IF EXISTS "Only owners can delete topics" ON topics_new;
-
-    -- goals policies
-    DROP POLICY IF EXISTS "Users can view goals from accessible topics" ON goals;
-    DROP POLICY IF EXISTS "Users can create goals in accessible topics" ON goals;
-    DROP POLICY IF EXISTS "Users can update goals in accessible topics" ON goals;
-    DROP POLICY IF EXISTS "Users can delete goals in accessible topics" ON goals;
-
-    -- tasks policies
-    DROP POLICY IF EXISTS "Users can view tasks from accessible goals" ON tasks;
-    DROP POLICY IF EXISTS "Users can create tasks in accessible goals" ON tasks;
-    DROP POLICY IF EXISTS "Users can update tasks in accessible goals" ON tasks;
-    DROP POLICY IF EXISTS "Users can delete tasks in accessible goals" ON tasks;
-
-    -- task_records policies
-    DROP POLICY IF EXISTS "Users can view their own task records" ON task_records;
-    DROP POLICY IF EXISTS "Users can view task records from accessible topics" ON task_records;
-    DROP POLICY IF EXISTS "Users can create task records" ON task_records;
-    DROP POLICY IF EXISTS "Users can update their own task records" ON task_records;
-    DROP POLICY IF EXISTS "Users can delete their own task records" ON task_records;
-END $$;
-
--- 重建 topics_new 的 policy
-DO $$ 
-BEGIN
-    -- 查看權限
-    CREATE POLICY "Users can view own topics" ON topics_new
-        FOR SELECT USING ((SELECT auth.uid()) = owner_id);
-
-    CREATE POLICY "Collaborators can view collaborative topics" ON topics_new
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM topic_collaborators
-                WHERE topic_id = topics_new.id
-                AND user_id = (SELECT auth.uid())
-            )
-        );
-
-    -- 修改權限
-    CREATE POLICY "Users can create topics" ON topics_new
-        FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
-
-    CREATE POLICY "Owners and editors can update topics" ON topics_new
-        FOR UPDATE USING (
-            (SELECT auth.uid()) = owner_id OR
-            EXISTS (
-                SELECT 1 FROM topic_collaborators
-                WHERE topic_id = topics_new.id
-                AND user_id = (SELECT auth.uid())
-                AND permission = 'edit'
-            )
-        );
-
-    CREATE POLICY "Only owners can delete topics" ON topics_new
-        FOR DELETE USING ((SELECT auth.uid()) = owner_id);
-END $$;
-
--- 重建 goals 的 policy
-DO $$ 
-BEGIN
-    CREATE POLICY "Users can view goals from accessible topics" ON goals
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can create goals in accessible topics" ON goals
-        FOR INSERT WITH CHECK (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can update goals in accessible topics" ON goals
-        FOR UPDATE USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can delete goals in accessible topics" ON goals
-        FOR DELETE USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = goals.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-END $$;
-
--- 重建 tasks 的 policy
-DO $$ 
-BEGIN
-    CREATE POLICY "Users can view tasks from accessible goals" ON tasks
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can create tasks in accessible goals" ON tasks
-        FOR INSERT WITH CHECK (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can update tasks in accessible goals" ON tasks
-        FOR UPDATE USING (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can delete tasks in accessible goals" ON tasks
-        FOR DELETE USING (
-            EXISTS (
-                SELECT 1 FROM goals
-                JOIN topics_new ON goals.topic_id = topics_new.id
-                WHERE goals.id = tasks.goal_id
-                AND (
-                    (SELECT auth.uid()) = topics_new.owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                        AND permission = 'edit'
-                    )
-                )
-            )
-        );
-END $$;
-
--- 重建 task_records 的 policy
-DO $$ 
-BEGIN
-    CREATE POLICY "Users can view their own task records" ON task_records
-        FOR SELECT USING ((SELECT auth.uid()) = user_id);
-
-    CREATE POLICY "Users can view task records from accessible topics" ON task_records
-        FOR SELECT USING (
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = task_records.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can create task records" ON task_records
-        FOR INSERT WITH CHECK (
-            (SELECT auth.uid()) = user_id AND
-            EXISTS (
-                SELECT 1 FROM topics_new
-                WHERE id = task_records.topic_id
-                AND (
-                    (SELECT auth.uid()) = owner_id OR
-                    EXISTS (
-                        SELECT 1 FROM topic_collaborators
-                        WHERE topic_id = topics_new.id
-                        AND user_id = (SELECT auth.uid())
-                    )
-                )
-            )
-        );
-
-    CREATE POLICY "Users can update their own task records" ON task_records
-        FOR UPDATE USING ((SELECT auth.uid()) = user_id);
-
-    CREATE POLICY "Users can delete their own task records" ON task_records
-        FOR DELETE USING ((SELECT auth.uid()) = user_id);
-END $$;
-
--- ========================================
--- 樂觀鎖定函數（版本控制）
--- ========================================
-
--- 安全更新主題函數
-CREATE OR REPLACE FUNCTION safe_update_topic(
-  p_topic_id UUID,
-  p_expected_version INTEGER,
-  p_updates JSONB
-) RETURNS JSONB AS $$
-DECLARE
-  v_current_version INTEGER;
-  v_result JSONB;
-BEGIN
-  -- 檢查版本號
-  SELECT version INTO v_current_version
-  FROM topics_new
-  WHERE id = p_topic_id;
-
-  IF v_current_version IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', '主題不存在');
-  END IF;
-
-  IF v_current_version != p_expected_version THEN
-    RETURN jsonb_build_object(
-      'success', false, 
-      'message', '版本衝突',
-      'current_version', v_current_version
-    );
-  END IF;
-
-  -- 執行更新，版本號+1
-  UPDATE topics_new 
-  SET 
-    title = COALESCE((p_updates->>'title')::VARCHAR, title),
-    description = COALESCE(p_updates->>'description', description),
-    subject = COALESCE(p_updates->>'subject', subject),
-    status = COALESCE(p_updates->>'status', status),
-    version = version + 1,
-    updated_at = NOW()
-  WHERE id = p_topic_id
-  RETURNING to_jsonb(topics_new.*) INTO v_result;
-
-  RETURN jsonb_build_object('success', true, 'data', v_result);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 安全更新目標函數
-CREATE OR REPLACE FUNCTION safe_update_goal(
-  p_goal_id UUID,
-  p_expected_version INTEGER,
-  p_updates JSONB
-) RETURNS JSONB AS $$
-DECLARE
-  v_current_version INTEGER;
-  v_result JSONB;
-BEGIN
-  -- 檢查版本號
-  SELECT version INTO v_current_version
-  FROM goals
-  WHERE id = p_goal_id;
-
-  IF v_current_version IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', '目標不存在');
-  END IF;
-
-  IF v_current_version != p_expected_version THEN
-    RETURN jsonb_build_object(
-      'success', false, 
-      'message', '版本衝突',
-      'current_version', v_current_version
-    );
-  END IF;
-
-  -- 執行更新，版本號+1
-  UPDATE goals 
-  SET 
-    title = COALESCE((p_updates->>'title')::VARCHAR, title),
-    description = COALESCE(p_updates->>'description', description),
-    status = COALESCE(p_updates->>'status', status),
-    priority = COALESCE(p_updates->>'priority', priority),
-    need_help = COALESCE((p_updates->>'need_help')::BOOLEAN, need_help),
-    help_message = COALESCE(p_updates->>'help_message', help_message),
-    version = version + 1,
-    updated_at = NOW()
-  WHERE id = p_goal_id
-  RETURNING to_jsonb(goals.*) INTO v_result;
-
-  RETURN jsonb_build_object('success', true, 'data', v_result);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 安全更新任務函數
-CREATE OR REPLACE FUNCTION safe_update_task(
-  p_task_id UUID,
-  p_expected_version INTEGER,
-  p_updates JSONB
-) RETURNS JSONB AS $$
-DECLARE
-  v_current_version INTEGER;
-  v_result JSONB;
-BEGIN
-  -- 檢查版本號
-  SELECT version INTO v_current_version
-  FROM tasks
-  WHERE id = p_task_id;
-
-  IF v_current_version IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', '任務不存在');
-  END IF;
-
-  IF v_current_version != p_expected_version THEN
-    RETURN jsonb_build_object(
-      'success', false, 
-      'message', '版本衝突',
-      'current_version', v_current_version
-    );
-  END IF;
-
-  -- 執行更新，版本號+1
-  UPDATE tasks 
-  SET 
-    title = COALESCE((p_updates->>'title')::VARCHAR, title),
-    description = COALESCE(p_updates->>'description', description),
-    status = COALESCE(p_updates->>'status', status),
-    priority = COALESCE(p_updates->>'priority', priority),
-    need_help = COALESCE((p_updates->>'need_help')::BOOLEAN, need_help),
-    help_message = COALESCE(p_updates->>'help_message', help_message),
-    completed_at = CASE 
-      WHEN p_updates->>'status' = 'done' THEN NOW()
-      WHEN p_updates->>'status' != 'done' THEN NULL
-      ELSE completed_at
-    END,
-    version = version + 1,
-    updated_at = NOW()
-  WHERE id = p_task_id
-  RETURNING to_jsonb(tasks.*) INTO v_result;
-
-  RETURN jsonb_build_object('success', true, 'data', v_result);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ========================================
--- 高性能查詢函數
--- ========================================
-
--- 獲取用戶的活躍任務（TaskWall 優化）
-CREATE OR REPLACE FUNCTION get_active_tasks_for_user(p_user_id UUID DEFAULT NULL)
-RETURNS TABLE (
-  task_id UUID,
-  task_title VARCHAR,
-  task_description TEXT,
-  task_status VARCHAR,
-  task_priority VARCHAR,
-  task_due_date TIMESTAMP WITH TIME ZONE,
-  task_need_help BOOLEAN,
-  goal_id UUID,
-  goal_title VARCHAR,
-  topic_id UUID,
-  topic_title VARCHAR,
-  topic_subject VARCHAR
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT 
-    t.id,
-    t.title,
-    t.description,
-    t.status,
-    t.priority,
-    t.due_date,
-    t.need_help,
-    g.id,
-    g.title,
-    tn.id,
-    tn.title,
-    tn.subject
-  FROM tasks t
-  JOIN goals g ON t.goal_id = g.id
-  JOIN topics_new tn ON g.topic_id = tn.id
-  LEFT JOIN topic_collaborators tc ON tn.id = tc.topic_id
-  WHERE 
-    t.status IN ('todo', 'in_progress')
-    AND g.status != 'archived'
-    AND tn.status != 'archived'
-    AND (
-      tn.owner_id = COALESCE(p_user_id, auth.uid()) OR
-      tc.user_id = COALESCE(p_user_id, auth.uid())
-    )
-  ORDER BY 
-    CASE t.status WHEN 'in_progress' THEN 1 ELSE 2 END,
-    CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
-    t.updated_at DESC;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 獲取主題完整結構（含目標和任務）
-CREATE OR REPLACE FUNCTION get_topic_with_structure(p_topic_id UUID)
-RETURNS TABLE (
-  topic_data JSONB,
-  goals_data JSONB,
-  tasks_data JSONB
-) AS $$
-BEGIN
-  RETURN QUERY
-  WITH topic_info AS (
-    SELECT to_jsonb(tn.*) as topic_json
-    FROM topics_new tn
+    FROM topics tn
     WHERE tn.id = p_topic_id
   ),
   goals_info AS (

@@ -747,12 +747,32 @@ export const TaskWallPage = () => {
   // 初始化資料載入
   useEffect(() => {
     const fetchData = async () => {
+      console.log('TaskWallPage fetchData called')
       setIsLoading(true);
+      const startTime = performance.now();
       try {
         await Promise.all([
           fetchTopics(),
           getCollaboratorCandidates()
         ]);
+        
+        const endTime = performance.now();
+        const loadTime = endTime - startTime;
+        console.log(`⚡ 任務牆載入時間: ${Math.round(loadTime)}ms`);
+        
+        // 在開發環境下顯示載入時間
+        if (import.meta.env.DEV) {
+          setTimeout(() => {
+            toast.success(`⚡ 載入完成：${Math.round(loadTime)}ms`, {
+              duration: 2000,
+              style: {
+                background: '#10B981',
+                color: 'white',
+                fontSize: '14px'
+              }
+            });
+          }, 100);
+        }
       } catch (error) {
         console.error('Failed to load task wall data:', error);
       } finally {

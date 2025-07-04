@@ -53,6 +53,7 @@ export interface CreateTaskRecordData {
 export interface TaskRecordFilters {
   topic_id?: string;
   task_id?: string;
+  task_ids?: string[]; // 新增：支援批量查詢任務記錄
   difficulty?: 1 | 2 | 3 | 4 | 5;
   task_type?: string;
   start_date?: string;
@@ -127,16 +128,19 @@ class TaskRecordStore {
   }
 
   /**
-   * 獲取用戶的任務記錄
+   * 獲取用戶的任務記錄 - 優化版本支援批量查詢
    */
-  async getUserTaskRecords(filters?: TaskRecordFilters): Promise<TaskRecord[]> {
+     async getUserTaskRecords(filters?: TaskRecordFilters): Promise<TaskRecord[]> {
     try {
       let query = supabase
         .from('task_records')
         .select('*');
 
-      // 如果有指定 task_id，使用複合索引
-      if (filters?.task_id) {
+      // 批量查詢指定任務的記錄（新增功能）
+      if (filters?.task_ids && filters.task_ids.length > 0) {
+        query = query.in('task_id', filters.task_ids).order('task_id').order('created_at', { ascending: false });
+      } else if (filters?.task_id) {
+        // 如果有指定 task_id，使用複合索引
         query = query.eq('task_id', filters.task_id).order('created_at', { ascending: false });
       } else {
         // 其他情況使用一般的時間排序
