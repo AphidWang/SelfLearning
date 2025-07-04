@@ -2,11 +2,15 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
+import { useTopicTemplateStore } from '../../store/topicTemplateStore';
+import { useAuth } from '../../context/AuthContext';
 import { subjects } from '../../styles/tokens';
 import { TopicRadialMap, useTopicRadialMapStats } from '../topic-review/TopicRadialMap';
 import { HelpMessageDisplay } from './HelpMessageDisplay';
 import { UserAvatar, UserAvatarGroup } from './UserAvatar';
 import { CollaborationManager } from './CollaborationManager';
+import { SUBJECTS } from '../../constants/subjects';
+import { TOPIC_CATEGORIES } from '../../constants/topics';
 import type { Goal, Task, User, Topic, TaskStatus } from '../../types/goal';
 import { 
   Brain, TrendingUp, Calendar, Trophy, Star, Clock, 
@@ -15,7 +19,7 @@ import {
   Flame, Eye, X, AlertCircle, PlayCircle, MessageSquare,
   ChevronLeft, Pencil, Sparkles, Check, HelpCircle,
   Save, AlertTriangle, Plus, Trash2, PenTool, Mic,
-  Edit, UserPlus, Users
+  Edit, UserPlus, Users, Archive
 } from 'lucide-react';
 
 interface Collaborator extends User {
@@ -58,6 +62,12 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   // 使用 userStore 獲取協作者候選人數據，遵循架構分層原則
   const { getCollaboratorCandidates, users } = useUserStore();
   
+  // 使用 topicTemplateStore 來存為模板
+  const { createTemplate } = useTopicTemplateStore();
+  
+  // 使用 auth 來檢查用戶權限
+  const { user } = useAuth();
+  
   const [topic, setTopic] = useState<Topic | null>(null);
   const weeklyStats = useTopicRadialMapStats(topicId);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -69,6 +79,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   const [pendingPermissions, setPendingPermissions] = useState<Record<string, 'view' | 'edit' | 'none'>>({});
+  const [showSaveAsTemplateModal, setShowSaveAsTemplateModal] = useState(false);
 
     // 異步載入主題數據
     const refreshTopic = useCallback(async () => {
@@ -225,6 +236,13 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
     if (!topic) return subjects.getSubjectStyle('');
     return subjects.getSubjectStyle(topic.subject || '');
   }, [topic?.subject]);
+
+  // 檢查是否為 mentor
+  const isMentor = useMemo(() => {
+    if (!user) return false;
+    const userRoles = user.roles || (user.role ? [user.role] : []);
+    return userRoles.includes('mentor');
+  }, [user]);
 
   if (!topic) {
     return (
@@ -479,17 +497,30 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
                   </button>
                 </>
               ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditedTopic(topic);
-                    setIsEditingTitle(true);
-                  }}
-                  className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  aria-label="編輯標題"
-                >
-                  <Pencil className="w-5 h-5 text-gray-500" />
-                </button>
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditedTopic(topic);
+                      setIsEditingTitle(true);
+                    }}
+                    className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    aria-label="編輯標題"
+                  >
+                    <Pencil className="w-5 h-5 text-gray-500" />
+                  </button>
+
+                  {/* 存為模板按鈕 - 只有 mentor 才能看到 */}
+                  {isMentor && (
+                    <button
+                      onClick={() => setShowSaveAsTemplateModal(true)}
+                      className="w-9 h-9 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors group"
+                      title="存為主題模板"
+                    >
+                      <Archive className="w-5 h-5 text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+                    </button>
+                  )}
+                </>
               )}
 
               {/* 刪除按鈕 */}
@@ -2921,7 +2952,243 @@ const TopicDetailPanel: React.FC<TopicDetailPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* 存為模板 Modal */}
+      <SaveAsTemplateModal
+        isOpen={showSaveAsTemplateModal}
+        onClose={() => setShowSaveAsTemplateModal(false)}
+        topic={topic}
+        onSubmit={async (templateData) => {
+          try {
+            setIsUpdating(true);
+            const newTemplate = await createTemplate(templateData);
+            if (newTemplate) {
+              setShowSaveAsTemplateModal(false);
+              alert('模板創建成功！');
+            } else {
+              alert('模板創建失敗，請稍後再試');
+            }
+          } catch (error) {
+            console.error('創建模板失敗:', error);
+            alert('模板創建失敗，請稍後再試');
+          } finally {
+            setIsUpdating(false);
+          }
+        }}
+      />
     </motion.div>
+  );
+};
+
+// 存為模板 Modal 組件
+interface SaveAsTemplateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  topic: Topic | null;
+  onSubmit: (data: any) => void;
+}
+
+const SaveAsTemplateModal: React.FC<SaveAsTemplateModalProps> = ({
+  isOpen,
+  onClose,
+  topic,
+  onSubmit
+}) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    subject: '',
+    category: '',
+    includeType: 'goals_only' as 'goals_only' | 'goals_and_tasks'
+  });
+
+  useEffect(() => {
+    if (topic) {
+      setFormData({
+        title: topic.title,
+        description: topic.description || '',
+        subject: topic.subject || '',
+        category: topic.category || 'learning',
+        includeType: 'goals_only'
+      });
+    }
+  }, [topic]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topic) return;
+    
+    onSubmit({
+      ...formData,
+      source_topic_id: topic.id
+    });
+    
+    setFormData({
+      title: '',
+      description: '',
+      subject: '',
+      category: '',
+      includeType: 'goals_only'
+    });
+  };
+
+  if (!isOpen || !topic) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl border border-amber-200 dark:border-gray-700">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Archive className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-amber-900 dark:text-amber-100 mb-2">
+            存為主題模板
+          </h2>
+          <p className="text-amber-700 dark:text-amber-300 text-sm">
+            將此主題保存為模板，供日後重複使用
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                模板名稱
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-amber-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100"
+                placeholder="輸入模板名稱"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                模板描述
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-amber-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 h-24 resize-none"
+                placeholder="描述此模板的用途和特色"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                學科
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-blue-50/90 dark:from-gray-700/90 dark:to-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer hover:shadow-md"
+                  required
+                >
+                  <option value="">選擇學科</option>
+                  {Object.entries(SUBJECTS).map(([key, subject]) => (
+                    <option key={key} value={subject}>
+                      {key === 'chinese' && '📖'} 
+                      {key === 'english' && '🔤'} 
+                      {key === 'math' && '🔢'} 
+                      {key === 'science' && '🔬'} 
+                      {key === 'social' && '🌍'} 
+                      {key === 'art' && '🎨'} 
+                      {key === 'pe' && '⚽'} 
+                      {key === 'other' && '✨'} 
+                      {' '}{subject}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                分類
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-purple-50/90 dark:from-gray-700/90 dark:to-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer hover:shadow-md"
+                  required
+                >
+                  <option value="">選擇分類</option>
+                  {TOPIC_CATEGORIES.map(category => (
+                    <option key={category.value} value={category.value}>
+                      {category.emoji} {category.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-3">
+                包含內容
+              </label>
+              <div className="space-y-3">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="goals_only"
+                    checked={formData.includeType === 'goals_only'}
+                    onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
+                    className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-amber-500 focus:ring-2"
+                  />
+                  <span className="ml-3 text-sm text-amber-800 dark:text-amber-200">
+                    🎯 僅包含目標
+                  </span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="goals_and_tasks"
+                    checked={formData.includeType === 'goals_and_tasks'}
+                    onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
+                    className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-amber-500 focus:ring-2"
+                  />
+                  <span className="ml-3 text-sm text-amber-800 dark:text-amber-200">
+                    📋 包含目標和任務
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={!formData.title.trim() || !formData.subject || !formData.category}
+              className="px-6 py-3 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              創建模板
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 
