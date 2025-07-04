@@ -19,11 +19,11 @@ import type {
   TopicTemplate, 
   TopicTemplateCollaborator, 
   CopyTemplateParams,
-  User,
   TemplateGoal,
   TemplateTask,
   Bubble 
 } from '../types/goal';
+import type { User } from '@self-learning/types';
 import { supabase } from '../services/supabase';
 
 interface TopicTemplateStore {
@@ -240,7 +240,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
       if (!user) throw new Error('User not authenticated');
 
       // 確保必要欄位存在
-      const requiredFields = ['title', 'description', 'template_type', 'subject', 'category'];
+      const requiredFields = ['title', 'subject', 'category'];
       const missingFields = requiredFields.filter(field => !templateData[field]);
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
@@ -249,6 +249,8 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
       // 設定預設值
       const templateWithDefaults = {
         ...templateData,
+        template_type: templateData.template_type || 'learning',
+        description: templateData.description || '',
         goals: templateData.goals || [],
         bubbles: templateData.bubbles || [],
         is_public: templateData.is_public || false,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Pencil, Trash2, Brain, Archive } from 'lucide-react';
+import { Check, X, Pencil, Trash2, Brain } from 'lucide-react';
 import { subjects } from '../../../styles/tokens';
 import type { Topic } from '../../../types/goal';
 
@@ -162,6 +162,17 @@ export const TopicHeader: React.FC<TopicHeaderProps> = ({
             </>
           ) : (
             <>
+              {/* 存為模板按鈕 - 只有 mentor 才能看到 */}
+              {isMentor && onSaveAsTemplate && (
+                <button
+                  onClick={onSaveAsTemplate}
+                  className="px-3 py-1.5 bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-300 hover:from-blue-200 hover:to-indigo-200 dark:hover:from-blue-800/40 dark:hover:to-indigo-800/40 rounded-full text-sm font-medium transition-all border border-blue-200 dark:border-blue-700 hover:shadow-sm"
+                  title="存為主題模板"
+                >
+                  儲存成主題模板
+                </button>
+              )}
+
               <button
                 onClick={() => onEditingToggle(true)}
                 className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -169,17 +180,6 @@ export const TopicHeader: React.FC<TopicHeaderProps> = ({
               >
                 <Pencil className="w-5 h-5 text-gray-500" />
               </button>
-
-              {/* 存為模板按鈕 - 只有 mentor 才能看到 */}
-              {isMentor && onSaveAsTemplate && (
-                <button
-                  onClick={onSaveAsTemplate}
-                  className="w-9 h-9 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors group"
-                  title="存為主題模板"
-                >
-                  <Archive className="w-5 h-5 text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
-                </button>
-              )}
             </>
           )}
 

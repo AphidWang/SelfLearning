@@ -355,7 +355,7 @@ const SaveAsTemplateModal: React.FC<SaveAsTemplateModalProps> = ({
     description: '',
     subject: '',
     category: '',
-    includeType: 'goals_only' as 'goals_only' | 'goals_and_tasks'
+    includeType: 'goals_and_tasks' as 'goals_only' | 'goals_and_tasks'
   });
 
   useEffect(() => {
@@ -365,7 +365,7 @@ const SaveAsTemplateModal: React.FC<SaveAsTemplateModalProps> = ({
         description: topic.description || '',
         subject: topic.subject || '',
         category: topic.category || 'learning',
-        includeType: 'goals_only'
+        includeType: 'goals_and_tasks'
       });
     }
   }, [topic]);
@@ -374,180 +374,195 @@ const SaveAsTemplateModal: React.FC<SaveAsTemplateModalProps> = ({
     e.preventDefault();
     if (!topic) return;
     
-    onSubmit({
-      ...formData,
-      source_topic_id: topic.id
-    });
+    // 準備模板資料
+    const templateData = {
+      title: formData.title,
+      description: formData.description,
+      subject: formData.subject,
+      category: formData.category,
+      template_type: topic.type || 'learning',
+      source_id: topic.id,
+      goals: formData.includeType === 'goals_and_tasks' ? topic.goals : 
+             topic.goals?.map(goal => ({ ...goal, tasks: [] })) || [],
+      bubbles: topic.bubbles || [],
+      is_public: true,
+      is_collaborative: false
+    };
+    
+    onSubmit(templateData);
     
     setFormData({
       title: '',
       description: '',
       subject: '',
       category: '',
-      includeType: 'goals_only'
+      includeType: 'goals_and_tasks'
     });
   };
 
   if (!isOpen || !topic) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl border border-amber-200 dark:border-gray-700">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Archive className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-2xl font-bold text-amber-900 dark:text-amber-100 mb-2">
-            存為主題模板
-          </h2>
-          <p className="text-amber-700 dark:text-amber-300 text-sm">
-            將此主題保存為模板，供日後重複使用
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
-                模板名稱
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-amber-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100"
-                placeholder="輸入模板名稱"
-                required
-              />
+    <div className="fixed inset-0 bg-black/20 flex items-center justify-center p-4 z-[70]">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full"
+        style={{
+          background: 'linear-gradient(135deg, #fefdf8 0%, #faf7f0 50%, #f7f3e9 100%)',
+        }}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full flex items-center justify-center">
+                <Archive className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-amber-900 font-hand">📚 存為主題模板</h3>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
-                模板描述
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-amber-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 h-24 resize-none"
-                placeholder="描述此模板的用途和特色"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
-                學科
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-blue-50/90 dark:from-gray-700/90 dark:to-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer hover:shadow-md"
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-amber-900 mb-2">
+                  模板名稱 *
+                </label>
+                <input
+                  type="text"
                   required
-                >
-                  <option value="">選擇學科</option>
-                  {Object.entries(SUBJECTS).map(([key, subject]) => (
-                    <option key={key} value={subject}>
-                      {key === 'CHINESE' && '📖'} 
-                      {key === 'ENGLISH' && '🔤'} 
-                      {key === 'MATH' && '🔢'} 
-                      {key === 'SCIENCE' && '🔬'} 
-                      {key === 'SOCIAL' && '🌍'} 
-                      {key === 'ARTS' && '🎨'} 
-                      {key === 'PE' && '⚽'} 
-                      {key === 'CUSTOM' && '✨'} 
-                      {' '}{subject}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/70 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-300 focus:border-transparent"
+                  placeholder="輸入模板名稱..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-amber-900 mb-2">
+                  模板描述
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-white/70 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-300 focus:border-transparent"
+                  placeholder="描述此模板的用途和特色..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-amber-900 mb-2">
+                    學科 *
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={formData.subject}
+                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-blue-50/90 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all appearance-none cursor-pointer hover:border-blue-300 shadow-sm"
+                      required
+                    >
+                      <option value="">選擇學科</option>
+                      {Object.entries(SUBJECTS).map(([key, subject]) => (
+                        <option key={key} value={subject}>
+                          {key === 'CHINESE' && '📖'} 
+                          {key === 'ENGLISH' && '🔤'} 
+                          {key === 'MATH' && '🔢'} 
+                          {key === 'SCIENCE' && '🔬'} 
+                          {key === 'SOCIAL' && '🌍'} 
+                          {key === 'ARTS' && '🎨'} 
+                          {key === 'PE' && '⚽'} 
+                          {key === 'CUSTOM' && '✨'} 
+                          {' ' + subject}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-amber-900 mb-2">
+                    分類 *
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-purple-50/90 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition-all appearance-none cursor-pointer hover:border-purple-300 shadow-sm"
+                      required
+                    >
+                      <option value="">選擇分類</option>
+                      <option value="learning">📚 學習成長</option>
+                      <option value="personal">🌟 個人發展</option>
+                      <option value="project">🚀 專案計畫</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
-                分類
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-purple-50/90 dark:from-gray-700/90 dark:to-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer hover:shadow-md"
-                  required
-                >
-                  <option value="">選擇分類</option>
-                  {[
-                    { value: 'learning', label: '學習成長', emoji: '📚' },
-                    { value: 'personal', label: '個人發展', emoji: '🌟' },
-                    { value: 'project', label: '專案計畫', emoji: '🚀' }
-                  ].map(category => (
-                    <option key={category.value} value={category.value}>
-                      {category.emoji} {category.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-3">
-                包含內容
-              </label>
-              <div className="space-y-3">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    value="goals_only"
-                    checked={formData.includeType === 'goals_only'}
-                    onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
-                    className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-amber-500 focus:ring-2"
-                  />
-                  <span className="ml-3 text-sm text-amber-800 dark:text-amber-200">
-                    🎯 僅包含目標
-                  </span>
-                </label>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    value="goals_and_tasks"
-                    checked={formData.includeType === 'goals_and_tasks'}
-                    onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
-                    className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-amber-500 focus:ring-2"
-                  />
-                  <span className="ml-3 text-sm text-amber-800 dark:text-amber-200">
-                    📋 包含目標和任務
-                  </span>
-                </label>
-              </div>
+                             <div>
+                 <label className="block text-sm font-medium text-amber-900 mb-3">
+                   包含內容
+                 </label>
+                 <div className="space-y-3">
+                   <label className="flex items-center cursor-pointer">
+                     <input
+                       type="radio"
+                       value="goals_and_tasks"
+                       checked={formData.includeType === 'goals_and_tasks'}
+                       onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
+                       className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-0 focus:ring-offset-0"
+                     />
+                     <span className="ml-3 text-sm text-amber-800">
+                       📋 包含目標和任務
+                     </span>
+                   </label>
+                   <label className="flex items-center cursor-pointer">
+                     <input
+                       type="radio"
+                       value="goals_only"
+                       checked={formData.includeType === 'goals_only'}
+                       onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
+                       className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-0 focus:ring-offset-0"
+                     />
+                     <span className="ml-3 text-sm text-amber-800">
+                       🎯 僅包含目標
+                     </span>
+                   </label>
+                 </div>
+               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 px-6 py-4 bg-gradient-to-r from-amber-50/50 to-orange-50/50 border-t border-amber-200/40">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors"
+              className="px-4 py-2 text-amber-700 border border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={!formData.title.trim() || !formData.subject || !formData.category}
-              className="px-6 py-3 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-400 text-white rounded-xl hover:from-amber-500 hover:to-orange-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <Archive className="w-4 h-4" />
               創建模板
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };
