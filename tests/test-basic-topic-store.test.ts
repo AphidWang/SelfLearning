@@ -1,12 +1,23 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { useTopicStore } from '../apps/client/src/store/topicStore';
 import { initTestAuth } from '../vitest.setup';
 
 describe('Topic Store - Basic Tests', () => {
   beforeAll(async () => {
-    // 初始化測試認證
-    await initTestAuth();
-    console.log('🔐 基本測試認證已初始化');
+    try {
+      // 初始化測試認證
+      const user = await initTestAuth();
+      console.log('🔐 基本測試認證已初始化:', user.email);
+    } catch (error) {
+      console.error('❌ 基本測試認證初始化失敗:', error);
+      throw error;
+    }
+  });
+
+  beforeEach(() => {
+    // 確保每個測試開始時都有乾淨的狀態
+    const store = useTopicStore.getState();
+    store.reset();
   });
 
   it('應該有正確的初始狀態', () => {
@@ -62,5 +73,29 @@ describe('Topic Store - Basic Tests', () => {
     
     expect(typeof store.getActiveTasksForUser).toBe('function');
     expect(typeof store.getTopicWithStructure).toBe('function');
+  });
+
+  it('應該能正確設置和重置狀態', () => {
+    const store = useTopicStore.getState();
+    
+    // 測試狀態設置
+    store.setSelectedTopicId('test-id');
+    store.setSyncing(true);
+    
+    // 立即檢查狀態
+    const stateAfterSet = useTopicStore.getState();
+    expect(stateAfterSet.selectedTopicId).toBe('test-id');
+    expect(stateAfterSet.syncing).toBe(true);
+    
+    // 重置狀態
+    store.reset();
+    
+    // 檢查重置結果
+    const stateAfterReset = useTopicStore.getState();
+    expect(stateAfterReset.selectedTopicId).toBeNull();
+    expect(stateAfterReset.loading).toBe(false);
+    expect(stateAfterReset.error).toBeNull();
+    expect(stateAfterReset.syncing).toBe(false);
+    expect(stateAfterReset.topics).toEqual([]);
   });
 }); 

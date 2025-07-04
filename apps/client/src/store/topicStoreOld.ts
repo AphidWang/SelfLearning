@@ -2,7 +2,7 @@
  * Topic Store - 正規化表格結構 + 版本控制版本
  * 
  * 🏗️ 架構改動：
- * - 從 JSONB 結構改為正規化三層表格：topics_new -> goals -> tasks
+ * - 從 JSONB 結構改為正規化三層表格：topics -> goals -> tasks
  * - 每一層都有獨立的版本控制，使用樂觀鎖定避免並發衝突
  * - 保留現有 API 接口，確保 UI 組件不需要大幅修改
  * 
@@ -125,7 +125,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       // 查詢用戶擁有的主題
       const { data: ownTopics, error: ownError } = await supabase
-        .from('topics_new')
+        .from('topics')
         .select('*')
         .eq('owner_id', user.id)
         .order('updated_at', { ascending: false });
@@ -134,7 +134,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       // 查詢協作主題
       const { data: collabTopics, error: collabError } = await supabase
-        .from('topics_new')
+        .from('topics')
         .select(`
           *,
           topic_collaborators!inner(*)
@@ -240,7 +240,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       if (!user) throw new Error('用戶未認證');
 
       const { data, error } = await supabase
-        .from('topics_new')
+        .from('topics')
         .insert([{
           ...topicData,
           owner_id: user.id
@@ -324,7 +324,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   deleteTopic: async (id: string) => {
     try {
       const { error } = await supabase
-        .from('topics_new')
+        .from('topics')
         .delete()
         .eq('id', id);
 
