@@ -1686,7 +1686,8 @@ export const TaskWallPage = () => {
           onCreateBlankTopic={() => {
             console.log('建立空白主題');
             setShowTemplateBrowser(false);
-            // TODO: 實現建立空白主題的邏輯
+            // 刷新主題列表
+            fetchTopics();
           }}
         />
 

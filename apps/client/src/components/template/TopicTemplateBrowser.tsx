@@ -35,6 +35,7 @@ import { useTopicTemplateStore } from '../../store/topicTemplateStore';
 import { useTopicStore } from '../../store/topicStore';
 import type { TopicTemplate } from '../../types/goal';
 import { SUBJECTS } from '../../constants/subjects';
+import { TOPIC_CATEGORIES } from '../../constants/topics';
 
 interface TopicTemplateBrowserProps {
   isOpen: boolean;
@@ -58,7 +59,8 @@ export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
   } = useTopicTemplateStore();
 
   const {
-    createTopicFromTemplate
+    createTopicFromTemplate,
+    createTopic
   } = useTopicStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +70,7 @@ export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
   const [selectedTemplate, setSelectedTemplate] = useState<TopicTemplate | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateBlankModal, setShowCreateBlankModal] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -123,6 +126,36 @@ export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
       }
     } catch (error) {
       console.error('建立主題失敗:', error);
+      // 這裡可以顯示錯誤提示，但不關閉 browser
+    }
+  };
+
+  // 處理建立空白主題
+  const handleCreateBlankTopic = async (createData: any) => {
+    try {
+      const newTopic = await createTopic({
+        title: createData.title,
+        description: createData.description,
+        subject: createData.subject || '未分類',
+        category: createData.category || 'learning',
+        type: '學習目標',
+        topic_type: '學習目標',
+        is_collaborative: createData.is_collaborative,
+        show_avatars: true,
+        bubbles: [],
+        status: 'active'
+      });
+
+      if (newTopic) {
+        // 清理狀態
+        setShowCreateBlankModal(false);
+        // 立即關閉整個 browser
+        onClose();
+        // 通知父組件已建立新主題
+        onTemplateSelected?.(newTopic.id);
+      }
+    } catch (error) {
+      console.error('建立空白主題失敗:', error);
       // 這裡可以顯示錯誤提示，但不關閉 browser
     }
   };
@@ -254,7 +287,7 @@ export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
                     animate={{ opacity: 1, y: 0, rotate: 0 }}
                     whileHover={{ scale: 1.03, y: -4, rotate: 0 }}
                     className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-dashed border-amber-300 rounded-2xl overflow-hidden hover:border-amber-400 transition-all group cursor-pointer shadow-sm h-[280px] flex flex-col"
-                    onClick={onCreateBlankTopic}
+                    onClick={() => setShowCreateBlankModal(true)}
                   >
                     <div className="p-5 text-center flex-1 flex flex-col justify-center">
                       <div className="w-12 h-12 mx-auto mb-3 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full flex items-center justify-center">
@@ -329,6 +362,15 @@ export const TopicTemplateBrowser: React.FC<TopicTemplateBrowserProps> = ({
         }}
         template={selectedTemplate}
         onSubmit={handleCreateFromTemplate}
+      />
+
+      {/* 建立空白主題 Modal */}
+      <CreateBlankTopicModal
+        isOpen={showCreateBlankModal}
+        onClose={() => {
+          setShowCreateBlankModal(false);
+        }}
+        onSubmit={handleCreateBlankTopic}
       />
     </div>
   );
@@ -695,6 +737,170 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({
             <button
               type="submit"
               className="px-4 py-2 bg-gradient-to-r from-emerald-400 to-teal-400 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 transition-all flex items-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              建立主題
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
+// 建立空白主題 Modal - 採用相同風格
+interface CreateBlankTopicModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+}
+
+const CreateBlankTopicModal: React.FC<CreateBlankTopicModalProps> = ({
+  isOpen,
+  onClose,
+  onSubmit
+}) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    subject: '',
+    category: '',
+    is_collaborative: false
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+    setFormData({ title: '', description: '', subject: '', category: '', is_collaborative: false });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[70]">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full"
+        style={{
+          background: 'linear-gradient(135deg, #fefdf8 0%, #faf7f0 50%, #f7f3e9 100%)',
+        }}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-amber-900 font-hand">✨ 建立空白主題</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-amber-900 mb-2">
+                  主題標題 *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/70 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-300 focus:border-transparent"
+                  placeholder="輸入主題標題..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-amber-900 mb-2">
+                  描述
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-white/70 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-300 focus:border-transparent"
+                  placeholder="輸入主題描述..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-amber-900 mb-2">
+                    學科
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={formData.subject}
+                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-blue-50/90 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all appearance-none cursor-pointer hover:border-blue-300 shadow-sm"
+                    >
+                      <option value="">選擇學科</option>
+                      {Object.entries(SUBJECTS).map(([key, subject]) => (
+                        <option key={key} value={subject}>
+                          {key === 'CHINESE' && '📖'} 
+                          {key === 'ENGLISH' && '🔤'} 
+                          {key === 'MATH' && '🔢'} 
+                          {key === 'SCIENCE' && '🔬'} 
+                          {key === 'SOCIAL' && '🌍'} 
+                          {key === 'ARTS' && '🎨'} 
+                          {key === 'PE' && '⚽'} 
+                          {key === 'CUSTOM' && '✨'} 
+                          {' ' + subject}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-400 w-5 h-5 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-amber-900 mb-2">
+                    分類
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-purple-50/90 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition-all appearance-none cursor-pointer hover:border-purple-300 shadow-sm"
+                    >
+                      <option value="">選擇分類</option>
+                      <option value="learning">📚 學習成長</option>
+                      <option value="personal">🌟 個人發展</option>
+                      <option value="project">🚀 專案計畫</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-400 w-5 h-5 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="is_collaborative_blank"
+                  checked={formData.is_collaborative}
+                  onChange={(e) => setFormData({ ...formData, is_collaborative: e.target.checked })}
+                  className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                />
+                <label htmlFor="is_collaborative_blank" className="text-sm text-amber-900 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  啟用協作模式（可邀請同學一起學習）
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 px-6 py-4 bg-gradient-to-r from-amber-50/50 to-orange-50/50 border-t border-amber-200/40">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-amber-700 border border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-gradient-to-r from-purple-400 to-pink-400 text-white rounded-xl hover:from-purple-500 hover:to-pink-500 transition-all flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
               建立主題
