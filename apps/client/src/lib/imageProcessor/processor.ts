@@ -249,8 +249,7 @@ export class ImageProcessor {
 
       // 使用 pica 縮放
       await pica.resize(img, canvas, {
-        quality: 3, // 最高品質
-        alpha: true
+        quality: 3 // 最高品質
       });
 
       options.onProgress?.(70);
