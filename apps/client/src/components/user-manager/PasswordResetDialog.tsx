@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Eye, EyeOff, AlertTriangle, Mail, Check, Loader2 } from 'lucide-react';
 import { useUserStore } from '../../store/userStore';
-import type { User } from '../../types/goal';
+import type { User } from '@self-learning/types';
 
 interface PasswordResetDialogProps {
   isOpen: boolean;

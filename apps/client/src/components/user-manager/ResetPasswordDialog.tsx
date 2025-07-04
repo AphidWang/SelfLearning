@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Lock, Eye, EyeOff, Shield } from 'lucide-react';
-import type { User } from '../../types/goal';
+import type { User } from '@self-learning/types';
 
 interface ResetPasswordDialogProps {
   user: User;

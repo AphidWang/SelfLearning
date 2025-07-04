@@ -3,7 +3,7 @@ import { motion, easeInOut } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { UserAvatar, UserAvatarGroup } from '../learning-map/UserAvatar';
-import type { User } from '../../types/goal';
+import type { User } from '@self-learning/types';
 import { Topic } from '../../types/goal';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserAvatar, UserAvatarGroup } from '../../learning-map/UserAvatar';
-import type { User } from '../../../types/goal';
+import type { User } from '@self-learning/types';
 import { 
   Users, Plus, X, Check, UserPlus, Trash2, 
   ChevronDown, ChevronUp 

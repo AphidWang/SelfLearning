@@ -9,7 +9,8 @@
 
 import React from 'react';
 import { Eye, Edit3, Shield, Users, Lock } from 'lucide-react';
-import type { TopicTemplate, Topic, User } from '../../types/goal';
+import type { TopicTemplate, Topic } from '../../types/goal';
+import type { User } from '@self-learning/types';
 
 // 權限類型
 export type Permission = 'view' | 'edit' | 'admin' | 'owner';

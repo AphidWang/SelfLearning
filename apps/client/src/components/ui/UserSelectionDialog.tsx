@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Check, UserPlus } from 'lucide-react';
-import type { User } from '../../types/goal';
+import type { User } from '@self-learning/types';
 
 interface UserSelectionDialogProps {
   isOpen: boolean;

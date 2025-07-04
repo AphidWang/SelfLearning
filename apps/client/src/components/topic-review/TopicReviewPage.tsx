@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Archive } from 'lucide-react';
 import { useTopicStore } from '../../store/topicStore';
+import { useTopicTemplateStore } from '../../store/topicTemplateStore';
+import { useAuth } from '../../context/AuthContext';
 import { subjects } from '../../styles/tokens';
+import { SUBJECTS } from '../../constants/subjects';
 import { TopicRadialMap } from './TopicRadialMap';
 import { TopicHeader } from './components/TopicHeader';
 import { StatsPanel } from './components/StatsPanel';
@@ -9,6 +13,7 @@ import { DetailsPanel } from './components/DetailsPanel';
 import { useTopicReview } from './hooks/useTopicReview';
 import { useTopicStats } from './hooks/useTopicStats';
 import { LoadingDots } from '../shared/LoadingDots';
+import type { Topic } from '../../types/goal';
 
 interface TopicReviewPageProps {
   topicId: string;
@@ -24,15 +29,41 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   onClose
 }) => {
   const { updateTopic, deleteTopic } = useTopicStore();
+  const { createTemplate } = useTopicTemplateStore();
+  const { user } = useAuth();
   
   const { state, actions, computed } = useTopicReview(topicId);
   const stats = useTopicStats(topicId, state.topic);
+
+  const [showSaveAsTemplateModal, setShowSaveAsTemplateModal] = useState(false);
 
   // 記憶化主題樣式
   const subjectStyle = useMemo(() => {
     if (!state.topic) return subjects.getSubjectStyle('');
     return subjects.getSubjectStyle(state.topic.subject || '');
   }, [state.topic?.subject]);
+
+  // 檢查是否為 mentor - 每次 topicId 變化時都會重新檢查
+  const isMentor = useMemo(() => {
+    console.log('🔍 檢查 Mentor 權限 - topicId:', topicId, 'user:', user);
+    if (!user) {
+      console.log('❌ 未登入用戶');
+      return false;
+    }
+    const userRoles = user.roles || (user.role ? [user.role] : []);
+    console.log('👤 用戶詳細資訊:', {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      roles: user.roles,
+      計算出的roles: userRoles,
+      是否為mentor: userRoles.includes('mentor')
+    });
+    const result = userRoles.includes('mentor');
+    console.log(result ? '✅ 是 Mentor' : '❌ 不是 Mentor');
+    return result;
+  }, [user?.roles, user?.role, topicId]); // 加入 topicId 作為依賴
 
   // 處理點擊外部關閉下拉選單
   useEffect(() => {
@@ -51,6 +82,11 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [state.showSubjectDropdown, actions]);
+
+  // 處理存為模板
+  const handleSaveAsTemplate = () => {
+    setShowSaveAsTemplateModal(true);
+  };
 
   if (!state.topic) {
     console.log('TopicReviewPage loading state triggered');
@@ -163,6 +199,8 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
           onCancel={handleCancelEdit}
           onDelete={() => actions.setShowDeleteConfirm(true)}
           onClose={onClose}
+          isMentor={isMentor}
+          onSaveAsTemplate={handleSaveAsTemplate}
         />
 
         {/* 刪除確認對話框 */}
@@ -252,26 +290,265 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
 
             {/* 右側詳情面板 */}
             <div className="col-span-3 h-full min-h-0">
-                          <DetailsPanel
-              topic={state.topic}
-              selectedGoalId={state.selectedGoalId}
-              selectedTaskId={state.selectedTaskId}
-              subjectStyle={subjectStyle}
-              onUpdateNotify={async () => {
-                const result = await actions.handleCollaborationUpdate();
-                if (result === null) {
-                  console.warn('Collaboration update returned null');
-                }
-              }}
-              availableUsers={computed.availableUsers}
-              collaborators={computed.collaborators}
-              onTaskSelect={handleDetailsPanelTaskSelect}
-            />
+              <DetailsPanel
+                topic={state.topic}
+                selectedGoalId={state.selectedGoalId}
+                selectedTaskId={state.selectedTaskId}
+                subjectStyle={subjectStyle}
+                onUpdateNotify={async () => {
+                  const result = await actions.handleCollaborationUpdate();
+                  if (result === null) {
+                    console.warn('Collaboration update returned null');
+                  }
+                }}
+                availableUsers={computed.availableUsers}
+                collaborators={computed.collaborators}
+                onTaskSelect={handleDetailsPanelTaskSelect}
+              />
             </div>
           </div>
         </div>
+
+        {/* 存為模板 Modal */}
+        {showSaveAsTemplateModal && (
+          <SaveAsTemplateModal
+            isOpen={showSaveAsTemplateModal}
+            onClose={() => setShowSaveAsTemplateModal(false)}
+            topic={state.topic}
+            onSubmit={async (templateData) => {
+              try {
+                const newTemplate = await createTemplate(templateData);
+                if (newTemplate) {
+                  setShowSaveAsTemplateModal(false);
+                  alert('模板創建成功！');
+                } else {
+                  alert('模板創建失敗，請稍後再試');
+                }
+              } catch (error) {
+                console.error('創建模板失敗:', error);
+                alert('模板創建失敗，請稍後再試');
+              }
+            }}
+          />
+        )}
       </motion.div>
     </motion.div>
+  );
+};
+
+// 存為模板 Modal 組件
+interface SaveAsTemplateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  topic: Topic | null;
+  onSubmit: (data: any) => void;
+}
+
+const SaveAsTemplateModal: React.FC<SaveAsTemplateModalProps> = ({
+  isOpen,
+  onClose,
+  topic,
+  onSubmit
+}) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    subject: '',
+    category: '',
+    includeType: 'goals_only' as 'goals_only' | 'goals_and_tasks'
+  });
+
+  useEffect(() => {
+    if (topic) {
+      setFormData({
+        title: topic.title,
+        description: topic.description || '',
+        subject: topic.subject || '',
+        category: topic.category || 'learning',
+        includeType: 'goals_only'
+      });
+    }
+  }, [topic]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topic) return;
+    
+    onSubmit({
+      ...formData,
+      source_topic_id: topic.id
+    });
+    
+    setFormData({
+      title: '',
+      description: '',
+      subject: '',
+      category: '',
+      includeType: 'goals_only'
+    });
+  };
+
+  if (!isOpen || !topic) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl border border-amber-200 dark:border-gray-700">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Archive className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-amber-900 dark:text-amber-100 mb-2">
+            存為主題模板
+          </h2>
+          <p className="text-amber-700 dark:text-amber-300 text-sm">
+            將此主題保存為模板，供日後重複使用
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                模板名稱
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-amber-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100"
+                placeholder="輸入模板名稱"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                模板描述
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-amber-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 h-24 resize-none"
+                placeholder="描述此模板的用途和特色"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                學科
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-blue-50/90 dark:from-gray-700/90 dark:to-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer hover:shadow-md"
+                  required
+                >
+                  <option value="">選擇學科</option>
+                  {Object.entries(SUBJECTS).map(([key, subject]) => (
+                    <option key={key} value={subject}>
+                      {key === 'CHINESE' && '📖'} 
+                      {key === 'ENGLISH' && '🔤'} 
+                      {key === 'MATH' && '🔢'} 
+                      {key === 'SCIENCE' && '🔬'} 
+                      {key === 'SOCIAL' && '🌍'} 
+                      {key === 'ARTS' && '🎨'} 
+                      {key === 'PE' && '⚽'} 
+                      {key === 'CUSTOM' && '✨'} 
+                      {' '}{subject}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">
+                分類
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-white/90 to-purple-50/90 dark:from-gray-700/90 dark:to-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer hover:shadow-md"
+                  required
+                >
+                  <option value="">選擇分類</option>
+                  {[
+                    { value: 'learning', label: '學習成長', emoji: '📚' },
+                    { value: 'personal', label: '個人發展', emoji: '🌟' },
+                    { value: 'project', label: '專案計畫', emoji: '🚀' }
+                  ].map(category => (
+                    <option key={category.value} value={category.value}>
+                      {category.emoji} {category.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-amber-900 dark:text-amber-100 mb-3">
+                包含內容
+              </label>
+              <div className="space-y-3">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="goals_only"
+                    checked={formData.includeType === 'goals_only'}
+                    onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
+                    className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-amber-500 focus:ring-2"
+                  />
+                  <span className="ml-3 text-sm text-amber-800 dark:text-amber-200">
+                    🎯 僅包含目標
+                  </span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="goals_and_tasks"
+                    checked={formData.includeType === 'goals_and_tasks'}
+                    onChange={(e) => setFormData({ ...formData, includeType: e.target.value as 'goals_only' | 'goals_and_tasks' })}
+                    className="w-4 h-4 text-amber-600 border-amber-300 focus:ring-amber-500 focus:ring-2"
+                  />
+                  <span className="ml-3 text-sm text-amber-800 dark:text-amber-200">
+                    📋 包含目標和任務
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={!formData.title.trim() || !formData.subject || !formData.category}
+              className="px-6 py-3 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              創建模板
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 

@@ -1,5 +1,6 @@
 import { SubjectType } from '../constants/subjects';
 import { TOPIC_STATUSES } from '../constants/topics';
+import { User } from '@self-learning/types';
 
 export type TopicStatus = typeof TOPIC_STATUSES[keyof typeof TOPIC_STATUSES];
 export type TopicType = '學習目標' | '個人成長' | '專案計畫' | '活動規劃';
@@ -9,20 +10,6 @@ export type TaskRole = 'explore' | 'work' | 'present';
 
 // 添加目標狀態類型
 export type GoalStatus = 'todo' | 'pause' | 'focus' | 'finish' | 'complete' | 'archived';
-
-// 用戶類型定義
-export interface User {
-  id: string;
-  name: string;
-  avatar?: string; // 頭像 URL 或 emoji
-  color?: string; // 代表顏色
-  email?: string;
-  roles?: ('student' | 'mentor' | 'parent' | 'admin')[]; // 改為複數陣列支援多角色
-  
-  // 向後兼容：保留單角色屬性（已棄用）
-  /** @deprecated 請使用 roles 陣列，此欄位僅為向後兼容 */
-  role?: 'student' | 'mentor' | 'parent' | 'admin';
-}
 
 export interface Topic {
   id: string;

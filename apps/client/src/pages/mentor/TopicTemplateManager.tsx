@@ -31,7 +31,8 @@ import {
 import PageLayout from '../../components/layout/PageLayout';
 import { useTopicTemplateStore } from '../../store/topicTemplateStore';
 import { useUserStore } from '../../store/userStore';
-import type { TopicTemplate, User } from '../../types/goal';
+import type { TopicTemplate } from '../../types/goal';
+import type { User } from '@self-learning/types';
 import { SUBJECTS } from '../../constants/subjects';
 
 const TopicTemplateManager: React.FC = () => {

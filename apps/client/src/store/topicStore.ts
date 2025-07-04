@@ -19,10 +19,10 @@
 
 import { create } from 'zustand';
 import { 
-  User, Topic, Goal, Task, Bubble, GoalStatus, TaskStatus, TaskPriority,
+  Topic, Goal, Task, Bubble, GoalStatus, TaskStatus, TaskPriority,
   CreateTopicFromTemplateParams, SafeUpdateResult, TopicWithStructure, ActiveTaskResult
 } from '../types/goal';
-import type { TopicCollaborator } from '@self-learning/types';
+import type { TopicCollaborator, User } from '@self-learning/types';
 import { supabase, authService } from '../services/supabase';
 import { taskRecordStore } from './taskRecordStore';
 

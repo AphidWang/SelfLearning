@@ -1,5 +1,5 @@
 import { authService as supabaseAuthService } from './supabase';
-import type { User } from '../types/goal';
+import type { User } from '@self-learning/types';
 
 export const authService = {
   // 登入 - 直接使用 Supabase Auth user_metadata
@@ -21,15 +21,16 @@ export const authService = {
     });
     
     // 支援新的多角色系統，同時向後兼容單角色
-    const roles = supabaseUser.user_metadata?.roles || 
-                 (supabaseUser.user_metadata?.role ? [supabaseUser.user_metadata.role] : ['student']);
+    const metadata = (supabaseUser.user_metadata || {}) as any;
+    const roles = metadata.roles || 
+                 (metadata.role ? [metadata.role] : ['student']);
     
     const userData: User = {
       id: supabaseUser.id,
-      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+      name: metadata.name || supabaseUser.email?.split('@')[0] || 'User',
       email: supabaseUser.email || '',
-      avatar: supabaseUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
-      color: supabaseUser.user_metadata?.color || '#FF6B6B',
+      avatar: metadata.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
+      color: metadata.color || '#FF6B6B',
       roles: roles,
       role: roles[0] // 向後兼容：取第一個角色作為主要角色
     };
@@ -120,18 +121,19 @@ export const authService = {
       }
 
       // 支援新的多角色系統，同時向後兼容單角色
-      const roles = supabaseUser.user_metadata?.roles || 
-                   (supabaseUser.user_metadata?.role ? [supabaseUser.user_metadata.role] : ['student']);
+      const metadata = (supabaseUser.user_metadata || {}) as any;
+      const roles = metadata.roles || 
+                   (metadata.role ? [metadata.role] : ['student']);
       
       const userData = {
         id: supabaseUser.id,
-        name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+        name: metadata.name || supabaseUser.email?.split('@')[0] || 'User',
         email: supabaseUser.email || '',
-        avatar: supabaseUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
-        color: supabaseUser.user_metadata?.color || '#FF6B6B',
+        avatar: metadata.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
+        color: metadata.color || '#FF6B6B',
         roles: roles,
         role: roles[0] // 向後兼容：取第一個角色作為主要角色
-      };
+      } as User;
       
       console.log('✅ [Auth] 獲取用戶成功', {
         userId: userData.id,

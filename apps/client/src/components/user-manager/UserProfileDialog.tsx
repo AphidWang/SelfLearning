@@ -5,7 +5,7 @@ import { useUserStore } from '../../store/userStore';
 import { UserAvatar } from '../learning-map/UserAvatar';
 import { AvatarSelectionDialog } from './AvatarSelectionDialog';
 import { AvatarUpload } from './AvatarUpload';
-import type { User } from '../../types/goal';
+import type { User } from '@self-learning/types';
 import { authService, avatarService } from '../../services/supabase';
 
 interface UserProfileDialogProps {

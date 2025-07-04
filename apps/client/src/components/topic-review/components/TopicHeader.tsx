@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Pencil, Trash2, Brain } from 'lucide-react';
+import { Check, X, Pencil, Trash2, Brain, Archive } from 'lucide-react';
 import { subjects } from '../../../styles/tokens';
 import type { Topic } from '../../../types/goal';
 
@@ -17,6 +17,8 @@ interface TopicHeaderProps {
   onCancel: () => void;
   onDelete: () => void;
   onClose: () => void;
+  isMentor?: boolean;
+  onSaveAsTemplate?: () => void;
 }
 
 export const TopicHeader: React.FC<TopicHeaderProps> = ({
@@ -31,7 +33,9 @@ export const TopicHeader: React.FC<TopicHeaderProps> = ({
   onSave,
   onCancel,
   onDelete,
-  onClose
+  onClose,
+  isMentor = false,
+  onSaveAsTemplate
 }) => {
   return (
     <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 p-3">
@@ -157,13 +161,26 @@ export const TopicHeader: React.FC<TopicHeaderProps> = ({
               </button>
             </>
           ) : (
-            <button
-              onClick={() => onEditingToggle(true)}
-              className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              aria-label="編輯標題"
-            >
-              <Pencil className="w-5 h-5 text-gray-500" />
-            </button>
+            <>
+              <button
+                onClick={() => onEditingToggle(true)}
+                className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                aria-label="編輯標題"
+              >
+                <Pencil className="w-5 h-5 text-gray-500" />
+              </button>
+
+              {/* 存為模板按鈕 - 只有 mentor 才能看到 */}
+              {isMentor && onSaveAsTemplate && (
+                <button
+                  onClick={onSaveAsTemplate}
+                  className="w-9 h-9 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors group"
+                  title="存為主題模板"
+                >
+                  <Archive className="w-5 h-5 text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+                </button>
+              )}
+            </>
           )}
 
           {/* 刪除按鈕 */}

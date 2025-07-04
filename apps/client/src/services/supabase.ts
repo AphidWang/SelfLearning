@@ -20,7 +20,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import type { User } from '../types/goal';
+import type { User } from '@self-learning/types';
 import { ImageProcessor } from '../lib/imageProcessor';
 
 // Supabase 配置
@@ -99,7 +99,20 @@ export const authService = {
   // 獲取當前用戶
   async getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser();
-    return user;
+    if (!user) return null;
+
+    // 支援新的多角色系統，同時向後兼容單角色
+    const roles = user.user_metadata?.roles || 
+                 (user.user_metadata?.role ? [user.user_metadata.role] : ['student']);
+
+    return {
+      ...user,
+      user_metadata: {
+        ...user.user_metadata,
+        roles,
+        role: roles[0] // 向後兼容：取第一個角色作為主要角色
+      }
+    };
   },
 
   // 監聽認證狀態變化

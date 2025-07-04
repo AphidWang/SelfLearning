@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUserStore } from '../../store/userStore';
 import { UserCard, UserProfileDialog, PasswordResetDialog } from './index';
-import type { User } from '../../types/goal';
+import type { User } from '@self-learning/types';
 import { 
   Search, Filter, Loader2, 
   UserPlus, Users

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTopicStore } from '../../../store/topicStore';
 import { useUserStore } from '../../../store/userStore';
 import { useAsyncOperation, ErrorPatterns } from '../../../utils/errorHandler';
-import type { Topic, Goal, Task, User } from '../../../types/goal';
+import type { Topic, Goal, Task } from '../../../types/goal';
+import type { User } from '@self-learning/types';
 
 interface Collaborator extends User {
   permission: 'view' | 'edit';

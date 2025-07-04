@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useMemo } from 'react';
 import { authService } from '../services/auth';
-import type { User } from '../types/goal';
+import type { User } from '@self-learning/types';
 import { trackEvent } from '../utils/analytics';
 
 interface UserContextType {

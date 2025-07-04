@@ -65,7 +65,8 @@ import {
   Pause, StopCircle, UserPlus, AlertTriangle, Brain,
   MessageSquare, HelpCircle, Sparkles, Eye
 } from 'lucide-react';
-import type { Topic, Goal, Task, User as UserType, TaskStatus, GoalStatus } from '../../../types/goal';
+import type { Topic, Goal, Task, TaskStatus, GoalStatus } from '../../../types/goal';
+import type { User as UserType } from '@self-learning/types';
 import { useTopicStore } from '../../../store/topicStore';
 import { UserAvatar } from '../../learning-map/UserAvatar';
 import { CollaborationManager } from '../../learning-map/CollaborationManager';

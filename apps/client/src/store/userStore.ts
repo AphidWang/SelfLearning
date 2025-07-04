@@ -12,7 +12,7 @@
  */
 
 import { create } from 'zustand';
-import type { User } from '../types/goal';
+import type { User } from '@self-learning/types';
 import { authService } from '../services/auth';
 
 // 管理員 API 基礎 URL (只用於管理其他用戶)

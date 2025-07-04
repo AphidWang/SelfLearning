@@ -12,7 +12,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { Navigate } from 'react-router-dom';
 import { tokenManager, TokenRefreshEvent } from '../services/tokenManager';
 import { authService } from '../services/auth';
-import type { User } from '../types/goal';
+import type { User } from '@self-learning/types';
 
 interface AuthContextType {
   user: User | null;

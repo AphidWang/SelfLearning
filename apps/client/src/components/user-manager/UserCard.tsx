@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useUserStore } from '../../store/userStore';
 import { UserAvatar } from '../learning-map/UserAvatar';
-import type { User } from '../../types/goal';
+import type { User } from '@self-learning/types';
 import { 
   Edit3, Trash2, Mail, MoreVertical, 
   AlertTriangle, Key, GraduationCap, Crown, Heart, Shield, Settings, Check, X
