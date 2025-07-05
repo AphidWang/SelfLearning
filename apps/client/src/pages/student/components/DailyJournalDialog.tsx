@@ -23,6 +23,7 @@ import { taskRecordStore, type TaskRecord } from '../../../store/taskRecordStore
 import { useTopicStore } from '../../../store/topicStore';
 import { useNavigate } from 'react-router-dom';
 import { Task } from '../../../types/goal';
+import { useAsyncOperation, ErrorPatterns } from '../../../utils/errorHandler';
 
 type MotivationLevel = number; // 1-10
 
@@ -146,6 +147,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
 }) => {
   const navigate = useNavigate();
   const { topics } = useTopicStore();
+  const { wrapAsync } = useAsyncOperation();
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
   const [motivationLevel, setMotivationLevel] = useState<MotivationLevel | null>(null);
   const [journalContent, setJournalContent] = useState('');
@@ -179,8 +181,8 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   useEffect(() => {
     if (!isOpen || mode === 'view') return;
 
-    const fetchTodayTasks = async () => {
-      try {
+    const fetchTodayTasks = wrapAsync(
+      async () => {
         // 設定今天的日期範圍
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -196,103 +198,108 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
 
         // 從 topics 中獲取今天完成的任務
         const completedTasks: CompletedTask[] = [];
-        topics.forEach(topic => {
-          topic.goals?.forEach(goal => {
-            goal.tasks?.forEach(task => {
-              if (task.status === 'done' && task.completed_at) {
-                const completedDate = new Date(task.completed_at);
-                completedDate.setHours(0, 0, 0, 0);
-                if (completedDate.getTime() === today.getTime()) {
-                  completedTasks.push({
-                    id: task.id,
-                    title: task.title,
-                    type: 'completed',
-                    time: task.completed_at,
-                    category: topic.title,
-                    assignedTo: goal.title
-                  });
+        if (topics && Array.isArray(topics)) {
+          topics.forEach(topic => {
+            topic.goals?.forEach(goal => {
+              goal.tasks?.forEach(task => {
+                if (task.status === 'done' && task.completed_at) {
+                  const completedDate = new Date(task.completed_at);
+                  completedDate.setHours(0, 0, 0, 0);
+                  if (completedDate.getTime() === today.getTime()) {
+                    completedTasks.push({
+                      id: task.id,
+                      title: task.title,
+                      type: 'completed',
+                      time: task.completed_at,
+                      category: topic.title,
+                      assignedTo: goal.title
+                    });
+                  }
                 }
-              }
+              });
             });
           });
-        });
+        }
         setTodayCompletedTasks(completedTasks);
-      } catch (error) {
-        console.error('獲取今天任務資料失敗:', error);
-      }
-    };
+      },
+      ErrorPatterns.DATA_LOADING
+    );
 
     fetchTodayTasks();
-  }, [isOpen, mode, topics]);
+  }, [isOpen, mode, topics, wrapAsync]);
 
   // 合併今天有做過的任務（記錄 + 完成）
   const todayActiveTasks = useMemo(() => {
     const taskMap = new Map();
     
     // 加入有記錄的任務
-    todayTaskRecords.forEach(record => {
-      if (record.task_id) {
-        taskMap.set(record.task_id, {
-          id: record.task_id,
-          title: record.title,
-          type: 'recorded' as const,
-          difficulty: record.difficulty,
-          time: record.created_at
-        });
-      }
-    });
+    if (todayTaskRecords && Array.isArray(todayTaskRecords)) {
+      todayTaskRecords.forEach(record => {
+        if (record.task_id) {
+          taskMap.set(record.task_id, {
+            id: record.task_id,
+            title: record.title,
+            type: 'recorded' as const,
+            difficulty: record.difficulty,
+            time: record.created_at
+          });
+        }
+      });
+    }
 
     // 加入完成的任務
-    todayCompletedTasks.forEach(task => {
-      taskMap.set(task.id, task);
-    });
+    if (todayCompletedTasks && Array.isArray(todayCompletedTasks)) {
+      todayCompletedTasks.forEach(task => {
+        taskMap.set(task.id, task);
+      });
+    }
 
     return Array.from(taskMap.values()).sort((a, b) => 
       new Date(b.time).getTime() - new Date(a.time).getTime()
     );
   }, [todayTaskRecords, todayCompletedTasks]);
 
-  const handleSave = async () => {
-    // 型別保護
-    if (!selectedMood || !motivationLevel) return;
-    
-    setIsSaving(true);
-    try {
-      const entry: CreateJournalEntry = {
-        mood: selectedMood,
-        motivation_level: motivationLevel,
-        content: journalContent,
-        has_voice_note: hasVoiceNote,
-        completed_tasks: todayActiveTasks
-      };
-
-      // 使用 store 儲存或呼叫外部回調
-      if (onSave) {
-        await onSave({
-          mood: selectedMood,
-          motivationLevel,
-          content: journalContent,
-          hasVoiceNote,
-          date: new Date().toISOString(),
-          completedTasks: todayActiveTasks
-        });
-      } else {
-        await journalStore.saveJournalEntry(entry);
-      }
+  const handleSave = wrapAsync(
+    async () => {
+      // 型別保護
+      if (!selectedMood || !motivationLevel) return;
       
-      // 重置表單
-      setSelectedMood(null);
-      setMotivationLevel(null);
-      setJournalContent('');
-      setHasVoiceNote(false);
-      onClose();
-    } catch (error) {
-      console.error('儲存日誌失敗:', error);
-      alert('儲存失敗，請稍後再試');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      setIsSaving(true);
+      try {
+        const entry: CreateJournalEntry = {
+          mood: selectedMood,
+          motivation_level: motivationLevel,
+          content: journalContent,
+          has_voice_note: hasVoiceNote,
+          completed_tasks: todayActiveTasks || []
+        };
+
+        // 使用 store 儲存或呼叫外部回調
+        if (onSave) {
+          await onSave({
+            mood: selectedMood,
+            motivationLevel,
+            content: journalContent,
+            hasVoiceNote,
+            date: new Date().toISOString(),
+            completedTasks: todayActiveTasks || []
+          });
+        } else {
+          await journalStore.saveJournalEntry(entry);
+        }
+        
+        // 重置表單
+        setSelectedMood(null);
+        setMotivationLevel(null);
+        setJournalContent('');
+        setHasVoiceNote(false);
+        onClose();
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    ErrorPatterns.DATA_SAVING
+  );
 
   const handleVoiceRecord = () => {
     setIsRecording(!isRecording);
