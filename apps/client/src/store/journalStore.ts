@@ -185,12 +185,29 @@ class JournalStore {
 
   // 獲取心情統計
   async getMoodStats(days: number = 30): Promise<Record<MoodType, number>> {
+    const defaultStats: Record<MoodType, number> = {
+      excited: 0,
+      happy: 0,
+      okay: 0,
+      tired: 0,
+      stressed: 0
+    };
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('用戶未登入');
+      if (!user) {
+        console.warn('用戶未登入，返回默認統計');
+        return defaultStats;
+      }
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
+
+      console.log('獲取心情統計:', {
+        userId: user.id,
+        startDate: startDate.toISOString().split('T')[0],
+        days
+      });
 
       const { data, error } = await supabase
         .from('daily_journals')
@@ -198,24 +215,26 @@ class JournalStore {
         .eq('user_id', user.id)
         .gte('date', startDate.toISOString().split('T')[0]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('心情統計查詢失敗:', error);
+        return defaultStats;
+      }
 
-      const stats: Record<MoodType, number> = {
-        excited: 0,
-        happy: 0,
-        okay: 0,
-        tired: 0,
-        stressed: 0
-      };
+      console.log('心情統計原始數據:', data);
+
+      const stats: Record<MoodType, number> = { ...defaultStats };
 
       data?.forEach(journal => {
-        stats[journal.mood as MoodType]++;
+        if (journal.mood && stats.hasOwnProperty(journal.mood)) {
+          stats[journal.mood as MoodType]++;
+        }
       });
 
+      console.log('心情統計結果:', stats);
       return stats;
     } catch (error) {
       console.error('獲取心情統計失敗:', error);
-      throw error;
+      return defaultStats;
     }
   }
 
@@ -223,10 +242,19 @@ class JournalStore {
   async getMotivationTrend(days: number = 14): Promise<Array<{ date: string; level: number }>> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('用戶未登入');
+      if (!user) {
+        console.warn('用戶未登入，返回空趨勢');
+        return [];
+      }
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
+
+      console.log('獲取動力趨勢:', {
+        userId: user.id,
+        startDate: startDate.toISOString().split('T')[0],
+        days
+      });
 
       const { data, error } = await supabase
         .from('daily_journals')
@@ -235,15 +263,23 @@ class JournalStore {
         .gte('date', startDate.toISOString().split('T')[0])
         .order('date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('動力趨勢查詢失敗:', error);
+        return [];
+      }
 
-      return data?.map(journal => ({
+      console.log('動力趨勢原始數據:', data);
+
+      const trend = data?.map(journal => ({
         date: journal.date,
         level: journal.motivation_level
       })) || [];
+
+      console.log('動力趨勢結果:', trend);
+      return trend;
     } catch (error) {
       console.error('獲取動力趨勢失敗:', error);
-      throw error;
+      return [];
     }
   }
 }

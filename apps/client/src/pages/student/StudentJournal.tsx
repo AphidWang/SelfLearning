@@ -37,6 +37,7 @@ import {
 import { journalStore, type DailyJournal, type MoodType } from '../../store/journalStore';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
 import PageLayout from '../../components/layout/PageLayout';
+import * as Sentry from '@sentry/react';
 
 const MOOD_CONFIG = {
   excited: { emoji: '🤩', label: '超興奮', color: '#FF6B6B', bgColor: '#FFE5E5' },
@@ -111,10 +112,48 @@ const StudentJournal: React.FC = () => {
         journalStore.getMoodStats(30),
         journalStore.getMotivationTrend(14)
       ]);
+      
+      // 調試：檢查數據類型和值
+      console.log('📊 心情統計載入結果:', {
+        stats,
+        statsType: typeof stats,
+        statsKeys: Object.keys(stats),
+        statsValues: Object.values(stats),
+        statsValuesTypes: Object.values(stats).map(v => typeof v),
+        trend,
+        trendLength: trend.length
+      });
+      
+      // 發送到 Sentry 進行追蹤
+      Sentry.addBreadcrumb({
+        message: 'Journal stats loaded',
+        level: 'info',
+        data: {
+          stats,
+          statsValues: Object.values(stats),
+          statsValuesTypes: Object.values(stats).map(v => typeof v),
+          trendLength: trend.length,
+          userAgent: navigator.userAgent,
+          platform: navigator.platform
+        }
+      });
+      
       setMoodStats(stats);
       setMotivationTrend(trend);
     } catch (error) {
       console.error('載入統計失敗:', error);
+      
+      // 發送錯誤到 Sentry
+      Sentry.captureException(error, {
+        tags: {
+          component: 'StudentJournal',
+          function: 'loadStats'
+        },
+        extra: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform
+        }
+      });
     }
   };
 
@@ -182,7 +221,24 @@ const StudentJournal: React.FC = () => {
     }
   };
 
-  const totalJournals = Object.values(moodStats).reduce((a, b) => a + b, 0);
+  // 安全計算總日記數，確保數值正確
+  const totalJournals = Object.values(moodStats).reduce((a, b) => {
+    const numA = typeof a === 'number' ? a : parseInt(String(a)) || 0;
+    const numB = typeof b === 'number' ? b : parseInt(String(b)) || 0;
+    return numA + numB;
+  }, 0);
+  
+  // 調試：記錄計算過程
+  console.log('🔢 總日記數計算:', {
+    moodStats,
+    moodStatsValues: Object.values(moodStats),
+    totalJournals,
+    calculation: Object.values(moodStats).map(v => ({ 
+      original: v, 
+      type: typeof v, 
+      parsed: typeof v === 'number' ? v : parseInt(String(v)) || 0 
+    }))
+  });
 
   return (
     <PageLayout title="學習日記">
@@ -204,15 +260,42 @@ const StudentJournal: React.FC = () => {
               </div>
             </div>
             
-            <motion.button
-              onClick={() => setShowNewDialog(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-semibold shadow-lg hover:from-purple-600 hover:to-pink-600 transition-all"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Plus className="w-5 h-5" />
-              寫新日記
-            </motion.button>
+            <div className="flex items-center gap-3">
+              {/* 調試按鈕 - 只在開發環境顯示 */}
+              {import.meta.env.DEV && (
+                <button
+                  onClick={() => {
+                    const debugData = {
+                      moodStats,
+                      moodStatsValues: Object.values(moodStats),
+                      totalJournals,
+                      userAgent: navigator.userAgent,
+                      platform: navigator.platform,
+                      timestamp: new Date().toISOString()
+                    };
+                    console.log('🐛 調試數據:', debugData);
+                    Sentry.captureMessage('iPad 調試數據', {
+                      level: 'info',
+                      extra: debugData
+                    });
+                    alert('調試數據已發送到 Sentry');
+                  }}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600 transition-colors"
+                >
+                  調試
+                </button>
+              )}
+              
+              <motion.button
+                onClick={() => setShowNewDialog(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-semibold shadow-lg hover:from-purple-600 hover:to-pink-600 transition-all"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Plus className="w-5 h-5" />
+                寫新日記
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>
@@ -235,7 +318,8 @@ const StudentJournal: React.FC = () => {
             
             <div className="space-y-3">
               {Object.entries(MOOD_CONFIG).map(([mood, config]) => {
-                const count = moodStats[mood as MoodType];
+                const rawCount = moodStats[mood as MoodType];
+                const count = typeof rawCount === 'number' ? rawCount : parseInt(String(rawCount)) || 0;
                 const percentage = totalJournals > 0 ? (count / totalJournals) * 100 : 0;
                 
                 return (
