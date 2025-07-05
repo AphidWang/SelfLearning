@@ -27,7 +27,7 @@ export const authService = {
     
     const userData: User = {
       id: supabaseUser.id,
-      name: metadata.name || supabaseUser.email?.split('@')[0] || 'User',
+      name: metadata.nickname || metadata.name || supabaseUser.email?.split('@')[0] || 'User',
       email: supabaseUser.email || '',
       avatar: metadata.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
       color: metadata.color || '#FF6B6B',
@@ -85,7 +85,7 @@ export const authService = {
     // 構建更新資料，支援多角色
     const updateData: any = {};
     
-    if (updates.name) updateData.name = updates.name;
+    if (updates.name) updateData.nickname = updates.name; // 更新 nickname 而不是 name
     if (updates.avatar) updateData.avatar = updates.avatar;
     if (updates.color) updateData.color = updates.color;
     
@@ -127,7 +127,7 @@ export const authService = {
       
       const userData = {
         id: supabaseUser.id,
-        name: metadata.name || supabaseUser.email?.split('@')[0] || 'User',
+        name: metadata.nickname || metadata.name || supabaseUser.email?.split('@')[0] || 'User',
         email: supabaseUser.email || '',
         avatar: metadata.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${supabaseUser.id}&backgroundColor=ffd5dc`,
         color: metadata.color || '#FF6B6B',

@@ -9,12 +9,19 @@
  * 
  * 用戶資料結構 (存於 user_metadata):
  * {
- *   "name": "用戶暱稱",
+ *   "name": "第三方登入的顯示名稱",
+ *   "nickname": "用戶暱稱（可編輯）",
  *   "role": "student|mentor|parent|admin",
  *   "avatar": "頭像 URL", 
  *   "color": "#FF6B6B",
  *   "email_verified": true
  * }
+ * 
+ * 注意：
+ * - 第三方登入時，name 會被自動設置為 OAuth 提供商的顯示名稱
+ * - nickname 用於平台上的顯示名稱，可由用戶自行編輯
+ * - 初次登入時，如果 nickname 為空，會自動使用 name 作為 nickname
+ * - 其他模組統一使用 nickname 作為顯示名稱
  * 
  * 注意：管理其他用戶的操作請使用 userStore 中的管理員功能
  */
@@ -52,6 +59,7 @@ export const authService = {
       options: {
         data: {
           name: userData.name,
+          nickname: userData.name, // 註冊時 nickname 和 name 一致
           role: userData.role
         }
       }
@@ -105,12 +113,44 @@ export const authService = {
     const roles = user.user_metadata?.roles || 
                  (user.user_metadata?.role ? [user.user_metadata.role] : ['student']);
 
+    // 處理 nickname 邏輯
+    const metadata = user.user_metadata || {};
+    let needsUpdate = false;
+    
+    // 如果 nickname 不存在，使用 display name 來設置
+    if (!metadata.nickname && user.user_metadata?.name) {
+      metadata.nickname = user.user_metadata.name;
+      needsUpdate = true;
+      
+      console.log('🔄 [Supabase] 設置 nickname:', {
+        userId: user.id,
+        nickname: metadata.nickname,
+        source: 'display_name'
+      });
+    }
+    
+    // 如果需要更新 metadata，執行更新
+    if (needsUpdate) {
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            ...user.user_metadata,
+            nickname: metadata.nickname
+          }
+        });
+        console.log('✅ [Supabase] nickname 更新成功');
+      } catch (error) {
+        console.error('❌ [Supabase] nickname 更新失敗:', error);
+      }
+    }
+
     return {
       ...user,
       user_metadata: {
         ...user.user_metadata,
         roles,
-        role: roles[0] // 向後兼容：取第一個角色作為主要角色
+        role: roles[0], // 向後兼容：取第一個角色作為主要角色
+        nickname: metadata.nickname || user.user_metadata?.name || user.email?.split('@')[0] || 'User'
       }
     };
   },
@@ -124,8 +164,15 @@ export const authService = {
 
   // 更新當前用戶資料
   async updateCurrentUser(updates: { name?: string; avatar?: string; [key: string]: any }) {
+    // 如果更新 name，則更新 nickname
+    const updateData = { ...updates };
+    if (updates.name) {
+      updateData.nickname = updates.name;
+      delete updateData.name; // 不更新 name 字段，只更新 nickname
+    }
+
     const { data, error } = await supabase.auth.updateUser({
-      data: updates
+      data: updateData
     });
 
     if (error) throw error;
