@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { useUser } from '../../context/UserContext';
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -12,30 +10,8 @@ interface PageLayoutProps {
 const PageLayout: React.FC<PageLayoutProps> = ({ children, title }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { isAuthenticated, isLoading } = useUser();
-  const navigate = useNavigate();
 
-  React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      console.log('Not authenticated, redirecting to login');
-      navigate('/login');
-    }
-  }, [isAuthenticated, isLoading, navigate]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <div>正在載入...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
+  // 移除認證檢查，因為路由層已經有 RoleProtectedRoute 保護
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">

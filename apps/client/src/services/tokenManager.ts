@@ -21,6 +21,7 @@ class TokenManager {
   private refreshPromise: Promise<string | null> | null = null;
   private listeners: ((event: TokenRefreshEvent) => void)[] = [];
   private isRefreshing = false;
+  private isLoggingOut = false; // 追蹤是否正在主動登出
 
   constructor() {
     console.log('🔧 [TokenManager] 初始化...');
@@ -189,6 +190,14 @@ class TokenManager {
   }
 
   /**
+   * 標記開始登出
+   */
+  markLoggingOut() {
+    console.log('📋 [TokenManager] 標記開始登出');
+    this.isLoggingOut = true;
+  }
+
+  /**
    * 處理 token 過期
    */
   private async handleTokenExpired() {
@@ -200,9 +209,17 @@ class TokenManager {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     
-    this.notifyListeners({
-      type: 'TOKEN_EXPIRED'
-    });
+    // 只有在非主動登出時才通知 TOKEN_EXPIRED 事件
+    if (!this.isLoggingOut) {
+      this.notifyListeners({
+        type: 'TOKEN_EXPIRED'
+      });
+    } else {
+      console.log('🚪 [TokenManager] 主動登出，不觸發 TOKEN_EXPIRED 事件');
+    }
+    
+    // 重置登出標記
+    this.isLoggingOut = false;
     
     console.log('🧹 [TokenManager] 本地存儲已清除');
   }

@@ -80,24 +80,12 @@ class CustomErrorBoundary extends React.Component<
   }
 }
 
-// 智能重定向組件
-const SmartRedirect: React.FC = () => {
-  const { user, isAuthenticated, isLoading } = useAuth();
+// 智能重定向組件 - 只處理角色重定向邏輯
+const SmartRedirectContent: React.FC = () => {
+  const { user } = useAuth();
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <div>載入中...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/login" replace />;
-  }
+  // 此時用戶一定已經認證（被 ProtectedRoute 保護）
+  if (!user) return null;
 
   // 根據用戶的主要角色重定向
   const userRoles = user.roles || (user.role ? [user.role] : ['student']);
@@ -111,6 +99,13 @@ const SmartRedirect: React.FC = () => {
     return <Navigate to="/student" replace />;
   }
 };
+
+// 使用 ProtectedRoute 包裝，避免重複認證邏輯
+const SmartRedirect: React.FC = () => (
+  <ProtectedRoute>
+    <SmartRedirectContent />
+  </ProtectedRoute>
+);
 
 function App() {
   return (

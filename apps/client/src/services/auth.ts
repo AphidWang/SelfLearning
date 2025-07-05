@@ -63,6 +63,10 @@ export const authService = {
     console.log('🚪 [Auth] 開始登出流程...');
     
     try {
+      // 導入 tokenManager 並標記開始登出
+      const { tokenManager } = await import('./tokenManager');
+      tokenManager.markLoggingOut();
+      
       await supabaseAuthService.signOut();
       console.log('✅ [Auth] Supabase 登出成功');
     } catch (error) {

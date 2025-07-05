@@ -118,6 +118,9 @@ function UserProvider({ children }: { children: ReactNode }) {
       await authService.logout();
       setCurrentUser(null);
       trackEvent('logout', 'auth');
+      
+      // 登出後重定向到登入頁面
+      window.location.href = '/login';
     } catch (err) {
       console.error('Logout failed:', err);
     }
