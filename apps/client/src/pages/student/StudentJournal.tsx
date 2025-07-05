@@ -112,48 +112,10 @@ const StudentJournal: React.FC = () => {
         journalStore.getMoodStats(30),
         journalStore.getMotivationTrend(14)
       ]);
-      
-      // 調試：檢查數據類型和值
-      console.log('📊 心情統計載入結果:', {
-        stats,
-        statsType: typeof stats,
-        statsKeys: Object.keys(stats),
-        statsValues: Object.values(stats),
-        statsValuesTypes: Object.values(stats).map(v => typeof v),
-        trend,
-        trendLength: trend.length
-      });
-      
-      // 發送到 Sentry 進行追蹤
-      Sentry.addBreadcrumb({
-        message: 'Journal stats loaded',
-        level: 'info',
-        data: {
-          stats,
-          statsValues: Object.values(stats),
-          statsValuesTypes: Object.values(stats).map(v => typeof v),
-          trendLength: trend.length,
-          userAgent: navigator.userAgent,
-          platform: navigator.platform
-        }
-      });
-      
       setMoodStats(stats);
       setMotivationTrend(trend);
     } catch (error) {
       console.error('載入統計失敗:', error);
-      
-      // 發送錯誤到 Sentry
-      Sentry.captureException(error, {
-        tags: {
-          component: 'StudentJournal',
-          function: 'loadStats'
-        },
-        extra: {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform
-        }
-      });
     }
   };
 
@@ -261,30 +223,7 @@ const StudentJournal: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* 調試按鈕 - 只在開發環境顯示 */}
-              {import.meta.env.DEV && (
-                <button
-                  onClick={() => {
-                    const debugData = {
-                      moodStats,
-                      moodStatsValues: Object.values(moodStats),
-                      totalJournals,
-                      userAgent: navigator.userAgent,
-                      platform: navigator.platform,
-                      timestamp: new Date().toISOString()
-                    };
-                    console.log('🐛 調試數據:', debugData);
-                    Sentry.captureMessage('iPad 調試數據', {
-                      level: 'info',
-                      extra: debugData
-                    });
-                    alert('調試數據已發送到 Sentry');
-                  }}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600 transition-colors"
-                >
-                  調試
-                </button>
-              )}
+              
               
               <motion.button
                 onClick={() => setShowNewDialog(true)}

@@ -33,6 +33,53 @@ import { SentryTestButton } from './components/shared/SentryTestButton';
 
 // initGA();
 
+// 自訂錯誤邊界組件
+class CustomErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('React Error Boundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50">
+          <div className="text-center p-8 max-w-md">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">出現錯誤</h2>
+            <p className="text-gray-600 mb-4">
+              很抱歉，應用程式遇到了問題。請重新載入頁面或聯繫支援。
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              重新載入頁面
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // 智能重定向組件
 const SmartRedirect: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -67,165 +114,158 @@ const SmartRedirect: React.FC = () => {
 
 function App() {
   return (
-    <ErrorBoundary
-      fallback={({ error, resetError }) => (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
-          <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-            <div className="text-6xl mb-4">😵</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">哎呀！出現了錯誤</h2>
-            <p className="text-gray-600 mb-4">
-              很抱歉，應用程式遇到了一個錯誤。我們已經收到錯誤報告，會盡快修復。
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={resetError}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                重試
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                重新載入頁面
-              </button>
+    <CustomErrorBoundary>
+      <ErrorBoundary
+        fallback={({ error, resetError }) => (
+          <div className="flex items-center justify-center min-h-screen bg-gray-50">
+            <div className="text-center p-8 max-w-md">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">系統錯誤</h2>
+              <p className="text-gray-600 mb-4">
+                {error instanceof Error ? error.message : '應用程式遇到了問題，請重試或聯繫支援。'}
+              </p>
+              <div className="space-x-2">
+                <button
+                  onClick={resetError}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  重試
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  重新載入
+                </button>
+              </div>
             </div>
-            {process.env.NODE_ENV === 'development' && (
-              <details className="mt-4 text-left">
-                <summary className="cursor-pointer text-sm text-gray-500">錯誤詳情</summary>
-                <pre className="text-xs text-red-600 mt-2 bg-red-50 p-2 rounded overflow-auto">
-                  {error instanceof Error ? error.toString() : String(error)}
-                </pre>
-              </details>
-            )}
           </div>
-        </div>
-      )}
-      beforeCapture={(scope) => {
-        scope.setTag('component', 'App');
-      }}
-    >
-      <ErrorProvider>
-        <AuthProvider>
-          <CurriculumProvider>
-            <UserProvider>
-              <Router>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              
-              {/* Preview Routes */}
-              <Route path="/preview/lottie" element={<LottiePreview />} />
-              
-              {/* Student Routes */}
-              <Route path="/student" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <TaskWallPage />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/task-wall" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <TaskWallPage />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/schedule" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <StudentSchedule />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/tasks" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <StudentTasks />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/planning" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <StudentPlanning />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/planning/goal/:goalId" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <GoalMindMapPage />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/planning/topic/:topicId" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <TopicMindMapPage />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/journal" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <StudentJournal />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/goals" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <StudentGoals />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/learning-map" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <StudentLearningMap />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/student/subject/:subjectId" element={
-                <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                  <SubjectPage />
-                </RoleProtectedRoute>
-              } />
-              
-              {/* Mentor Routes */}
-              <Route path="/mentor" element={
-                <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
-                  <MentorDashboard />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/mentor/tasks" element={
-                <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
-                  <MentorTaskManager />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/mentor/task-planner" element={
-                <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
-                  <MentorTaskPlanner />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/mentor/subject/:subjectId" element={
-                <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
-                  <SubjectPage isMentor={true} />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/mentor/curriculum" element={
-                <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
-                  <MentorCurriculum />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/mentor/course-blueprint" element={
-                <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
-                  <CourseBluePrint />
-                </RoleProtectedRoute>
-              } />
-              
-              {/* Admin Routes */}
-              <Route path="/admin/users" element={
-                <RoleProtectedRoute requiredRoles={['admin']}>
-                  <UserAdminPage />
-                </RoleProtectedRoute>
-              } />
-              
-
-              
-              {/* Default and Not Found Routes */}
-              <Route path="/" element={<SmartRedirect />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-                          </Router>
-          </UserProvider>
-        </CurriculumProvider>
-      </AuthProvider>
-    </ErrorProvider>
-    <SentryTestButton />
-  </ErrorBoundary>
+        )}
+      >
+        <ErrorProvider>
+          <AuthProvider>
+            <CurriculumProvider>
+              <UserProvider>
+                <Router>
+                  <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
+                    
+                    {/* Preview Routes */}
+                    <Route path="/preview/lottie" element={<LottiePreview />} />
+                    
+                    {/* Student Routes */}
+                    <Route path="/student" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <TaskWallPage />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/task-wall" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <TaskWallPage />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/schedule" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <StudentSchedule />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/tasks" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <StudentTasks />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/planning" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <StudentPlanning />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/planning/goal/:goalId" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <GoalMindMapPage />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/planning/topic/:topicId" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <TopicMindMapPage />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/journal" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <StudentJournal />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/goals" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <StudentGoals />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/learning-map" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <StudentLearningMap />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/subject/:subjectId" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <SubjectPage />
+                      </RoleProtectedRoute>
+                    } />
+                    
+                    {/* Mentor Routes */}
+                    <Route path="/mentor" element={
+                      <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
+                        <MentorDashboard />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/mentor/tasks" element={
+                      <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
+                        <MentorTaskManager />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/mentor/task-planner" element={
+                      <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
+                        <MentorTaskPlanner />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/mentor/subject/:subjectId" element={
+                      <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
+                        <SubjectPage isMentor={true} />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/mentor/curriculum" element={
+                      <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
+                        <MentorCurriculum />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/mentor/course-blueprint" element={
+                      <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
+                        <CourseBluePrint />
+                      </RoleProtectedRoute>
+                    } />
+                    
+                    {/* Admin Routes */}
+                    <Route path="/admin/users" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <UserAdminPage />
+                      </RoleProtectedRoute>
+                    } />
+                    
+                    {/* Default and Not Found Routes */}
+                    <Route path="/" element={<SmartRedirect />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Router>
+              </UserProvider>
+            </CurriculumProvider>
+          </AuthProvider>
+        </ErrorProvider>
+        <SentryTestButton />
+      </ErrorBoundary>
+    </CustomErrorBoundary>
   );
 }
 

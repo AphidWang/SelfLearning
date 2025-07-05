@@ -32,30 +32,30 @@ function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     
-      const initializeAuth = async () => {
-    try {
-      console.log('🔄 [UserContext] 初始化認證狀態...');
-      const user = await authService.getCurrentUser();
-      
-      if (isMounted) {
-        console.log('✅ [UserContext] 初始化完成', {
-          hasUser: !!user,
-          userId: user?.id,
-          roles: user?.roles
-        });
-        setCurrentUser(user);
+    const initializeAuth = async () => {
+      try {
+        console.log('🔄 [UserContext] 初始化認證狀態...');
+        const user = await authService.getCurrentUser();
+        
+        if (isMounted) {
+          console.log('✅ [UserContext] 初始化完成', {
+            hasUser: !!user,
+            userId: user?.id,
+            roles: user?.roles
+          });
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        console.error('❌ [UserContext] 初始化失敗:', error);
+        if (isMounted) {
+          setCurrentUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('❌ [UserContext] 初始化失敗:', error);
-      if (isMounted) {
-        setCurrentUser(null);
-      }
-    } finally {
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    }
-  };
+    };
 
     initializeAuth();
 
@@ -149,8 +149,16 @@ function UserProvider({ children }: { children: ReactNode }) {
     refreshUser
   }), [currentUser, isLoading, error]);
 
+  // 在載入中時顯示載入畫面，而不是返回 null
   if (isLoading) {
-    return null;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div>正在載入用戶資料...</div>
+        </div>
+      </div>
+    );
   }
 
   return (

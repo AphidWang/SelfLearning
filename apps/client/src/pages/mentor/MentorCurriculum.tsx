@@ -10,7 +10,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
   Users,
@@ -34,24 +33,24 @@ import {
   Filter,
   Grid,
   List,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { useTopicTemplateStore } from '../../store/topicTemplateStore';
-import { useUserStore } from '../../store/userStore';
+import { useUser } from '../../context/UserContext';
 import { usePermissions, PermissionBadge, CollaboratorList } from '../../components/template/PermissionManager';
-import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
+
+import { TemplateEditor } from '../../components/template/TemplateEditor';
 import { SUBJECTS } from '../../constants/subjects';
 import type { TopicTemplate } from '../../types/goal';
 
 const MentorCurriculum: React.FC = () => {
   const {
     templates,
-    loading,
+    loading: storeLoading,
     error,
-    fetchMyTemplates,
-    fetchPublicTemplates,
-    fetchCollaborativeTemplates,
+    fetchAllTemplates,
     createTemplate,
     updateTemplate,
     deleteTemplate,
@@ -61,41 +60,120 @@ const MentorCurriculum: React.FC = () => {
     clearError
   } = useTopicTemplateStore();
 
-  const { currentUser } = useUserStore();
+  const { currentUser } = useUser();
   const { checkTemplatePermission } = usePermissions(currentUser?.id || '');
+
+  // Debug: 檢查 currentUser 狀態（只在 currentUser 改變時執行）
+  useEffect(() => {
+    console.log('🔍 [MentorCurriculum] currentUser:', {
+      hasUser: !!currentUser,
+      userId: currentUser?.id,
+      userName: currentUser?.name,
+      userRoles: currentUser?.roles
+    });
+  }, [currentUser]);
 
   const [currentView, setCurrentView] = useState<'my' | 'public' | 'collaborative'>('my');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
-  const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateBlankModal, setShowCreateBlankModal] = useState(false);
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<TopicTemplate | null>(null);
 
-  // 載入資料
-  useEffect(() => {
+  // 客戶端過濾模板
+  const getFilteredTemplates = () => {
+    if (!currentUser) return [];
+    
+    let filteredByCategory = templates;
+    
+    // 根據分頁過濾
     if (currentView === 'my') {
-      fetchMyTemplates();
+      filteredByCategory = templates.filter(template => template.created_by === currentUser.id);
     } else if (currentView === 'public') {
-      fetchPublicTemplates();
-    } else {
-      fetchCollaborativeTemplates();
+      filteredByCategory = templates.filter(template => template.is_public);
+    } else if (currentView === 'collaborative') {
+      filteredByCategory = templates.filter(template => 
+        template.collaborators?.some(collab => collab.user_id === currentUser.id)
+      );
     }
-  }, [currentView]);
-
-  // 過濾模板
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         template.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSubject = !selectedSubject || template.subject === selectedSubject;
-    return matchesSearch && matchesSubject;
-  });
-
-  // 獲取統計數據
+    
+    // 根據搜尋和學科過濾
+    return filteredByCategory.filter(template => {
+      const matchesSearch = template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           template.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSubject = !selectedSubject || template.subject === selectedSubject;
+      return matchesSearch && matchesSubject;
+    });
+  };
+  
+  const filteredTemplates = getFilteredTemplates();
+  
+  // 計算統計數據
   const stats = {
-    totalTemplates: templates.length,
+    totalTemplates: currentUser ? templates.filter(t => t.created_by === currentUser.id).length : 0,
     publicTemplates: templates.filter(t => t.is_public).length,
-    collaborativeTemplates: templates.filter(t => t.is_collaborative).length,
-    totalUsage: templates.reduce((sum, t) => sum + t.usage_count, 0)
+    collaborativeTemplates: currentUser ? templates.filter(t => 
+      t.collaborators?.some(collab => collab.user_id === currentUser.id)
+    ).length : 0,
+    totalUsage: currentUser ? templates
+      .filter(t => t.created_by === currentUser.id)
+      .reduce((sum, t) => sum + t.usage_count, 0) : 0
+  };
+  
+  // 初始化：載入所有模板
+  useEffect(() => {
+    fetchAllTemplates();
+  }, []);
+
+  // 刷新模板數據
+  const handleRefresh = async () => {
+    await fetchAllTemplates();
+  };
+
+  // 處理編輯模板
+  const handleEditTemplate = (template: TopicTemplate) => {
+    setEditingTemplate(template);
+    setShowTemplateEditor(true);
+  };
+
+  // 處理複製模板
+  const handleCopyTemplate = async (template: TopicTemplate) => {
+    const copiedTemplate = await copyTemplate({
+      source_template_id: template.id,
+      title: `${template.title} (複製)`,
+      description: template.description || '',
+      is_public: false
+    });
+
+    if (copiedTemplate) {
+      // 重新載入所有模板數據
+      await fetchAllTemplates();
+    }
+  };
+
+  // 處理建立空白模板
+  const handleCreateBlankTemplate = async (templateData: any) => {
+    try {
+      const newTemplate = await createTemplate({
+        title: templateData.title,
+        description: templateData.description,
+        subject: templateData.subject || '未分類',
+        category: templateData.category || 'learning',
+        is_public: false,
+        is_collaborative: templateData.is_collaborative,
+        goals: [],
+        bubbles: []
+      });
+
+      if (newTemplate) {
+        // 重新載入所有模板數據
+        await fetchAllTemplates();
+        setShowCreateBlankModal(false);
+      }
+    } catch (error) {
+      console.error('建立模板失敗:', error);
+    }
   };
 
   return (
@@ -103,9 +181,7 @@ const MentorCurriculum: React.FC = () => {
       <div className="space-y-6">
         {/* 錯誤提示 */}
         {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
+          <div
             className="bg-red-50 border border-red-200 rounded-lg p-4"
           >
             <div className="flex justify-between items-center">
@@ -117,17 +193,18 @@ const MentorCurriculum: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
 
-        {/* 統計卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* 統計卡片 - 縮小版 */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={Layers}
             title="我的模板"
             value={stats.totalTemplates}
             description="已建立的模板"
             color="bg-blue-500"
+            compact
           />
           <StatCard
             icon={Eye}
@@ -135,13 +212,15 @@ const MentorCurriculum: React.FC = () => {
             value={stats.publicTemplates}
             description="對學生公開"
             color="bg-green-500"
+            compact
           />
           <StatCard
             icon={Users}
             title="協作模板"
             value={stats.collaborativeTemplates}
-            description="團隊協作中"
+            description="我參與協作的"
             color="bg-purple-500"
+            compact
           />
           <StatCard
             icon={TrendingUp}
@@ -149,6 +228,7 @@ const MentorCurriculum: React.FC = () => {
             value={stats.totalUsage}
             description="學生使用統計"
             color="bg-orange-500"
+            compact
           />
         </div>
 
@@ -180,18 +260,19 @@ const MentorCurriculum: React.FC = () => {
             {/* 右側操作 */}
             <div className="flex gap-3">
               <button
-                onClick={() => setShowTemplateBrowser(true)}
-                className="flex items-center gap-2 px-4 py-2 text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors"
+                onClick={handleRefresh}
+                disabled={storeLoading}
+                className="flex items-center gap-2 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
-                <Search className="w-4 h-4" />
-                瀏覽模板庫
+                <RefreshCw className={`w-4 h-4 ${storeLoading ? 'animate-spin' : ''}`} />
+                刷新
               </button>
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => setShowCreateBlankModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                建立模板
+                建立空白模板
               </button>
             </div>
           </div>
@@ -236,7 +317,7 @@ const MentorCurriculum: React.FC = () => {
         </div>
 
         {/* 模板列表 */}
-        {loading ? (
+        {storeLoading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
@@ -245,22 +326,36 @@ const MentorCurriculum: React.FC = () => {
             templates={filteredTemplates}
             viewMode={viewMode}
             currentUserId={currentUser?.id || ''}
-            onEdit={(template) => {
-              // TODO: 開啟編輯模式
-              console.log('編輯模板:', template.id);
-            }}
+            onEdit={handleEditTemplate}
             onCopy={(templateId) => {
-              // TODO: 實作複製功能，需要提供額外參數
-              console.log('複製模板:', templateId);
+              const template = filteredTemplates.find(t => t.id === templateId);
+              if (template) {
+                handleCopyTemplate(template);
+              }
             }}
-            onDelete={deleteTemplate}
-            onTogglePublic={togglePublic}
-            onToggleCollaborative={toggleCollaborative}
+            onDelete={async (templateId) => {
+              const success = await deleteTemplate(templateId);
+              if (success) {
+                await fetchAllTemplates();
+              }
+            }}
+            onTogglePublic={async (templateId) => {
+              const success = await togglePublic(templateId);
+              if (success) {
+                await fetchAllTemplates();
+              }
+            }}
+            onToggleCollaborative={async (templateId) => {
+              const success = await toggleCollaborative(templateId);
+              if (success) {
+                await fetchAllTemplates();
+              }
+            }}
             checkPermission={checkTemplatePermission}
           />
         )}
 
-        {filteredTemplates.length === 0 && !loading && (
+        {filteredTemplates.length === 0 && !storeLoading && (
           <div className="text-center py-12">
             <Layers className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">沒有找到模板</h3>
@@ -269,28 +364,40 @@ const MentorCurriculum: React.FC = () => {
             </p>
             {currentView === 'my' && (
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => setShowCreateBlankModal(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                建立模板
+                建立空白模板
               </button>
             )}
           </div>
         )}
       </div>
 
-      {/* 模板瀏覽器 */}
-      <TopicTemplateBrowser
-        isOpen={showTemplateBrowser}
-        onClose={() => setShowTemplateBrowser(false)}
-        onTemplateSelected={(templateId) => {
-          console.log('選擇了模板:', templateId);
-        }}
+      {/* 建立空白模板 Modal */}
+      <CreateBlankTemplateModal
+        isOpen={showCreateBlankModal}
+        onClose={() => setShowCreateBlankModal(false)}
+        onSubmit={handleCreateBlankTemplate}
       />
-
-      {/* TODO: 建立模板 Modal */}
-      {/* TODO: 編輯模板 Modal */}
+      
+      {/* 模板編輯器 */}
+      {showTemplateEditor && editingTemplate && (
+        <TemplateEditor
+          template={editingTemplate}
+          onClose={() => {
+            setShowTemplateEditor(false);
+            setEditingTemplate(null);
+          }}
+          onSave={async (updatedTemplate) => {
+            // 更新模板後重新載入所有數據
+            await fetchAllTemplates();
+            setShowTemplateEditor(false);
+            setEditingTemplate(null);
+          }}
+        />
+      )}
     </PageLayout>
   );
 };
@@ -302,28 +409,29 @@ interface StatCardProps {
   value: number;
   description: string;
   color: string;
+  compact?: boolean;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ icon: Icon, title, value, description, color }) => {
+const StatCard: React.FC<StatCardProps> = ({ icon: Icon, title, value, description, color, compact = false }) => {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden"
+    <div
+      className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md hover:border-gray-300 transition-all duration-200"
     >
-      <div className="p-6">
+      <div className={compact ? "p-4" : "p-6"}>
         <div className="flex items-center">
-          <div className={`flex items-center justify-center w-12 h-12 rounded-lg ${color} text-white`}>
-            <Icon className="w-6 h-6" />
+          <div className={`flex items-center justify-center ${compact ? 'w-8 h-8' : 'w-12 h-12'} rounded-lg ${color} text-white`}>
+            <Icon className={compact ? "w-4 h-4" : "w-6 h-6"} />
           </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <div className={compact ? "ml-3" : "ml-4"}>
+            <p className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-500`}>{title}</p>
+            <p className={`${compact ? 'text-lg' : 'text-2xl'} font-bold text-gray-900`}>{value}</p>
           </div>
         </div>
-        <p className="mt-2 text-sm text-gray-600">{description}</p>
+        {!compact && (
+          <p className="mt-2 text-sm text-gray-600">{description}</p>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -354,21 +462,19 @@ const TemplateList: React.FC<TemplateListProps> = ({
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <AnimatePresence>
-          {templates.map((template) => (
-            <TemplateCard
-              key={template.id}
-              template={template}
-              currentUserId={currentUserId}
-              onEdit={onEdit}
-              onCopy={onCopy}
-              onDelete={onDelete}
-              onTogglePublic={onTogglePublic}
-              onToggleCollaborative={onToggleCollaborative}
-              checkPermission={checkPermission}
-            />
-          ))}
-        </AnimatePresence>
+        {templates.map((template) => (
+          <TemplateCard
+            key={template.id}
+            template={template}
+            currentUserId={currentUserId}
+            onEdit={onEdit}
+            onCopy={onCopy}
+            onDelete={onDelete}
+            onTogglePublic={onTogglePublic}
+            onToggleCollaborative={onToggleCollaborative}
+            checkPermission={checkPermission}
+          />
+        ))}
       </div>
     );
   }
@@ -442,102 +548,81 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
   onToggleCollaborative,
   checkPermission
 }) => {
-  const [showActions, setShowActions] = useState(false);
   const isOwner = template.created_by === currentUserId;
   const canEdit = isOwner || checkPermission(template, 'edit');
   const canAdmin = isOwner || checkPermission(template, 'admin');
+  
+  // Debug 資訊
+  console.log('TemplateCard Debug:', {
+    templateTitle: template.title,
+    templateCreatedBy: template.created_by,
+    currentUserId: currentUserId,
+    isOwner: isOwner,
+    templateCreatedByType: typeof template.created_by,
+    currentUserIdType: typeof currentUserId
+  });
+
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+    setShowDropdown(false);
+  };
+
+  const confirmDelete = () => {
+    onDelete(template.id);
+    setShowDeleteConfirm(false);
+  };
+
+  // 點擊外部關閉下拉選單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showDropdown && !(event.target as Element).closest('.dropdown-menu')) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showDropdown]);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all"
+    <div
+      className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg hover:border-indigo-300 transition-all duration-200"
     >
       <div className="h-2 bg-indigo-500" />
       
       <div className="p-6">
-        {/* 標題和操作 */}
-        <div className="flex justify-between items-start mb-3">
+        {/* 標題和選單 */}
+        <div className="mb-3 flex justify-between items-start">
           <h3 className="font-bold text-gray-900 text-lg line-clamp-2 flex-1">
             {template.title}
           </h3>
-          <div className="relative">
-            <button
-              onClick={() => setShowActions(!showActions)}
-              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <MoreVertical className="w-4 h-4 text-gray-400" />
-            </button>
-            
-            {showActions && (
-              <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 w-48">
-                {canEdit && (
+          
+          {/* 三個點選單 - 只有 owner 才顯示 */}
+          {isOwner && (
+            <div className="relative ml-2 dropdown-menu">
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <MoreVertical className="w-4 h-4 text-gray-500" />
+              </button>
+              
+              {showDropdown && (
+                <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 min-w-[120px]">
                   <button
-                    onClick={() => {
-                      onEdit(template);
-                      setShowActions(false);
-                    }}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                    onClick={handleDelete}
+                    className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 text-sm"
                   >
-                    <Edit3 className="w-4 h-4" />
-                    編輯
+                    <Trash2 className="w-4 h-4" />
+                    刪除
                   </button>
-                )}
-                <button
-                  onClick={() => {
-                    onCopy(template.id);
-                    setShowActions(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <Copy className="w-4 h-4" />
-                  複製
-                </button>
-                {canAdmin && (
-                  <>
-                    <div className="border-t border-gray-100 my-1" />
-                    <button
-                      onClick={() => {
-                        onTogglePublic(template.id);
-                        setShowActions(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      {template.is_public ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      {template.is_public ? '設為私人' : '設為公開'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        onToggleCollaborative(template.id);
-                        setShowActions(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      {template.is_collaborative ? '關閉協作' : '開啟協作'}
-                    </button>
-                  </>
-                )}
-                {isOwner && (
-                  <>
-                    <div className="border-t border-gray-100 my-1" />
-                    <button
-                      onClick={() => {
-                        onDelete(template.id);
-                        setShowActions(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      刪除
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 描述 */}
@@ -594,8 +679,62 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
             maxDisplay={3}
           />
         )}
+
+        {/* 操作按鈕 - 放在底部 */}
+        <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+          <button
+            onClick={() => onEdit(template)}
+            className="flex-1 px-3 py-2 text-indigo-700 border border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors flex items-center justify-center gap-1 text-sm"
+          >
+            <Eye className="w-4 h-4" />
+            瀏覽
+          </button>
+          <button
+            onClick={() => onCopy(template.id)}
+            className="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+          >
+            <Copy className="w-4 h-4" />
+            複製
+          </button>
+        </div>
       </div>
-    </motion.div>
+      
+      {/* 刪除確認對話框 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">確認刪除</h3>
+                <p className="text-sm text-gray-600">此操作無法復原</p>
+              </div>
+            </div>
+            
+            <p className="text-gray-700 mb-6">
+              確定要刪除模板「<span className="font-medium">{template.title}</span>」嗎？
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                確認刪除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -615,6 +754,16 @@ const TemplateRow: React.FC<TemplateRowProps> = ({
   const isOwner = template.created_by === currentUserId;
   const canEdit = isOwner || checkPermission(template, 'edit');
   const canAdmin = isOwner || checkPermission(template, 'admin');
+
+  // Debug 資訊
+  console.log('TemplateRow Debug:', {
+    templateTitle: template.title,
+    templateCreatedBy: template.created_by,
+    currentUserId: currentUserId,
+    isOwner: isOwner,
+    templateCreatedByType: typeof template.created_by,
+    currentUserIdType: typeof currentUserId
+  });
 
   return (
     <tr className="hover:bg-gray-50">
@@ -667,14 +816,12 @@ const TemplateRow: React.FC<TemplateRowProps> = ({
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
         <div className="flex gap-2">
-          {canEdit && (
-            <button
-              onClick={() => onEdit(template)}
-              className="text-indigo-600 hover:text-indigo-900"
-            >
-              編輯
-            </button>
-          )}
+          <button
+            onClick={() => onEdit(template)}
+            className="text-indigo-600 hover:text-indigo-900"
+          >
+            瀏覽
+          </button>
           <button
             onClick={() => onCopy(template.id)}
             className="text-gray-600 hover:text-gray-900"
@@ -692,6 +839,151 @@ const TemplateRow: React.FC<TemplateRowProps> = ({
         </div>
       </td>
     </tr>
+  );
+};
+
+// 建立空白模板 Modal - 採用 TopicTemplateBrowser 的風格
+interface CreateBlankTemplateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+}
+
+const CreateBlankTemplateModal: React.FC<CreateBlankTemplateModalProps> = ({
+  isOpen,
+  onClose,
+  onSubmit
+}) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    subject: '',
+    category: '',
+    is_collaborative: false
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+    setFormData({ title: '', description: '', subject: '', category: '', is_collaborative: false });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[70]">
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full"
+        style={{
+          background: 'linear-gradient(135deg, #fefdf8 0%, #faf7f0 50%, #f7f3e9 100%)',
+        }}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full flex items-center justify-center">
+                <Plus className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">建立空白模板</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  模板標題 *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                  placeholder="輸入模板標題..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  描述
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                  placeholder="輸入模板描述..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    學科
+                  </label>
+                  <select
+                    value={formData.subject}
+                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                    className="w-full px-4 py-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                  >
+                    <option value="">選擇學科</option>
+                    {Object.values(SUBJECTS).map(subject => (
+                      <option key={subject} value={subject}>{subject}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    分類
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-4 py-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                  >
+                    <option value="">選擇分類</option>
+                    <option value="learning">學習成長</option>
+                    <option value="personal">個人發展</option>
+                    <option value="project">專案計畫</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="is_collaborative_template"
+                  checked={formData.is_collaborative}
+                  onChange={(e) => setFormData({ ...formData, is_collaborative: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <label htmlFor="is_collaborative_template" className="text-sm text-gray-900 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  啟用協作模式（可邀請其他 mentor 共同編輯）
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50/50 border-t border-gray-200/40">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              建立模板
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 

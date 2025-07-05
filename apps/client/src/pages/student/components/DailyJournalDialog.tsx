@@ -23,7 +23,6 @@ import { taskRecordStore, type TaskRecord } from '../../../store/taskRecordStore
 import { useTopicStore } from '../../../store/topicStore';
 import { useNavigate } from 'react-router-dom';
 import { Task } from '../../../types/goal';
-import { useAsyncOperation, ErrorPatterns } from '../../../utils/errorHandler';
 
 type MotivationLevel = number; // 1-10
 
@@ -147,7 +146,6 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
 }) => {
   const navigate = useNavigate();
   const { topics } = useTopicStore();
-  const { wrapAsync } = useAsyncOperation();
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
   const [motivationLevel, setMotivationLevel] = useState<MotivationLevel | null>(null);
   const [journalContent, setJournalContent] = useState('');
@@ -181,8 +179,8 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   useEffect(() => {
     if (!isOpen || mode === 'view') return;
 
-    const fetchTodayTasks = wrapAsync(
-      async () => {
+    const fetchTodayTasks = async () => {
+      try {
         // 設定今天的日期範圍
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -221,12 +219,13 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
           });
         }
         setTodayCompletedTasks(completedTasks);
-      },
-      ErrorPatterns.DATA_LOADING
-    );
+      } catch (error) {
+        console.error('Failed to fetch today tasks:', error);
+      }
+    };
 
     fetchTodayTasks();
-  }, [isOpen, mode, topics, wrapAsync]);
+  }, [isOpen, mode, topics]);
 
   // 合併今天有做過的任務（記錄 + 完成）
   const todayActiveTasks = useMemo(() => {
@@ -259,47 +258,46 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
     );
   }, [todayTaskRecords, todayCompletedTasks]);
 
-  const handleSave = wrapAsync(
-    async () => {
-      // 型別保護
-      if (!selectedMood || !motivationLevel) return;
-      
-      setIsSaving(true);
-      try {
-        const entry: CreateJournalEntry = {
-          mood: selectedMood,
-          motivation_level: motivationLevel,
-          content: journalContent,
-          has_voice_note: hasVoiceNote,
-          completed_tasks: todayActiveTasks || []
-        };
+  const handleSave = async () => {
+    // 型別保護
+    if (!selectedMood || !motivationLevel) return;
+    
+    setIsSaving(true);
+    try {
+      const entry: CreateJournalEntry = {
+        mood: selectedMood,
+        motivation_level: motivationLevel,
+        content: journalContent,
+        has_voice_note: hasVoiceNote,
+        completed_tasks: todayActiveTasks || []
+      };
 
-        // 使用 store 儲存或呼叫外部回調
-        if (onSave) {
-          await onSave({
-            mood: selectedMood,
-            motivationLevel,
-            content: journalContent,
-            hasVoiceNote,
-            date: new Date().toISOString(),
-            completedTasks: todayActiveTasks || []
-          });
-        } else {
-          await journalStore.saveJournalEntry(entry);
-        }
-        
-        // 重置表單
-        setSelectedMood(null);
-        setMotivationLevel(null);
-        setJournalContent('');
-        setHasVoiceNote(false);
-        onClose();
-      } finally {
-        setIsSaving(false);
+      // 使用 store 儲存或呼叫外部回調
+      if (onSave) {
+        await onSave({
+          mood: selectedMood,
+          motivationLevel,
+          content: journalContent,
+          hasVoiceNote,
+          date: new Date().toISOString(),
+          completedTasks: todayActiveTasks || []
+        });
+      } else {
+        await journalStore.saveJournalEntry(entry);
       }
-    },
-    ErrorPatterns.DATA_SAVING
-  );
+      
+      // 重置表單
+      setSelectedMood(null);
+      setMotivationLevel(null);
+      setJournalContent('');
+      setHasVoiceNote(false);
+      onClose();
+    } catch (error) {
+      console.error('Failed to save journal entry:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleVoiceRecord = () => {
     setIsRecording(!isRecording);

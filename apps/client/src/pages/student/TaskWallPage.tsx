@@ -807,7 +807,7 @@ export const TaskWallPage = () => {
   const [isViewModeChanging, setIsViewModeChanging] = useState(false);
   const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
   
-  // Store hooks
+  // Store hooks with error handling
   const { 
     fetchTopics, 
     topics, 
@@ -821,7 +821,7 @@ export const TaskWallPage = () => {
   } = useTopicStore();
   
   const { users, getCollaboratorCandidates } = useUserStore();
-  const { currentUser } = useUser();
+  const { currentUser, isLoading: userLoading } = useUser();
 
   // 組件狀態
   const [config, setConfig] = useState<TaskWallConfig>({
@@ -849,6 +849,9 @@ export const TaskWallPage = () => {
   // 初始化資料載入
   useEffect(() => {
     const fetchData = async () => {
+      // 等待用戶資料載入完成
+      if (userLoading) return;
+      
       console.log('TaskWallPage fetchData called')
       setIsLoading(true);
       const startTime = performance.now();
@@ -883,7 +886,7 @@ export const TaskWallPage = () => {
     };
     
     fetchData();
-  }, [fetchTopics, getCollaboratorCandidates]);
+  }, [fetchTopics, getCollaboratorCandidates, userLoading]);
 
   // 自動清除錯誤消息
   useEffect(() => {

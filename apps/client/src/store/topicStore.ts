@@ -244,7 +244,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       
       if (!user) {
         console.warn('用戶未登錄，無法獲取主題');
-        set({ loading: false, topics: [], error: '請先登錄以查看主題' });
+        set({ loading: false, topics: [], error: null }); // 清除錯誤，允許重試
         return;
       }
 

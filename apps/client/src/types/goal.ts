@@ -200,6 +200,7 @@ export interface TopicTemplate {
   // 前端額外欄位 (從 Supabase 查詢時會填入)
   creator?: User; // 建立者資訊
   collaborators?: TopicTemplateCollaborator[]; // 協作者列表
+  _category?: 'my' | 'public' | 'collaborative'; // 用於前端分類過濾
 }
 
 /**

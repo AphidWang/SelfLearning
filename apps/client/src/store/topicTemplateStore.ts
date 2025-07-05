@@ -38,6 +38,7 @@ interface TopicTemplateStore {
   fetchMyTemplates: () => Promise<void>;
   fetchPublicTemplates: () => Promise<void>;
   fetchCollaborativeTemplates: () => Promise<void>;
+  fetchAllTemplates: () => Promise<void>; // 新增統一的載入方法
   getTemplate: (id: string) => Promise<TopicTemplate | null>;
   createTemplate: (template: Omit<TopicTemplate, 'id' | 'created_by' | 'created_at' | 'updated_at' | 'copy_count' | 'usage_count'>) => Promise<TopicTemplate | null>;
   updateTemplate: (id: string, updates: Partial<TopicTemplate>) => Promise<TopicTemplate | null>;
@@ -200,6 +201,113 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to fetch collaborative templates:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to fetch collaborative templates', loading: false });
+    }
+  },
+
+  fetchAllTemplates: async () => {
+    set({ loading: true, error: null });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // 並行載入三種類型的模板
+      const [myTemplatesResult, publicTemplatesResult, collaborativeTemplatesResult] = await Promise.allSettled([
+        // 我的模板
+        supabase
+          .from('topic_templates')
+          .select(`
+            *,
+            topic_template_collaborators (
+              id,
+              user_id,
+              permission,
+              invited_by,
+              invited_at
+            )
+          `)
+          .eq('created_by', user.id)
+          .order('updated_at', { ascending: false }),
+        
+        // 公開模板
+        supabase
+          .from('topic_templates')
+          .select('*')
+          .eq('is_public', true)
+          .order('usage_count', { ascending: false }),
+        
+        // 協作模板
+        supabase
+          .from('topic_templates')
+          .select(`
+            *,
+            topic_template_collaborators!inner (
+              id,
+              user_id,
+              permission,
+              invited_by,
+              invited_at
+            )
+          `)
+          .eq('topic_template_collaborators.user_id', user.id)
+          .order('updated_at', { ascending: false })
+      ]);
+
+      // 合併所有結果
+      const allTemplates: TopicTemplate[] = [];
+      const templateIds = new Set<string>();
+
+      // 處理我的模板
+      if (myTemplatesResult.status === 'fulfilled' && myTemplatesResult.value.data) {
+        const myTemplates = myTemplatesResult.value.data.map(template => ({
+          ...template,
+          collaborators: template.topic_template_collaborators || [],
+          _category: 'my' as const
+        }));
+        myTemplates.forEach(template => {
+          if (!templateIds.has(template.id)) {
+            templateIds.add(template.id);
+            allTemplates.push(template);
+          }
+        });
+      }
+
+      // 處理公開模板
+      if (publicTemplatesResult.status === 'fulfilled' && publicTemplatesResult.value.data) {
+        const publicTemplates = publicTemplatesResult.value.data.map(template => ({
+          ...template,
+          collaborators: [],
+          _category: 'public' as const
+        }));
+        publicTemplates.forEach(template => {
+          if (!templateIds.has(template.id)) {
+            templateIds.add(template.id);
+            allTemplates.push(template);
+          }
+        });
+      }
+
+      // 處理協作模板
+      if (collaborativeTemplatesResult.status === 'fulfilled' && collaborativeTemplatesResult.value.data) {
+        const collaborativeTemplates = collaborativeTemplatesResult.value.data.map(template => ({
+          ...template,
+          collaborators: template.topic_template_collaborators || [],
+          _category: 'collaborative' as const
+        }));
+        collaborativeTemplates.forEach(template => {
+          if (!templateIds.has(template.id)) {
+            templateIds.add(template.id);
+            allTemplates.push(template);
+          }
+        });
+      }
+
+      // 按更新時間排序
+      allTemplates.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+      set({ templates: allTemplates, loading: false });
+    } catch (error) {
+      console.error('Failed to fetch all templates:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch all templates', loading: false });
     }
   },
 
