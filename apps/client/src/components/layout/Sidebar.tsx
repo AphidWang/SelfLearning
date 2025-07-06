@@ -3,8 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, Users, BookMarked, 
-  Menu, X, LogOut, Map, Calendar, ChevronLeft, ChevronRight, Target, Grid3X3, 
-  PenTool
+  Menu, X, LogOut, Map, ChevronLeft, ChevronRight, Target, Grid3X3, 
+  PenTool, Zap, SplitSquareHorizontal
 } from 'lucide-react';
 import { useUser, UserRole } from '../../context/UserContext';
 import { UserProfileDialog } from '../user-manager';
@@ -76,8 +76,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       const mentorItems = [
         { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
         { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
-        { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
-        { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
       ];
       
       // 如果有家長或學生身份，加入學生視圖
@@ -113,8 +111,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       const mentorItems = [
         { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
         { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
-        { name: '任務規劃', path: '/mentor/task-planner', icon: <Calendar size={20} /> },
-        { name: '課程藍圖', path: '/mentor/course-blueprint', icon: <Target size={20} /> },
       ];
       
       // 如果有家長或學生身份，加入學生視圖
