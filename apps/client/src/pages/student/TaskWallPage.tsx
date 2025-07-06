@@ -29,7 +29,7 @@ import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus } from 'lucide-react';
+import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus, Edit3, Trophy, Calendar } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
@@ -677,7 +677,7 @@ const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, onCreateTop
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
       {topics.map((topicData, index) => (
         <motion.div
           key={topicData.topic.id}
@@ -717,6 +717,261 @@ const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, onCreateTop
         />
       </motion.div>
     </div>
+  );
+};
+
+/**
+ * 本週挑戰卡片組件
+ */
+interface WeeklyChallengeCardProps {
+  challenge: {
+    title: string;
+    completedDays: string[];
+    startDate: string;
+  } | null;
+  onCheckIn: () => void;
+  onCancelCheckIn: () => void;
+  onEdit: () => void;
+  onSetChallenge: () => void;
+  editingChallenge: boolean;
+  challengeInput: string;
+  setChallengeInput: (value: string) => void;
+  setEditingChallenge: (value: boolean) => void;
+  getTaiwanDateString: () => string;
+}
+
+const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({ 
+  challenge, 
+  onCheckIn, 
+  onCancelCheckIn,
+  onEdit, 
+  onSetChallenge,
+  editingChallenge,
+  challengeInput,
+  setChallengeInput,
+  setEditingChallenge,
+  getTaiwanDateString
+}) => {
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  
+  const today = getTaiwanDateString();
+  const isCheckedToday = challenge?.completedDays.includes(today) || false;
+  const completedDays = challenge?.completedDays.length || 0;
+  const progress = (completedDays / 7) * 100;
+
+  // 生成這週的日期
+  const getWeekDates = () => {
+    if (!challenge) return [];
+    const startDate = new Date(challenge.startDate);
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+    return dates;
+  };
+
+  const weekDates = getWeekDates();
+
+  return (
+    <motion.div
+      className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl shadow-2xl p-4 text-white relative overflow-hidden w-full h-[420px] flex flex-col"
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ 
+        duration: 0.5, 
+        type: "spring", 
+        stiffness: 300, 
+        damping: 25 
+      }}
+      whileHover={{ y: -2 }}
+    >
+      {/* 背景裝飾 */}
+      <div className="absolute inset-0">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
+        <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
+      </div>
+
+      <div className="relative z-10 flex flex-col h-full">
+        {/* 標題區域 */}
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+              <Trophy className="w-5 h-5 text-yellow-300" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">本週挑戰</h3>
+            </div>
+          </div>
+          
+          {challenge && !editingChallenge && (
+            <button
+              onClick={onEdit}
+              className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors backdrop-blur-sm"
+              title="編輯挑戰"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* 挑戰內容 - 固定高度容器 */}
+        <div className="flex-1 flex flex-col justify-center min-h-[320px]">
+          {editingChallenge ? (
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={challengeInput}
+                onChange={(e) => setChallengeInput(e.target.value)}
+                placeholder="輸入你的本週挑戰..."
+                className="w-full px-3 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-white/60 focus:ring-2 focus:ring-white/50 focus:border-transparent text-sm"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={onSetChallenge}
+                  disabled={!challengeInput.trim()}
+                  className="flex-1 py-2 bg-white/90 text-indigo-600 rounded-xl font-bold hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  確定設定
+                </button>
+                <button
+                  onClick={() => setEditingChallenge(false)}
+                  className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl font-bold hover:bg-white/30 transition-colors text-sm"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : challenge ? (
+            <div className="space-y-4">
+              {/* 挑戰標題 */}
+              <div className="text-center">
+                <h4 className="text-lg font-bold mb-2 line-clamp-2">{challenge.title}</h4>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-2xl font-black">{completedDays}</span>
+                  <span className="text-white/80">/</span>
+                  <span className="text-lg font-bold text-white/80">7</span>
+                  <span className="text-sm text-white/80 ml-1">天完成</span>
+                </div>
+              </div>
+
+              {/* 進度條 */}
+              <div className="space-y-3">
+                <div className="w-full bg-white/20 rounded-full h-3 backdrop-blur-sm">
+                  <motion.div
+                    className="h-3 bg-gradient-to-r from-yellow-300 to-orange-300 rounded-full shadow-lg"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                  />
+                </div>
+                
+                {/* 週間日期標記 */}
+                <div className="flex justify-between">
+                  {weekDates.map((date, index) => {
+                    const isCompleted = challenge.completedDays.includes(date);
+                    const isToday = date === today;
+                    const dayName = ['一', '二', '三', '四', '五', '六', '日'][index];
+                    
+                    return (
+                      <div key={date} className="flex flex-col items-center">
+                        <div 
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                            isCompleted 
+                              ? 'bg-yellow-300 text-indigo-600 shadow-lg' 
+                              : isToday 
+                                ? 'bg-white/30 border-2 border-white/60 text-white' 
+                                : 'bg-white/10 text-white/60'
+                          }`}
+                        >
+                          {isCompleted ? '✓' : dayName}
+                        </div>
+                        {isToday && (
+                          <div className="w-1 h-1 bg-yellow-300 rounded-full mt-1"></div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 打卡按鈕區域 */}
+              {isCheckedToday ? (
+                <div className="space-y-2">
+                  {/* 已打卡狀態 */}
+                  <div className="w-full py-3 rounded-xl font-bold text-sm bg-white/20 text-white/80 text-center border border-white/30">
+                    今日已打卡 ✓
+                  </div>
+                  
+                  {/* 取消打卡按鈕 */}
+                  {!showCancelConfirm ? (
+                    <div className="flex justify-center">
+                      <motion.button
+                        onClick={() => setShowCancelConfirm(true)}
+                        className="px-4 py-1.5 rounded-lg text-xs bg-white/10 text-white/70 hover:bg-white/20 transition-colors border border-white/20"
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        取消今日打卡
+                      </motion.button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="text-center text-xs text-white/80 py-1">
+                        確定要取消今日打卡嗎？
+                      </div>
+                      <div className="flex gap-2">
+                        <motion.button
+                          onClick={() => setShowCancelConfirm(false)}
+                          className="flex-1 py-2 rounded-lg text-xs bg-white/10 text-white/70 hover:bg-white/20 transition-colors"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          不了
+                        </motion.button>
+                        <motion.button
+                          onClick={() => {
+                            onCancelCheckIn();
+                            setShowCancelConfirm(false);
+                          }}
+                          className="flex-1 py-2 rounded-lg text-xs bg-red-400/80 text-white hover:bg-red-500/80 transition-colors"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          確定取消
+                        </motion.button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <motion.button
+                  onClick={onCheckIn}
+                  className="w-full py-3 rounded-xl font-bold text-sm transition-all shadow-lg bg-white/90 text-indigo-600 hover:bg-white hover:scale-105 active:scale-95"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  今日打卡 🎯
+                </motion.button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center space-y-4">
+              <div className="text-4xl mb-2">🎯</div>
+              <h4 className="text-lg font-bold">還沒有設定本週挑戰</h4>
+              <p className="text-white/80 text-sm mb-4">設定一個專屬於你的本週挑戰吧！</p>
+              <button
+                onClick={() => setEditingChallenge(true)}
+                className="px-6 py-2 bg-white/90 text-indigo-600 rounded-xl font-bold hover:bg-white transition-all shadow-lg hover:scale-105 text-sm"
+              >
+                立即設定
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 };
 
@@ -826,7 +1081,7 @@ export const TaskWallPage = () => {
   // 組件狀態
   const [config, setConfig] = useState<TaskWallConfig>({
     maxVisibleCards: 12,
-    gridColumns: 'auto',
+    gridColumns: 3, // 在60%寬度下使用3列來保持正方形比例
     priorityFilter: 'all',
     showCompletedStack: true,
     viewMode: 'tasks'
@@ -845,6 +1100,48 @@ export const TaskWallPage = () => {
   const [loadingTopicId, setLoadingTopicId] = useState<string | null>(null);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [selectedTaskForHistory, setSelectedTaskForHistory] = useState<TaskWithContext | null>(null);
+  
+  // 本週挑戰相關狀態
+  const [weeklyChallenge, setWeeklyChallenge] = useState<{
+    title: string;
+    completedDays: string[];
+    startDate: string;
+  } | null>(null);
+  const [editingChallenge, setEditingChallenge] = useState(false);
+  const [challengeInput, setChallengeInput] = useState('');
+
+  // 獲取台灣時間的日期字串 (UTC+8)
+  const getTaiwanDateString = () => {
+    const now = new Date();
+    const taiwanTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    return taiwanTime.toISOString().split('T')[0];
+  };
+
+  // 獲取本週的開始日期 (週一)
+  const getWeekStart = (date: string) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff)).toISOString().split('T')[0];
+  };
+
+  // 初始化本週挑戰數據
+  useEffect(() => {
+    const savedChallenge = localStorage.getItem('weeklyChallenge');
+    const currentWeekStart = getWeekStart(getTaiwanDateString());
+    
+    if (savedChallenge) {
+      const challenge = JSON.parse(savedChallenge);
+      // 檢查是否是本週的挑戰
+      if (challenge.startDate === currentWeekStart) {
+        setWeeklyChallenge(challenge);
+      } else {
+        // 新的一週，清除舊挑戰
+        localStorage.removeItem('weeklyChallenge');
+        setWeeklyChallenge(null);
+      }
+    }
+  }, []);
 
   // 初始化資料載入
   useEffect(() => {
@@ -1358,6 +1655,113 @@ export const TaskWallPage = () => {
     setShowHistoryDialog(true);
   }, []);
 
+  // 處理設定週挑戰
+  const handleSetChallenge = useCallback(() => {
+    if (!challengeInput.trim()) return;
+    
+    const currentWeekStart = getWeekStart(getTaiwanDateString());
+    const newChallenge = {
+      title: challengeInput.trim(),
+      completedDays: [],
+      startDate: currentWeekStart
+    };
+    
+    setWeeklyChallenge(newChallenge);
+    localStorage.setItem('weeklyChallenge', JSON.stringify(newChallenge));
+    setChallengeInput('');
+    setEditingChallenge(false);
+    
+    toast.success('本週挑戰設定成功！🎯', {
+      duration: 3000,
+      style: {
+        background: '#10B981',
+        color: 'white',
+        borderRadius: '12px'
+      }
+    });
+  }, [challengeInput]);
+
+  // 處理挑戰打卡
+  const handleChallengeCheckIn = useCallback(() => {
+    if (!weeklyChallenge) return;
+    
+    const today = getTaiwanDateString();
+    const isAlreadyChecked = weeklyChallenge.completedDays.includes(today);
+    
+    if (isAlreadyChecked) {
+      toast.error('今天已經打過卡了！明天再來吧 😊');
+      return;
+    }
+    
+    const updatedChallenge = {
+      ...weeklyChallenge,
+      completedDays: [...weeklyChallenge.completedDays, today]
+    };
+    
+    setWeeklyChallenge(updatedChallenge);
+    localStorage.setItem('weeklyChallenge', JSON.stringify(updatedChallenge));
+    
+    // 檢查是否完成本週挑戰
+    if (updatedChallenge.completedDays.length === 7) {
+      toast.success('🎉 恭喜完成本週挑戰！你太棒了！', {
+        duration: 5000,
+        style: {
+          background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+          color: 'white',
+          borderRadius: '12px',
+          fontWeight: '600'
+        }
+      });
+    } else {
+      toast.success(`✨ 打卡成功！已完成 ${updatedChallenge.completedDays.length}/7 天`, {
+        duration: 3000,
+        style: {
+          background: '#10B981',
+          color: 'white',
+          borderRadius: '12px'
+        }
+      });
+    }
+  }, [weeklyChallenge]);
+
+  // 處理編輯挑戰
+  const handleEditChallenge = useCallback(() => {
+    if (weeklyChallenge) {
+      setChallengeInput(weeklyChallenge.title);
+    }
+    setEditingChallenge(true);
+  }, [weeklyChallenge]);
+
+  // 處理取消打卡
+  const handleCancelCheckIn = useCallback(() => {
+    if (!weeklyChallenge) return;
+    
+    const today = getTaiwanDateString();
+    const isAlreadyChecked = weeklyChallenge.completedDays.includes(today);
+    
+    if (!isAlreadyChecked) {
+      toast.error('今天還沒有打卡記錄');
+      return;
+    }
+    
+    const updatedChallenge = {
+      ...weeklyChallenge,
+      completedDays: weeklyChallenge.completedDays.filter(date => date !== today)
+    };
+    
+    setWeeklyChallenge(updatedChallenge);
+    localStorage.setItem('weeklyChallenge', JSON.stringify(updatedChallenge));
+    
+    toast.success('已取消今日打卡', {
+      duration: 3000,
+      style: {
+        background: '#F59E0B',
+        color: 'white',
+        borderRadius: '12px'
+      }
+    });
+  }, [weeklyChallenge]);
+
   // 載入狀態
   if (loading) {
     return (
@@ -1408,190 +1812,202 @@ export const TaskWallPage = () => {
           backgroundSize: '100px 100px'
         }}
       >
-        {/* 標題區域 */}
-        <div className="bg-gradient-to-r from-amber-50/80 to-orange-50/80 backdrop-blur-sm border-b border-amber-200/50 mb-6">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => window.history.back()}
-                  className="p-2 rounded-full bg-white/80 text-amber-700 hover:bg-white transition-colors shadow-sm"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                
-                <div>
-                  <div className="flex items-center gap-4 mb-1">
-                    <h1 className="text-3xl font-bold text-amber-900 font-hand">
-                      {config.viewMode === 'tasks' ? '⭐ 我的任務牆' : '🐦 我的主題牆'}
-                    </h1>
-                    <StarCounter 
-                      count={completedCount} 
-                      isAnimating={isStarAnimating}
-                      onClick={handleToggleCompletedStack}
-                    />
+        {/* 主要內容區域 */}
+        <div className="max-w-7xl mx-auto px-4 pb-12">
+          {/* 任務牆標題區域 - 保持整條 */}
+          <div className="bg-gradient-to-r from-amber-50/80 to-orange-50/80 backdrop-blur-sm border-b border-amber-200/50 mb-4 rounded-2xl">
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-2xl font-bold text-amber-900">
+                        {config.viewMode === 'tasks' ? '⭐ 任務牆' : '🐦 主題牆'}
+                      </h1>
+                      <StarCounter 
+                        count={completedCount} 
+                        isAnimating={isStarAnimating}
+                        onClick={handleToggleCompletedStack}
+                      />
+                      <span className="text-sm text-amber-600">
+                        {config.viewMode === 'tasks' ? (
+                          `${allCards.length} 張卡片 • ${activeTasks.filter(task => task.status === 'in_progress').length} 個進行中`
+                        ) : (
+                          `${topicCards.length} 個主題 • ${topicCards.reduce((sum, topic) => sum + topic.inProgressTasks, 0)} 個任務進行中`
+                        )}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-amber-700">
-                    {config.viewMode === 'tasks' ? (
-                      <>
-                        {allCards.length} 張卡片 • 
-                        {activeTasks.filter(task => task.status === 'in_progress').length} 個進行中
-                      </>
-                    ) : (
-                      <>
-                        {topicCards.length} 個主題 • 
-                        {topicCards.reduce((sum, topic) => sum + topic.inProgressTasks, 0)} 個任務進行中
-                        {topicCards.length > 0 && ' • 點擊 + 建立新主題'}
-                      </>
-                    )}
-                  </p>
                 </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                {/* 可愛模式切換按鈕 */}
-                <button
-                  onClick={() => handleViewModeChange(config.viewMode === 'tasks' ? 'topics' : 'tasks')}
-                  className="flex items-center bg-white/95 rounded-full shadow-lg border-2 border-indigo-300 overflow-hidden mr-4 hover:bg-indigo-50/50 transition-colors"
-                  title={`切換到${config.viewMode === 'tasks' ? '主題' : '任務'}模式`}
-                >
-                  <div className={`px-4 py-3 transition-all duration-300 flex items-center gap-3 ${
-                    config.viewMode === 'tasks'
-                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                      : 'text-slate-700'
-                  }`}>
-                    <span className="text-lg">⭐</span>
-                    <span className="text-sm font-bold">任務</span>
-                  </div>
-                  <div className="w-px h-8 bg-indigo-200"></div>
-                  <div className={`px-4 py-3 transition-all duration-300 flex items-center gap-3 ${
-                    config.viewMode === 'topics'
-                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg'
-                      : 'text-slate-700'
-                  }`}>
-                    <span className="text-lg">🐦</span>
-                    <span className="text-sm font-bold">主題</span>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setShowJournalDialog(true)}
-                  className="p-3 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 text-white hover:from-purple-500 hover:to-pink-500 transition-all shadow-md hover:shadow-lg hover:scale-110"
-                  title="寫今日學習日記"
-                >
-                  <BookMarked className="w-5 h-5" />
-                </button>
                 
-                <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className="p-2 rounded-full bg-white/80 text-amber-700 hover:bg-white transition-colors shadow-sm"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* 緊湊模式切換按鈕 */}
+                  <button
+                    onClick={() => handleViewModeChange(config.viewMode === 'tasks' ? 'topics' : 'tasks')}
+                    className="flex items-center bg-white/95 rounded-full shadow-lg border border-indigo-200 overflow-hidden hover:bg-indigo-50/50 transition-colors"
+                    title={`切換到${config.viewMode === 'tasks' ? '主題' : '任務'}模式`}
+                  >
+                    <div className={`px-3 py-2 transition-all duration-300 flex items-center gap-2 ${
+                      config.viewMode === 'tasks'
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                        : 'text-slate-700'
+                    }`}>
+                      <span className="text-sm">⭐</span>
+                      <span className="text-xs font-bold">任務</span>
+                    </div>
+                    <div className="w-px h-6 bg-indigo-200"></div>
+                    <div className={`px-3 py-2 transition-all duration-300 flex items-center gap-2 ${
+                      config.viewMode === 'topics'
+                        ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md'
+                        : 'text-slate-700'
+                    }`}>
+                      <span className="text-sm">🐦</span>
+                      <span className="text-xs font-bold">主題</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setShowJournalDialog(true)}
+                    className="p-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 text-white hover:from-purple-500 hover:to-pink-500 transition-all shadow-md hover:shadow-lg"
+                    title="寫今日學習日記"
+                  >
+                    <BookMarked className="w-4 h-4" />
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowSettings(!showSettings)}
+                    className="p-2 rounded-full bg-white/80 text-amber-700 hover:bg-white transition-colors shadow-sm"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 設定面板 */}
-        <AnimatePresence>
-          {showSettings && (
-            <motion.div
-              className="fixed top-0 right-0 w-80 h-full bg-white/95 backdrop-blur-md shadow-2xl z-[100] p-6"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            >
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-800">任務牆設定</h3>
-                  <button
-                    onClick={() => setShowSettings(false)}
-                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                
-                {/* 最大卡片數設定已移除 - 現在顯示所有卡片 */}
-
-                {/* 優先權過濾 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    優先權過濾
-                  </label>
-                  <select
-                    value={config.priorityFilter}
-                    onChange={(e) => setConfig(prev => ({ 
-                      ...prev, 
-                      priorityFilter: e.target.value as any 
+          {/* 佈局容器：左側60%任務區，右側40%挑戰卡 */}
+          <div className="flex gap-6 relative">
+            {/* 左側：任務內容區域 (60%) */}
+            <div className="flex-1 w-3/5">
+              {config.viewMode === 'tasks' ? (
+                // 任務模式
+                filteredTasks.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🎉</div>
+                    <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
+                    <p className="text-amber-600">所有任務都完成了，該享受成就感了！</p>
+                  </div>
+                ) : (
+                  <TaskWallGrid
+                    cards={allCards}
+                    config={config}
+                    onTaskStatusUpdate={handleTaskStatusUpdate}
+                    onAddTaskToGoal={handleAddTaskToGoal}
+                    onOpenRecord={handleOpenRecord}
+                    onOpenHistory={handleOpenHistory}
+                    onRecordSuccess={handleRecordSuccess}
+                    currentUserId={currentUser?.id}
+                    isLoading={isLoading}
+                  />
+                )
+              ) : (
+                // 主題模式
+                topicCards.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">📚</div>
+                    <h3 className="text-2xl font-bold text-amber-800 mb-2">還沒有主題</h3>
+                    <p className="text-amber-600 mb-4">建立你的第一個學習主題吧！</p>
+                    <button
+                      onClick={() => setShowTemplateBrowser(true)}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 text-white rounded-2xl font-medium hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg hover:shadow-xl"
+                    >
+                      <Plus className="w-5 h-5" />
+                      建立新主題
+                    </button>
+                  </div>
+                ) : (
+                  <TopicGrid
+                    topics={topicCards.map(card => ({
+                      ...card,
+                      isLoading: card.topic.id === loadingTopicId
                     }))}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="all">所有優先權</option>
-                    <option value="high">高優先權</option>
-                    <option value="medium">中優先權</option>
-                    <option value="low">低優先權</option>
-                  </select>
+                    onTopicClick={handleTopicClick}
+                    onCreateTopicClick={() => setShowTemplateBrowser(true)}
+                    isLoading={isLoading}
+                    isViewModeChanging={isViewModeChanging}
+                    loadingTopicId={loadingTopicId}
+                  />
+                )
+              )}
+            </div>
+
+            {/* 右側：本週挑戰卡片 (40%) */}
+            <div className="w-2/5 flex-shrink-0">
+              <div className="sticky top-4">
+                <div className="w-full">
+                  <WeeklyChallengeCard
+                    challenge={weeklyChallenge}
+                    onCheckIn={handleChallengeCheckIn}
+                    onCancelCheckIn={handleCancelCheckIn}
+                    onEdit={handleEditChallenge}
+                    onSetChallenge={handleSetChallenge}
+                    editingChallenge={editingChallenge}
+                    challengeInput={challengeInput}
+                    setChallengeInput={setChallengeInput}
+                    setEditingChallenge={setEditingChallenge}
+                    getTaiwanDateString={getTaiwanDateString}
+                  />
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
 
-        {/* 主要內容區域 */}
-        <div className="max-w-7xl mx-auto px-4 pb-20">
-          {config.viewMode === 'tasks' ? (
-            // 任務模式
-            filteredTasks.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-6xl mb-4">🎉</div>
-                <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
-                <p className="text-amber-600">所有任務都完成了，該享受成就感了！</p>
-              </div>
-            ) : (
-              <TaskWallGrid
-                cards={allCards}
-                config={config}
-                onTaskStatusUpdate={handleTaskStatusUpdate}
-                onAddTaskToGoal={handleAddTaskToGoal}
-                onOpenRecord={handleOpenRecord}
-                onOpenHistory={handleOpenHistory}
-                onRecordSuccess={handleRecordSuccess}
-                currentUserId={currentUser?.id}
-                isLoading={isLoading}
-              />
-            )
-          ) : (
-            // 主題模式
-            topicCards.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-6xl mb-4">📚</div>
-                <h3 className="text-2xl font-bold text-amber-800 mb-2">還沒有主題</h3>
-                <p className="text-amber-600 mb-4">建立你的第一個學習主題吧！</p>
-                <button
-                  onClick={() => setShowTemplateBrowser(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 text-white rounded-2xl font-medium hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg hover:shadow-xl"
-                >
-                  <Plus className="w-5 h-5" />
-                  建立新主題
-                </button>
-              </div>
-            ) : (
-                          <TopicGrid
-              topics={topicCards.map(card => ({
-                ...card,
-                isLoading: card.topic.id === loadingTopicId
-              }))}
-              onTopicClick={handleTopicClick}
-              onCreateTopicClick={() => setShowTemplateBrowser(true)}
-              isLoading={isLoading}
-              isViewModeChanging={isViewModeChanging}
-              loadingTopicId={loadingTopicId}
-            />
-            )
-          )}
+          {/* 設定面板 */}
+          <AnimatePresence>
+            {showSettings && (
+              <motion.div
+                className="fixed top-0 right-0 w-80 h-full bg-white/95 backdrop-blur-md shadow-2xl z-[100] p-6"
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              >
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-800">任務牆設定</h3>
+                    <button
+                      onClick={() => setShowSettings(false)}
+                      className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {/* 最大卡片數設定已移除 - 現在顯示所有卡片 */}
+
+                  {/* 優先權過濾 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      優先權過濾
+                    </label>
+                    <select
+                      value={config.priorityFilter}
+                      onChange={(e) => setConfig(prev => ({ 
+                        ...prev, 
+                        priorityFilter: e.target.value as any 
+                      }))}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="all">所有優先權</option>
+                      <option value="high">高優先權</option>
+                      <option value="medium">中優先權</option>
+                      <option value="low">低優先權</option>
+                    </select>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* 完成任務 Dialog */}
