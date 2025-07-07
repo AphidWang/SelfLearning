@@ -20,9 +20,10 @@
  * - 手寫風字體：親切溫馨的視覺效果
  */
 
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Activity, Pause, User as UserIcon, Timer } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { Clock, Target, CheckCircle2, Play, Edit, BookOpen, Activity, Pause, User as UserIcon, Timer, Link, FileText, Image, Video, Download, ExternalLink } from 'lucide-react';
 import type { Task, TaskStatus } from '../../../types/goal';
 
 /**
@@ -58,6 +59,9 @@ interface TaskCardProps {
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpenRecord, onOpenHistory, onRecordSuccess, currentUserId }) => {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [showReferenceInfo, setShowReferenceInfo] = useState(false);
+  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   /**
    * 獲取優先權顏色和圖示
@@ -98,11 +102,99 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
   // 檢查是否需要顯示 owner tag
   const shouldShowOwnerTag = task.owner && currentUserId && task.owner.id !== currentUserId;
 
+  // 參考資訊相關
+  const attachments = task.reference_info?.attachments || [];
+  const links = task.reference_info?.links || [];
+  const totalReferenceItems = attachments.length + links.length;
+
+  // 點擊外部關閉彈窗
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showReferenceInfo && buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
+        // 檢查是否點擊在彈窗內
+        const popupElement = document.querySelector('[data-popup="reference-info"]');
+        if (popupElement && !popupElement.contains(event.target as Node)) {
+          setShowReferenceInfo(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showReferenceInfo]);
+
+  /**
+   * 獲取附件類型對應的圖標
+   */
+  const getAttachmentIcon = (type: string) => {
+    switch (type) {
+      case 'image':
+        return Image;
+      case 'video':
+        return Video;
+      case 'pdf':
+      case 'document':
+        return FileText;
+      default:
+        return FileText;
+    }
+  };
+
+  /**
+   * 獲取連結類型對應的圖標
+   */
+  const getLinkIcon = (type: string) => {
+    switch (type) {
+      case 'youtube':
+        return Video;
+      case 'github':
+        return Link;
+      default:
+        return Link;
+    }
+  };
+
+  /**
+   * 處理參考資訊項目點擊
+   */
+  const handleReferenceItemClick = (url: string, type: string) => {
+    // 根據類型決定行為
+    if (type === 'image' || type === 'video' || type === 'pdf') {
+      // 在新分頁中預覽
+      window.open(url, '_blank');
+    } else if (type === 'document' || type === 'audio' || type === 'other') {
+      // 下載
+      window.open(url, '_blank');
+    } else {
+      // 連結類型，在新分頁中開啟
+      window.open(url, '_blank');
+    }
+  };
+
   /**
    * 處理完成任務，檢查是否需要記錄
    */
   const handleCompleteTask = () => {
     onStatusUpdate('done');
+  };
+
+  /**
+   * 處理參考資訊彈窗的顯示位置
+   */
+  const handleShowReferenceInfo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPopupPosition({
+        x: rect.right - 256, // 彈窗寬度是 256px (w-64)
+        y: rect.bottom + 8
+      });
+    }
+    
+    setShowReferenceInfo(!showReferenceInfo);
   };
 
   /**
@@ -118,11 +210,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
   };
 
   return (
-    <div className="relative w-full max-w-xs mx-auto h-48" style={{ perspective: '1000px' }}>
+    <div className="relative w-full max-w-xs mx-auto h-48" style={{ perspective: '1000px', zIndex: showReferenceInfo ? 9999 : 1 }}>
       {/* 卡片容器 */}
       <motion.div
         className="relative w-full h-full cursor-pointer"
-        onClick={() => setIsFlipped(!isFlipped)}
+        onClick={() => {
+          setIsFlipped(!isFlipped);
+          setShowReferenceInfo(false); // 翻轉時關閉參考資訊彈窗
+        }}
         animate={isFlipped ? "back" : "front"}
         variants={cardVariants}
         transition={{ duration: 0.6, ease: "easeInOut" }}
@@ -134,8 +229,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
           style={{
             backgroundColor: '#FFFEF7',
             backgroundImage: `
-              linear-gradient(135deg, ${task.subjectStyle.accent}08 0%, ${task.subjectStyle.accent}15 100%),
-              url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23f5f0e8' fill-opacity='0.3'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3C/g%3E%3C/svg%3E")
+              linear-gradient(135deg, ${task.subjectStyle.accent}20 0%, ${task.subjectStyle.accent}30 100%),
+              url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23f5f0e8' fill-opacity='0.5'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3C/g%3E%3C/svg%3E")
             `,
             boxShadow: `
               0 4px 12px rgba(0,0,0,0.1),
@@ -193,8 +288,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
               </div>
             </div>
 
-            {/* 學習記錄數量 */}
-            <div className="flex justify-end mb-2">
+            {/* 操作按鈕區域 */}
+            <div className="flex justify-end gap-2 mb-2">
+              {/* 學習記錄數量 */}
               {(task.records?.length || 0) > 0 && (
                 <button 
                   onClick={(e) => {
@@ -211,7 +307,146 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                   +{task.records?.length}
                 </button>
               )}
+              
+              {/* 參考資訊按鈕 */}
+              {totalReferenceItems > 0 && (
+                <div className="relative">
+                  <button 
+                    ref={buttonRef}
+                    onClick={handleShowReferenceInfo}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:scale-110 hover:shadow-md"
+                    style={{
+                      backgroundColor: task.subjectStyle.accent + 'AA',
+                      color: 'white'
+                    }}
+                    title={`${totalReferenceItems} 個參考資料`}
+                  >
+                    <Link className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
+
+                        {/* 參考資訊彈窗 - 使用 Portal 渲染到 body */}
+            {showReferenceInfo && createPortal(
+              <AnimatePresence>
+                <motion.div
+                  className="fixed z-[99999] w-64 rounded-2xl shadow-2xl border-0 p-4"
+                  data-popup="reference-info"
+                  style={{
+                    left: popupPosition.x,
+                    top: popupPosition.y,
+                    background: '#f0f4ff',
+                    boxShadow: `
+                      0 20px 40px rgba(0,0,0,0.15),
+                      0 8px 16px ${task.subjectStyle.accent}25,
+                      0 0 0 1px ${task.subjectStyle.accent}20,
+                      inset 0 1px 0 rgba(255,255,255,0.9)
+                    `
+                  }}
+                  initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* 箭頭指向按鈕 */}
+                  <div 
+                    className="absolute -top-2 right-6 w-4 h-4 rotate-45"
+                    style={{
+                      background: '#f0f4ff',
+                      border: `1px solid ${task.subjectStyle.accent}20`,
+                      borderRight: 'none',
+                      borderBottom: 'none'
+                    }}
+                  />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 
+                        className="text-sm font-bold flex items-center gap-2"
+                        style={{ color: task.subjectStyle.accent }}
+                      >
+                        <Link className="w-4 h-4" />
+                        參考資料
+                      </h5>
+                      <button
+                        onClick={() => setShowReferenceInfo(false)}
+                        className="p-1.5 rounded-full transition-all hover:scale-110"
+                        style={{ 
+                          backgroundColor: task.subjectStyle.accent + '15',
+                          color: task.subjectStyle.accent 
+                        }}
+                      >
+                        <span className="text-xs font-bold">✕</span>
+                      </button>
+                    </div>
+                    
+                    {/* 附件列表 */}
+                    {attachments.map((attachment) => {
+                      const Icon = getAttachmentIcon(attachment.type);
+                      return (
+                        <div
+                          key={attachment.id}
+                          className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
+                          style={{
+                            background: '#f8f9fa',
+                            border: `1px solid ${task.subjectStyle.accent}20`
+                          }}
+                          onClick={() => handleReferenceItemClick(attachment.url, attachment.type)}
+                        >
+                          <Icon className="w-4 h-4 flex-shrink-0" style={{ color: task.subjectStyle.accent }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-800 truncate">
+                              {attachment.title}
+                            </div>
+                            {(attachment.size || 0) > 0 && (
+                              <div className="text-xs text-gray-600">
+                                {((attachment.size || 0) / 1024 / 1024).toFixed(1)} MB
+                              </div>
+                            )}
+                          </div>
+                          {attachment.type === 'image' || attachment.type === 'video' || attachment.type === 'pdf' ? (
+                            <ExternalLink className="w-3 h-3" style={{ color: task.subjectStyle.accent }} />
+                          ) : (
+                            <Download className="w-3 h-3" style={{ color: task.subjectStyle.accent }} />
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* 連結列表 */}
+                    {links.map((link) => {
+                      const Icon = getLinkIcon(link.type);
+                      return (
+                        <div
+                          key={link.id}
+                          className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
+                          style={{
+                            background: '#f0f4ff',
+                            border: `1px solid #1e40af20`
+                          }}
+                          onClick={() => handleReferenceItemClick(link.url, link.type)}
+                        >
+                          <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-800 truncate">
+                              {link.title}
+                            </div>
+                            {link.description && (
+                              <div className="text-xs text-gray-600 truncate">
+                                {link.description}
+                              </div>
+                            )}
+                          </div>
+                          <ExternalLink className="w-3 h-3 text-blue-600" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              </AnimatePresence>,
+              document.body
+            )}
 
             {/* 底部：目標資訊 */}
             <div className="mt-auto pt-2 border-t border-gray-200/50">
@@ -237,7 +472,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
           className="absolute inset-0 w-full h-full rounded-2xl shadow-lg border-0"
           style={{
             backgroundColor: '#FFF9F0',
-            backgroundImage: `linear-gradient(135deg, ${task.subjectStyle.accent}12 0%, ${task.subjectStyle.accent}25 100%)`,
+            backgroundImage: `linear-gradient(135deg, ${task.subjectStyle.accent}25 0%, ${task.subjectStyle.accent}40 100%)`,
             boxShadow: `
               0 4px 12px rgba(0,0,0,0.1),
               0 2px 8px ${task.subjectStyle.accent}20,
@@ -263,6 +498,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setShowReferenceInfo(false);
                         onStatusUpdate('in_progress');
                       }}
                       className="flex-1 py-2 px-3 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors flex items-center justify-center gap-1"
@@ -273,6 +509,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setShowReferenceInfo(false);
                         handleCompleteTask();
                       }}
                       className="flex-1 py-2 px-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-1"
@@ -286,6 +523,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setShowReferenceInfo(false);
                         onStatusUpdate('todo');
                       }}
                       className="flex-1 py-2 px-3 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors flex items-center justify-center gap-1"
@@ -296,6 +534,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setShowReferenceInfo(false);
                         handleCompleteTask();
                       }}
                       className="flex-1 py-2 px-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-1"
@@ -312,6 +551,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                setShowReferenceInfo(false);
                 onOpenRecord?.(task);
               }}
               className="w-full py-2 px-3 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
