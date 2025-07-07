@@ -389,12 +389,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                           key={attachment.id}
                           className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
                           style={{
-                            background: '#f8f9fa',
-                            border: `1px solid ${task.subjectStyle.accent}20`
+                            background: '#ffffff',
+                            border: `1px solid #e2e8f0`
                           }}
                           onClick={() => handleReferenceItemClick(attachment.url, attachment.type)}
                         >
-                          <Icon className="w-4 h-4 flex-shrink-0" style={{ color: task.subjectStyle.accent }} />
+                          <Icon className="w-4 h-4 flex-shrink-0" style={{ color: '#4f46e5' }} />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium text-gray-800 truncate">
                               {attachment.title}
@@ -406,9 +406,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                             )}
                           </div>
                           {attachment.type === 'image' || attachment.type === 'video' || attachment.type === 'pdf' ? (
-                            <ExternalLink className="w-3 h-3" style={{ color: task.subjectStyle.accent }} />
+                            <ExternalLink className="w-3 h-3" style={{ color: '#4f46e5' }} />
                           ) : (
-                            <Download className="w-3 h-3" style={{ color: task.subjectStyle.accent }} />
+                            <Download className="w-3 h-3" style={{ color: '#4f46e5' }} />
                           )}
                         </div>
                       );
@@ -422,12 +422,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                           key={link.id}
                           className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
                           style={{
-                            background: '#f0f4ff',
-                            border: `1px solid #1e40af20`
+                            background: '#ffffff',
+                            border: `1px solid #e2e8f0`
                           }}
                           onClick={() => handleReferenceItemClick(link.url, link.type)}
                         >
-                          <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          <Icon className="w-4 h-4 flex-shrink-0" style={{ color: '#0ea5e9' }} />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium text-gray-800 truncate">
                               {link.title}
@@ -438,7 +438,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStatusUpdate, onOpen
                               </div>
                             )}
                           </div>
-                          <ExternalLink className="w-3 h-3 text-blue-600" />
+                          <ExternalLink className="w-3 h-3" style={{ color: '#0ea5e9' }} />
                         </div>
                       );
                     })}
