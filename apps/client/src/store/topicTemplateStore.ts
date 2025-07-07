@@ -21,7 +21,10 @@ import type {
   CopyTemplateParams,
   TemplateGoal,
   TemplateTask,
-  Bubble 
+  Bubble,
+  ReferenceInfo,
+  ReferenceAttachment,
+  ReferenceLink
 } from '../types/goal';
 import type { User } from '@self-learning/types';
 import { supabase } from '../services/supabase';
@@ -62,6 +65,13 @@ interface TopicTemplateStore {
   addBubble: (templateId: string, bubble: Omit<Bubble, 'id'>) => Promise<Bubble | null>;
   updateBubble: (templateId: string, bubbleId: string, updates: Partial<Bubble>) => Promise<Bubble | null>;
   deleteBubble: (templateId: string, bubbleId: string) => Promise<boolean>;
+
+  // 參考資訊管理
+  updateTemplateReferenceInfo: (templateId: string, referenceInfo: ReferenceInfo) => Promise<boolean>;
+  addTemplateAttachment: (templateId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTemplateAttachment: (templateId: string, attachmentId: string) => Promise<boolean>;
+  addTemplateLink: (templateId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTemplateLink: (templateId: string, linkId: string) => Promise<boolean>;
 
   // 工具方法
   setSelectedTemplateId: (id: string | null) => void;
@@ -858,6 +868,95 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to refresh template:', error);
     }
+  },
+
+  // 參考資訊管理實作
+  updateTemplateReferenceInfo: async (templateId, referenceInfo) => {
+    try {
+      const { error } = await supabase
+        .from('topic_templates')
+        .update({ reference_info: referenceInfo })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set(state => ({
+        templates: state.templates.map(template =>
+          template.id === templateId
+            ? { ...template, reference_info: referenceInfo }
+            : template
+        )
+      }));
+
+      return true;
+    } catch (error) {
+      console.error('更新模板參考資訊失敗:', error);
+      set({ error: error instanceof Error ? error.message : '更新參考資訊失敗' });
+      return false;
+    }
+  },
+
+  addTemplateAttachment: async (templateId, attachment) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const newAttachment: ReferenceAttachment = {
+      ...attachment,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = template.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      attachments: [...currentReferenceInfo.attachments, newAttachment]
+    };
+
+    return await get().updateTemplateReferenceInfo(templateId, updatedReferenceInfo);
+  },
+
+  removeTemplateAttachment: async (templateId, attachmentId) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template || !template.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...template.reference_info,
+      attachments: template.reference_info.attachments.filter(a => a.id !== attachmentId)
+    };
+
+    return await get().updateTemplateReferenceInfo(templateId, updatedReferenceInfo);
+  },
+
+  addTemplateLink: async (templateId, link) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const newLink: ReferenceLink = {
+      ...link,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = template.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      links: [...currentReferenceInfo.links, newLink]
+    };
+
+    return await get().updateTemplateReferenceInfo(templateId, updatedReferenceInfo);
+  },
+
+  removeTemplateLink: async (templateId, linkId) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template || !template.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...template.reference_info,
+      links: template.reference_info.links.filter(l => l.id !== linkId)
+    };
+
+    return await get().updateTemplateReferenceInfo(templateId, updatedReferenceInfo);
   },
 
   reset: () => set({

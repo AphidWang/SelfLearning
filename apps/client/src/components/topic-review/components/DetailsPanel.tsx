@@ -74,6 +74,7 @@ import { TaskRecordInterface } from './TaskRecordInterface';
 import { TopicCollaborationManager } from './TopicCollaborationManager';
 import { GoalStatusManager } from './GoalStatusManager';
 import { TaskStatusManager } from './TaskStatusManager';
+import { ReferenceInfoPanel } from './ReferenceInfoPanel';
 import toast from 'react-hot-toast';
 
 interface DetailsPanelProps {
@@ -106,7 +107,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     markTaskCompletedCompat: markTaskCompleted,
     markTaskInProgressCompat: markTaskInProgress,
     markTaskTodoCompat: markTaskTodo,
-    updateGoalCompat
+    updateGoalCompat,
+    // 參考資訊方法
+    updateTopicReferenceInfo, addTopicAttachment, removeTopicAttachment, addTopicLink, removeTopicLink,
+    updateGoalReferenceInfo, addGoalAttachment, removeGoalAttachment, addGoalLink, removeGoalLink,
+    updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink
   } = useTopicStore();
 
   // 編輯狀態
@@ -409,6 +414,38 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
           {/* 協作者管理 */}
           {renderCollaboratorManager()}
+
+          {/* 目標參考資訊 */}
+          <ReferenceInfoPanel
+            title="目標參考資訊"
+            referenceInfo={selectedGoal.reference_info}
+            onUpdateReferenceInfo={async (info) => {
+              await handleUpdate(async () => {
+                await updateGoalReferenceInfo(selectedGoal.id, info);
+              });
+            }}
+            onAddAttachment={async (attachment) => {
+              await handleUpdate(async () => {
+                await addGoalAttachment(selectedGoal.id, attachment);
+              });
+            }}
+            onRemoveAttachment={async (attachmentId) => {
+              await handleUpdate(async () => {
+                await removeGoalAttachment(selectedGoal.id, attachmentId);
+              });
+            }}
+            onAddLink={async (link) => {
+              await handleUpdate(async () => {
+                await addGoalLink(selectedGoal.id, link);
+              });
+            }}
+            onRemoveLink={async (linkId) => {
+              await handleUpdate(async () => {
+                await removeGoalLink(selectedGoal.id, linkId);
+              });
+            }}
+            isUpdating={isUpdating}
+          />
 
           {/* 任務列表與管理 */}
           <div>
@@ -774,6 +811,38 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
 
 
+          {/* 主題參考資訊 */}
+          <ReferenceInfoPanel
+            title="主題參考資訊"
+            referenceInfo={topic.reference_info}
+            onUpdateReferenceInfo={async (info) => {
+              await handleUpdate(async () => {
+                await updateTopicReferenceInfo(topic.id, info);
+              });
+            }}
+            onAddAttachment={async (attachment) => {
+              await handleUpdate(async () => {
+                await addTopicAttachment(topic.id, attachment);
+              });
+            }}
+            onRemoveAttachment={async (attachmentId) => {
+              await handleUpdate(async () => {
+                await removeTopicAttachment(topic.id, attachmentId);
+              });
+            }}
+            onAddLink={async (link) => {
+              await handleUpdate(async () => {
+                await addTopicLink(topic.id, link);
+              });
+            }}
+            onRemoveLink={async (linkId) => {
+              await handleUpdate(async () => {
+                await removeTopicLink(topic.id, linkId);
+              });
+            }}
+            isUpdating={isUpdating}
+          />
+
           {/* 學科資訊 */}
           {topic.subject && (
             <div>
@@ -841,7 +910,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 }) => {
   const { 
     updateTaskInfo, deleteTask, setTaskOwner, addTaskCollaborator,
-          removeTaskCollaborator, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo
+          removeTaskCollaborator, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo,
+    // 參考資訊方法
+    updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink
   } = useTopicStore();
   
   // 編輯狀態
@@ -1149,6 +1220,38 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 
         {/* 協作者管理 */}
         {topic.is_collaborative && renderCollaboratorManager()}
+
+        {/* 任務參考資訊 */}
+        <ReferenceInfoPanel
+          title="任務參考資訊"
+          referenceInfo={task.reference_info}
+          onUpdateReferenceInfo={async (info) => {
+            await handleUpdate(async () => {
+              await updateTaskReferenceInfo(task.id, info);
+            });
+          }}
+          onAddAttachment={async (attachment) => {
+            await handleUpdate(async () => {
+              await addTaskAttachment(task.id, attachment);
+            });
+          }}
+          onRemoveAttachment={async (attachmentId) => {
+            await handleUpdate(async () => {
+              await removeTaskAttachment(task.id, attachmentId);
+            });
+          }}
+          onAddLink={async (link) => {
+            await handleUpdate(async () => {
+              await addTaskLink(task.id, link);
+            });
+          }}
+          onRemoveLink={async (linkId) => {
+            await handleUpdate(async () => {
+              await removeTaskLink(task.id, linkId);
+            });
+          }}
+          isUpdating={isUpdating}
+        />
       </div>
 
       {/* 固定底部按鈕 */}

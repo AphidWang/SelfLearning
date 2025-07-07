@@ -16,6 +16,7 @@ export interface Topic {
   owner_id: string;
   title: string;
   description?: string;
+  reference_info?: ReferenceInfo;
   subject?: string;
   category?: string;
   status: TopicStatus;
@@ -50,6 +51,7 @@ export interface Goal {
   topic_id: string;
   title: string;
   description?: string;
+  reference_info?: ReferenceInfo;
   status: GoalStatus;
   priority: TaskPriority;
   order_index: number;
@@ -80,6 +82,7 @@ export interface Task {
   goal_id: string;
   title: string;
   description?: string;
+  reference_info?: ReferenceInfo;
   status: TaskStatus;
   priority: TaskPriority;
   order_index: number;
@@ -176,6 +179,7 @@ export interface TopicTemplate {
   id: string;
   title: string;
   description?: string;
+  reference_info?: ReferenceInfo;
   subject?: SubjectType;
   category?: string;
   template_type?: string;
@@ -313,4 +317,35 @@ export interface TaskWithContext extends Task {
     files?: any[];
     tags?: string[];
   }[];
+}
+
+// 參考資訊相關類型
+export type AttachmentType = 'image' | 'video' | 'pdf' | 'document' | 'audio' | 'other';
+export type LinkType = 'website' | 'youtube' | 'github' | 'drive' | 'other';
+
+export interface ReferenceAttachment {
+  id: string;
+  title: string;
+  url: string;
+  type: AttachmentType;
+  size?: number; // 檔案大小（bytes）
+  thumbnail?: string; // 縮圖 URL
+  created_at: string;
+  created_by?: string;
+}
+
+export interface ReferenceLink {
+  id: string;
+  title: string;
+  url: string;
+  type: LinkType;
+  description?: string;
+  thumbnail?: string; // 網站截圖或 favicon
+  created_at: string;
+  created_by?: string;
+}
+
+export interface ReferenceInfo {
+  attachments: ReferenceAttachment[];
+  links: ReferenceLink[];
 }

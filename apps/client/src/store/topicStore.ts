@@ -20,7 +20,8 @@
 import { create } from 'zustand';
 import { 
   Topic, Goal, Task, Bubble, GoalStatus, TaskStatus, TaskPriority,
-  CreateTopicFromTemplateParams, SafeUpdateResult, TopicWithStructure, ActiveTaskResult
+  CreateTopicFromTemplateParams, SafeUpdateResult, TopicWithStructure, ActiveTaskResult,
+  ReferenceInfo, ReferenceAttachment, ReferenceLink
 } from '../types/goal';
 import type { TopicCollaborator, User } from '@self-learning/types';
 import { supabase, authService } from '../services/supabase';
@@ -126,6 +127,29 @@ interface TopicStore {
   addTask: (goalId: string, task: Omit<Task, 'id' | 'goal_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Task | null>;
   updateTask: (taskId: string, expectedVersion: number, updates: Partial<Task>) => Promise<Task | null>;
   deleteTask: (taskId: string) => Promise<boolean>;
+
+  // === 參考資訊操作 ===
+  
+  // Topic 參考資訊
+  updateTopicReferenceInfo: (topicId: string, referenceInfo: ReferenceInfo) => Promise<boolean>;
+  addTopicAttachment: (topicId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTopicAttachment: (topicId: string, attachmentId: string) => Promise<boolean>;
+  addTopicLink: (topicId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTopicLink: (topicId: string, linkId: string) => Promise<boolean>;
+  
+  // Goal 參考資訊
+  updateGoalReferenceInfo: (goalId: string, referenceInfo: ReferenceInfo) => Promise<boolean>;
+  addGoalAttachment: (goalId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => Promise<boolean>;
+  removeGoalAttachment: (goalId: string, attachmentId: string) => Promise<boolean>;
+  addGoalLink: (goalId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
+  removeGoalLink: (goalId: string, linkId: string) => Promise<boolean>;
+  
+  // Task 參考資訊
+  updateTaskReferenceInfo: (taskId: string, referenceInfo: ReferenceInfo) => Promise<boolean>;
+  addTaskAttachment: (taskId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTaskAttachment: (taskId: string, attachmentId: string) => Promise<boolean>;
+  addTaskLink: (taskId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTaskLink: (taskId: string, linkId: string) => Promise<boolean>;
 
   // === 專門的狀態切換函數（推薦使用） ===
   markTaskCompleted: (taskId: string, expectedVersion: number, requireRecord?: boolean) => Promise<MarkTaskResult>;
@@ -2226,5 +2250,381 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       console.error('移除協作者失敗:', error);
       return false;
     }
+  },
+
+  // === 參考資訊操作實現 ===
+  
+  // Topic 參考資訊
+  updateTopicReferenceInfo: async (topicId: string, referenceInfo: ReferenceInfo) => {
+    set({ loading: true, error: null });
+    try {
+      const { error } = await supabase
+        .from('topics')
+        .update({ reference_info: referenceInfo })
+        .eq('id', topicId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set((state) => ({
+        topics: state.topics.map((topic) =>
+          topic.id === topicId
+            ? { ...topic, reference_info: referenceInfo }
+            : topic
+        ),
+        loading: false
+      }));
+
+      return true;
+    } catch (error: any) {
+      console.error('更新 Topic 參考資訊失敗:', error);
+      set({ loading: false, error: error.message });
+      return false;
+    }
+  },
+
+  addTopicAttachment: async (topicId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => {
+    const topic = get().topics.find(t => t.id === topicId);
+    if (!topic) return false;
+
+    const newAttachment: ReferenceAttachment = {
+      ...attachment,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = topic.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      attachments: [...currentReferenceInfo.attachments, newAttachment]
+    };
+
+    return await get().updateTopicReferenceInfo(topicId, updatedReferenceInfo);
+  },
+
+  removeTopicAttachment: async (topicId: string, attachmentId: string) => {
+    const topic = get().topics.find(t => t.id === topicId);
+    if (!topic || !topic.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...topic.reference_info,
+      attachments: topic.reference_info.attachments.filter(a => a.id !== attachmentId)
+    };
+
+    return await get().updateTopicReferenceInfo(topicId, updatedReferenceInfo);
+  },
+
+  addTopicLink: async (topicId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => {
+    const topic = get().topics.find(t => t.id === topicId);
+    if (!topic) return false;
+
+    const newLink: ReferenceLink = {
+      ...link,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = topic.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      links: [...currentReferenceInfo.links, newLink]
+    };
+
+    return await get().updateTopicReferenceInfo(topicId, updatedReferenceInfo);
+  },
+
+  removeTopicLink: async (topicId: string, linkId: string) => {
+    const topic = get().topics.find(t => t.id === topicId);
+    if (!topic || !topic.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...topic.reference_info,
+      links: topic.reference_info.links.filter(l => l.id !== linkId)
+    };
+
+    return await get().updateTopicReferenceInfo(topicId, updatedReferenceInfo);
+  },
+
+  // Goal 參考資訊
+  updateGoalReferenceInfo: async (goalId: string, referenceInfo: ReferenceInfo) => {
+    set({ loading: true, error: null });
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ reference_info: referenceInfo })
+        .eq('id', goalId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set((state) => ({
+        topics: state.topics.map((topic) => ({
+          ...topic,
+          goals: topic.goals?.map((goal) =>
+            goal.id === goalId
+              ? { ...goal, reference_info: referenceInfo }
+              : goal
+          )
+        })),
+        loading: false
+      }));
+
+      return true;
+    } catch (error: any) {
+      console.error('更新 Goal 參考資訊失敗:', error);
+      set({ loading: false, error: error.message });
+      return false;
+    }
+  },
+
+  addGoalAttachment: async (goalId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => {
+    let targetGoal: Goal | null = null;
+    
+    // 找到目標 Goal
+    for (const topic of get().topics) {
+      const goal = topic.goals?.find(g => g.id === goalId);
+      if (goal) {
+        targetGoal = goal;
+        break;
+      }
+    }
+    
+    if (!targetGoal) return false;
+
+    const newAttachment: ReferenceAttachment = {
+      ...attachment,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = targetGoal.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      attachments: [...currentReferenceInfo.attachments, newAttachment]
+    };
+
+    return await get().updateGoalReferenceInfo(goalId, updatedReferenceInfo);
+  },
+
+  removeGoalAttachment: async (goalId: string, attachmentId: string) => {
+    let targetGoal: Goal | null = null;
+    
+    // 找到目標 Goal
+    for (const topic of get().topics) {
+      const goal = topic.goals?.find(g => g.id === goalId);
+      if (goal) {
+        targetGoal = goal;
+        break;
+      }
+    }
+    
+    if (!targetGoal || !targetGoal.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...targetGoal.reference_info,
+      attachments: targetGoal.reference_info.attachments.filter(a => a.id !== attachmentId)
+    };
+
+    return await get().updateGoalReferenceInfo(goalId, updatedReferenceInfo);
+  },
+
+  addGoalLink: async (goalId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => {
+    let targetGoal: Goal | null = null;
+    
+    // 找到目標 Goal
+    for (const topic of get().topics) {
+      const goal = topic.goals?.find(g => g.id === goalId);
+      if (goal) {
+        targetGoal = goal;
+        break;
+      }
+    }
+    
+    if (!targetGoal) return false;
+
+    const newLink: ReferenceLink = {
+      ...link,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = targetGoal.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      links: [...currentReferenceInfo.links, newLink]
+    };
+
+    return await get().updateGoalReferenceInfo(goalId, updatedReferenceInfo);
+  },
+
+  removeGoalLink: async (goalId: string, linkId: string) => {
+    let targetGoal: Goal | null = null;
+    
+    // 找到目標 Goal
+    for (const topic of get().topics) {
+      const goal = topic.goals?.find(g => g.id === goalId);
+      if (goal) {
+        targetGoal = goal;
+        break;
+      }
+    }
+    
+    if (!targetGoal || !targetGoal.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...targetGoal.reference_info,
+      links: targetGoal.reference_info.links.filter(l => l.id !== linkId)
+    };
+
+    return await get().updateGoalReferenceInfo(goalId, updatedReferenceInfo);
+  },
+
+  // Task 參考資訊
+  updateTaskReferenceInfo: async (taskId: string, referenceInfo: ReferenceInfo) => {
+    set({ loading: true, error: null });
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ reference_info: referenceInfo })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set((state) => ({
+        topics: state.topics.map((topic) => ({
+          ...topic,
+          goals: topic.goals?.map((goal) => ({
+            ...goal,
+            tasks: goal.tasks?.map((task) =>
+              task.id === taskId
+                ? { ...task, reference_info: referenceInfo }
+                : task
+            )
+          }))
+        })),
+        loading: false
+      }));
+
+      return true;
+    } catch (error: any) {
+      console.error('更新 Task 參考資訊失敗:', error);
+      set({ loading: false, error: error.message });
+      return false;
+    }
+  },
+
+  addTaskAttachment: async (taskId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => {
+    let targetTask: Task | null = null;
+    
+    // 找到目標 Task
+    for (const topic of get().topics) {
+      for (const goal of topic.goals || []) {
+        const task = goal.tasks?.find(t => t.id === taskId);
+        if (task) {
+          targetTask = task;
+          break;
+        }
+      }
+      if (targetTask) break;
+    }
+    
+    if (!targetTask) return false;
+
+    const newAttachment: ReferenceAttachment = {
+      ...attachment,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = targetTask.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      attachments: [...currentReferenceInfo.attachments, newAttachment]
+    };
+
+    return await get().updateTaskReferenceInfo(taskId, updatedReferenceInfo);
+  },
+
+  removeTaskAttachment: async (taskId: string, attachmentId: string) => {
+    let targetTask: Task | null = null;
+    
+    // 找到目標 Task
+    for (const topic of get().topics) {
+      for (const goal of topic.goals || []) {
+        const task = goal.tasks?.find(t => t.id === taskId);
+        if (task) {
+          targetTask = task;
+          break;
+        }
+      }
+      if (targetTask) break;
+    }
+    
+    if (!targetTask || !targetTask.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...targetTask.reference_info,
+      attachments: targetTask.reference_info.attachments.filter(a => a.id !== attachmentId)
+    };
+
+    return await get().updateTaskReferenceInfo(taskId, updatedReferenceInfo);
+  },
+
+  addTaskLink: async (taskId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => {
+    let targetTask: Task | null = null;
+    
+    // 找到目標 Task
+    for (const topic of get().topics) {
+      for (const goal of topic.goals || []) {
+        const task = goal.tasks?.find(t => t.id === taskId);
+        if (task) {
+          targetTask = task;
+          break;
+        }
+      }
+      if (targetTask) break;
+    }
+    
+    if (!targetTask) return false;
+
+    const newLink: ReferenceLink = {
+      ...link,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = targetTask.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      links: [...currentReferenceInfo.links, newLink]
+    };
+
+    return await get().updateTaskReferenceInfo(taskId, updatedReferenceInfo);
+  },
+
+  removeTaskLink: async (taskId: string, linkId: string) => {
+    let targetTask: Task | null = null;
+    
+    // 找到目標 Task
+    for (const topic of get().topics) {
+      for (const goal of topic.goals || []) {
+        const task = goal.tasks?.find(t => t.id === taskId);
+        if (task) {
+          targetTask = task;
+          break;
+        }
+      }
+      if (targetTask) break;
+    }
+    
+    if (!targetTask || !targetTask.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...targetTask.reference_info,
+      links: targetTask.reference_info.links.filter(l => l.id !== linkId)
+    };
+
+    return await get().updateTaskReferenceInfo(taskId, updatedReferenceInfo);
   }
 })); 

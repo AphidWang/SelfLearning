@@ -677,7 +677,7 @@ const TopicGrid: React.FC<TopicGridProps> = ({ topics, onTopicClick, onCreateTop
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
       {topics.map((topicData, index) => (
         <motion.div
           key={topicData.topic.id}
@@ -1885,13 +1885,13 @@ export const TaskWallPage = () => {
             </div>
           </div>
 
-          {/* 佈局容器：左側60%任務區，右側40%挑戰卡 */}
-          <div className="flex gap-6 relative">
-            {/* 左側：任務內容區域 (60%) */}
-            <div className="flex-1 w-3/5">
-              {config.viewMode === 'tasks' ? (
-                // 任務模式
-                filteredTasks.length === 0 ? (
+          {/* 根據模式決定佈局 */}
+          {config.viewMode === 'tasks' ? (
+            // 任務模式：左右分割佈局
+            <div className="flex gap-6 relative">
+              {/* 左側：任務內容區域 (60%) */}
+              <div className="flex-1 w-3/5">
+                {filteredTasks.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">🎉</div>
                     <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
@@ -1909,58 +1909,60 @@ export const TaskWallPage = () => {
                     currentUserId={currentUser?.id}
                     isLoading={isLoading}
                   />
-                )
-              ) : (
-                // 主題模式
-                topicCards.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">📚</div>
-                    <h3 className="text-2xl font-bold text-amber-800 mb-2">還沒有主題</h3>
-                    <p className="text-amber-600 mb-4">建立你的第一個學習主題吧！</p>
-                    <button
-                      onClick={() => setShowTemplateBrowser(true)}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 text-white rounded-2xl font-medium hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg hover:shadow-xl"
-                    >
-                      <Plus className="w-5 h-5" />
-                      建立新主題
-                    </button>
-                  </div>
-                ) : (
-                  <TopicGrid
-                    topics={topicCards.map(card => ({
-                      ...card,
-                      isLoading: card.topic.id === loadingTopicId
-                    }))}
-                    onTopicClick={handleTopicClick}
-                    onCreateTopicClick={() => setShowTemplateBrowser(true)}
-                    isLoading={isLoading}
-                    isViewModeChanging={isViewModeChanging}
-                    loadingTopicId={loadingTopicId}
-                  />
-                )
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* 右側：本週挑戰卡片 (40%) */}
-            <div className="w-2/5 flex-shrink-0">
-              <div className="sticky top-4">
-                <div className="w-full">
-                  <WeeklyChallengeCard
-                    challenge={weeklyChallenge}
-                    onCheckIn={handleChallengeCheckIn}
-                    onCancelCheckIn={handleCancelCheckIn}
-                    onEdit={handleEditChallenge}
-                    onSetChallenge={handleSetChallenge}
-                    editingChallenge={editingChallenge}
-                    challengeInput={challengeInput}
-                    setChallengeInput={setChallengeInput}
-                    setEditingChallenge={setEditingChallenge}
-                    getTaiwanDateString={getTaiwanDateString}
-                  />
+              {/* 右側：本週挑戰卡片 (40%) */}
+              <div className="w-2/5 flex-shrink-0">
+                <div className="sticky top-4">
+                  <div className="w-full">
+                    <WeeklyChallengeCard
+                      challenge={weeklyChallenge}
+                      onCheckIn={handleChallengeCheckIn}
+                      onCancelCheckIn={handleCancelCheckIn}
+                      onEdit={handleEditChallenge}
+                      onSetChallenge={handleSetChallenge}
+                      editingChallenge={editingChallenge}
+                      challengeInput={challengeInput}
+                      setChallengeInput={setChallengeInput}
+                      setEditingChallenge={setEditingChallenge}
+                      getTaiwanDateString={getTaiwanDateString}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            // 主題模式：全寬度佈局
+            <div className="w-full">
+              {topicCards.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">📚</div>
+                  <h3 className="text-2xl font-bold text-amber-800 mb-2">還沒有主題</h3>
+                  <p className="text-amber-600 mb-4">建立你的第一個學習主題吧！</p>
+                  <button
+                    onClick={() => setShowTemplateBrowser(true)}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 text-white rounded-2xl font-medium hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    <Plus className="w-5 h-5" />
+                    建立新主題
+                  </button>
+                </div>
+              ) : (
+                <TopicGrid
+                  topics={topicCards.map(card => ({
+                    ...card,
+                    isLoading: card.topic.id === loadingTopicId
+                  }))}
+                  onTopicClick={handleTopicClick}
+                  onCreateTopicClick={() => setShowTemplateBrowser(true)}
+                  isLoading={isLoading}
+                  isViewModeChanging={isViewModeChanging}
+                  loadingTopicId={loadingTopicId}
+                />
+              )}
+            </div>
+          )}
 
           {/* 設定面板 */}
           <AnimatePresence>
