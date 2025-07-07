@@ -385,7 +385,7 @@ const MentorCurriculum: React.FC = () => {
       {/* 模板編輯器 */}
       {showTemplateEditor && editingTemplate && (
         <TemplateEditor
-          template={editingTemplate}
+          templateId={editingTemplate.id}
           onClose={() => {
             setShowTemplateEditor(false);
             setEditingTemplate(null);

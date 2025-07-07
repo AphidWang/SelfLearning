@@ -160,7 +160,6 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setScale(prev => Math.max(0.5, Math.min(3, prev * delta)));
   }, []);
@@ -296,7 +295,7 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               if (!isDragging) {
-                onGoalClick?.('TOPIC');
+                onGoalClick?.('TEMPLATE');
               }
             }}
           />
@@ -353,7 +352,7 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               if (!isDragging) {
-                onGoalClick?.('TOPIC');
+                onGoalClick?.('TEMPLATE');
               }
             }}
           >
