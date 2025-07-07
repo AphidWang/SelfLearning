@@ -22,8 +22,7 @@ import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
 import TopicMindMapPage from './pages/student/TopicMindMapPage.tsx';
 import TaskWallPage from './pages/student/TaskWallPage';
-import HabitChallengePage from './pages/student/HabitChallengePage';
-import TaskHabitIntegrationPage from './pages/student/TaskHabitIntegrationPage';
+
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
 import { UserAdminPage } from './pages/admin/UserAdminPage';
@@ -166,16 +165,7 @@ function App() {
                         <TaskWallPage />
                       </RoleProtectedRoute>
                     } />
-                    <Route path="/student/habits" element={
-                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                        <HabitChallengePage />
-                      </RoleProtectedRoute>
-                    } />
-                    <Route path="/student/task-habit-integration" element={
-                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
-                        <TaskHabitIntegrationPage />
-                      </RoleProtectedRoute>
-                    } />
+
                     <Route path="/student/schedule" element={
                       <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
                         <StudentSchedule />
