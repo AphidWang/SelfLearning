@@ -20,7 +20,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TaskCard } from './TaskCard';
+import { TaskCardFactory } from './cards';
 import { GoalCard } from './GoalCard';
 import { LoadingDots } from '../../../components/shared/LoadingDots';
 import type { TaskStatus, Task, Goal, TaskWithContext } from '../../../types/goal';
@@ -231,7 +231,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
             }}
           >
             {card.type === 'task' ? (
-              <TaskCard
+              <TaskCardFactory
                 task={card.data}
                 onStatusUpdate={(newStatus) =>
                   onTaskStatusUpdate(
