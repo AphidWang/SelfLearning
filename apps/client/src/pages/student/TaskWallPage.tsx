@@ -1091,6 +1091,7 @@ interface WeeklyQuickCardProps {
   hasExistingChallenge?: boolean;
   existingChallengeTask?: TaskWithContext;
   onTaskClick?: (task: TaskWithContext) => void;
+  onResetChallenge?: () => void;
 }
 
 const WeeklyQuickCard: React.FC<WeeklyQuickCardProps> = ({ 
@@ -1098,20 +1099,77 @@ const WeeklyQuickCard: React.FC<WeeklyQuickCardProps> = ({
   isLoading, 
   hasExistingChallenge = false,
   existingChallengeTask,
-  onTaskClick
+  onTaskClick,
+  onResetChallenge
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // 檢查今天是否已經打卡
   const isCheckedInToday = useMemo(() => {
-    if (!existingChallengeTask || existingChallengeTask.task_type !== 'streak') {
+    if (!existingChallengeTask || existingChallengeTask.task_type !== 'count') {
       return false;
     }
     
     const today = new Date().toISOString().split('T')[0];
     const checkInDates = (existingChallengeTask.progress_data as any)?.check_in_dates || [];
     return checkInDates.includes(today);
+  }, [existingChallengeTask]);
+
+  // 獲取本週的打卡資料
+  const weeklyCheckInData = useMemo(() => {
+    if (!existingChallengeTask || existingChallengeTask.task_type !== 'count') {
+      return { checkInDates: [], weekDates: [] };
+    }
+    
+    const checkInDates = (existingChallengeTask.progress_data as any)?.check_in_dates || [];
+    
+    // 生成本週的日期
+    const cycleConfig = existingChallengeTask.cycle_config as any;
+    const weekStart = cycleConfig?.start_date || cycleConfig?.cycle_start_date;
+    
+    if (!weekStart) {
+      return { checkInDates, weekDates: [] };
+    }
+    
+    const weekDates: string[] = [];
+    const startDate = new Date(weekStart);
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      weekDates.push(date.toISOString().split('T')[0]);
+    }
+    
+    return { checkInDates, weekDates };
+  }, [existingChallengeTask]);
+
+  // 獲取詳細的打卡時間資料（模擬從 task_actions 表獲取）
+  const checkInTimestamps = useMemo(() => {
+    if (!existingChallengeTask) return [];
+    
+    // 這裡應該從 task_actions 表獲取實際的打卡時間
+    // 目前先模擬一些數據，但保持穩定性
+    const checkInDates = (existingChallengeTask.progress_data as any)?.check_in_dates || [];
+    
+    return checkInDates.map((date: string, index: number) => {
+      // 使用日期字串作為種子，產生穩定的隨機時間
+      const dateHash = date.split('-').reduce((acc, val) => acc + parseInt(val), 0);
+      const baseHour = 8 + (dateHash + index) % 12; // 8點到19點之間
+      const minute = (dateHash * 7 + index * 13) % 60; // 穩定的分鐘數
+      
+      const dayOfWeek = new Date(date).getDay();
+      const dayName = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'][dayOfWeek];
+      
+      return {
+        date,
+        time: `${baseHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+        dayName,
+        timestamp: new Date(`${date}T${baseHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`).getTime()
+      };
+    }).sort((a, b) => a.timestamp - b.timestamp); // 按時間排序
   }, [existingChallengeTask]);
 
   const handleSubmit = () => {
@@ -1130,8 +1188,26 @@ const WeeklyQuickCard: React.FC<WeeklyQuickCardProps> = ({
     }
   };
 
+  const handleResetChallenge = () => {
+    setShowResetConfirm(false);
+    setIsFlipped(false);
+    onResetChallenge?.();
+  };
+
+  /**
+   * 卡片翻轉動畫變體 - 統一與其他卡片的行為
+   */
+  const cardVariants = {
+    front: {
+      rotateY: 0
+    },
+    back: {
+      rotateY: 180
+    }
+  };
+
   return (
-    <div className="relative w-full max-w-xs mx-auto h-48" style={{ perspective: '1000px' }}>
+    <div className="relative w-full max-w-xs mx-auto h-48 overflow-hidden" style={{ perspective: '1000px' }}>
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/20 rounded-2xl">
           <LoadingDots />
@@ -1140,182 +1216,305 @@ const WeeklyQuickCard: React.FC<WeeklyQuickCardProps> = ({
       
       {/* 卡片容器 */}
       <motion.div
-        className="relative w-full h-full cursor-pointer"
+        className="relative w-full h-full cursor-pointer rounded-2xl shadow-lg border-0 text-white relative overflow-hidden"
         onClick={() => {
-          if (!hasExistingChallenge && !isEditing) {
+          if (!hasExistingChallenge && !isEditing && !showResetConfirm) {
             setIsEditing(true);
+          } else if (hasExistingChallenge && !showResetConfirm) {
+            // 統一翻面行為：點擊卡片即可翻面
+            setIsFlipped(!isFlipped);
           }
         }}
-        whileHover={{ y: -3, scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ 
-          type: "spring",
-          stiffness: 400,
-          damping: 30,
-          mass: 1
+        animate={isFlipped ? "back" : "front"}
+        variants={cardVariants}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+        style={{
+          background: 'linear-gradient(135deg, rgb(99 102 241), rgb(147 51 234), rgb(236 72 153))'
         }}
-        style={{ transformStyle: "preserve-3d" }}
       >
-        {/* 正面 - 保持原本的彩色漸層背景 */}
-        <motion.div
-          className="absolute inset-0 w-full h-full rounded-2xl shadow-lg border-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white relative overflow-hidden"
-          style={{
-            backfaceVisibility: 'hidden'
-          }}
-        >
-          {/* 背景裝飾 */}
-          <div className="absolute inset-0">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
-          </div>
+        {/* 背景裝飾 */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
+          <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
+        </div>
 
-          <div className="relative z-10 p-4 h-full flex flex-col">
-            {/* 頂部：主題標籤 */}
-            <div className="mb-3">
-              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
-                <Trophy className="w-3 h-3" />
-                週挑戰系統
+        <div className="relative z-10 p-4 h-full flex flex-col min-h-0">
+          {/* 根據翻轉狀態顯示不同內容 */}
+          {!isFlipped ? (
+            // 正面內容
+            <>
+              {/* 頂部：主題標籤 */}
+              <div className="mb-3">
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
+                  <Trophy className="w-3 h-3" />
+                  週挑戰
+                </div>
               </div>
-            </div>
 
-            {/* 中間：任務標題 */}
-            <div className="flex-1 flex flex-col justify-center">
-              {hasExistingChallenge && existingChallengeTask ? (
-                // 顯示現有挑戰任務 - 支援打卡功能
-                <div>
-                  <div className="mb-3">
-                    <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">
-                      {existingChallengeTask.title}
-                    </h3>
+              {/* 中間：任務標題 */}
+              <div className="flex-1 flex flex-col justify-center">
+                {hasExistingChallenge && existingChallengeTask ? (
+                  // 顯示現有挑戰任務 - 支援打卡功能
+                  <div>
+                    <div className="mb-3">
+                      <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">
+                        {existingChallengeTask.title}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-white/80 mb-3">
+                      {existingChallengeTask.task_type === 'count' && (
+                        <>
+                          <span className="text-yellow-300">🎯</span>
+                          <span>
+                            {weeklyCheckInData.checkInDates.length}/{(existingChallengeTask.task_config as any)?.target_count || 7} 次
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* 打卡按鈕 */}
+                    <div className="space-y-2">
+                      {isCheckedInToday ? (
+                        // 今天已打卡
+                        <div className="w-full py-2 rounded-xl font-bold text-sm bg-white/20 text-white/80 text-center border border-white/30">
+                          今天已完成 ✅
+                        </div>
+                      ) : (
+                        // 今天還沒打卡
+                        <motion.button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // 處理任務打卡邏輯
+                            onTaskClick?.(existingChallengeTask);
+                          }}
+                          className="w-full py-2 rounded-xl font-bold text-sm transition-all shadow-lg bg-white/90 text-indigo-600 hover:bg-white hover:scale-105 active:scale-95"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          animate={isLoading ? { scale: [1, 1.05, 1] } : {}}
+                          transition={{ duration: 0.5, repeat: isLoading ? Infinity : 0 }}
+                        >
+                          今天完成了 ✨
+                        </motion.button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-white/80 mb-3">
-                    {existingChallengeTask.task_type === 'streak' && (
-                      <>
-                        <span className="text-yellow-300">🔥</span>
-                        <span>
-                          {(existingChallengeTask.task_config as any).current_streak}/{(existingChallengeTask.task_config as any).target_days} 天
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* 打卡按鈕 */}
-                  <div className="space-y-2">
-                    {isCheckedInToday ? (
-                      // 今天已打卡
-                      <div className="w-full py-2 rounded-xl font-bold text-sm bg-white/20 text-white/80 text-center border border-white/30">
-                        今天已完成 ✅
-                      </div>
-                    ) : (
-                      // 今天還沒打卡
-                      <motion.button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // 處理任務打卡邏輯
-                          onTaskClick?.(existingChallengeTask);
-                        }}
-                        className="w-full py-2 rounded-xl font-bold text-sm transition-all shadow-lg bg-white/90 text-indigo-600 hover:bg-white hover:scale-105 active:scale-95"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        animate={isLoading ? { scale: [1, 1.05, 1] } : {}}
-                        transition={{ duration: 0.5, repeat: isLoading ? Infinity : 0 }}
+                ) : isEditing ? (
+                  // 創建新挑戰輸入界面
+                  <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="text"
+                      value={taskTitle}
+                      onChange={(e) => setTaskTitle(e.target.value)}
+                      onKeyDown={handleKeyPress}
+                      placeholder="輸入你的週挑戰..."
+                      className="w-full px-3 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-white/60 focus:ring-2 focus:ring-white/50 focus:border-transparent text-sm"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSubmit}
+                        disabled={!taskTitle.trim() || isLoading}
+                        className="flex-1 py-2 bg-white/90 text-indigo-600 rounded-xl font-bold hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                       >
-                        今天完成了 ✨
-                      </motion.button>
+                        創建挑戰
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTaskTitle('');
+                          setIsEditing(false);
+                        }}
+                        className="px-3 py-2 bg-white/20 backdrop-blur-sm rounded-xl font-bold hover:bg-white/30 transition-colors text-xs"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // 創建新挑戰引導界面
+                  <div className="text-center">
+                    <div className="mb-2">
+                      <h3 className="text-lg font-bold text-white leading-tight">
+                        快速創建週挑戰
+                      </h3>
+                    </div>
+                    <motion.div
+                      className="text-3xl mb-2"
+                      animate={{ 
+                        rotate: [0, -5, 5, -5, 0],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{ 
+                        rotate: { duration: 1, repeat: Infinity, repeatDelay: 3 },
+                        scale: { duration: 0.5, repeat: Infinity, repeatDelay: 4 }
+                      }}
+                    >
+                      🎯
+                    </motion.div>
+                    <p className="text-sm text-white/80 leading-relaxed">
+                      點擊設定7天打卡挑戰
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* 底部：目標資訊 */}
+              <div className="mt-auto pt-2 border-t border-white/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-xs text-white/80">
+                    <Target className="w-3 h-3" />
+                    <span className="truncate">每週挑戰目標</span>
+                  </div>
+                  {/* 7天打卡裝飾 */}
+                  <div className="flex gap-1">
+                    {weeklyCheckInData.weekDates.length > 0 ? (
+                      weeklyCheckInData.weekDates.map((date, i) => {
+                        const isChecked = weeklyCheckInData.checkInDates.includes(date);
+                        const isToday = date === new Date().toISOString().split('T')[0];
+                        
+                        return (
+                          <div
+                            key={i}
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${
+                              isChecked 
+                                ? 'bg-yellow-300 shadow-sm' 
+                                : isToday 
+                                  ? 'bg-white/60 ring-1 ring-white/40' 
+                                  : 'bg-white/40'
+                            }`}
+                          />
+                        );
+                      })
+                    ) : (
+                      [...Array(7)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full bg-white/40"
+                        />
+                      ))
                     )}
                   </div>
                 </div>
-              ) : isEditing ? (
-                // 創建新挑戰輸入界面
-                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="text"
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    placeholder="輸入你的週挑戰..."
-                    className="w-full px-3 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-white/60 focus:ring-2 focus:ring-white/50 focus:border-transparent text-sm"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
+              </div>
+
+              {/* 狀態指示器 */}
+              {hasExistingChallenge && (
+                <div className="absolute top-2 right-2 text-lg transform hover:scale-125 transition-transform">
+                  🎯
+                </div>
+              )}
+            </>
+          ) : (
+            // 背面內容 - 詳細記錄 (反向翻轉抵消容器翻轉)
+            <div style={{ transform: 'scaleX(-1)' }}>
+              {/* 頂部：標題和操作按鈕 */}
+              {!showResetConfirm && (
+                <>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
+                      <Calendar className="w-3 h-3" />
+                      詳細記錄
+                    </div>
+                  </div>
+
+                  {/* 挑戰標題 */}
+                  <div className="mb-3">
+                    <h4 className="text-sm font-bold text-white/90 line-clamp-1">
+                      {existingChallengeTask?.title || '週挑戰'}
+                    </h4>
+                  </div>
+                </>
+              )}
+
+              {/* 打卡記錄列表 */}
+              <div className="flex-1 overflow-y-auto">
+                              {showResetConfirm ? (
+                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                  <div className="text-center space-y-2">
+                    <div className="text-2xl">⚠️</div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-white">重新設定挑戰</p>
+                      <p className="text-xs text-white/80">會清空所有進度</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 w-full">
                     <button
-                      onClick={handleSubmit}
-                      disabled={!taskTitle.trim() || isLoading}
-                      className="flex-1 py-2 bg-white/90 text-indigo-600 rounded-xl font-bold hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                    >
-                      創建挑戰
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTaskTitle('');
-                        setIsEditing(false);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowResetConfirm(false);
                       }}
-                      className="px-3 py-2 bg-white/20 backdrop-blur-sm rounded-xl font-bold hover:bg-white/30 transition-colors text-xs"
+                      className="flex-1 py-2 px-3 bg-white/20 rounded-lg text-xs hover:bg-white/30 transition-colors"
                     >
                       取消
                     </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleResetChallenge();
+                      }}
+                      className="flex-1 py-2 px-3 bg-red-500/80 rounded-lg text-xs hover:bg-red-500 transition-colors"
+                    >
+                      確定重設
+                    </button>
                   </div>
                 </div>
-              ) : (
-                // 創建新挑戰引導界面
-                <div className="text-center">
-                  <div className="mb-2">
-                    <h3 className="text-lg font-bold text-white leading-tight">
-                      快速創建週挑戰
-                    </h3>
+                ) : checkInTimestamps.length > 0 ? (
+                  <div className="space-y-2">
+                    {checkInTimestamps.map((record, index) => (
+                      <motion.div
+                        key={record.date}
+                        className="flex items-center justify-between p-2 bg-white/10 rounded-lg"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          <span className="text-xs font-medium">{record.dayName}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-white/90">
+                            {new Date(record.date).toLocaleDateString('zh-TW', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                          <div className="text-xs text-white/70">
+                            {record.time}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
-                  <motion.div
-                    className="text-3xl mb-2"
-                    animate={{ 
-                      rotate: [0, -5, 5, -5, 0],
-                      scale: [1, 1.1, 1]
-                    }}
-                    transition={{ 
-                      rotate: { duration: 1, repeat: Infinity, repeatDelay: 3 },
-                      scale: { duration: 0.5, repeat: Infinity, repeatDelay: 4 }
-                    }}
-                  >
-                    🎯
-                  </motion.div>
-                  <p className="text-sm text-white/80 leading-relaxed">
-                    點擊設定7天打卡挑戰
-                  </p>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <div className="text-2xl mb-2">📝</div>
+                    <p className="text-sm text-white/70">還沒有打卡記錄</p>
+                    <p className="text-xs text-white/50">完成任務後會顯示在這裡</p>
+                  </div>
+                )}
+              </div>
+
+                            {/* 底部：統計資訊和重置按鈕 */}
+              {!showResetConfirm && (
+                <div className="mt-3 pt-2 border-t border-white/20">
+                  <div className="flex items-center justify-between text-xs text-white/80">
+                    <span>已完成 {checkInTimestamps.length}/7 次</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowResetConfirm(true);
+                      }}
+                      className="p-1.5 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+                      title="重置週挑戰"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
-
-            {/* 操作按鈕區域 */}
-            <div className="flex justify-end gap-2 mb-2">
-              {/* 移除了圖表圖標按鈕 */}
-            </div>
-
-            {/* 底部：目標資訊 */}
-            <div className="mt-auto pt-2 border-t border-white/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-xs text-white/80">
-                  <Target className="w-3 h-3" />
-                  <span className="truncate">每週挑戰目標</span>
-                </div>
-                {/* 7天打卡裝飾 */}
-                <div className="flex gap-1">
-                  {[...Array(7)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-1.5 h-1.5 rounded-full bg-white/40"
-                    />
-                  ))}
-                </div>
               </div>
-            </div>
-          </div>
-
-          {/* 狀態指示器 */}
-          {hasExistingChallenge && (
-            <div className="absolute top-2 right-2 text-lg transform hover:scale-125 transition-transform">
-              🎯
-            </div>
-          )}
-        </motion.div>
+            )}
+        </div>
       </motion.div>
     </div>
   );
@@ -1335,6 +1534,7 @@ export const TaskWallPage = () => {
     addTask,
     createTopic,
     addGoal,
+    deleteTask,
     markTaskCompletedCompat: markTaskCompleted,
     markTaskInProgressCompat: markTaskInProgress,
     markTaskTodoCompat: markTaskTodo,
@@ -1711,7 +1911,7 @@ export const TaskWallPage = () => {
         if (goal.status === 'archived') return;
         
         goal.tasks?.forEach(task => {
-          // 只顯示待完成和進行中的任務
+          // 只顯示待完成和進行中的任務，排除已歸檔的任務
           if (task.status === 'todo' || task.status === 'in_progress') {
             // 排除隱藏主題中的週挑戰任務，避免與 WeeklyQuickCard 重複
             const isHiddenTopicWeeklyChallenge = 
@@ -2198,17 +2398,16 @@ export const TaskWallPage = () => {
         challengeGoal = newGoal;
       }
 
-      // 創建連續型任務
+      // 創建計數型任務（週挑戰）
       const weekStart = getWeekStart(getTaiwanDateString());
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
 
       const taskConfig = {
-        type: 'streak' as const,
-        target_days: 7,
-        current_streak: 0,
-        max_streak: 0,
-        check_in_dates: []
+        type: 'count' as const,
+        target_count: 7,
+        current_count: 0,
+        reset_frequency: 'weekly' as const // 每週重置
       };
 
       const cycleConfig = {
@@ -2222,14 +2421,14 @@ export const TaskWallPage = () => {
         last_updated: new Date().toISOString(),
         completion_percentage: 0,
         check_in_dates: [],
-        current_streak: 0,
-        max_streak: 0
+        current_count: 0,
+        target_count: 7
       };
 
       const newTask = await addTask(challengeGoal.id, {
         title: title.trim(),
         description: `本週挑戰：${title.trim()}`,
-        task_type: 'streak',
+        task_type: 'count',
         task_config: taskConfig,
         cycle_config: cycleConfig,
         progress_data: progressData,
@@ -2263,6 +2462,41 @@ export const TaskWallPage = () => {
       setIsCreatingWeeklyTask(false);
     }
   }, [currentUser, topics, createTopic, addGoal, addTask, fetchTopics]);
+
+  /**
+   * 重新設定週挑戰
+   */
+  const handleResetWeeklyChallenge = useCallback(async () => {
+    if (!weeklyQuickChallengeInfo.challengeTask || !currentUser) return;
+
+    try {
+      const task = weeklyQuickChallengeInfo.challengeTask;
+      
+      // 刪除現有的週挑戰任務
+      const deleteSuccess = await deleteTask(task.id);
+      
+      if (!deleteSuccess) {
+        toast.error('刪除任務失敗');
+        return;
+      }
+
+      // 刷新數據，讓 WeeklyQuickCard 回到創建狀態
+      await fetchTopics();
+      
+      toast.success('週挑戰已清除！可以重新創建新的挑戰 🔄', {
+        duration: 3000,
+        style: {
+          background: '#10B981',
+          color: 'white',
+          borderRadius: '12px',
+          fontWeight: '600'
+        }
+      });
+    } catch (error) {
+      console.error('重設週挑戰失敗:', error);
+      toast.error('重設失敗，請稍後再試');
+    }
+  }, [weeklyQuickChallengeInfo.challengeTask, currentUser, deleteTask, fetchTopics]);
 
   /**
    * 遷移週挑戰到新的任務結構
@@ -2311,17 +2545,16 @@ export const TaskWallPage = () => {
         challengeGoal = newGoal;
       }
 
-      // 創建連續型任務
+      // 創建計數型任務（遷移週挑戰）
       const weekStart = getWeekStart(getTaiwanDateString());
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
 
       const taskConfig = {
-        type: 'streak' as const,
-        target_days: 7,
-        current_streak: weeklyChallenge.completedDays.length,
-        max_streak: weeklyChallenge.completedDays.length,
-        check_in_dates: weeklyChallenge.completedDays
+        type: 'count' as const,
+        target_count: 7,
+        current_count: weeklyChallenge.completedDays.length,
+        reset_frequency: 'weekly' as const // 每週重置
       };
 
       const cycleConfig = {
@@ -2335,21 +2568,22 @@ export const TaskWallPage = () => {
         last_updated: new Date().toISOString(),
         completion_percentage: (weeklyChallenge.completedDays.length / 7) * 100,
         check_in_dates: weeklyChallenge.completedDays,
-        current_streak: weeklyChallenge.completedDays.length,
-        max_streak: weeklyChallenge.completedDays.length
+        current_count: weeklyChallenge.completedDays.length,
+        target_count: 7
       };
 
       const newTask = await addTask(challengeGoal.id, {
         title: weeklyChallenge.title,
         description: `本週挑戰：${weeklyChallenge.title}`,
-        task_type: 'streak',
+        task_type: 'count',
         task_config: taskConfig,
         cycle_config: cycleConfig,
         progress_data: progressData,
         status: 'in_progress',
         priority: 'high',
         order_index: 0,
-        need_help: false
+        need_help: false,
+        special_flags: [SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE]
       });
 
       if (newTask) {
@@ -2559,11 +2793,12 @@ export const TaskWallPage = () => {
                       isLoading={isCreatingWeeklyTask}
                       hasExistingChallenge={weeklyQuickChallengeInfo.hasChallenge}
                       existingChallengeTask={weeklyQuickChallengeInfo.challengeTask}
+                      onResetChallenge={handleResetWeeklyChallenge}
                       onTaskClick={async (task) => {
                         // 處理週挑戰任務的打卡邏輯
-                        if (task.task_type === 'streak') {
+                        if (task.task_type === 'count') {
                           try {
-                            // 使用 topicStore 的 performTaskAction 來處理打卡
+                            // 使用 performTaskAction 記錄動作
                             const result = await performTaskAction(task.id, 'check_in');
                             
                             if (result.success) {
@@ -2572,7 +2807,9 @@ export const TaskWallPage = () => {
                               setTimeout(() => setIsStarAnimating(false), 1000);
                               
                               // 顯示成功訊息
-                              toast.success('今天完成了！連續 ' + (result.task?.progress_data?.current_streak || 1) + ' 天 🎉', {
+                              const checkInDates = (result.task?.progress_data as any)?.check_in_dates || [];
+                              const targetCount = (result.task?.task_config as any)?.target_count || 7;
+                              toast.success(`今天完成了！進度 ${checkInDates.length}/${targetCount} 次 🎉`, {
                                 duration: 3000,
                                 style: {
                                   background: '#10B981',

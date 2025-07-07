@@ -1309,22 +1309,26 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         return { success: false, message: '找不到任務' };
       }
 
-      if (taskData.task_type !== 'streak') {
-        return { success: false, message: '只有連續型任務支援打卡' };
+      if (taskData.task_type !== 'streak' && taskData.task_type !== 'count') {
+        return { success: false, message: '只有連續型或計數型任務支援打卡' };
       }
 
-      // 更新連續型任務進度
       const progressData = taskData.progress_data || {};
       const today = new Date().toISOString().split('T')[0];
       const checkInDates = progressData.check_in_dates || [];
       
-      if (!checkInDates.includes(today)) {
-        checkInDates.push(today);
-        checkInDates.sort();
-        
-        // 計算新的連續天數
+      if (checkInDates.includes(today)) {
+        return { success: false, message: '今天已經打卡了' };
+      }
+
+      // 添加今天的打卡記錄
+      const newCheckInDates = [...checkInDates, today].sort();
+      let newProgressData;
+
+      if (taskData.task_type === 'streak') {
+        // 連續型任務：計算連續天數
         let currentStreak = 0;
-        const sortedDates = checkInDates.sort();
+        const sortedDates = newCheckInDates.sort();
         for (let i = sortedDates.length - 1; i >= 0; i--) {
           const date = new Date(sortedDates[i]);
           const expectedDate = new Date();
@@ -1337,39 +1341,55 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
           }
         }
 
-        const newProgressData = {
+        newProgressData = {
           ...progressData,
-          check_in_dates: checkInDates,
+          check_in_dates: newCheckInDates,
           current_streak: currentStreak,
-          max_streak: Math.max(progressData.max_streak || 0, currentStreak)
+          max_streak: Math.max(progressData.max_streak || 0, currentStreak),
+          last_updated: new Date().toISOString()
         };
+      } else if (taskData.task_type === 'count') {
+        // 計數型任務：記錄打卡次數
+        const config = taskData.task_config || {};
+        const targetCount = config.target_count || 7;
+        const currentCount = newCheckInDates.length;
 
-        const { data: updatedTask, error: updateError } = await supabase
-          .from('tasks')
-          .update({ progress_data: newProgressData })
-          .eq('id', taskId)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-
-        // 更新本地狀態
-        set(state => ({
-          topics: state.topics.map(topic => ({
-            ...topic,
-            goals: (topic.goals || []).map(goal => ({
-              ...goal,
-              tasks: (goal.tasks || []).map(task => 
-                task.id === taskId ? updatedTask : task
-              )
-            }))
-          }))
-        }));
-
-        return { success: true, task: updatedTask };
+        newProgressData = {
+          ...progressData,
+          check_in_dates: newCheckInDates,
+          current_count: currentCount,
+          target_count: targetCount,
+          completion_percentage: (currentCount / targetCount) * 100,
+          last_updated: new Date().toISOString()
+        };
       }
 
-      return { success: false, message: '今天已經打卡了' };
+      const { data: updatedTask, error: updateError } = await supabase
+        .from('tasks')
+        .update({ 
+          progress_data: newProgressData,
+          status: newProgressData.completion_percentage >= 100 ? 'done' : 'in_progress'
+        })
+        .eq('id', taskId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // 更新本地狀態
+      set(state => ({
+        topics: state.topics.map(topic => ({
+          ...topic,
+          goals: (topic.goals || []).map(goal => ({
+            ...goal,
+            tasks: (goal.tasks || []).map(task => 
+              task.id === taskId ? updatedTask : task
+            )
+          }))
+        }))
+      }));
+
+      return { success: true, task: updatedTask };
     } catch (error: any) {
       console.error('打卡失敗:', error);
       return { success: false, message: error.message || '打卡失敗' };

@@ -189,13 +189,12 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
           <motion.div
             key="weekly-quick-card"
             className="flex justify-center"
-            variants={cardVariants}
-            custom={0}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             layout
             layoutId="weekly-quick-card"
-            initial="hidden"
-            animate="visible"
-            exit="exit"
           >
             {weeklyQuickCard}
           </motion.div>
