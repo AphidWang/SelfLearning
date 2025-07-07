@@ -29,7 +29,7 @@ import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus, Edit3, Trophy, Calendar } from 'lucide-react';
+import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus, Edit3, Trophy, Calendar, TrendingUp } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
@@ -49,6 +49,7 @@ interface TaskWallConfig {
   priorityFilter: 'all' | 'high' | 'medium' | 'low'; // 優先權過濾
   showCompletedStack: boolean;
   viewMode: 'tasks' | 'topics'; // 新增：視圖模式切換
+  sortMode: 'task_type' | 'topic'; // 新增：排序模式
 }
 
 /**
@@ -733,6 +734,7 @@ interface WeeklyChallengeCardProps {
   onCancelCheckIn: () => void;
   onEdit: () => void;
   onSetChallenge: () => void;
+  onMigrate: () => void;
   editingChallenge: boolean;
   challengeInput: string;
   setChallengeInput: (value: string) => void;
@@ -746,6 +748,7 @@ const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({
   onCancelCheckIn,
   onEdit, 
   onSetChallenge,
+  onMigrate,
   editingChallenge,
   challengeInput,
   setChallengeInput,
@@ -806,13 +809,23 @@ const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({
           </div>
           
           {challenge && !editingChallenge && (
-            <button
-              onClick={onEdit}
-              className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors backdrop-blur-sm"
-              title="編輯挑戰"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={onEdit}
+                className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors backdrop-blur-sm"
+                title="編輯挑戰"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+                             {/* 遷移按鈕 */}
+               <button
+                 onClick={onMigrate}
+                 className="p-2 bg-yellow-400/80 text-indigo-600 rounded-xl hover:bg-yellow-400 transition-colors backdrop-blur-sm"
+                 title="遷移到新任務系統"
+               >
+                 <TrendingUp className="w-4 h-4" />
+               </button>
+            </div>
           )}
         </div>
 
@@ -856,6 +869,18 @@ const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({
                   <span className="text-sm text-white/80 ml-1">天完成</span>
                 </div>
               </div>
+
+              {/* 遷移提示 */}
+              {challenge.completedDays.length > 0 && (
+                <div className="mb-3 p-2 bg-yellow-400/20 border border-yellow-400/30 rounded-lg backdrop-blur-sm">
+                  <div className="flex items-center gap-2 text-xs">
+                    <TrendingUp className="w-3 h-3 text-yellow-300" />
+                    <span className="text-yellow-100">
+                      可升級為連續型任務，享受更豐富的追蹤功能！
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* 進度條 */}
               <div className="space-y-3">
@@ -1067,6 +1092,8 @@ export const TaskWallPage = () => {
     fetchTopics, 
     topics, 
     addTask,
+    createTopic,
+    addGoal,
     markTaskCompletedCompat: markTaskCompleted,
     markTaskInProgressCompat: markTaskInProgress,
     markTaskTodoCompat: markTaskTodo,
@@ -1081,10 +1108,11 @@ export const TaskWallPage = () => {
   // 組件狀態
   const [config, setConfig] = useState<TaskWallConfig>({
     maxVisibleCards: 12,
-    gridColumns: 3, // 在60%寬度下使用3列來保持正方形比例
+    gridColumns: 'auto', // 使用自動響應式網格，全寬度下會有更多欄數
     priorityFilter: 'all',
     showCompletedStack: true,
-    viewMode: 'tasks'
+    viewMode: 'tasks',
+    sortMode: 'task_type'
   });
   
   const [showSettings, setShowSettings] = useState(false);
@@ -1352,7 +1380,11 @@ export const TaskWallPage = () => {
         description: '',
         priority: 'medium',
         order_index: 0,
-        need_help: false
+        need_help: false,
+        task_type: 'single',
+        task_config: { type: 'single' },
+        cycle_config: { cycle_type: 'none', auto_reset: false },
+        progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 }
       });
     } catch (error) {
       console.error('新增任務失敗:', error);
@@ -1462,30 +1494,86 @@ export const TaskWallPage = () => {
       });
     });
 
-    // 按狀態、優先權和更新時間排序
+    // 根據排序模式進行排序
     return tasks.sort((a, b) => {
-      // 首先按狀態排序：進行中 > 待開始
-      const statusOrder = { in_progress: 2, todo: 1 };
-      const aStatus = statusOrder[a.status] || 1;
-      const bStatus = statusOrder[b.status] || 1;
-      
-      if (aStatus !== bStatus) {
-        return bStatus - aStatus; // 進行中在前
+      if (config.sortMode === 'task_type') {
+        // 任務類型排序：每週 > 其他計次 > 其他連續 > 其他累積 > 單次型任務
+        const getTaskTypeOrder = (task: TaskWithContext) => {
+          if (task.task_type === 'single') return 5; // 單次任務最後
+          
+          // 檢查是否是週循環
+          const hasWeeklyCycle = (task.cycle_config as any)?.cycle_type === 'weekly';
+          
+          switch (task.task_type) {
+            case 'count':
+              return hasWeeklyCycle ? 1 : 2; // 週循環計次 > 其他計次
+            case 'streak':
+              return hasWeeklyCycle ? 1 : 3; // 週循環連續 > 其他連續
+            case 'accumulative':
+              return hasWeeklyCycle ? 1 : 4; // 週循環累積 > 其他累積
+            default:
+              return 5;
+          }
+        };
+        
+        const aOrder = getTaskTypeOrder(a);
+        const bOrder = getTaskTypeOrder(b);
+        
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        
+        // 相同類型則按狀態排序：進行中 > 待開始
+        const statusOrder = { in_progress: 2, todo: 1 };
+        const aStatus = statusOrder[a.status] || 1;
+        const bStatus = statusOrder[b.status] || 1;
+        
+        if (aStatus !== bStatus) {
+          return bStatus - aStatus;
+        }
+        
+        // 相同狀態則按優先權排序
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        const aPriority = priorityOrder[a.priority || 'medium'];
+        const bPriority = priorityOrder[b.priority || 'medium'];
+        
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority;
+        }
+        
+        // 最後按建立時間排序
+        return b.id.localeCompare(a.id);
+      } else {
+        // 主題排序：按主題名稱，然後按狀態和優先權
+        const topicCompare = a.topicTitle.localeCompare(b.topicTitle);
+        
+        if (topicCompare !== 0) {
+          return topicCompare;
+        }
+        
+        // 相同主題則按狀態排序
+        const statusOrder = { in_progress: 2, todo: 1 };
+        const aStatus = statusOrder[a.status] || 1;
+        const bStatus = statusOrder[b.status] || 1;
+        
+        if (aStatus !== bStatus) {
+          return bStatus - aStatus;
+        }
+        
+        // 相同狀態則按優先權排序
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        const aPriority = priorityOrder[a.priority || 'medium'];
+        const bPriority = priorityOrder[b.priority || 'medium'];
+        
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority;
+        }
+        
+        // 最後按建立時間排序
+        return b.id.localeCompare(a.id);
       }
-      
-      // 相同狀態則按優先權排序
-      const priorityOrder = { high: 3, medium: 2, low: 1 };
-      const aPriority = priorityOrder[a.priority || 'medium'];
-      const bPriority = priorityOrder[b.priority || 'medium'];
-      
-      if (aPriority !== bPriority) {
-        return bPriority - aPriority; // 高優先權在前
-      }
-      
-      // 相同優先權則按建立時間排序（假設 id 包含時間資訊）
-      return b.id.localeCompare(a.id);
     });
-  }, [topics]);
+  }, [topics, config.sortMode]);
 
   /**
    * 從所有主題中提取需要建立任務的目標
@@ -1755,11 +1843,132 @@ export const TaskWallPage = () => {
     toast.success('已取消今日打卡', {
       duration: 3000,
       style: {
-        background: '#F59E0B',
+        background: '#64748B',
         color: 'white',
         borderRadius: '12px'
       }
     });
+  }, [weeklyChallenge]);
+
+  /**
+   * 遷移週挑戰到新的任務結構
+   */
+  const migrateWeeklyChallengeToTask = useCallback(async () => {
+    if (!weeklyChallenge || !currentUser) return;
+
+    try {
+      // 找到或創建"個人習慣"主題
+      let habitTopic = topics?.find(topic => topic.title === '個人習慣' && topic.subject === '生活');
+      
+      if (!habitTopic) {
+        // 創建個人習慣主題
+        const newTopic = await createTopic({
+          title: '個人習慣',
+          description: '培養良好的日常習慣',
+          subject: '生活',
+          status: 'active',
+          is_collaborative: false,
+          show_avatars: false
+        });
+        
+        if (!newTopic) {
+          toast.error('創建習慣主題失敗');
+          return;
+        }
+        habitTopic = newTopic;
+      }
+
+      // 找到或創建"每週挑戰"目標
+      let challengeGoal = habitTopic.goals?.find(goal => goal.title === '每週挑戰');
+      
+      if (!challengeGoal) {
+        const newGoal = await addGoal(habitTopic.id, {
+          title: '每週挑戰',
+          description: '堅持完成本週設定的挑戰',
+          status: 'todo',
+          priority: 'high',
+          order_index: 0
+        });
+        
+        if (!newGoal) {
+          toast.error('創建挑戰目標失敗');
+          return;
+        }
+        challengeGoal = newGoal;
+      }
+
+      // 創建連續型任務
+      const weekStart = getWeekStart(getTaiwanDateString());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      const taskConfig = {
+        type: 'streak' as const,
+        target_days: 7,
+        current_streak: weeklyChallenge.completedDays.length,
+        max_streak: weeklyChallenge.completedDays.length,
+        check_in_dates: weeklyChallenge.completedDays
+      };
+
+      const cycleConfig = {
+        cycle_type: 'weekly' as const,
+        start_date: weekStart,
+        deadline: weekEnd.toISOString().split('T')[0],
+        auto_reset: true
+      };
+
+      const progressData = {
+        last_updated: new Date().toISOString(),
+        completion_percentage: (weeklyChallenge.completedDays.length / 7) * 100,
+        check_in_dates: weeklyChallenge.completedDays,
+        current_streak: weeklyChallenge.completedDays.length,
+        max_streak: weeklyChallenge.completedDays.length
+      };
+
+      const newTask = await addTask(challengeGoal.id, {
+        title: weeklyChallenge.title,
+        description: `本週挑戰：${weeklyChallenge.title}`,
+        task_type: 'streak',
+        task_config: taskConfig,
+        cycle_config: cycleConfig,
+        progress_data: progressData,
+        status: 'in_progress',
+        priority: 'high',
+        order_index: 0,
+        need_help: false
+      });
+
+      if (newTask) {
+        // 清除舊的 localStorage 數據
+        localStorage.removeItem('weeklyChallenge');
+        setWeeklyChallenge(null);
+        
+        // 刷新頁面數據
+        await fetchTopics();
+        
+        toast.success('週挑戰已成功遷移到任務系統！🎉', {
+          duration: 5000,
+          style: {
+            background: '#10B981',
+            color: 'white',
+            borderRadius: '12px',
+            fontWeight: '600'
+          }
+        });
+      } else {
+        toast.error('遷移任務失敗');
+      }
+    } catch (error) {
+      console.error('遷移週挑戰失敗:', error);
+      toast.error('遷移失敗，請稍後再試');
+    }
+  }, [weeklyChallenge, currentUser, topics, createTopic, addGoal, addTask, fetchTopics]);
+
+  /**
+   * 檢查是否需要提示用戶遷移週挑戰
+   */
+  const shouldShowMigrationPrompt = useMemo(() => {
+    return weeklyChallenge && weeklyChallenge.completedDays.length > 0;
   }, [weeklyChallenge]);
 
   // 載入狀態
@@ -1831,7 +2040,7 @@ export const TaskWallPage = () => {
                       />
                       <span className="text-sm text-amber-600">
                         {config.viewMode === 'tasks' ? (
-                          `${allCards.length} 張卡片 • ${activeTasks.filter(task => task.status === 'in_progress').length} 個進行中`
+                          `${allCards.length} 張卡片 • ${activeTasks.filter(task => task.status === 'in_progress').length} 個進行中 • ${config.sortMode === 'task_type' ? '類型排序' : '主題排序'}`
                         ) : (
                           `${topicCards.length} 個主題 • ${topicCards.reduce((sum, topic) => sum + topic.inProgressTasks, 0)} 個任務進行中`
                         )}
@@ -1866,6 +2075,29 @@ export const TaskWallPage = () => {
                     </div>
                   </button>
 
+                  {config.viewMode === 'tasks' && (
+                    <button
+                      onClick={() => setConfig(prev => ({ 
+                        ...prev, 
+                        sortMode: prev.sortMode === 'task_type' ? 'topic' : 'task_type' 
+                      }))}
+                      className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/90 text-slate-700 hover:bg-slate-100 transition-colors shadow-sm border border-slate-200"
+                      title={`當前排序: ${config.sortMode === 'task_type' ? '任務類型' : '主題分類'}`}
+                    >
+                      {config.sortMode === 'task_type' ? (
+                        <>
+                          <Target className="w-4 h-4" />
+                          <span className="text-xs font-medium">類型排序</span>
+                        </>
+                      ) : (
+                        <>
+                          <BookMarked className="w-4 h-4" />
+                          <span className="text-xs font-medium">主題排序</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setShowJournalDialog(true)}
                     className="p-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 text-white hover:from-purple-500 hover:to-pink-500 transition-all shadow-md hover:shadow-lg"
@@ -1887,50 +2119,27 @@ export const TaskWallPage = () => {
 
           {/* 根據模式決定佈局 */}
           {config.viewMode === 'tasks' ? (
-            // 任務模式：左右分割佈局
-            <div className="flex gap-6 relative">
-              {/* 左側：任務內容區域 (60%) */}
-              <div className="flex-1 w-3/5">
-                {filteredTasks.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🎉</div>
-                    <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
-                    <p className="text-amber-600">所有任務都完成了，該享受成就感了！</p>
-                  </div>
-                ) : (
-                  <TaskWallGrid
-                    cards={allCards}
-                    config={config}
-                    onTaskStatusUpdate={handleTaskStatusUpdate}
-                    onAddTaskToGoal={handleAddTaskToGoal}
-                    onOpenRecord={handleOpenRecord}
-                    onOpenHistory={handleOpenHistory}
-                    onRecordSuccess={handleRecordSuccess}
-                    currentUserId={currentUser?.id}
-                    isLoading={isLoading}
-                  />
-                )}
-              </div>
-
-              {/* 右側：本週挑戰卡片 (40%) */}
-              <div className="w-2/5 flex-shrink-0">
-                <div className="sticky top-4">
-                  <div className="w-full">
-                    <WeeklyChallengeCard
-                      challenge={weeklyChallenge}
-                      onCheckIn={handleChallengeCheckIn}
-                      onCancelCheckIn={handleCancelCheckIn}
-                      onEdit={handleEditChallenge}
-                      onSetChallenge={handleSetChallenge}
-                      editingChallenge={editingChallenge}
-                      challengeInput={challengeInput}
-                      setChallengeInput={setChallengeInput}
-                      setEditingChallenge={setEditingChallenge}
-                      getTaiwanDateString={getTaiwanDateString}
-                    />
-                  </div>
+            // 任務模式：全寬度佈局
+            <div className="w-full">
+              {filteredTasks.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🎉</div>
+                  <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
+                  <p className="text-amber-600">所有任務都完成了，該享受成就感了！</p>
                 </div>
-              </div>
+              ) : (
+                <TaskWallGrid
+                  cards={allCards}
+                  config={config}
+                  onTaskStatusUpdate={handleTaskStatusUpdate}
+                  onAddTaskToGoal={handleAddTaskToGoal}
+                  onOpenRecord={handleOpenRecord}
+                  onOpenHistory={handleOpenHistory}
+                  onRecordSuccess={handleRecordSuccess}
+                  currentUserId={currentUser?.id}
+                  isLoading={isLoading}
+                />
+              )}
             </div>
           ) : (
             // 主題模式：全寬度佈局
