@@ -9,7 +9,7 @@
  * 🏗️ 架構設計：
  * - 工廠模式：根據 task_type 選擇對應的卡片
  * - 統一的 props 傳遞和任務操作處理
- * - 支援 WeeklyQuickCard 特化
+ * - 支援 highlight 特化模式
  */
 
 import React from 'react';
@@ -144,19 +144,4 @@ export const TaskCardFactory: React.FC<TaskCardFactoryProps> = (props) => {
   return renderTaskCard();
 };
 
-/**
- * 週挑戰快速卡片（CountTaskCard 的特化版本）
- */
-export const WeeklyQuickCard: React.FC<TaskCardFactoryProps> = (props) => {
-  // 檢查是否為計數型且有週循環配置
-  const isWeeklyCountTask = props.task.task_type === 'count' && 
-    (props.task.cycle_config as any)?.cycle_type === 'weekly';
-
-  if (!isWeeklyCountTask) {
-    console.warn('WeeklyQuickCard 只能用於週循環的計數型任務');
-    return <TaskCardFactory {...props} />;
-  }
-
-  // 使用特化模式渲染
-  return <TaskCardFactory {...props} highlight={true} />;
-}; 
+ 

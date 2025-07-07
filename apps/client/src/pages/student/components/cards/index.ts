@@ -15,5 +15,5 @@ export { StreakTaskCard } from './StreakTaskCard';
 export { AccumulativeTaskCard } from './AccumulativeTaskCard';
 
 // 卡片工廠
-export { TaskCardFactory, WeeklyQuickCard } from './TaskCardFactory';
+export { TaskCardFactory } from './TaskCardFactory';
 export type { TaskCardFactoryProps } from './TaskCardFactory'; 

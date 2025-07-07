@@ -6,6 +6,7 @@
  * - 支援動畫進場和退場效果
  * - 統一管理 TaskCard 和 GoalCard 的排列
  * - 網格間隔和卡片大小適配不同螢幕
+ * - 支援 highlight 卡片（如週挑戰）的特殊處理
  * 
  * 🏗️ 架構設計：
  * - 使用 CSS Grid 和 Framer Motion 實現動畫
@@ -45,11 +46,17 @@ interface TaskWallConfig {
   priorityFilter: 'all' | 'high' | 'medium' | 'low'; // 優先權過濾
 }
 
+/**
+ * 卡片數據介面，支援 highlight 屬性
+ */
+interface CardData {
+  type: 'task' | 'goal';
+  data: TaskWithContext | GoalWithContext;
+  highlight?: boolean; // 是否為特殊卡片（如週挑戰）
+}
+
 interface TaskWallGridProps {
-  cards: Array<
-    | { type: 'task'; data: TaskWithContext }
-    | { type: 'goal'; data: GoalWithContext }
-  >;
+  cards: CardData[];
   config: TaskWallConfig;
   onTaskStatusUpdate: (
     taskId: string,
@@ -67,7 +74,6 @@ interface TaskWallGridProps {
   onRecordSuccess?: () => void;
   currentUserId?: string;
   isLoading?: boolean;
-  weeklyQuickCard?: React.ReactNode; // 新增：週挑戰快速創建卡片
 }
 
 export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
@@ -79,8 +85,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   onOpenHistory,
   onRecordSuccess,
   currentUserId,
-  isLoading = false,
-  weeklyQuickCard
+  isLoading = false
 }) => {
   const [showLoading, setShowLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -184,29 +189,12 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
       }}
     >
       <AnimatePresence mode="popLayout">
-        {/* 週挑戰快速創建卡片 - 永遠排在第一個 */}
-        {weeklyQuickCard && (
-          <motion.div
-            key="weekly-quick-card"
-            className="flex justify-center"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            layout
-            layoutId="weekly-quick-card"
-          >
-            {weeklyQuickCard}
-          </motion.div>
-        )}
-        
-        {/* 其他任務卡片 */}
         {cards.map((card, index) => (
           <motion.div
             key={`${card.type}-${card.data.id}`}
             className="flex justify-center"
             variants={cardVariants}
-            custom={weeklyQuickCard ? index + 1 : index} // 如果有週挑戰卡片，索引要+1
+            custom={index}
             layout
             layoutId={`${card.type}-${card.data.id}`}
             initial="hidden"
@@ -232,12 +220,12 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
           >
             {card.type === 'task' ? (
               <TaskCardFactory
-                task={card.data}
+                task={card.data as TaskWithContext}
                 onStatusUpdate={(newStatus) =>
                   onTaskStatusUpdate(
                     card.data.id,
-                    card.data.goalId,
-                    card.data.topicId,
+                    (card.data as TaskWithContext).goalId,
+                    (card.data as TaskWithContext).topicId,
                     newStatus
                   )
                 }
@@ -245,14 +233,15 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
                 onOpenHistory={onOpenHistory}
                 onRecordSuccess={onRecordSuccess}
                 currentUserId={currentUserId}
+                highlight={card.highlight} // 傳遞 highlight 屬性
               />
             ) : (
               <GoalCard
-                goal={card.data}
+                goal={card.data as GoalWithContext}
                 onAddTask={(taskTitle) =>
                   onAddTaskToGoal(
                     card.data.id,
-                    card.data.topicId,
+                    (card.data as GoalWithContext).topicId,
                     taskTitle
                   )
                 }
