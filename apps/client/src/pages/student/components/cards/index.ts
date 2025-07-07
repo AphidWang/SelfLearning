@@ -14,6 +14,10 @@ export { CountTaskCard } from './CountTaskCard';
 export { StreakTaskCard } from './StreakTaskCard';
 export { AccumulativeTaskCard } from './AccumulativeTaskCard';
 
+// 特殊卡片
+export { CreateWeeklyTaskCard } from './CreateWeeklyTaskCard';
+export type { CreateWeeklyTaskCardProps } from './CreateWeeklyTaskCard';
+
 // 卡片工廠
 export { TaskCardFactory } from './TaskCardFactory';
 export type { TaskCardFactoryProps } from './TaskCardFactory'; 

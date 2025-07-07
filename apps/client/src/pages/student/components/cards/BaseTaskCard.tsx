@@ -73,7 +73,7 @@ export interface CardContent {
  * 基礎任務卡片組件
  */
 export const BaseTaskCard: React.FC<BaseTaskCardProps & {
-  renderContent: () => CardContent;
+  renderContent: (showReferenceInfo: (e: React.MouseEvent, buttonRef?: React.RefObject<HTMLButtonElement>) => void) => CardContent;
   cardClassName?: string;
   frontClassName?: string;
   backClassName?: string;
@@ -109,10 +109,21 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
   // 點擊外部關閉彈窗
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showReferenceInfo && buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
+      if (showReferenceInfo) {
         const popupElement = document.querySelector('[data-popup="reference-info"]');
         if (popupElement && !popupElement.contains(event.target as Node)) {
-          setShowReferenceInfo(false);
+          // 檢查是否點擊了任何參考資訊按鈕
+          const referenceButtons = document.querySelectorAll('[data-reference-button]');
+          let clickedButton = false;
+          referenceButtons.forEach(button => {
+            if (button.contains(event.target as Node)) {
+              clickedButton = true;
+            }
+          });
+          
+          if (!clickedButton) {
+            setShowReferenceInfo(false);
+          }
         }
       }
     };
@@ -209,33 +220,67 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
   /**
    * 處理參考資訊彈窗的顯示位置
    */
-  const handleShowReferenceInfo = (e: React.MouseEvent) => {
+  const handleShowReferenceInfo = (e: React.MouseEvent, externalButtonRef?: React.RefObject<HTMLButtonElement>) => {
     e.stopPropagation();
     
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
+    const targetRef = externalButtonRef || buttonRef;
+    if (targetRef.current) {
+      const rect = targetRef.current.getBoundingClientRect();
       const popupWidth = 256; // 彈窗寬度
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       
-      // 計算水平位置 - 優先顯示在按鈕右側，如果空間不夠則顯示在左側
+      // 檢測是否為觸控設備
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      
+      // 計算水平位置 - 觸控設備優先顯示在按鈕下方，桌面設備優先顯示在右側
       let x = rect.right + 8;
       let arrowSide = 'left';
-      if (x + popupWidth > viewportWidth) {
-        x = rect.left - popupWidth - 8;
-        arrowSide = 'right';
+      
+      if (isTouchDevice) {
+        // 觸控設備：居中顯示
+        x = rect.left + (rect.width / 2) - (popupWidth / 2);
+        // 確保不超出螢幕邊界
+        if (x < 8) x = 8;
+        if (x + popupWidth > viewportWidth) x = viewportWidth - popupWidth - 8;
+        arrowSide = 'top'; // 箭頭指向上方
+      } else {
+        // 桌面設備：右側或左側
+        if (x + popupWidth > viewportWidth) {
+          x = rect.left - popupWidth - 8;
+          arrowSide = 'right';
+        }
       }
       
-      // 計算垂直位置 - 優先顯示在按鈕下方，如果空間不夠則顯示在上方
+      // 計算垂直位置
       let y = rect.bottom + 8;
       const estimatedPopupHeight = 200; // 估算彈窗高度
-      if (y + estimatedPopupHeight > viewportHeight) {
-        y = rect.top - estimatedPopupHeight - 8;
+      
+      if (isTouchDevice) {
+        // 觸控設備：優先顯示在按鈕下方，給手指操作留出空間
+        y = rect.bottom + 16;
+        if (y + estimatedPopupHeight > viewportHeight) {
+          y = rect.top - estimatedPopupHeight - 16;
+          arrowSide = 'bottom'; // 箭頭指向下方
+        }
+      } else {
+        // 桌面設備：原有邏輯
+        if (y + estimatedPopupHeight > viewportHeight) {
+          y = rect.top - estimatedPopupHeight - 8;
+        }
       }
       
       // 計算箭頭位置
-      const buttonCenter = rect.top + rect.height / 2;
-      const arrowOffset = Math.max(16, Math.min(buttonCenter - y, popupWidth - 32));
+      let arrowOffset;
+      if (arrowSide === 'top' || arrowSide === 'bottom') {
+        // 水平居中的箭頭
+        const buttonCenter = rect.left + rect.width / 2;
+        arrowOffset = Math.max(16, Math.min(buttonCenter - x, popupWidth - 32));
+      } else {
+        // 垂直居中的箭頭
+        const buttonCenter = rect.top + rect.height / 2;
+        arrowOffset = Math.max(16, Math.min(buttonCenter - y, 200 - 32));
+      }
       
       setPopupPosition({ x, y });
       setArrowPosition({ side: arrowSide, offset: arrowOffset });
@@ -267,7 +312,7 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
     return createPortal(
       <AnimatePresence>
         <motion.div
-          className="fixed z-[99999] w-64 rounded-2xl shadow-2xl border-0 p-4"
+          className="fixed z-[99999] w-64 rounded-2xl shadow-2xl border-0 p-4 touch-manipulation"
           data-popup="reference-info"
           style={{
             left: popupPosition.x,
@@ -289,16 +334,22 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
           {/* 箭頭指向按鈕 */}
           <div 
             className={`absolute w-4 h-4 rotate-45 ${
-              arrowPosition.side === 'left' ? '-left-2' : '-right-2'
+              arrowPosition.side === 'left' ? '-left-2' : 
+              arrowPosition.side === 'right' ? '-right-2' :
+              arrowPosition.side === 'top' ? '-top-2' : '-bottom-2'
             }`}
             style={{
-              top: `${arrowPosition.offset}px`,
+              ...(arrowPosition.side === 'left' || arrowPosition.side === 'right' ? {
+                top: `${arrowPosition.offset}px`
+              } : {
+                left: `${arrowPosition.offset}px`
+              }),
               background: '#f0f4ff',
               border: `1px solid ${task.subjectStyle.accent}20`,
-              borderRight: arrowPosition.side === 'left' ? 'none' : `1px solid ${task.subjectStyle.accent}20`,
-              borderBottom: arrowPosition.side === 'left' ? 'none' : `1px solid ${task.subjectStyle.accent}20`,
-              borderLeft: arrowPosition.side === 'right' ? 'none' : `1px solid ${task.subjectStyle.accent}20`,
-              borderTop: arrowPosition.side === 'right' ? 'none' : `1px solid ${task.subjectStyle.accent}20`
+              borderRight: arrowPosition.side === 'left' || arrowPosition.side === 'bottom' ? 'none' : `1px solid ${task.subjectStyle.accent}20`,
+              borderBottom: arrowPosition.side === 'left' || arrowPosition.side === 'bottom' ? 'none' : `1px solid ${task.subjectStyle.accent}20`,
+              borderLeft: arrowPosition.side === 'right' || arrowPosition.side === 'top' ? 'none' : `1px solid ${task.subjectStyle.accent}20`,
+              borderTop: arrowPosition.side === 'right' || arrowPosition.side === 'top' ? 'none' : `1px solid ${task.subjectStyle.accent}20`
             }}
           />
           <div className="space-y-3">
@@ -312,7 +363,7 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
               </h5>
               <button
                 onClick={() => setShowReferenceInfo(false)}
-                className="p-1.5 rounded-full transition-all hover:scale-110"
+                className="p-1.5 rounded-full transition-all hover:scale-110 active:scale-95 touch-manipulation"
                 style={{ 
                   backgroundColor: task.subjectStyle.accent + '15',
                   color: task.subjectStyle.accent 
@@ -328,7 +379,7 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
               return (
                 <div
                   key={attachment.id}
-                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
+                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] touch-manipulation"
                   style={{
                     background: '#ffffff',
                     border: `1px solid #e2e8f0`
@@ -361,7 +412,7 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
               return (
                 <div
                   key={link.id}
-                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
+                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] touch-manipulation"
                   style={{
                     background: '#ffffff',
                     border: `1px solid #e2e8f0`
@@ -467,7 +518,7 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
     </div>
   );
 
-  const content = renderContent();
+  const content = renderContent(handleShowReferenceInfo);
 
   return (
     <div className={`relative w-full max-w-sm mx-auto h-48 ${className}`} style={{ perspective: '1000px', ...style }}>
@@ -498,11 +549,13 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
               inset 0 1px 0 rgba(255,255,255,0.8)
               ${highlight ? `, 0 0 0 2px ${task.subjectStyle.accent}40` : ''}
             `,
-            backfaceVisibility: 'hidden'
+            backfaceVisibility: 'hidden',
+            pointerEvents: isFlipped ? 'none' : 'auto'
           }}
         >
           {content.frontContent}
           {content.statusIndicator}
+          
         </motion.div>
 
         {/* 背面 */}
@@ -518,7 +571,8 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
               ${highlight ? `, 0 0 0 2px ${task.subjectStyle.accent}40` : ''}
             `,
             transform: 'rotateY(180deg)',
-            backfaceVisibility: 'hidden'
+            backfaceVisibility: 'hidden',
+            pointerEvents: isFlipped ? 'auto' : 'none'
           }}
         >
           <div className="p-4 h-full flex flex-col items-center justify-center gap-4">
@@ -623,6 +677,12 @@ export const useBaseTaskCard = (task: TaskWithContext) => {
         {totalReferenceItems > 0 && (
           <div className="relative">
             <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('參考資訊按鈕被點擊 (from BaseTaskCard renderActionButtons)', task.reference_info);
+                // 這裡需要觸發參考資訊彈窗，但目前 renderActionButtons 沒有這個功能
+                // 應該在各個卡片組件中自行實現參考資訊按鈕
+              }}
               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:scale-110 hover:shadow-md"
               style={{
                 backgroundColor: task.subjectStyle.accent + 'AA',

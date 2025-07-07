@@ -12,8 +12,8 @@
  * - 簡潔的進度條或狀態標籤
  */
 
-import React from 'react';
-import { Clock, Play, CheckCircle2, Target, BookOpen, User as UserIcon } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Clock, Play, CheckCircle2, Target, BookOpen, User as UserIcon, Link } from 'lucide-react';
 import { BaseTaskCard, BaseTaskCardProps, useBaseTaskCard } from './BaseTaskCard';
 
 interface SingleTaskCardProps extends BaseTaskCardProps {}
@@ -21,6 +21,7 @@ interface SingleTaskCardProps extends BaseTaskCardProps {}
 export const SingleTaskCard: React.FC<SingleTaskCardProps> = (props) => {
   const { task, currentUserId, onOpenRecord, onOpenHistory } = props;
   const { renderTopicTag, renderOwnerTag, renderBottomInfo, renderActionButtons } = useBaseTaskCard(task);
+  const referenceButtonRef = useRef<HTMLButtonElement>(null);
 
   /**
    * 獲取狀態圖示
@@ -43,7 +44,7 @@ export const SingleTaskCard: React.FC<SingleTaskCardProps> = (props) => {
   /**
    * 渲染正面內容 - 三分佈局
    */
-  const renderFrontContent = () => (
+  const renderFrontContent = (showReferenceInfo: (e: React.MouseEvent, buttonRef?: React.RefObject<HTMLButtonElement>) => void) => (
     <div className="p-4 h-full flex flex-col">
       {/* 第一部分：主題標籤 */}
       <div className="flex-shrink-0">
@@ -80,7 +81,45 @@ export const SingleTaskCard: React.FC<SingleTaskCardProps> = (props) => {
 
           {/* 按鈕區域 */}
           <div className="flex-shrink-0">
-            {renderActionButtons(onOpenRecord, onOpenHistory)}
+            <div className="flex gap-2">
+              {/* 學習記錄數量 */}
+              {(task.records?.length || 0) > 0 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenHistory?.(task);
+                  }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:scale-110 hover:shadow-md"
+                  style={{
+                    backgroundColor: task.subjectStyle.accent + 'CC',
+                    color: 'white'
+                  }}
+                  title={`${task.records?.length} 則學習記錄`}
+                >
+                  +{task.records?.length}
+                </button>
+              )}
+              
+              {/* 參考資訊按鈕 */}
+              {((task.reference_info?.attachments || []).length + (task.reference_info?.links || []).length) > 0 && (
+                <button 
+                  ref={referenceButtonRef}
+                  data-reference-button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    showReferenceInfo(e, referenceButtonRef);
+                  }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:scale-110 hover:shadow-md active:scale-95"
+                  style={{
+                    backgroundColor: task.subjectStyle.accent + 'AA',
+                    color: 'white'
+                  }}
+                  title={`${(task.reference_info?.attachments || []).length + (task.reference_info?.links || []).length} 個參考資料`}
+                >
+                  <Link className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -109,8 +148,8 @@ export const SingleTaskCard: React.FC<SingleTaskCardProps> = (props) => {
   return (
     <BaseTaskCard
       {...props}
-      renderContent={() => ({
-        frontContent: renderFrontContent(),
+      renderContent={(showReferenceInfo) => ({
+        frontContent: renderFrontContent(showReferenceInfo),
         backContent: null, // 使用默認背面內容
         statusIndicator: renderStatusIndicator(),
         actionButtons: null // 使用默認操作按鈕

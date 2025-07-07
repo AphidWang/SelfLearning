@@ -38,6 +38,7 @@ import { TopicReviewPage } from '../../components/topic-review/TopicReviewPage';
 import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
 import { TopicGrid, TopicCard, CreateTopicCard, TopicCardData } from './components/TopicCards';
 import { StarCounter, CompletedTasksDialog, CutePromptDialog } from './components/SharedDialogs';
+import { CreateWeeklyTaskCard } from './components/cards/CreateWeeklyTaskCard';
 import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
 import { SPECIAL_TASK_FLAGS, hasWeeklyQuickChallenge } from '../../types/goal';
 import { LoadingDots } from '../../components/shared/LoadingDots';
@@ -86,23 +87,6 @@ interface GoalWithContext extends Goal {
   topicSubject: string;
   subjectStyle: any;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 export const TaskWallPage = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -153,6 +137,7 @@ export const TaskWallPage = () => {
   const [loadingTopicId, setLoadingTopicId] = useState<string | null>(null);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [selectedTaskForHistory, setSelectedTaskForHistory] = useState<TaskWithContext | null>(null);
+  const [isCreatingWeeklyTask, setIsCreatingWeeklyTask] = useState(false);
   
 
 
@@ -434,6 +419,140 @@ export const TaskWallPage = () => {
       throw error;
     }
   }, [selectedTaskForRecord]);
+
+  /**
+   * 獲取週開始日期（週日開始）
+   */
+  const getWeekStart = useCallback((dateStr: string) => {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const diff = date.getDate() - dayOfWeek;
+    const weekStart = new Date(date.setDate(diff));
+    return weekStart;
+  }, []);
+
+  /**
+   * 獲取台灣時間的日期字串
+   */
+  const getTaiwanDateString = useCallback(() => {
+    const now = new Date();
+    const taiwanTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)); // UTC+8
+    return taiwanTime.toISOString().split('T')[0];
+  }, []);
+
+  /**
+   * 快速創建週循環任務
+   */
+  const handleCreateWeeklyTask = useCallback(async (title: string) => {
+    if (!currentUser) return;
+
+    setIsCreatingWeeklyTask(true);
+    
+    try {
+      // 找到或創建"個人習慣"主題
+      let habitTopic = topics?.find(topic => topic.title === '個人習慣' && topic.subject === '生活');
+      
+      if (!habitTopic) {
+        // 創建個人習慣主題（隱藏主題，不在主題牆顯示）
+        const newTopic = await createTopic({
+          title: '個人習慣',
+          description: '培養良好的日常習慣',
+          subject: '生活',
+          status: 'hidden', // 使用 hidden 狀態來隱藏主題
+          is_collaborative: false,
+          show_avatars: false
+        });
+        
+        if (!newTopic) {
+          toast.error('創建習慣主題失敗');
+          return;
+        }
+        habitTopic = newTopic;
+      }
+
+      // 找到或創建"每週挑戰"目標
+      let challengeGoal = habitTopic.goals?.find(goal => goal.title === '每週挑戰');
+      
+      if (!challengeGoal) {
+        const newGoal = await addGoal(habitTopic.id, {
+          title: '每週挑戰',
+          description: '堅持完成本週設定的挑戰',
+          status: 'todo',
+          priority: 'high',
+          order_index: 0
+        });
+        
+        if (!newGoal) {
+          toast.error('創建挑戰目標失敗');
+          return;
+        }
+        challengeGoal = newGoal;
+      }
+
+      // 創建計數型任務
+      const weekStart = getWeekStart(getTaiwanDateString());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      const taskConfig = {
+        type: 'count' as const,
+        target_count: 7,
+        current_count: 0,
+        reset_frequency: 'weekly' as const // 每週重置
+      };
+
+      const cycleConfig = {
+        cycle_type: 'weekly' as const,
+        cycle_start_date: weekStart.toISOString().split('T')[0],
+        deadline: weekEnd.toISOString().split('T')[0],
+        auto_reset: true
+      };
+
+      const progressData = {
+        last_updated: new Date().toISOString(),
+        completion_percentage: 0,
+        check_in_dates: [],
+        current_count: 0,
+        target_count: 7
+      };
+
+      const newTask = await addTask(challengeGoal.id, {
+        title: title,
+        description: `本週挑戰：${title}`,
+        task_type: 'count',
+        task_config: taskConfig,
+        cycle_config: cycleConfig,
+        progress_data: progressData,
+        status: 'in_progress',
+        priority: 'high',
+        order_index: 0,
+        need_help: false,
+        special_flags: [SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE]
+      });
+
+      if (newTask) {
+        // 刷新頁面數據
+        await fetchTopics();
+        
+        toast.success('週挑戰創建成功！開始你的7天打卡之旅 🎉', {
+          duration: 5000,
+          style: {
+            background: '#10B981',
+            color: 'white',
+            borderRadius: '12px',
+            fontWeight: '600'
+          }
+        });
+      } else {
+        toast.error('創建任務失敗');
+      }
+    } catch (error) {
+      console.error('創建週挑戰失敗:', error);
+      toast.error('創建失敗，請稍後再試');
+    } finally {
+      setIsCreatingWeeklyTask(false);
+    }
+  }, [currentUser, topics, createTopic, addGoal, addTask, fetchTopics, getWeekStart, getTaiwanDateString]);
 
   /**
    * 從所有主題中提取活躍的任務
@@ -806,18 +925,6 @@ export const TaskWallPage = () => {
     setShowHistoryDialog(true);
   }, []);
 
-
-
-
-
-
-
-
-
-
-
-
-
   // 載入狀態
   if (loading) {
     return (
@@ -969,7 +1076,26 @@ export const TaskWallPage = () => {
           {config.viewMode === 'tasks' ? (
             // 任務模式：全寬度佈局
             <div className="w-full">
-              {filteredTasks.length === 0 ? (
+              {/* 週挑戰區域 - 總是顯示在最前面 */}
+              <div className="mb-6">
+                {weeklyQuickChallengeInfo.hasChallenge ? (
+                  // 如果有週挑戰任務，顯示在 TaskWallGrid 中（通過 allCards）
+                  null
+                ) : (
+                  // 如果沒有週挑戰任務，顯示創建卡片
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-sm">
+                      <CreateWeeklyTaskCard
+                        onCreateWeeklyTask={handleCreateWeeklyTask}
+                        isCreatingTask={isCreatingWeeklyTask}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 一般任務區域 */}
+              {filteredTasks.length === 0 && weeklyQuickChallengeInfo.hasChallenge ? (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">🎉</div>
                   <h3 className="text-2xl font-bold text-amber-800 mb-2">太棒了！</h3>
