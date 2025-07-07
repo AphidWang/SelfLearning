@@ -21,7 +21,8 @@ import { create } from 'zustand';
 import { 
   Topic, Goal, Task, Bubble, GoalStatus, TaskStatus, TaskPriority,
   CreateTopicFromTemplateParams, SafeUpdateResult, TopicWithStructure, ActiveTaskResult,
-  ReferenceInfo, ReferenceAttachment, ReferenceLink
+  ReferenceInfo, ReferenceAttachment, ReferenceLink, TaskType, TaskConfig, CycleConfig, 
+  TaskProgressData, createDefaultTaskConfig, createDefaultCycleConfig, createDefaultProgressData
 } from '../types/goal';
 import type { TopicCollaborator, User } from '@self-learning/types';
 import { supabase, authService } from '../services/supabase';
@@ -155,6 +156,13 @@ interface TopicStore {
   markTaskCompleted: (taskId: string, expectedVersion: number, requireRecord?: boolean) => Promise<MarkTaskResult>;
   markTaskInProgress: (taskId: string, expectedVersion: number) => Promise<MarkTaskResult>;
   markTaskTodo: (taskId: string, expectedVersion: number) => Promise<MarkTaskResult>;
+
+  // === 新的任務動作處理方法 ===
+  performTaskAction: (taskId: string, actionType: 'check_in' | 'add_count' | 'add_amount' | 'reset', params?: any) => Promise<MarkTaskResult>;
+  checkInTask: (taskId: string) => Promise<MarkTaskResult>;
+  addTaskCount: (taskId: string, count: number) => Promise<MarkTaskResult>;
+  addTaskAmount: (taskId: string, amount: number, unit?: string) => Promise<MarkTaskResult>;
+  resetTaskProgress: (taskId: string) => Promise<MarkTaskResult>;
 
   // === 快速查詢函數（性能優化） ===
   getActiveTasksForUser: () => Promise<ActiveTaskResult[]>;
@@ -988,7 +996,15 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   addTask: async (goalId: string, taskData) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
       // 確保所有必需字段都有默認值
+      const taskType = taskData.task_type || 'single';
+      const taskConfig = taskData.task_config || createDefaultTaskConfig(taskType);
+      const cycleConfig = taskData.cycle_config || createDefaultCycleConfig();
+      const progressData = taskData.progress_data || createDefaultProgressData();
+
       const taskDataWithDefaults = {
         title: taskData.title,
         description: taskData.description || '',
@@ -996,7 +1012,13 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         priority: taskData.priority || 'medium',
         order_index: taskData.order_index || 0,
         need_help: taskData.need_help || false,
-        goal_id: goalId
+        goal_id: goalId,
+        task_type: taskType,
+        task_config: taskConfig,
+        cycle_config: cycleConfig,
+        progress_data: progressData,
+        special_flags: taskData.special_flags || [],
+        owner_id: user.id
       };
 
       const { data, error } = await supabase
@@ -1224,6 +1246,307 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         return { success: false, message: error.message };
       }
       return { success: false, message: error.message || '標記任務待辦失敗' };
+    }
+  },
+
+  // === 新的任務動作處理方法 ===
+  performTaskAction: async (taskId: string, actionType: 'check_in' | 'add_count' | 'add_amount' | 'reset', params?: any) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // 記錄任務動作
+      const { data: actionData, error: actionError } = await supabase
+        .from('task_actions')
+        .insert([{
+          task_id: taskId,
+          action_type: actionType,
+          action_data: params || {},
+          action_date: today,
+          user_id: user.id
+        }])
+        .select()
+        .single();
+
+      if (actionError) {
+        if (actionError.code === '23505') {
+          return { success: false, message: '今天已經執行過這個動作了' };
+        }
+        throw actionError;
+      }
+
+      // 根據動作類型執行對應的處理
+      switch (actionType) {
+        case 'check_in':
+          return await get().checkInTask(taskId);
+        case 'add_count':
+          return await get().addTaskCount(taskId, params?.count || 1);
+        case 'add_amount':
+          return await get().addTaskAmount(taskId, params?.amount || 0, params?.unit);
+        case 'reset':
+          return await get().resetTaskProgress(taskId);
+        default:
+          return { success: false, message: '不支持的任務動作' };
+      }
+    } catch (error: any) {
+      console.error('執行任務動作失敗:', error);
+      return { success: false, message: error.message || '執行任務動作失敗' };
+    }
+  },
+
+  checkInTask: async (taskId: string) => {
+    try {
+      // 獲取任務資料
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError || !taskData) {
+        return { success: false, message: '找不到任務' };
+      }
+
+      if (taskData.task_type !== 'streak') {
+        return { success: false, message: '只有連續型任務支援打卡' };
+      }
+
+      // 更新連續型任務進度
+      const progressData = taskData.progress_data || {};
+      const today = new Date().toISOString().split('T')[0];
+      const checkInDates = progressData.check_in_dates || [];
+      
+      if (!checkInDates.includes(today)) {
+        checkInDates.push(today);
+        checkInDates.sort();
+        
+        // 計算新的連續天數
+        let currentStreak = 0;
+        const sortedDates = checkInDates.sort();
+        for (let i = sortedDates.length - 1; i >= 0; i--) {
+          const date = new Date(sortedDates[i]);
+          const expectedDate = new Date();
+          expectedDate.setDate(expectedDate.getDate() - currentStreak);
+          
+          if (date.toISOString().split('T')[0] === expectedDate.toISOString().split('T')[0]) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+
+        const newProgressData = {
+          ...progressData,
+          check_in_dates: checkInDates,
+          current_streak: currentStreak,
+          max_streak: Math.max(progressData.max_streak || 0, currentStreak)
+        };
+
+        const { data: updatedTask, error: updateError } = await supabase
+          .from('tasks')
+          .update({ progress_data: newProgressData })
+          .eq('id', taskId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+
+        // 更新本地狀態
+        set(state => ({
+          topics: state.topics.map(topic => ({
+            ...topic,
+            goals: (topic.goals || []).map(goal => ({
+              ...goal,
+              tasks: (goal.tasks || []).map(task => 
+                task.id === taskId ? updatedTask : task
+              )
+            }))
+          }))
+        }));
+
+        return { success: true, task: updatedTask };
+      }
+
+      return { success: false, message: '今天已經打卡了' };
+    } catch (error: any) {
+      console.error('打卡失敗:', error);
+      return { success: false, message: error.message || '打卡失敗' };
+    }
+  },
+
+  addTaskCount: async (taskId: string, count: number) => {
+    try {
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError || !taskData) {
+        return { success: false, message: '找不到任務' };
+      }
+
+      if (taskData.task_type !== 'count') {
+        return { success: false, message: '只有計數型任務支援計數' };
+      }
+
+      const config = taskData.task_config || {};
+      const progressData = taskData.progress_data || {};
+      const newCurrentCount = (progressData.current_count || 0) + count;
+
+      const newProgressData = {
+        ...progressData,
+        current_count: newCurrentCount,
+        completed: newCurrentCount >= (config.target_count || 0)
+      };
+
+      const { data: updatedTask, error: updateError } = await supabase
+        .from('tasks')
+        .update({ 
+          progress_data: newProgressData,
+          status: newProgressData.completed ? 'done' : 'in_progress'
+        })
+        .eq('id', taskId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // 更新本地狀態
+      set(state => ({
+        topics: state.topics.map(topic => ({
+          ...topic,
+          goals: (topic.goals || []).map(goal => ({
+            ...goal,
+            tasks: (goal.tasks || []).map(task => 
+              task.id === taskId ? updatedTask : task
+            )
+          }))
+        }))
+      }));
+
+      return { success: true, task: updatedTask };
+    } catch (error: any) {
+      console.error('更新任務計數失敗:', error);
+      return { success: false, message: error.message || '更新任務計數失敗' };
+    }
+  },
+
+  addTaskAmount: async (taskId: string, amount: number, unit?: string) => {
+    try {
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError || !taskData) {
+        return { success: false, message: '找不到任務' };
+      }
+
+      if (taskData.task_type !== 'accumulative') {
+        return { success: false, message: '只有累計型任務支援累計' };
+      }
+
+      const config = taskData.task_config || {};
+      const progressData = taskData.progress_data || {};
+      const today = new Date().toISOString().split('T')[0];
+      const dailyRecords = progressData.daily_records || {};
+      
+      // 更新今日記錄
+      if (!dailyRecords[today]) {
+        dailyRecords[today] = 0;
+      }
+      dailyRecords[today] += amount;
+
+      // 計算總累計
+      const totalAmount = Object.values(dailyRecords).reduce((sum: number, val: any) => sum + val, 0);
+
+      const newProgressData = {
+        ...progressData,
+        daily_records: dailyRecords,
+        current_amount: totalAmount,
+        completed: totalAmount >= (config.target_amount || 0)
+      };
+
+      const { data: updatedTask, error: updateError } = await supabase
+        .from('tasks')
+        .update({ 
+          progress_data: newProgressData,
+          status: newProgressData.completed ? 'done' : 'in_progress'
+        })
+        .eq('id', taskId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // 更新本地狀態
+      set(state => ({
+        topics: state.topics.map(topic => ({
+          ...topic,
+          goals: (topic.goals || []).map(goal => ({
+            ...goal,
+            tasks: (goal.tasks || []).map(task => 
+              task.id === taskId ? updatedTask : task
+            )
+          }))
+        }))
+      }));
+
+      return { success: true, task: updatedTask };
+    } catch (error: any) {
+      console.error('更新任務累計失敗:', error);
+      return { success: false, message: error.message || '更新任務累計失敗' };
+    }
+  },
+
+  resetTaskProgress: async (taskId: string) => {
+    try {
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError || !taskData) {
+        return { success: false, message: '找不到任務' };
+      }
+
+      // 重置進度數據
+      const newProgressData = createDefaultProgressData();
+
+      const { data: updatedTask, error: updateError } = await supabase
+        .from('tasks')
+        .update({ 
+          progress_data: newProgressData,
+          status: 'todo'
+        })
+        .eq('id', taskId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // 更新本地狀態
+      set(state => ({
+        topics: state.topics.map(topic => ({
+          ...topic,
+          goals: (topic.goals || []).map(goal => ({
+            ...goal,
+            tasks: (goal.tasks || []).map(task => 
+              task.id === taskId ? updatedTask : task
+            )
+          }))
+        }))
+      }));
+
+      return { success: true, task: updatedTask };
+    } catch (error: any) {
+      console.error('重置任務進度失敗:', error);
+      return { success: false, message: error.message || '重置任務進度失敗' };
     }
   },
 
@@ -1727,10 +2050,10 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   setTaskOwner: async (topicId: string, goalId: string, taskId: string, userId: string) => {
     try {
-      // 更新數據庫中的 task owner_id
+      // 更新數據庫中的 task owner
       const { data: updatedTask, error } = await supabase
         .from('tasks')
-        .update({ owner_id: userId })
+        .update({ owner: userId })
         .eq('id', taskId)
         .select()
         .single();
@@ -1746,12 +2069,12 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       if (topicIndex >= 0 && topics[topicIndex].goals) {
         const goalIndex = topics[topicIndex].goals!.findIndex(g => g.id === goalId);
         if (goalIndex >= 0) {
-          const taskIndex = topics[topicIndex].goals![goalIndex].tasks?.findIndex(t => t.id === taskId) ?? -1;
+          // 獲取用戶信息並設置 owner
+          const usersMap = await getUsersData([userId]);
+          const updatedGoals = [...topics[topicIndex].goals!];
+          const updatedTasks = [...(updatedGoals[goalIndex].tasks || [])];
+          const taskIndex = updatedTasks.findIndex(t => t.id === taskId);
           if (taskIndex >= 0) {
-            // 獲取用戶信息並設置 owner
-            const usersMap = await getUsersData([userId]);
-            const updatedGoals = [...topics[topicIndex].goals!];
-            const updatedTasks = [...(updatedGoals[goalIndex].tasks || [])];
             updatedTasks[taskIndex] = {
               ...updatedTasks[taskIndex],
               owner: usersMap[userId] || null

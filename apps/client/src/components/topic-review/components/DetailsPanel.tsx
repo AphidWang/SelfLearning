@@ -200,7 +200,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         description: '',
         priority: 'medium',
         order_index: (selectedGoal.tasks?.length || 0) + 1,
-        need_help: false
+        need_help: false,
+        task_type: 'single',
+        task_config: { type: 'single' },
+        cycle_config: { cycle_type: 'none', auto_reset: false },
+        progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 }
       });
     });
     setNewTaskTitle('');

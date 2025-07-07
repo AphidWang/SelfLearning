@@ -10,7 +10,8 @@ export const TOPIC_STATUSES = {
   ARCHIVED: 'archived',
   IN_PROGRESS: 'in-progress',
   OVERDUE: 'overdue',
-  PAUSED: 'paused'
+  PAUSED: 'paused',
+  HIDDEN: 'hidden'
 } as const;
 
 export const TOPIC_SOURCES = {

@@ -67,6 +67,7 @@ interface TaskWallGridProps {
   onRecordSuccess?: () => void;
   currentUserId?: string;
   isLoading?: boolean;
+  weeklyQuickCard?: React.ReactNode; // 新增：週挑戰快速創建卡片
 }
 
 export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
@@ -78,7 +79,8 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   onOpenHistory,
   onRecordSuccess,
   currentUserId,
-  isLoading = false
+  isLoading = false,
+  weeklyQuickCard
 }) => {
   const [showLoading, setShowLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -182,12 +184,30 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
       }}
     >
       <AnimatePresence mode="popLayout">
+        {/* 週挑戰快速創建卡片 - 永遠排在第一個 */}
+        {weeklyQuickCard && (
+          <motion.div
+            key="weekly-quick-card"
+            className="flex justify-center"
+            variants={cardVariants}
+            custom={0}
+            layout
+            layoutId="weekly-quick-card"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            {weeklyQuickCard}
+          </motion.div>
+        )}
+        
+        {/* 其他任務卡片 */}
         {cards.map((card, index) => (
           <motion.div
             key={`${card.type}-${card.data.id}`}
             className="flex justify-center"
             variants={cardVariants}
-            custom={index}
+            custom={weeklyQuickCard ? index + 1 : index} // 如果有週挑戰卡片，索引要+1
             layout
             layoutId={`${card.type}-${card.data.id}`}
             initial="hidden"

@@ -11,6 +11,157 @@ export type TaskRole = 'explore' | 'work' | 'present';
 // 添加目標狀態類型
 export type GoalStatus = 'todo' | 'pause' | 'focus' | 'finish' | 'complete' | 'archived';
 
+// === 新增：擴展任務類型 ===
+
+/**
+ * 任務類型定義
+ */
+export type TaskType = 
+  | 'single'        // 單次任務（現有的傳統任務）
+  | 'count'         // 計數型（累積做幾次）
+  | 'streak'        // 連續型（支援打卡算連續天數）
+  | 'accumulative'; // 累計型（每天可完成多次，單位自訂）
+
+/**
+ * 週期類型定義
+ */
+export type CycleType = 
+  | 'none'          // 無週期
+  | 'weekly'        // 週循環
+  | 'monthly';      // 月循環
+
+/**
+ * 計數型任務配置
+ */
+export interface CountTaskConfig {
+  type: 'count';
+  target_count: number;           // 目標次數
+  current_count: number;          // 當前次數
+  reset_frequency: CycleType;     // 重置頻率
+}
+
+/**
+ * 連續型任務配置
+ */
+export interface StreakTaskConfig {
+  type: 'streak';
+  target_days: number;            // 目標連續天數
+  current_streak: number;         // 當前連續天數
+  max_streak: number;             // 最高連續紀錄
+  check_in_dates: string[];       // 打卡日期列表
+}
+
+/**
+ * 累計型任務配置
+ */
+export interface AccumulativeTaskConfig {
+  type: 'accumulative';
+  target_amount: number;          // 目標累計量
+  current_amount: number;         // 當前累計量
+  unit: string;                   // 單位（分鐘、次數、頁數等）
+  daily_records: Array<{          // 每日記錄
+    date: string;
+    amount: number;
+  }>;
+}
+
+/**
+ * 單次任務配置
+ */
+export interface SingleTaskConfig {
+  type: 'single';
+  // 單次任務不需要額外配置，使用現有的 status 即可
+}
+
+/**
+ * 任務配置聯合類型
+ */
+export type TaskConfig = 
+  | SingleTaskConfig 
+  | CountTaskConfig 
+  | StreakTaskConfig 
+  | AccumulativeTaskConfig;
+
+/**
+ * 週期配置
+ */
+export interface CycleConfig {
+  cycle_type: CycleType;          // 週期類型
+  cycle_start_date?: string;      // 週期開始日期（週一或月初）
+  due_date?: string;              // 截止日期
+  auto_reset: boolean;            // 是否自動重置
+}
+
+/**
+ * 任務進度數據
+ */
+export interface TaskProgressData {
+  last_updated: string;           // 最後更新時間
+  completion_percentage: number;  // 完成百分比
+  
+  // 連續型任務專用欄位
+  current_streak?: number;        // 當前連續天數
+  max_streak?: number;            // 最高連續紀錄
+  check_in_dates?: string[];      // 打卡日期列表
+  
+  // 計數型任務專用欄位
+  current_count?: number;         // 當前計數
+  target_count?: number;          // 目標計數
+  
+  // 累計型任務專用欄位
+  current_amount?: number;        // 當前累計量
+  target_amount?: number;         // 目標累計量
+  unit?: string;                  // 單位
+  
+  // 通用統計數據
+  streak_data?: {                 // 連續型專用（舊格式，向後兼容）
+    longest_streak: number;
+    current_streak: number;
+    last_check_in: string;
+  };
+  weekly_summary?: {              // 週期總結
+    week_start: string;
+    total_count: number;
+    daily_breakdown: Array<{
+      date: string;
+      count: number;
+    }>;
+  };
+}
+
+/**
+ * 任務動作類型
+ */
+export type TaskActionType = 
+  | 'check_in'      // 打卡
+  | 'add_count'     // 增加計數
+  | 'add_amount'    // 增加累計量
+  | 'complete'      // 完成
+  | 'reset';        // 重置
+
+// 特殊任務標記常量
+export const SPECIAL_TASK_FLAGS = {
+  WEEKLY_QUICK_CHALLENGE: 'weekly_quick_challenge', // 週挑戰快速創建任務
+  DAILY_HABIT: 'daily_habit',                       // 每日習慣任務
+  MONTHLY_GOAL: 'monthly_goal',                     // 月度目標任務
+} as const;
+
+export type SpecialTaskFlag = typeof SPECIAL_TASK_FLAGS[keyof typeof SPECIAL_TASK_FLAGS];
+
+/**
+ * 任務動作記錄
+ */
+export interface TaskAction {
+  id: string;
+  task_id: string;
+  user_id: string;
+  action_type: TaskActionType;
+  action_data: Record<string, any>;  // 動作相關數據
+  action_date: string;               // 動作日期
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Topic {
   id: string;
   owner_id: string;
@@ -87,6 +238,13 @@ export interface Task {
   priority: TaskPriority;
   order_index: number;
   
+  // === 新增：擴展任務類型支援 ===
+  task_type: TaskType;              // 任務類型
+  task_config: TaskConfig;          // 任務配置
+  cycle_config: CycleConfig;        // 週期配置
+  progress_data: TaskProgressData;  // 進度數據
+  special_flags?: string[];         // 特殊標記（如：'weekly_quick_challenge'）
+  
   // 協作相關
   need_help: boolean;
   help_message?: string;
@@ -103,7 +261,7 @@ export interface Task {
   actual_minutes?: number;
   
   // 學習記錄
-  records?: { id: string; content?: string; created_at?: string }[];
+  records?: TaskRecord[];
   
   // 版本控制
   version: number;
@@ -300,6 +458,20 @@ export interface ActiveTaskResult {
   topic_status: TopicStatus;
 }
 
+/**
+ * 擴展的學習記錄介面（用於 task_records 表）
+ */
+export interface TaskRecord {
+  id: string;
+  created_at: string;
+  title: string;
+  message: string;
+  difficulty: number;
+  completion_time?: number;
+  files?: any[];
+  tags?: string[];
+}
+
 export interface TaskWithContext extends Task {
   topicId: string;
   topicTitle: string;
@@ -307,16 +479,7 @@ export interface TaskWithContext extends Task {
   goalId: string;
   goalTitle: string;
   subjectStyle: any;
-  records: {
-    id: string;
-    created_at: string;
-    title: string;
-    message: string;
-    difficulty: number;
-    completion_time?: number;
-    files?: any[];
-    tags?: string[];
-  }[];
+  records: TaskRecord[];
 }
 
 // 參考資訊相關類型
@@ -348,4 +511,110 @@ export interface ReferenceLink {
 export interface ReferenceInfo {
   attachments: ReferenceAttachment[];
   links: ReferenceLink[];
+}
+
+// === 輔助函數：創建預設配置 ===
+
+/**
+ * 創建預設的任務配置
+ */
+export function createDefaultTaskConfig(type: TaskType): TaskConfig {
+  switch (type) {
+    case 'single':
+      return { type: 'single' };
+    case 'count':
+      return {
+        type: 'count',
+        target_count: 7,
+        current_count: 0,
+        reset_frequency: 'weekly'
+      };
+    case 'streak':
+      return {
+        type: 'streak',
+        target_days: 7,
+        current_streak: 0,
+        max_streak: 0,
+        check_in_dates: []
+      };
+    case 'accumulative':
+      return {
+        type: 'accumulative',
+        target_amount: 100,
+        current_amount: 0,
+        unit: '分鐘',
+        daily_records: []
+      };
+    default:
+      return { type: 'single' };
+  }
+}
+
+/**
+ * 創建預設的週期配置
+ */
+export function createDefaultCycleConfig(): CycleConfig {
+  return {
+    cycle_type: 'none',
+    auto_reset: false
+  };
+}
+
+/**
+ * 創建預設的進度數據
+ */
+export function createDefaultProgressData(): TaskProgressData {
+  return {
+    last_updated: new Date().toISOString(),
+    completion_percentage: 0
+  };
+}
+
+/**
+ * 檢查任務是否為擴展類型（非單次任務）
+ */
+export function isExtendedTaskType(task: Task): boolean {
+  return task.task_type !== 'single';
+}
+
+/**
+ * 獲取任務的顯示進度
+ */
+export function getTaskDisplayProgress(task: Task): number {
+  if (task.task_type === 'single') {
+    return task.status === 'done' ? 100 : 0;
+  }
+  return task.progress_data?.completion_percentage || 0;
+}
+
+/**
+ * 檢查任務是否可以今天執行動作
+ */
+export function canPerformTodayAction(task: Task): boolean {
+  if (task.task_type === 'single') {
+    return task.status !== 'done';
+  }
+  
+  const today = new Date().toISOString().split('T')[0];
+  
+  if (task.task_type === 'streak') {
+    const config = task.task_config as StreakTaskConfig;
+    return !config.check_in_dates.includes(today);
+  }
+  
+  return true; // count 和 accumulative 都可以每天多次操作
+}
+
+/**
+ * 檢查任務是否有特定標記
+ */
+export function hasSpecialFlag(task: Task, flag: SpecialTaskFlag): boolean {
+  return task.special_flags?.includes(flag) || false;
+}
+
+/**
+ * 檢查是否存在週挑戰快速創建任務
+ */
+export function hasWeeklyQuickChallenge(tasks: Task[]): boolean {
+  return tasks.some(task => hasSpecialFlag(task, SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE));
 }
