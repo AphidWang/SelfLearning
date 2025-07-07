@@ -1225,11 +1225,11 @@ export const TaskWallPage = () => {
                 id: record.id,
                 created_at: record.created_at || new Date().toISOString(),
                 title: task.title,
-                message: record.content || '',
-                difficulty: 3,
-                completion_time: undefined,
-                files: [],
-                tags: []
+                message: record.message || '',
+                difficulty: record.difficulty || 3,
+                completion_time: record.completion_time,
+                files: record.files || [],
+                tags: record.tags || []
               }))
             });
           }
@@ -1289,11 +1289,11 @@ export const TaskWallPage = () => {
                     id: record.id,
                     created_at: record.created_at || new Date().toISOString(),
                     title: task.title,
-                    message: record.content || '',
-                    difficulty: 3,
-                    completion_time: undefined,
-                    files: [],
-                    tags: []
+                    message: record.message || '',
+                    difficulty: record.difficulty || 3,
+                    completion_time: record.completion_time,
+                    files: record.files || [],
+                    tags: record.tags || []
                   }))
                 });
                 setShowPromptDialog(true);
@@ -1450,11 +1450,11 @@ export const TaskWallPage = () => {
                 id: record.id,
                 created_at: record.created_at || new Date().toISOString(),
                 title: task.title,
-                message: record.content || '',
-                difficulty: 3,
-                completion_time: undefined,
-                files: [],
-                tags: []
+                message: record.message || '',
+                difficulty: record.difficulty || 3,
+                completion_time: record.completion_time,
+                files: record.files || [],
+                tags: record.tags || []
               }))
             });
           }
