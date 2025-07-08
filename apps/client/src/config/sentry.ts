@@ -33,6 +33,12 @@ export const initSentry = () => {
       debug: false,
       tracesSampleRate: 0, // 關閉 Performance Tracing
       sendDefaultPii: true,
+      // 捕捉 console 錯誤
+      integrations: [
+        Sentry.captureConsoleIntegration({
+          levels: ['error'] // 只捕捉 console.error
+        })
+      ],
     });
     
     // 測試 Sentry 是否正常運作
