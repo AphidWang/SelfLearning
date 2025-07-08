@@ -173,9 +173,13 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
     }
   };
 
+  // 分離特殊卡片和普通卡片
+  const highlightCards = cards.filter(card => card.highlight);
+  const normalCards = cards.filter(card => !card.highlight);
+
   return (
     <motion.div
-      className={`grid gap-4 md:gap-6 ${getGridColumns()}`}
+      className="space-y-6"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -184,69 +188,150 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
       }}
     >
       <AnimatePresence mode="popLayout">
-        {cards.map((card, index) => (
+        {/* 第一列：特殊卡片區域 */}
+        {highlightCards.length > 0 && (
           <motion.div
-            key={`${card.type}-${card.data.id}`}
-            className="flex justify-center"
-            variants={cardVariants}
-            custom={index}
-            layout
-            layoutId={`${card.type}-${card.data.id}`}
+            className="w-full mb-6"
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
-            exit="exit"
-            whileHover={{
-              scale: 1.05,
-              y: -8,
-              rotate: 0, // 懸停時回正
-              transition: {
-                type: "spring",
-                damping: 15,
-                stiffness: 500,
-                duration: 0.2
-              }
-            }}
-            whileTap={{
-              scale: 0.98,
-              transition: {
-                duration: 0.1
-              }
-            }}
           >
-            {card.type === 'task' ? (
-              <TaskCardFactory
-                task={card.data as TaskWithContext}
-                onStatusUpdate={(newStatus) =>
-                  onTaskStatusUpdate(
-                    card.data.id,
-                    (card.data as TaskWithContext).goalId,
-                    (card.data as TaskWithContext).topicId,
-                    newStatus
-                  )
-                }
-                onOpenRecord={onOpenRecord}
-                onOpenHistory={onOpenHistory}
-                onRecordSuccess={onRecordSuccess}
-                currentUserId={currentUserId}
-                highlight={card.highlight} // 傳遞 highlight 屬性
-              />
-            ) : (
-              <GoalCard
-                goal={card.data as GoalWithContext}
-                onAddTask={(taskTitle) =>
-                  onAddTaskToGoal(
-                    card.data.id,
-                    (card.data as GoalWithContext).topicId,
-                    taskTitle
-                  )
-                }
-              />
-            )}
+            <div className="flex flex-wrap gap-4 justify-center w-full">
+              {highlightCards.map((card, index) => (
+                <motion.div
+                  key={`${card.type}-${card.data.id}`}
+                  className="w-full max-w-sm"
+                  variants={cardVariants}
+                  custom={index}
+                  layout
+                  layoutId={`${card.type}-${card.data.id}`}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  whileHover={{
+                    scale: 1.05,
+                    y: -8,
+                    rotate: 0, // 懸停時回正
+                    transition: {
+                      type: "spring",
+                      damping: 15,
+                      stiffness: 500,
+                      duration: 0.2
+                    }
+                  }}
+                  whileTap={{
+                    scale: 0.98,
+                    transition: {
+                      duration: 0.1
+                    }
+                  }}
+                >
+                  {card.type === 'task' ? (
+                    <TaskCardFactory
+                      task={card.data as TaskWithContext}
+                      onStatusUpdate={(newStatus) =>
+                        onTaskStatusUpdate(
+                          card.data.id,
+                          (card.data as TaskWithContext).goalId,
+                          (card.data as TaskWithContext).topicId,
+                          newStatus
+                        )
+                      }
+                      onOpenRecord={onOpenRecord}
+                      onOpenHistory={onOpenHistory}
+                      onRecordSuccess={onRecordSuccess}
+                      currentUserId={currentUserId}
+                      highlight={card.highlight} // 傳遞 highlight 屬性
+                    />
+                  ) : (
+                    <GoalCard
+                      goal={card.data as GoalWithContext}
+                      onAddTask={(taskTitle) =>
+                        onAddTaskToGoal(
+                          card.data.id,
+                          (card.data as GoalWithContext).topicId,
+                          taskTitle
+                        )
+                      }
+                    />
+                  )}
+                </motion.div>
+              ))}
+            </div>
           </motion.div>
-        ))}
+        )}
+
+        {/* 第二列開始：普通卡片網格區域 */}
+        {normalCards.length > 0 && (
+          <motion.div
+            className={`grid gap-4 md:gap-6 ${getGridColumns()}`}
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {normalCards.map((card, index) => (
+              <motion.div
+                key={`${card.type}-${card.data.id}`}
+                className="flex justify-center"
+                variants={cardVariants}
+                custom={index + highlightCards.length} // 調整動畫延遲
+                layout
+                layoutId={`${card.type}-${card.data.id}`}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                whileHover={{
+                  scale: 1.05,
+                  y: -8,
+                  rotate: 0, // 懸停時回正
+                  transition: {
+                    type: "spring",
+                    damping: 15,
+                    stiffness: 500,
+                    duration: 0.2
+                  }
+                }}
+                whileTap={{
+                  scale: 0.98,
+                  transition: {
+                    duration: 0.1
+                  }
+                }}
+              >
+                {card.type === 'task' ? (
+                  <TaskCardFactory
+                    task={card.data as TaskWithContext}
+                    onStatusUpdate={(newStatus) =>
+                      onTaskStatusUpdate(
+                        card.data.id,
+                        (card.data as TaskWithContext).goalId,
+                        (card.data as TaskWithContext).topicId,
+                        newStatus
+                      )
+                    }
+                    onOpenRecord={onOpenRecord}
+                    onOpenHistory={onOpenHistory}
+                    onRecordSuccess={onRecordSuccess}
+                    currentUserId={currentUserId}
+                    highlight={card.highlight} // 傳遞 highlight 屬性
+                  />
+                ) : (
+                  <GoalCard
+                    goal={card.data as GoalWithContext}
+                    onAddTask={(taskTitle) =>
+                      onAddTaskToGoal(
+                        card.data.id,
+                        (card.data as GoalWithContext).topicId,
+                        taskTitle
+                      )
+                    }
+                  />
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
       </AnimatePresence>
-
-
     </motion.div>
   );
 }; 
