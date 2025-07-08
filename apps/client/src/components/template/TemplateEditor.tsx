@@ -250,6 +250,24 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
               onUpdateTask={actions.handleUpdateTask}
               onDeleteTask={actions.handleDeleteTask}
               isUpdating={state.isUpdating}
+              // 模板參考資訊管理
+              onUpdateTemplateReferenceInfo={actions.handleUpdateTemplateReferenceInfo}
+              onAddTemplateAttachment={actions.handleAddTemplateAttachment}
+              onRemoveTemplateAttachment={actions.handleRemoveTemplateAttachment}
+              onAddTemplateLink={actions.handleAddTemplateLink}
+              onRemoveTemplateLink={actions.handleRemoveTemplateLink}
+              // 目標參考資訊管理
+              onUpdateGoalReferenceInfo={actions.handleUpdateGoalReferenceInfo}
+              onAddGoalAttachment={actions.handleAddGoalAttachment}
+              onRemoveGoalAttachment={actions.handleRemoveGoalAttachment}
+              onAddGoalLink={actions.handleAddGoalLink}
+              onRemoveGoalLink={actions.handleRemoveGoalLink}
+              // 任務參考資訊管理
+              onUpdateTaskReferenceInfo={actions.handleUpdateTaskReferenceInfo}
+              onAddTaskAttachment={actions.handleAddTaskAttachment}
+              onRemoveTaskAttachment={actions.handleRemoveTaskAttachment}
+              onAddTaskLink={actions.handleAddTaskLink}
+              onRemoveTaskLink={actions.handleRemoveTaskLink}
             />
           </motion.div>
         </div>

@@ -1449,6 +1449,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topicData = {
         title: title || template.title,
         description: description || template.description,
+        reference_info: template.reference_info, // 轉移模板的參考資訊
         subject: template.subject,
         category: template.category,
         type: template.template_type || 'learning',
@@ -1479,6 +1480,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
             topic_id: newTopic.id,
             title: templateGoal.title || `Goal ${goalIndex + 1}`,
             description: templateGoal.description || '',
+            reference_info: templateGoal.reference_info, // 轉移 Goal 的參考資訊
             status: templateGoal.status || 'todo',
             priority: templateGoal.priority || 'medium',
             order_index: goalIndex,
@@ -1504,6 +1506,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
                 goal_id: newGoal.id,
                 title: templateTask.title || `Task ${taskIndex + 1}`,
                 description: templateTask.description || '',
+                reference_info: templateTask.reference_info, // 轉移 Task 的參考資訊
                 status: templateTask.status === 'idea' ? 'todo' : (templateTask.status || 'todo'),
                 priority: templateTask.priority || 'medium',
                 order_index: taskIndex,

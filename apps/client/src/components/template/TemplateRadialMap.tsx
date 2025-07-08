@@ -36,7 +36,7 @@ import { subjects } from '../../styles/tokens';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,
   Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon,
-  Pause, Trophy, BookOpen
+  Pause, Trophy
 } from 'lucide-react';
 import type { TopicTemplate, TemplateGoal } from '../../types/goal';
 
@@ -179,10 +179,22 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
     }
   }, [isDragging, onTaskClick]);
 
-  const goalRadius = Math.min(width, height) * 0.46;
-  const taskRadius = goalRadius * 0.6;
-  const goalNodeSize = Math.min(60, Math.min(width, height) * 0.13);
-  const taskNodeSize = Math.min(24, Math.min(width, height) * 0.06);
+  // 動態計算尺寸，與 TopicRadialMap 保持一致
+  const computedValues = useMemo(() => {
+    const goalRadius = Math.min(width, height) * 0.46;
+    const taskRadius = goalRadius * 0.6;
+    const goalNodeSize = Math.min(60, Math.min(width, height) * 0.13);
+    const taskNodeSize = Math.min(24, Math.min(width, height) * 0.06);
+    
+    return {
+      goalRadius,
+      taskRadius,
+      goalNodeSize,
+      taskNodeSize
+    };
+  }, [width, height]);
+
+  const { goalRadius, taskRadius, goalNodeSize, taskNodeSize } = computedValues;
 
   return (
     <div className={`relative ${className}`} style={{ overflow: 'visible' }}>
@@ -286,21 +298,43 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
           })}
 
           {/* 透明背景區域用於捕捉點擊事件 */}
-          <circle
-            cx={centerX}
-            cy={centerY}
-            r={Math.min(width, height) * 0.6}
+          <rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
             fill="transparent"
-            className="cursor-pointer"
             onClick={(e) => {
-              e.stopPropagation();
-              if (!isDragging) {
-                onGoalClick?.('TEMPLATE');
+              // 點擊空白區域取消選擇
+              if (!isDragging && (selectedGoalId || selectedTaskId)) {
+                e.stopPropagation();
+                onGoalClick?.(''); // 傳遞空字串來取消選擇
               }
             }}
+            style={{ cursor: 'default' }}
           />
 
-          {/* 目標連接線 - 直接遍歷模板目標，無需像 TopicRadialMap 那樣處理 goals 為空的情況 */}
+          {/* 背景放射線 */}
+          {template.goals.map((_, index) => {
+            const { x, y } = getRadialPosition(index, template.goals.length, goalRadius, centerX, centerY);
+            return (
+              <motion.line
+                key={`bg-line-${index}`}
+                x1={centerX}
+                y1={centerY}
+                x2={x}
+                y2={y}
+                stroke={subjectColor}
+                strokeWidth="3"
+                strokeOpacity="0.15"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ delay: index * 0.1, duration: 0.8 }}
+              />
+            );
+          })}
+
+          {/* 目標和任務的連接線 - 在背景之後，節點之前 */}
           {template.goals.map((goal, goalIndex) => {
             const goalPos = getRadialPosition(goalIndex, template.goals.length, goalRadius, centerX, centerY);
             
@@ -379,30 +413,48 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
               strokeDasharray="6,4"
             />
             
-            {/* 主題圖標 */}
-            <foreignObject
-              x={centerX - 15}
-              y={centerY - 25}
-              width={30}
-              height={30}
-              className="pointer-events-none"
-            >
-              <div className="w-full h-full flex items-center justify-center">
-                <BookOpen className="w-6 h-6" style={{ color: subjectColor }} />
-              </div>
-            </foreignObject>
+
             
             {/* 主題標題 */}
             <foreignObject
               x={centerX - Math.min(60, Math.min(width, height) * 0.12)}
-              y={centerY + 5}
+              y={centerY - Math.min(35, Math.min(width, height) * 0.07)}
               width={Math.min(120, Math.min(width, height) * 0.24)}
-              height={Math.min(40, Math.min(width, height) * 0.08)}
+              height={Math.min(70, Math.min(width, height) * 0.14)}
               className="pointer-events-none"
             >
               <div className="w-full h-full flex items-center justify-center text-center">
-                <div className="text-sm font-bold text-gray-800 leading-tight">
-                  {template.title}
+                <div className="text-base font-bold text-gray-800 leading-tight">
+                  {(() => {
+                    const title = template.title;
+                    const length = title.length;
+                    
+                    // 如果標題很短，直接顯示
+                    if (length <= 4) {
+                      return <div>{title}</div>;
+                    }
+                    
+                    // 如果標題較長，嘗試平均分行
+                    if (length <= 8) {
+                      const mid = Math.ceil(length / 2);
+                      return (
+                        <div>
+                          <div>{title.substring(0, mid)}</div>
+                          <div>{title.substring(mid)}</div>
+                        </div>
+                      );
+                    }
+                    
+                    // 更長的標題分三行
+                    const third = Math.ceil(length / 3);
+                    return (
+                      <div>
+                        <div>{title.substring(0, third)}</div>
+                        <div>{title.substring(third, third * 2)}</div>
+                        <div>{title.substring(third * 2)}</div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </foreignObject>
@@ -483,8 +535,8 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
                   <motion.circle
                     cx={x}
                     cy={y}
-                    r={goalNodeSize * 0.8}
-                    fill={subjectColor}
+                    r={Math.min(68, Math.min(width, height) * 0.15)}
+                    fill="#3b82f6"
                     fillOpacity="0.1"
                     initial={{ fillOpacity: 0.05 }}
                     animate={{ fillOpacity: 0.15 }}
@@ -497,44 +549,60 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
                   />
                 )}
 
+                {/* 專注狀態的脈動效果 */}
+                {goal.status === 'focus' && (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={Math.min(70, Math.min(width, height) * 0.14)}
+                    fill="none"
+                    stroke={`color-mix(in srgb, ${subjectColor} 75%, white 25%)`}
+                    strokeWidth="2"
+                    opacity="0.4"
+                  >
+                    <animate
+                      attributeName="r"
+                      values={`${Math.min(60, Math.min(width, height) * 0.13)};${Math.min(75, Math.min(width, height) * 0.16)};${Math.min(60, Math.min(width, height) * 0.13)}`}
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.6;0;0.6"
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                )}
+
                 {/* 目標圓圈 */}
                 <circle
                   cx={x}
                   cy={y}
-                  r={goalNodeSize * 0.5}
+                  r={goalNodeSize}
                   fill={goalBgColor}
-                  stroke={strokeColor}
-                  strokeWidth={strokeWidth}
+                  stroke={isSelected ? '#3b82f6' : strokeColor}
+                  strokeWidth={isSelected ? "5" : strokeWidth}
                   filter={`url(#glow-${template.id})`}
                 />
 
-                {/* 目標圖標 */}
+                {/* 目標圖標和標題 */}
                 <foreignObject
-                  x={x - goalNodeSize * 0.25}
-                  y={y - goalNodeSize * 0.25}
-                  width={goalNodeSize * 0.5}
-                  height={goalNodeSize * 0.5}
+                  x={x - Math.min(55, Math.min(width, height) * 0.12)}
+                  y={y - Math.min(55, Math.min(width, height) * 0.12)}
+                  width={Math.min(110, Math.min(width, height) * 0.24)}
+                  height={Math.min(110, Math.min(width, height) * 0.24)}
                   className="pointer-events-none"
                 >
-                  <div className="w-full h-full flex items-center justify-center">
-                    {React.createElement(goalIcon, {
-                      size: goalNodeSize * 0.3,
-                      style: { color: goalColor }
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-1">
+                    {React.createElement(goalIcon, { 
+                      className: "w-6 h-6 mb-2", 
+                      style: { color: goalColor } 
                     })}
-                  </div>
-                </foreignObject>
-
-                {/* 目標標題 */}
-                <foreignObject
-                  x={x - goalNodeSize * 0.8}
-                  y={y + goalNodeSize * 0.6}
-                  width={goalNodeSize * 1.6}
-                  height={goalNodeSize * 0.6}
-                  className="pointer-events-none"
-                >
-                  <div className="w-full text-center">
-                    <div className="text-xs font-medium text-gray-800 leading-tight">
-                      {goal.title}
+                    <div className="text-sm font-medium text-gray-800 leading-tight max-w-[90px] overflow-hidden">
+                      <div className="truncate">
+                        {goal.title}
+                      </div>
                     </div>
                   </div>
                 </foreignObject>
@@ -578,8 +646,8 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
                     <motion.circle
                       cx={x}
                       cy={y}
-                      r={taskNodeSize * 0.8}
-                      fill={taskColor}
+                      r={Math.min(32, Math.min(width, height) * 0.08)}
+                      fill="#3b82f6"
                       fillOpacity="0.1"
                       initial={{ fillOpacity: 0.05 }}
                       animate={{ fillOpacity: 0.2 }}
@@ -592,29 +660,52 @@ export const TemplateRadialMap: React.FC<TemplateRadialMapProps> = ({
                     />
                   )}
 
+                  {/* 進行中任務的脈動效果 */}
+                  {task.status === 'in_progress' && (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={Math.min(30, Math.min(width, height) * 0.075)}
+                      fill="none"
+                      stroke="#dbeafe"
+                      strokeWidth="2"
+                      opacity="0.4"
+                    >
+                      <animate
+                        attributeName="r"
+                        values={`${Math.min(24, Math.min(width, height) * 0.06)};${Math.min(32, Math.min(width, height) * 0.08)};${Math.min(24, Math.min(width, height) * 0.06)}`}
+                        dur="2s"
+                        repeatCount="indefinite"
+                      />
+                      <animate
+                        attributeName="opacity"
+                        values="0.6;0;0.6"
+                        dur="2s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
+                  )}
+
                   {/* 任務圓圈 */}
                   <circle
                     cx={x}
                     cy={y}
-                    r={taskNodeSize * 0.5}
+                    r={taskNodeSize}
                     fill={taskBg}
-                    stroke={taskColor}
-                    strokeWidth="2"
+                    stroke={isSelected ? '#3b82f6' : taskColor}
+                    strokeWidth={isSelected ? "4" : "3"}
                   />
 
                   {/* 任務圖標 */}
                   <foreignObject
-                    x={x - taskNodeSize * 0.25}
-                    y={y - taskNodeSize * 0.25}
-                    width={taskNodeSize * 0.5}
-                    height={taskNodeSize * 0.5}
+                    x={x - Math.min(16, Math.min(width, height) * 0.04)}
+                    y={y - Math.min(16, Math.min(width, height) * 0.04)}
+                    width={Math.min(32, Math.min(width, height) * 0.08)}
+                    height={Math.min(32, Math.min(width, height) * 0.08)}
                     className="pointer-events-none"
                   >
                     <div className="w-full h-full flex items-center justify-center">
-                      {React.createElement(TaskIcon, {
-                        size: taskNodeSize * 0.3,
-                        style: { color: taskColor }
-                      })}
+                      <TaskIcon className="w-4 h-4" style={{ color: taskColor }} />
                     </div>
                   </foreignObject>
                 </motion.g>

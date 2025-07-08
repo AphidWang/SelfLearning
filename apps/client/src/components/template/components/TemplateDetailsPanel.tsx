@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import type { TopicTemplate, TemplateGoal, TemplateTask } from '../../../types/goal';
 import { SUBJECTS } from '../../../constants/subjects';
+import { ReferenceInfoPanel } from '../../topic-review/components/ReferenceInfoPanel';
 import toast from 'react-hot-toast';
 
 interface TemplateDetailsPanelProps {
@@ -51,6 +52,22 @@ interface TemplateDetailsPanelProps {
   onUpdateTask: (goalId: string, taskId: string, updates: Partial<TemplateTask>) => Promise<void>;
   onDeleteTask: (goalId: string, taskId: string) => Promise<void>;
   isUpdating: boolean;
+  // 參考資訊管理方法
+  onUpdateTemplateReferenceInfo?: (info: any) => Promise<void>;
+  onAddTemplateAttachment?: (attachment: any) => Promise<void>;
+  onRemoveTemplateAttachment?: (attachmentId: string) => Promise<void>;
+  onAddTemplateLink?: (link: any) => Promise<void>;
+  onRemoveTemplateLink?: (linkId: string) => Promise<void>;
+  onUpdateGoalReferenceInfo?: (goalId: string, info: any) => Promise<void>;
+  onAddGoalAttachment?: (goalId: string, attachment: any) => Promise<void>;
+  onRemoveGoalAttachment?: (goalId: string, attachmentId: string) => Promise<void>;
+  onAddGoalLink?: (goalId: string, link: any) => Promise<void>;
+  onRemoveGoalLink?: (goalId: string, linkId: string) => Promise<void>;
+  onUpdateTaskReferenceInfo?: (goalId: string, taskId: string, info: any) => Promise<void>;
+  onAddTaskAttachment?: (goalId: string, taskId: string, attachment: any) => Promise<void>;
+  onRemoveTaskAttachment?: (goalId: string, taskId: string, attachmentId: string) => Promise<void>;
+  onAddTaskLink?: (goalId: string, taskId: string, link: any) => Promise<void>;
+  onRemoveTaskLink?: (goalId: string, taskId: string, linkId: string) => Promise<void>;
 }
 
 export const TemplateDetailsPanel: React.FC<TemplateDetailsPanelProps> = ({
@@ -68,7 +85,23 @@ export const TemplateDetailsPanel: React.FC<TemplateDetailsPanelProps> = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
-  isUpdating
+  isUpdating,
+  // 參考資訊管理方法
+  onUpdateTemplateReferenceInfo,
+  onAddTemplateAttachment,
+  onRemoveTemplateAttachment,
+  onAddTemplateLink,
+  onRemoveTemplateLink,
+  onUpdateGoalReferenceInfo,
+  onAddGoalAttachment,
+  onRemoveGoalAttachment,
+  onAddGoalLink,
+  onRemoveGoalLink,
+  onUpdateTaskReferenceInfo,
+  onAddTaskAttachment,
+  onRemoveTaskAttachment,
+  onAddTaskLink,
+  onRemoveTaskLink
 }) => {
   // 編輯狀態
   const [isEditing, setIsEditing] = useState(false);
@@ -185,6 +218,11 @@ export const TemplateDetailsPanel: React.FC<TemplateDetailsPanelProps> = ({
       onDeleteTask={onDeleteTask}
       onTaskSelect={onTaskSelect}
       isUpdating={isUpdating}
+      onUpdateTaskReferenceInfo={onUpdateTaskReferenceInfo}
+      onAddTaskAttachment={onAddTaskAttachment}
+      onRemoveTaskAttachment={onRemoveTaskAttachment}
+      onAddTaskLink={onAddTaskLink}
+      onRemoveTaskLink={onRemoveTaskLink}
     />;
   }
 
@@ -277,6 +315,40 @@ export const TemplateDetailsPanel: React.FC<TemplateDetailsPanelProps> = ({
               <div className="text-sm text-gray-600 dark:text-gray-400">預計任務數</div>
             </div>
           </div>
+
+          {/* 目標參考資訊 */}
+          {onUpdateGoalReferenceInfo && (
+            <ReferenceInfoPanel
+              title="目標參考資訊"
+              referenceInfo={selectedGoal.reference_info}
+              onUpdateReferenceInfo={async (info) => {
+                await handleUpdate(async () => {
+                  await onUpdateGoalReferenceInfo(selectedGoal.id, info);
+                });
+              }}
+              onAddAttachment={async (attachment) => {
+                await handleUpdate(async () => {
+                  await onAddGoalAttachment?.(selectedGoal.id, attachment);
+                });
+              }}
+              onRemoveAttachment={async (attachmentId) => {
+                await handleUpdate(async () => {
+                  await onRemoveGoalAttachment?.(selectedGoal.id, attachmentId);
+                });
+              }}
+              onAddLink={async (link) => {
+                await handleUpdate(async () => {
+                  await onAddGoalLink?.(selectedGoal.id, link);
+                });
+              }}
+              onRemoveLink={async (linkId) => {
+                await handleUpdate(async () => {
+                  await onRemoveGoalLink?.(selectedGoal.id, linkId);
+                });
+              }}
+              isUpdating={isUpdating}
+            />
+          )}
 
           {/* 任務列表與管理 */}
           <div>
@@ -574,6 +646,40 @@ export const TemplateDetailsPanel: React.FC<TemplateDetailsPanelProps> = ({
             </div>
           </div>
 
+          {/* 模板參考資訊 */}
+          {onUpdateTemplateReferenceInfo && (
+            <ReferenceInfoPanel
+              title="模板參考資訊"
+              referenceInfo={template.reference_info}
+              onUpdateReferenceInfo={async (info) => {
+                await handleUpdate(async () => {
+                  await onUpdateTemplateReferenceInfo(info);
+                });
+              }}
+              onAddAttachment={async (attachment) => {
+                await handleUpdate(async () => {
+                  await onAddTemplateAttachment?.(attachment);
+                });
+              }}
+              onRemoveAttachment={async (attachmentId) => {
+                await handleUpdate(async () => {
+                  await onRemoveTemplateAttachment?.(attachmentId);
+                });
+              }}
+              onAddLink={async (link) => {
+                await handleUpdate(async () => {
+                  await onAddTemplateLink?.(link);
+                });
+              }}
+              onRemoveLink={async (linkId) => {
+                await handleUpdate(async () => {
+                  await onRemoveTemplateLink?.(linkId);
+                });
+              }}
+              isUpdating={isUpdating}
+            />
+          )}
+
           {/* 學科資訊 */}
           {template.subject && (
             <div>
@@ -625,6 +731,12 @@ interface TemplateTaskDetailPanelProps {
   onDeleteTask: (goalId: string, taskId: string) => Promise<void>;
   onTaskSelect?: (taskId: string, goalId: string) => void;
   isUpdating: boolean;
+  // 任務參考資訊管理方法
+  onUpdateTaskReferenceInfo?: (goalId: string, taskId: string, info: any) => Promise<void>;
+  onAddTaskAttachment?: (goalId: string, taskId: string, attachment: any) => Promise<void>;
+  onRemoveTaskAttachment?: (goalId: string, taskId: string, attachmentId: string) => Promise<void>;
+  onAddTaskLink?: (goalId: string, taskId: string, link: any) => Promise<void>;
+  onRemoveTaskLink?: (goalId: string, taskId: string, linkId: string) => Promise<void>;
 }
 
 const TemplateTaskDetailPanel: React.FC<TemplateTaskDetailPanelProps> = ({
@@ -636,7 +748,13 @@ const TemplateTaskDetailPanel: React.FC<TemplateTaskDetailPanelProps> = ({
   onUpdateTask,
   onDeleteTask,
   onTaskSelect,
-  isUpdating
+  isUpdating,
+  // 任務參考資訊管理方法
+  onUpdateTaskReferenceInfo,
+  onAddTaskAttachment,
+  onRemoveTaskAttachment,
+  onAddTaskLink,
+  onRemoveTaskLink
 }) => {
   // 編輯狀態
   const [isEditing, setIsEditing] = useState(false);
@@ -800,6 +918,40 @@ const TemplateTaskDetailPanel: React.FC<TemplateTaskDetailPanelProps> = ({
             </span>
           </div>
         </div>
+
+        {/* 任務參考資訊 */}
+        {onUpdateTaskReferenceInfo && (
+          <ReferenceInfoPanel
+            title="任務參考資訊"
+            referenceInfo={task.reference_info}
+            onUpdateReferenceInfo={async (info) => {
+              await handleUpdate(async () => {
+                await onUpdateTaskReferenceInfo(goal.id, task.id, info);
+              });
+            }}
+            onAddAttachment={async (attachment) => {
+              await handleUpdate(async () => {
+                await onAddTaskAttachment?.(goal.id, task.id, attachment);
+              });
+            }}
+            onRemoveAttachment={async (attachmentId) => {
+              await handleUpdate(async () => {
+                await onRemoveTaskAttachment?.(goal.id, task.id, attachmentId);
+              });
+            }}
+            onAddLink={async (link) => {
+              await handleUpdate(async () => {
+                await onAddTaskLink?.(goal.id, task.id, link);
+              });
+            }}
+            onRemoveLink={async (linkId) => {
+              await handleUpdate(async () => {
+                await onRemoveTaskLink?.(goal.id, task.id, linkId);
+              });
+            }}
+            isUpdating={isUpdating}
+          />
+        )}
       </div>
 
       {/* 固定底部按鈕 */}

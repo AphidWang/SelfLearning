@@ -697,6 +697,32 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
             複製
           </button>
         </div>
+        
+        {/* 公開/不公開切換按鈕 - 只有 owner 可以操作 */}
+        {isOwner && (
+          <div className="mt-2">
+            <button
+              onClick={() => onTogglePublic(template.id)}
+              className={`w-full px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-medium ${
+                template.is_public
+                  ? 'bg-gray-400 text-white hover:bg-gray-500'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              {template.is_public ? (
+                <>
+                  <Eye className="w-4 h-4" />
+                  設為不公開
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-4 h-4" />
+                  設為公開
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
       
       {/* 刪除確認對話框 */}
@@ -829,12 +855,24 @@ const TemplateRow: React.FC<TemplateRowProps> = ({
             複製
           </button>
           {isOwner && (
-            <button
-              onClick={() => onDelete(template.id)}
-              className="text-red-600 hover:text-red-900"
-            >
-              刪除
-            </button>
+            <>
+              <button
+                onClick={() => onTogglePublic(template.id)}
+                className={`${
+                  template.is_public
+                    ? 'text-gray-400 hover:text-gray-500'
+                    : 'text-green-600 hover:text-green-900'
+                }`}
+              >
+                {template.is_public ? '設為不公開' : '設為公開'}
+              </button>
+              <button
+                onClick={() => onDelete(template.id)}
+                className="text-red-600 hover:text-red-900"
+              >
+                刪除
+              </button>
+            </>
           )}
         </div>
       </td>

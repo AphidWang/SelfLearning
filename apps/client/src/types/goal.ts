@@ -314,6 +314,7 @@ export interface TemplateGoal {
   id: string;
   title: string;
   description?: string;
+  reference_info?: ReferenceInfo;
   status: GoalStatus;
   priority?: TaskPriority;
   tasks?: TemplateTask[];
@@ -326,6 +327,7 @@ export interface TemplateTask {
   id: string;
   title: string;
   description?: string;
+  reference_info?: ReferenceInfo;
   status: TaskStatus;
   priority?: TaskPriority;
 }

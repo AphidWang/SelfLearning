@@ -62,6 +62,9 @@ interface TopicTemplateStore {
   addGoal: (templateId: string, goal: Omit<TemplateGoal, 'id'>) => Promise<TemplateGoal | null>;
   updateGoal: (templateId: string, goalId: string, updates: Partial<TemplateGoal>) => Promise<TemplateGoal | null>;
   deleteGoal: (templateId: string, goalId: string) => Promise<boolean>;
+  addTask: (templateId: string, goalId: string, task: Omit<TemplateTask, 'id'>) => Promise<TemplateTask | null>;
+  updateTask: (templateId: string, goalId: string, taskId: string, updates: Partial<TemplateTask>) => Promise<TemplateTask | null>;
+  deleteTask: (templateId: string, goalId: string, taskId: string) => Promise<boolean>;
   addBubble: (templateId: string, bubble: Omit<Bubble, 'id'>) => Promise<Bubble | null>;
   updateBubble: (templateId: string, bubbleId: string, updates: Partial<Bubble>) => Promise<Bubble | null>;
   deleteBubble: (templateId: string, bubbleId: string) => Promise<boolean>;
@@ -72,6 +75,20 @@ interface TopicTemplateStore {
   removeTemplateAttachment: (templateId: string, attachmentId: string) => Promise<boolean>;
   addTemplateLink: (templateId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
   removeTemplateLink: (templateId: string, linkId: string) => Promise<boolean>;
+  
+  // 目標參考資訊管理
+  updateGoalReferenceInfo: (templateId: string, goalId: string, referenceInfo: ReferenceInfo) => Promise<boolean>;
+  addGoalAttachment: (templateId: string, goalId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => Promise<boolean>;
+  removeGoalAttachment: (templateId: string, goalId: string, attachmentId: string) => Promise<boolean>;
+  addGoalLink: (templateId: string, goalId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
+  removeGoalLink: (templateId: string, goalId: string, linkId: string) => Promise<boolean>;
+  
+  // 任務參考資訊管理
+  updateTaskReferenceInfo: (templateId: string, goalId: string, taskId: string, referenceInfo: ReferenceInfo) => Promise<boolean>;
+  addTaskAttachment: (templateId: string, goalId: string, taskId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTaskAttachment: (templateId: string, goalId: string, taskId: string, attachmentId: string) => Promise<boolean>;
+  addTaskLink: (templateId: string, goalId: string, taskId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
+  removeTaskLink: (templateId: string, goalId: string, taskId: string, linkId: string) => Promise<boolean>;
 
   // 工具方法
   setSelectedTemplateId: (id: string | null) => void;
@@ -957,6 +974,362 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
     };
 
     return await get().updateTemplateReferenceInfo(templateId, updatedReferenceInfo);
+  },
+
+  // 任務管理方法
+  addTask: async (templateId, goalId, taskData) => {
+    try {
+      const template = get().templates.find(t => t.id === templateId);
+      if (!template) throw new Error('Template not found');
+
+      const goal = template.goals.find(g => g.id === goalId);
+      if (!goal) throw new Error('Goal not found');
+
+      const newTask = {
+        ...taskData,
+        id: crypto.randomUUID()
+      };
+
+      const updatedTasks = [...(goal.tasks || []), newTask];
+      const updatedGoals = template.goals.map(g =>
+        g.id === goalId ? { ...g, tasks: updatedTasks } : g
+      );
+
+      const { error } = await supabase
+        .from('topic_templates')
+        .update({ goals: updatedGoals })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set(state => ({
+        templates: state.templates.map(t =>
+          t.id === templateId
+            ? { ...t, goals: updatedGoals }
+            : t
+        )
+      }));
+
+      return newTask;
+    } catch (error) {
+      console.error('Failed to add task:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to add task' });
+      return null;
+    }
+  },
+
+  updateTask: async (templateId, goalId, taskId, updates) => {
+    try {
+      const template = get().templates.find(t => t.id === templateId);
+      if (!template) throw new Error('Template not found');
+
+      const goal = template.goals.find(g => g.id === goalId);
+      if (!goal) throw new Error('Goal not found');
+
+      const updatedTasks = (goal.tasks || []).map(task =>
+        task.id === taskId ? { ...task, ...updates } : task
+      );
+
+      const updatedGoals = template.goals.map(g =>
+        g.id === goalId ? { ...g, tasks: updatedTasks } : g
+      );
+
+      const { error } = await supabase
+        .from('topic_templates')
+        .update({ goals: updatedGoals })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set(state => ({
+        templates: state.templates.map(t =>
+          t.id === templateId
+            ? { ...t, goals: updatedGoals }
+            : t
+        )
+      }));
+
+      const updatedTask = updatedTasks.find(t => t.id === taskId);
+      return updatedTask || null;
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to update task' });
+      return null;
+    }
+  },
+
+  deleteTask: async (templateId, goalId, taskId) => {
+    try {
+      const template = get().templates.find(t => t.id === templateId);
+      if (!template) throw new Error('Template not found');
+
+      const goal = template.goals.find(g => g.id === goalId);
+      if (!goal) throw new Error('Goal not found');
+
+      const updatedTasks = (goal.tasks || []).filter(task => task.id !== taskId);
+      const updatedGoals = template.goals.map(g =>
+        g.id === goalId ? { ...g, tasks: updatedTasks } : g
+      );
+
+      const { error } = await supabase
+        .from('topic_templates')
+        .update({ goals: updatedGoals })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set(state => ({
+        templates: state.templates.map(t =>
+          t.id === templateId
+            ? { ...t, goals: updatedGoals }
+            : t
+        )
+      }));
+
+      return true;
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to delete task' });
+      return false;
+    }
+  },
+
+  // 目標參考資訊管理
+  updateGoalReferenceInfo: async (templateId, goalId, referenceInfo) => {
+    try {
+      const template = get().templates.find(t => t.id === templateId);
+      if (!template) throw new Error('Template not found');
+
+      const updatedGoals = template.goals.map(goal =>
+        goal.id === goalId ? { ...goal, reference_info: referenceInfo } : goal
+      );
+
+      const { error } = await supabase
+        .from('topic_templates')
+        .update({ goals: updatedGoals })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set(state => ({
+        templates: state.templates.map(t =>
+          t.id === templateId
+            ? { ...t, goals: updatedGoals }
+            : t
+        )
+      }));
+
+      return true;
+    } catch (error) {
+      console.error('Failed to update goal reference info:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to update goal reference info' });
+      return false;
+    }
+  },
+
+  addGoalAttachment: async (templateId, goalId, attachment) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal) return false;
+
+    const newAttachment: ReferenceAttachment = {
+      ...attachment,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = goal.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      attachments: [...currentReferenceInfo.attachments, newAttachment]
+    };
+
+    return await get().updateGoalReferenceInfo(templateId, goalId, updatedReferenceInfo);
+  },
+
+  removeGoalAttachment: async (templateId, goalId, attachmentId) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal || !goal.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...goal.reference_info,
+      attachments: goal.reference_info.attachments.filter(a => a.id !== attachmentId)
+    };
+
+    return await get().updateGoalReferenceInfo(templateId, goalId, updatedReferenceInfo);
+  },
+
+  addGoalLink: async (templateId, goalId, link) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal) return false;
+
+    const newLink: ReferenceLink = {
+      ...link,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = goal.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      links: [...currentReferenceInfo.links, newLink]
+    };
+
+    return await get().updateGoalReferenceInfo(templateId, goalId, updatedReferenceInfo);
+  },
+
+  removeGoalLink: async (templateId, goalId, linkId) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal || !goal.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...goal.reference_info,
+      links: goal.reference_info.links.filter(l => l.id !== linkId)
+    };
+
+    return await get().updateGoalReferenceInfo(templateId, goalId, updatedReferenceInfo);
+  },
+
+  // 任務參考資訊管理
+  updateTaskReferenceInfo: async (templateId, goalId, taskId, referenceInfo) => {
+    try {
+      const template = get().templates.find(t => t.id === templateId);
+      if (!template) throw new Error('Template not found');
+
+      const updatedGoals = template.goals.map(goal =>
+        goal.id === goalId
+          ? {
+              ...goal,
+              tasks: (goal.tasks || []).map(task =>
+                task.id === taskId ? { ...task, reference_info: referenceInfo } : task
+              )
+            }
+          : goal
+      );
+
+      const { error } = await supabase
+        .from('topic_templates')
+        .update({ goals: updatedGoals })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      set(state => ({
+        templates: state.templates.map(t =>
+          t.id === templateId
+            ? { ...t, goals: updatedGoals }
+            : t
+        )
+      }));
+
+      return true;
+    } catch (error) {
+      console.error('Failed to update task reference info:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to update task reference info' });
+      return false;
+    }
+  },
+
+  addTaskAttachment: async (templateId, goalId, taskId, attachment) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal) return false;
+
+    const task = (goal.tasks || []).find(t => t.id === taskId);
+    if (!task) return false;
+
+    const newAttachment: ReferenceAttachment = {
+      ...attachment,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = task.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      attachments: [...currentReferenceInfo.attachments, newAttachment]
+    };
+
+    return await get().updateTaskReferenceInfo(templateId, goalId, taskId, updatedReferenceInfo);
+  },
+
+  removeTaskAttachment: async (templateId, goalId, taskId, attachmentId) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal) return false;
+
+    const task = (goal.tasks || []).find(t => t.id === taskId);
+    if (!task || !task.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...task.reference_info,
+      attachments: task.reference_info.attachments.filter(a => a.id !== attachmentId)
+    };
+
+    return await get().updateTaskReferenceInfo(templateId, goalId, taskId, updatedReferenceInfo);
+  },
+
+  addTaskLink: async (templateId, goalId, taskId, link) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal) return false;
+
+    const task = (goal.tasks || []).find(t => t.id === taskId);
+    if (!task) return false;
+
+    const newLink: ReferenceLink = {
+      ...link,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+
+    const currentReferenceInfo = task.reference_info || { attachments: [], links: [] };
+    const updatedReferenceInfo = {
+      ...currentReferenceInfo,
+      links: [...currentReferenceInfo.links, newLink]
+    };
+
+    return await get().updateTaskReferenceInfo(templateId, goalId, taskId, updatedReferenceInfo);
+  },
+
+  removeTaskLink: async (templateId, goalId, taskId, linkId) => {
+    const template = get().templates.find(t => t.id === templateId);
+    if (!template) return false;
+
+    const goal = template.goals.find(g => g.id === goalId);
+    if (!goal) return false;
+
+    const task = (goal.tasks || []).find(t => t.id === taskId);
+    if (!task || !task.reference_info) return false;
+
+    const updatedReferenceInfo = {
+      ...task.reference_info,
+      links: task.reference_info.links.filter(l => l.id !== linkId)
+    };
+
+    return await get().updateTaskReferenceInfo(templateId, goalId, taskId, updatedReferenceInfo);
   },
 
   reset: () => set({
