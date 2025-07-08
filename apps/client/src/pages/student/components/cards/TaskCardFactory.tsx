@@ -76,7 +76,16 @@ export const TaskCardFactory: React.FC<TaskCardFactoryProps> = (props) => {
 
       if (result.success) {
         toast.success(getSuccessMessage(action));
-        otherProps.onRecordSuccess?.();
+        
+        // 檢查是否為週挑戰任務的打卡操作
+        // 週挑戰任務會在卡片內部自行處理狀態更新，不需要觸發全域刷新
+        const isWeeklyChallenge = task.special_flags?.includes('weekly_quick_challenge');
+        const isCheckInAction = action === 'check_in';
+        
+        if (!(isWeeklyChallenge && isCheckInAction)) {
+          // 非週挑戰打卡操作才觸發全域刷新
+          otherProps.onRecordSuccess?.();
+        }
       } else {
         toast.error(result.message || '操作失敗');
       }

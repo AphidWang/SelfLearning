@@ -13,11 +13,11 @@
  * - 打卡按鈕和狀態指示
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Target, Trophy, Calendar, Play, CheckCircle2, 
-  Clock, RotateCcw, TrendingUp
+  Clock, RotateCcw, TrendingUp, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { BaseTaskCard, BaseTaskCardProps, useBaseTaskCard } from './BaseTaskCard';
 import { CountTaskConfig } from '../../../../types/goal';
@@ -45,19 +45,30 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
   // 取消打卡確認狀態
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [realCheckInTimes, setRealCheckInTimes] = useState<{[date: string]: string}>({});
+  // 新增：本地任務狀態
+  const [localTask, setLocalTask] = useState(task);
+  // 新增：打卡操作載入狀態
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  // 新增：當前顯示的記錄索引（背面用）
+  const [currentRecordIndex, setCurrentRecordIndex] = useState(0);
 
-  const { renderTopicTag, renderOwnerTag, renderBottomInfo } = useBaseTaskCard(task);
+  const { renderTopicTag, renderOwnerTag, renderBottomInfo } = useBaseTaskCard(localTask);
 
-  // 解析任務配置
-  const taskConfig = task.task_config as CountTaskConfig;
-  const currentCount = task.progress_data?.current_count || taskConfig?.current_count || 0;
-  const targetCount = task.progress_data?.target_count || taskConfig?.target_count || 7;
-  const checkInDates = (task.progress_data as any)?.check_in_dates || [];
+  // 監聽 task prop 變化，同步到本地狀態
+  useEffect(() => {
+    setLocalTask(task);
+  }, [task]);
+
+  // 解析任務配置 - 使用本地狀態
+  const taskConfig = localTask.task_config as CountTaskConfig;
+  const currentCount = localTask.progress_data?.current_count || taskConfig?.current_count || 0;
+  const targetCount = localTask.progress_data?.target_count || taskConfig?.target_count || 7;
+  const checkInDates = (localTask.progress_data as any)?.check_in_dates || [];
   
   console.log('📊 任務數據:', {
-    taskTitle: task.title,
+    taskTitle: localTask.title,
     taskConfig,
-    progressData: task.progress_data,
+    progressData: localTask.progress_data,
     currentCount,
     targetCount,
     checkInDates
@@ -75,7 +86,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     const isChecked = checkInDates.includes(today);
     
     console.log('🔍 打卡檢查:', {
-      taskTitle: task.title,
+      taskTitle: localTask.title,
       now: now.toISOString(),
       utc8Today: utc8Today.toISOString(),
       today,
@@ -84,11 +95,11 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     });
     
     return isChecked;
-  }, [checkInDates, task.title]);
+  }, [checkInDates, localTask.title]);
 
   // 生成週日期（針對週循環任務）
   const weekDates = useMemo(() => {
-    if (task.cycle_config?.cycle_type !== 'weekly') {
+    if (localTask.cycle_config?.cycle_type !== 'weekly') {
       // 如果不是週循環，生成當前週的日期 (UTC+8，週一為起始)
       const today = new Date();
       // 轉換為 UTC+8 時區
@@ -108,7 +119,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
       return dates;
     }
     
-    const cycleStart = task.cycle_config?.cycle_start_date;
+    const cycleStart = localTask.cycle_config?.cycle_start_date;
     if (!cycleStart) {
       // 如果沒有設置開始日期，使用當前週 (UTC+8，週一為起始)
       const today = new Date();
@@ -140,18 +151,18 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     console.log('打卡日期:', checkInDates);
     
     return dates;
-  }, [task.cycle_config, checkInDates]);
+  }, [localTask.cycle_config, checkInDates]);
 
   // 載入真實的打卡時間資料
   React.useEffect(() => {
     const loadRealCheckInTimes = async () => {
-      if (!task.id || checkInDates.length === 0) return;
+      if (!localTask.id || checkInDates.length === 0) return;
       
       try {
         const { data: taskActions, error } = await supabase
           .from('task_actions')
           .select('action_date, action_timestamp')
-          .eq('task_id', task.id)
+          .eq('task_id', localTask.id)
           .eq('action_type', 'check_in')
           .in('action_date', checkInDates);
 
@@ -183,11 +194,11 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     };
 
     loadRealCheckInTimes();
-  }, [task.id, checkInDates]);
+  }, [localTask.id, checkInDates]);
 
   // 獲取詳細的打卡時間資料（使用真實時間）
   const checkInTimestamps = useMemo(() => {
-    return checkInDates.map((date: string, index: number) => {
+    const timestamps = checkInDates.map((date: string, index: number) => {
       const dayOfWeek = new Date(date).getDay();
       const dayName = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'][dayOfWeek];
       
@@ -200,20 +211,78 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
         dayName,
         timestamp: new Date(`${date}T00:00:00`).getTime() + index // 簡單排序用
       };
-    }).sort((a, b) => a.timestamp - b.timestamp); // 按時間排序
+    }).sort((a, b) => b.timestamp - a.timestamp); // 按時間倒序排列，最新的在前
+    
+    return timestamps;
   }, [checkInDates, realCheckInTimes]);
 
+  // 當記錄變化時，重置顯示索引到最新記錄
+  useEffect(() => {
+    setCurrentRecordIndex(0);
+  }, [checkInTimestamps.length]);
+
   /**
-   * 處理打卡操作
+   * 處理打卡操作 - 優化版本，只刷新當前卡片
    */
   const handleCheckIn = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isCheckedInToday || !onTaskAction) return;
+    if (isCheckedInToday || isCheckingIn) return;
+    
+    setIsCheckingIn(true);
     
     try {
-      await onTaskAction(task.id, 'check_in');
+      // 檢查是否為週挑戰任務，使用不同的處理方式
+      const isWeeklyChallenge = localTask.special_flags?.includes('weekly_quick_challenge');
+      
+      if (isWeeklyChallenge) {
+        // 週挑戰任務：直接調用 topicStore 的 checkInTask 方法，只更新本地狀態
+        const { useTopicStore } = await import('../../../../store/topicStore');
+        const result = await useTopicStore.getState().checkInTask(localTask.id);
+        
+        if (result.success && result.task) {
+          console.log('✅ 週挑戰打卡成功，更新本地狀態');
+          
+          // 更新本地任務狀態，立即反映變化
+          setLocalTask(prevTask => ({
+            ...prevTask,
+            progress_data: result.task.progress_data,
+            task_config: result.task.task_config,
+            version: result.task.version
+          }));
+          
+          // 顯示成功提示
+          const { default: toast } = await import('react-hot-toast');
+          const checkInDates = (result.task.progress_data as any)?.check_in_dates || [];
+          const targetCount = (result.task.task_config as any)?.target_count || 7;
+          toast.success(`今天完成了！進度 ${checkInDates.length}/${targetCount} 次 🎉`, {
+            duration: 3000,
+            style: {
+              background: '#10B981',
+              color: 'white',
+              borderRadius: '12px',
+              fontWeight: '600'
+            }
+          });
+          
+          // 重新載入打卡時間資料
+          setRealCheckInTimes({});
+        } else {
+          console.error('❌ 週挑戰打卡失敗:', result.success === false ? result.message : '未知錯誤');
+          const { default: toast } = await import('react-hot-toast');
+          toast.error(result.success === false ? result.message : '打卡失敗');
+        }
+      } else {
+        // 普通任務：使用原來的方式，通過 onTaskAction 觸發全域刷新
+        if (onTaskAction) {
+          await onTaskAction(localTask.id, 'check_in');
+        }
+      }
     } catch (error) {
-      console.error('打卡失敗:', error);
+      console.error('打卡操作失敗:', error);
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('打卡失敗，請稍後再試');
+    } finally {
+      setIsCheckingIn(false);
     }
   };
 
@@ -225,7 +294,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     if (!onTaskAction) return;
     
     try {
-      await onTaskAction(task.id, 'reset');
+      await onTaskAction(localTask.id, 'reset');
       setShowResetConfirm(false);
     } catch (error) {
       console.error('重置失敗:', error);
@@ -233,34 +302,73 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
   };
 
   /**
-   * 處理取消今日打卡
+   * 處理取消今日打卡 - 優化版本，只刷新當前卡片
    */
   const handleCancelTodayCheckIn = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
     try {
-      // 這裡使用 topicStore 的 cancelTodayCheckIn 方法
-      const { useTopicStore } = await import('../../../../store/topicStore');
-      const result = await useTopicStore.getState().cancelTodayCheckIn(task.id);
+      // 檢查是否為週挑戰任務，使用不同的處理方式
+      const isWeeklyChallenge = localTask.special_flags?.includes('weekly_quick_challenge');
       
-      if (result.success) {
-        console.log('✅ 成功取消今日打卡');
-        // 重新載入打卡時間資料
-        setRealCheckInTimes({});
+      if (isWeeklyChallenge) {
+        // 週挑戰任務：直接調用 topicStore 的 cancelTodayCheckIn 方法，只更新本地狀態
+        const { useTopicStore } = await import('../../../../store/topicStore');
+        const result = await useTopicStore.getState().cancelTodayCheckIn(localTask.id);
         
-        // 觸發父組件重新載入任務資料
-        if (onTaskUpdate) {
-          onTaskUpdate();
+        if (result.success && result.task) {
+          console.log('✅ 週挑戰取消打卡成功，更新本地狀態');
+          
+          // 更新本地任務狀態，立即反映變化
+          setLocalTask(prevTask => ({
+            ...prevTask,
+            progress_data: result.task.progress_data,
+            task_config: result.task.task_config,
+            version: result.task.version
+          }));
+          
+          // 顯示成功提示
+          const { default: toast } = await import('react-hot-toast');
+          toast.success('已取消今日打卡', {
+            duration: 2000,
+            style: {
+              background: '#10B981',
+              color: 'white',
+              borderRadius: '12px',
+              fontWeight: '600'
+            }
+          });
+          
+          // 重新載入打卡時間資料
+          setRealCheckInTimes({});
+        } else {
+          console.error('❌ 週挑戰取消打卡失敗:', result.success === false ? result.message : '未知錯誤');
+          const { default: toast } = await import('react-hot-toast');
+          toast.error(result.success === false ? result.message : '取消打卡失敗');
         }
       } else {
-        console.error('❌ 取消打卡失敗:', result.message);
-        alert(result.message || '取消打卡失敗');
+        // 普通任務：使用原來的方式
+        const { useTopicStore } = await import('../../../../store/topicStore');
+        const result = await useTopicStore.getState().cancelTodayCheckIn(localTask.id);
+        
+        if (result.success) {
+          console.log('✅ 普通任務取消打卡成功');
+          // 觸發父組件重新載入任務資料
+          if (onTaskUpdate) {
+            onTaskUpdate();
+          }
+        } else {
+          console.error('❌ 普通任務取消打卡失敗:', result.success === false ? result.message : '未知錯誤');
+          const { default: toast } = await import('react-hot-toast');
+          toast.error(result.success === false ? result.message : '取消打卡失敗');
+        }
       }
       
       setShowCancelConfirm(false);
     } catch (error) {
       console.error('取消今日打卡失敗:', error);
-      alert('取消打卡失敗');
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('取消打卡失敗');
       setShowCancelConfirm(false);
     }
   };
@@ -359,7 +467,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="mb-2">
                     <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">
-                      {task.title}
+                      {localTask.title}
                     </h3>
                   </div>
                   
@@ -390,11 +498,12 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                   ) : (
                     <motion.button
                       onClick={handleCheckIn}
-                      className="w-full py-3 rounded-xl font-bold text-sm transition-all shadow-lg bg-white/90 text-indigo-600 hover:bg-white hover:scale-105 active:scale-95"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      disabled={isCheckingIn}
+                      className="w-full py-3 rounded-xl font-bold text-sm transition-all shadow-lg bg-white/90 text-indigo-600 hover:bg-white hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      whileHover={{ scale: isCheckingIn ? 1 : 1.02 }}
+                      whileTap={{ scale: isCheckingIn ? 1 : 0.98 }}
                     >
-                      今天完成了 ✨
+                      {isCheckingIn ? '打卡中... ⏳' : '今天完成了 ✨'}
                     </motion.button>
                   )}
 
@@ -462,7 +571,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                 className="text-lg font-bold text-gray-800 leading-tight line-clamp-2 flex-1"
                 style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}
               >
-                {task.title}
+                {localTask.title}
               </h3>
             </div>
             
@@ -505,7 +614,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                 // 正常的計數資訊和打卡按鈕
                 <>
                   <div className="text-sm text-gray-600 mb-1">
-                    {task.cycle_config?.cycle_type === 'weekly' && (
+                    {localTask.cycle_config?.cycle_type === 'weekly' && (
                       <span className="text-yellow-600">🎯 週挑戰 • </span>
                     )}
                     已完成 {currentCount}/{targetCount} 次
@@ -535,11 +644,12 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                     ) : (
                       <motion.button
                         onClick={handleCheckIn}
-                        className="w-full py-2 px-3 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        disabled={isCheckingIn}
+                        className="w-full py-2 px-3 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        whileHover={{ scale: isCheckingIn ? 1 : 1.02 }}
+                        whileTap={{ scale: isCheckingIn ? 1 : 0.98 }}
                       >
-                        今天完成了 📝
+                        {isCheckingIn ? '打卡中... ⏳' : '今天完成了 📝'}
                       </motion.button>
                     )}
                   </div>
@@ -556,10 +666,10 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           {/* 底部：目標資訊 */}
           {renderBottomInfo()}
 
-          {/* 狀態指示器 */}
-          {task.status === 'in_progress' && (
+          {/* 狀態指示器 - 右上角 */}
+          {!showResetConfirm && !showCancelConfirm && (
             <div className="absolute top-2 right-2 text-lg transform hover:scale-125 transition-transform">
-              📊
+              🎯
             </div>
           )}
         </div>
@@ -574,22 +684,24 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     if (highlight) {
       // 特化模式：顯示詳細記錄和重置按鈕
       return (
-        <div className="w-full h-full flex flex-col text-white relative">
-          {/* 背景裝飾 - 覆蓋 BaseTaskCard 的背景 */}
-          <div className="absolute -inset-4 -z-10">
-            <div className="w-full h-full rounded-2xl" style={{
-              background: 'linear-gradient(135deg, rgb(99 102 241), rgb(147 51 234), rgb(236 72 153))'
-            }}>
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
-              <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
-            </div>
+        <div 
+          className="absolute inset-0 w-full h-full rounded-2xl shadow-lg border-0 text-white overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, rgb(99 102 241), rgb(147 51 234), rgb(236 72 153))',
+            backfaceVisibility: 'hidden'
+          }}
+        >
+          {/* 背景裝飾 */}
+          <div className="absolute inset-0">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
           </div>
 
           {/* 內容區域 */}
-          <div className="w-full h-full flex flex-col relative z-10">
+          <div className="relative z-10 p-4 h-full flex flex-col">
             {/* 頂部標籤 */}
             {!showResetConfirm && (
-              <div className="mb-4">
+              <div className="mb-3">
                 <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
                   <Calendar className="w-3 h-3" />
                   詳細記錄
@@ -627,32 +739,81 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                   </div>
                 </div>
               ) : checkInTimestamps.length > 0 ? (
-                <div className="space-y-2">
-                  {checkInTimestamps.map((record, index) => (
+                <div className="flex flex-col h-full">
+                  {/* 單個記錄顯示區域 - 使用原本的橫向佈局 */}
+                  <div className="flex-1 flex items-center justify-center">
                     <motion.div
-                      key={record.date}
-                      className="flex items-center justify-between p-2 bg-white/10 rounded-lg"
+                      key={currentRecordIndex}
+                      className="flex items-center justify-between p-2 bg-white/10 rounded-lg w-full"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
+                      transition={{ duration: 0.3 }}
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        <span className="text-xs font-medium">{record.dayName}</span>
+                        <span className="text-xs font-medium text-white">
+                          {checkInTimestamps[currentRecordIndex]?.dayName}
+                        </span>
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-white/90">
-                          {new Date(record.date).toLocaleDateString('zh-TW', { 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })}
+                          {checkInTimestamps[currentRecordIndex]?.date && 
+                            new Date(checkInTimestamps[currentRecordIndex].date).toLocaleDateString('zh-TW', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })
+                          }
                         </div>
                         <div className="text-xs text-white/70">
-                          {record.time}
+                          {checkInTimestamps[currentRecordIndex]?.time}
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                  </div>
+                  
+                  {/* 導航控制 */}
+                  {checkInTimestamps.length > 1 && (
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentRecordIndex(prev => 
+                            prev > 0 ? prev - 1 : checkInTimestamps.length - 1
+                          );
+                        }}
+                        className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                        title="上一個記錄"
+                      >
+                        <ChevronLeft className="w-3 h-3 text-white" />
+                      </button>
+                      
+                      <div className="flex items-center gap-1">
+                        {checkInTimestamps.map((_, index) => (
+                          <div
+                            key={index}
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${
+                              index === currentRecordIndex 
+                                ? 'bg-white' 
+                                : 'bg-white/40'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentRecordIndex(prev => 
+                            prev < checkInTimestamps.length - 1 ? prev + 1 : 0
+                          );
+                        }}
+                        className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                        title="下一個記錄"
+                      >
+                        <ChevronRight className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
@@ -665,24 +826,31 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
 
             {/* 底部 footer */}
             {!showResetConfirm && !showCancelConfirm && (
-              <div className="mt-3 pt-2 border-t border-white/20">
+              <div className="mt-2 pt-2 border-t border-white/20">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-white/80">已完成 {checkInTimestamps.length}/7 次</span>
-                                  <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    console.log('重新設定按鈕被點擊');
-                    setShowResetConfirm(true);
-                  }}
-                  className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
-                  title="重新設定"
-                >
-                  <RotateCcw className="w-3 h-3 text-white" />
-                </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('重新設定按鈕被點擊');
+                      setShowResetConfirm(true);
+                    }}
+                    className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                    title="重新設定"
+                  >
+                    <RotateCcw className="w-3 h-3 text-white" />
+                  </button>
                 </div>
               </div>
             )}
           </div>
+
+          {/* 狀態指示器 - 右上角 */}
+          {!showResetConfirm && (
+            <div className="absolute top-2 right-2 text-lg transform hover:scale-125 transition-transform">
+              🎯
+            </div>
+          )}
         </div>
       );
     } else {
