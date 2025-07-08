@@ -23,13 +23,13 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTopicStore } from '../../store/topicStore';
 import { useUserStore } from '../../store/userStore';
 import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Settings, Filter, Star, BookMarked, X, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus, Edit3, Trophy, Calendar, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Filter, Star, BookMarked, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus, Edit3, Trophy, Calendar, TrendingUp } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { TaskWallGrid } from './components/TaskWallGrid';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
@@ -48,9 +48,7 @@ import { TaskRecordHistoryDialog } from './components/TaskRecordHistoryDialog';
  * 任務牆配置介面
  */
 interface TaskWallConfig {
-  maxVisibleCards: number; // 已停用 - 現在顯示所有卡片
   gridColumns: 'auto' | 2 | 3; // 網格欄數
-  priorityFilter: 'all' | 'high' | 'medium' | 'low'; // 優先權過濾
   showCompletedStack: boolean;
   viewMode: 'tasks' | 'topics'; // 新增：視圖模式切換
   sortMode: 'task_type' | 'topic'; // 新增：排序模式
@@ -116,15 +114,12 @@ export const TaskWallPage = () => {
 
   // 組件狀態
   const [config, setConfig] = useState<TaskWallConfig>({
-    maxVisibleCards: 12,
-    gridColumns: 'auto', // 使用自動響應式網格，全寬度下會有更多欄數
-    priorityFilter: 'all',
+    gridColumns: 'auto',
     showCompletedStack: true,
     viewMode: 'tasks',
     sortMode: 'task_type'
   });
   
-  const [showSettings, setShowSettings] = useState(false);
   const [showJournalDialog, setShowJournalDialog] = useState(false);
   const [showRecordDialog, setShowRecordDialog] = useState(false);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
@@ -730,16 +725,9 @@ export const TaskWallPage = () => {
    * 根據配置過濾任務
    */
   const filteredTasks = useMemo(() => {
-    let filtered = activeTasks;
-    
-    // 優先權過濾
-    if (config.priorityFilter !== 'all') {
-      filtered = filtered.filter(task => task.priority === config.priorityFilter);
-    }
-    
-    // 顯示所有符合條件的任務（移除數量限制）
-    return filtered;
-  }, [activeTasks, config]);
+    // 顯示所有活躍任務
+    return activeTasks;
+  }, [activeTasks]);
 
   /**
    * 檢查是否存在週挑戰任務（包括隱藏主題中的）
@@ -1060,13 +1048,6 @@ export const TaskWallPage = () => {
                   >
                     <BookMarked className="w-4 h-4" />
                   </button>
-                  
-                  <button
-                    onClick={() => setShowSettings(!showSettings)}
-                    className="p-2 rounded-full bg-white/80 text-amber-700 hover:bg-white transition-colors shadow-sm"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -1146,53 +1127,6 @@ export const TaskWallPage = () => {
               )}
             </div>
           )}
-
-          {/* 設定面板 */}
-          <AnimatePresence>
-            {showSettings && (
-              <motion.div
-                className="fixed top-0 right-0 w-80 h-full bg-white/95 backdrop-blur-md shadow-2xl z-[100] p-6"
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              >
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-800">任務牆設定</h3>
-                    <button
-                      onClick={() => setShowSettings(false)}
-                      className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  {/* 最大卡片數設定已移除 - 現在顯示所有卡片 */}
-
-                  {/* 優先權過濾 */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      優先權過濾
-                    </label>
-                    <select
-                      value={config.priorityFilter}
-                      onChange={(e) => setConfig(prev => ({ 
-                        ...prev, 
-                        priorityFilter: e.target.value as any 
-                      }))}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="all">所有優先權</option>
-                      <option value="high">高優先權</option>
-                      <option value="medium">中優先權</option>
-                      <option value="low">低優先權</option>
-                    </select>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* 完成任務 Dialog */}

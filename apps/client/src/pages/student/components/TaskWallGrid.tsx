@@ -37,16 +37,6 @@ interface GoalWithContext extends Goal {
 }
 
 /**
- * 任務牆配置介面
- */
-interface TaskWallConfig {
-  maxVisibleCards: number; // 主畫面最大卡片數
-  gridColumns: 'auto' | 2 | 3; // 網格欄數
-  showCompletedStack: boolean; // 是否顯示完成堆疊
-  priorityFilter: 'all' | 'high' | 'medium' | 'low'; // 優先權過濾
-}
-
-/**
  * 卡片數據介面，支援 highlight 屬性
  */
 interface CardData {
@@ -57,7 +47,12 @@ interface CardData {
 
 interface TaskWallGridProps {
   cards: CardData[];
-  config: TaskWallConfig;
+  config: {
+    gridColumns: 'auto' | 2 | 3;
+    showCompletedStack: boolean;
+    viewMode: 'tasks' | 'topics';
+    sortMode: 'task_type' | 'topic';
+  };
   onTaskStatusUpdate: (
     taskId: string,
     goalId: string,
@@ -251,36 +246,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
         ))}
       </AnimatePresence>
 
-      {/* 載入更多卡片的佔位符（未來功能） */}
-      {cards.length === config.maxVisibleCards && (
-        <motion.div
-          className="col-span-full flex justify-center py-8"
-          initial={{ opacity: 0, y: 20, scale: 0.9 }}
-          animate={{ 
-            opacity: 1, 
-            y: 0, 
-            scale: 1,
-            transition: {
-              type: "spring",
-              damping: 20,
-              stiffness: 200,
-              delay: cards.length * 0.02 + 0.1
-            }
-          }}
-        >
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
-              <span className="text-2xl">📚</span>
-            </div>
-            <p className="text-amber-700 text-sm font-medium">
-              還有更多任務等著你
-            </p>
-            <p className="text-amber-600 text-xs mt-1">
-              調整設定可以顯示更多卡片
-            </p>
-          </div>
-        </motion.div>
-      )}
+
     </motion.div>
   );
 }; 

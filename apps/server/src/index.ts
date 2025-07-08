@@ -8,6 +8,7 @@ import cors from 'cors';
 import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
 import usersRouter from './routes/users';
+import reportRouter from './routes/report';
 import path from 'path';
 
 export const app = express();
@@ -38,6 +39,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/users', usersRouter);
+app.use('/api', reportRouter);
 
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 
