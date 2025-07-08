@@ -43,9 +43,10 @@ interface TopicTemplateStore {
   fetchCollaborativeTemplates: () => Promise<void>;
   fetchAllTemplates: () => Promise<void>; // 新增統一的載入方法
   getTemplate: (id: string) => Promise<TopicTemplate | null>;
-  createTemplate: (template: Omit<TopicTemplate, 'id' | 'created_by' | 'created_at' | 'updated_at' | 'copy_count' | 'usage_count'>) => Promise<TopicTemplate | null>;
+  createTemplate: (template: Omit<TopicTemplate, 'id' | 'created_by' | 'created_at' | 'updated_at' | 'copy_count' | 'usage_count' | 'status'>) => Promise<TopicTemplate | null>;
   updateTemplate: (id: string, updates: Partial<TopicTemplate>) => Promise<TopicTemplate | null>;
-  deleteTemplate: (id: string) => Promise<boolean>;
+  archiveTemplate: (id: string) => Promise<boolean>; // 改名為 archiveTemplate
+  deleteTemplate: (id: string) => Promise<boolean>; // 保留舊方法名稱以向後兼容
 
   // 協作功能
   addCollaborator: (templateId: string, userId: string, permission: 'view' | 'edit' | 'admin') => Promise<boolean>;
@@ -121,6 +122,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
             invited_at
           )
         `)
+        .eq('status', 'active')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -156,6 +158,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
           )
         `)
         .eq('created_by', user.id)
+        .eq('status', 'active')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -180,6 +183,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
         .from('topic_templates')
         .select('*')
         .eq('is_public', true)
+        .eq('status', 'active')
         .order('usage_count', { ascending: false });
 
       if (error) throw error;
@@ -215,6 +219,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
           )
         `)
         .eq('topic_template_collaborators.user_id', user.id)
+        .eq('status', 'active')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -253,6 +258,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
             )
           `)
           .eq('created_by', user.id)
+          .eq('status', 'active')
           .order('updated_at', { ascending: false }),
         
         // 公開模板
@@ -260,6 +266,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
           .from('topic_templates')
           .select('*')
           .eq('is_public', true)
+          .eq('status', 'active')
           .order('usage_count', { ascending: false }),
         
         // 協作模板
@@ -276,6 +283,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
             )
           `)
           .eq('topic_template_collaborators.user_id', user.id)
+          .eq('status', 'active')
           .order('updated_at', { ascending: false })
       ]);
 
@@ -353,6 +361,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
           )
         `)
         .eq('id', id)
+        .eq('status', 'active')
         .single();
 
       if (error) throw error;
@@ -390,6 +399,7 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
         bubbles: templateData.bubbles || [],
         is_public: templateData.is_public || false,
         is_collaborative: templateData.is_collaborative || false,
+        status: 'active' as const,
         copy_count: 0,
         usage_count: 0,
         created_by: user.id
@@ -462,27 +472,32 @@ export const useTopicTemplateStore = create<TopicTemplateStore>((set, get) => ({
     }
   },
 
-  deleteTemplate: async (id) => {
+  archiveTemplate: async (id) => {
     try {
       const { error } = await supabase
         .from('topic_templates')
-        .delete()
+        .update({ status: 'archived' })
         .eq('id', id);
 
       if (error) throw error;
 
-      // 更新本地狀態
-      set(state => ({
-        templates: state.templates.filter(t => t.id !== id),
-        selectedTemplateId: state.selectedTemplateId === id ? null : state.selectedTemplateId
-      }));
+             // 更新本地狀態 - 過濾掉已歸檔的模板
+       set(state => ({
+         templates: state.templates.filter(t => t.id !== id),
+         selectedTemplateId: state.selectedTemplateId === id ? null : state.selectedTemplateId
+       }));
 
       return true;
     } catch (error) {
-      console.error('Failed to delete template:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to delete template' });
+      console.error('Failed to archive template:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to archive template' });
       return false;
     }
+  },
+
+  deleteTemplate: async (id) => {
+    // 為了向後兼容，deleteTemplate 現在調用 archiveTemplate
+    return await get().archiveTemplate(id);
   },
 
   // 協作功能

@@ -353,6 +353,9 @@ export interface TopicTemplate {
   is_public: boolean; // 是否公開
   is_collaborative: boolean; // 是否允許協作
   
+  // 狀態管理
+  status: 'active' | 'archived'; // 模板狀態
+  
   // 統計資料
   copy_count: number; // 被複製次數
   usage_count: number; // 被使用次數

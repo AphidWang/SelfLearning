@@ -78,6 +78,45 @@ describe('TopicTemplateStore', () => {
       const deletedTemplate = await store.getTemplate(template!.id);
       expect(deletedTemplate).toBeNull();
     });
+
+    it('應該能歸檔模板', async () => {
+      const template = await store.createTemplate(mockTemplate);
+      if (template?.id) createdTemplates.push(template.id);
+      expect(template).toBeDefined();
+      expect(template?.status).toBe('active');
+      
+      const result = await store.archiveTemplate(template!.id);
+      expect(result).toBe(true);
+      
+      // 歸檔後，應該無法通過一般查詢取得（因為會過濾 archived 狀態）
+      const archivedTemplate = await store.getTemplate(template!.id);
+      expect(archivedTemplate).toBeNull();
+    });
+
+    it('載入模板時應該過濾掉已歸檔的模板', async () => {
+      // 創建一個模板
+      const template = await store.createTemplate({
+        ...mockTemplate,
+        title: '測試歸檔過濾'
+      });
+      
+      if (template?.id) createdTemplates.push(template.id);
+      expect(template).toBeDefined();
+      expect(template?.status).toBe('active');
+      
+      // 確認模板可以被查詢到
+      const activeTemplate = await store.getTemplate(template!.id);
+      expect(activeTemplate).toBeDefined();
+      expect(activeTemplate?.status).toBe('active');
+      
+      // 歸檔模板
+      const archiveResult = await store.archiveTemplate(template!.id);
+      expect(archiveResult).toBe(true);
+      
+      // 歸檔後應該無法通過 getTemplate 查詢到（因為會過濾 archived 狀態）
+      const archivedTemplate = await store.getTemplate(template!.id);
+      expect(archivedTemplate).toBeNull();
+    });
   });
 
   describe('目標管理', () => {
