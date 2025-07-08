@@ -199,12 +199,12 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
             <div className="flex flex-wrap gap-4 justify-center w-full">
               {highlightCards.map((card, index) => (
                 <motion.div
-                  key={`${card.type}-${card.data.id}`}
+                  key={`highlight-${card.type}-${card.data.id}`}
                   className="w-full max-w-sm"
                   variants={cardVariants}
                   custom={index}
                   layout
-                  layoutId={`${card.type}-${card.data.id}`}
+                  layoutId={`highlight-${card.type}-${card.data.id}`}
                   initial="hidden"
                   animate="visible"
                   exit="exit"
@@ -271,12 +271,12 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
           >
             {normalCards.map((card, index) => (
               <motion.div
-                key={`${card.type}-${card.data.id}`}
+                key={`normal-${card.type}-${card.data.id}`}
                 className="flex justify-center"
                 variants={cardVariants}
                 custom={index + highlightCards.length} // 調整動畫延遲
                 layout
-                layoutId={`${card.type}-${card.data.id}`}
+                layoutId={`normal-${card.type}-${card.data.id}`}
                 initial="hidden"
                 animate="visible"
                 exit="exit"
