@@ -4,6 +4,7 @@
  * 🎯 功能說明：
  * - 自動捕捉未處理的錯誤和 Promise rejection
  * - 整合 React Error Boundary
+ * - 啟用 React Component Stack Trace
  * - 關閉 Performance Monitoring 以節省配額
  * 
  * 📝 使用說明：
@@ -33,12 +34,56 @@ export const initSentry = () => {
       debug: false,
       tracesSampleRate: 0, // 關閉 Performance Tracing
       sendDefaultPii: true,
-      // 捕捉 console 錯誤
+      
+      // 🚀 啟用更好的錯誤追蹤
       integrations: [
+        // 捕捉 React 組件錯誤和 component stack
+        Sentry.browserTracingIntegration({
+          // 關閉 performance 追蹤，但保留錯誤追蹤
+          enableLongTask: false,
+          enableInp: false
+        }),
+        
+        // 捕捉 console 錯誤
         Sentry.captureConsoleIntegration({
           levels: ['error'] // 只捕捉 console.error
+        }),
+        
+        // 捕捉更多的 React 錯誤資訊
+        Sentry.replayIntegration({
+          // 只在錯誤時記錄，節省配額
+          sessionSampleRate: 0,
+          errorSampleRate: 0.1
         })
       ],
+      
+      // 🎯 增強錯誤上下文捕捉
+      beforeSend: (event, hint) => {
+        // 增強 React 錯誤的 component stack
+        if (hint.originalException && hint.originalException instanceof Error) {
+          const error = hint.originalException as any;
+          
+          // 如果有 componentStack，添加到 contexts
+          if (error.componentStack) {
+            event.contexts = event.contexts || {};
+            event.contexts.react = {
+              componentStack: error.componentStack
+            };
+          }
+          
+          // 如果是 DOM 錯誤，添加更多上下文
+          if (error.message && error.message.includes('insertBefore')) {
+            event.contexts = event.contexts || {};
+            event.contexts.dom_error = {
+              error_type: 'DOM Manipulation Error',
+              error_method: 'insertBefore',
+              likely_cause: 'React component rendering issue'
+            };
+          }
+        }
+        
+        return event;
+      }
     });
     
     // 測試 Sentry 是否正常運作
@@ -49,7 +94,7 @@ export const initSentry = () => {
   }
 };
 
-// 手動報告錯誤的輔助函數
+// 🚀 增強的手動報告錯誤函數
 export const reportError = (error: Error, context?: Record<string, any>) => {
   Sentry.withScope((scope) => {
     if (context) {
@@ -57,6 +102,38 @@ export const reportError = (error: Error, context?: Record<string, any>) => {
         scope.setContext(key, value);
       });
     }
+    
+    // 如果錯誤有 componentStack，特別處理
+    const errorWithStack = error as any;
+    if (errorWithStack.componentStack) {
+      scope.setContext('react', {
+        componentStack: errorWithStack.componentStack
+      });
+    }
+    
+    Sentry.captureException(error);
+  });
+};
+
+// 🎯 專門用於 React 組件錯誤的報告函數
+export const reportReactError = (error: Error, errorInfo: React.ErrorInfo, additionalContext?: Record<string, any>) => {
+  Sentry.withScope((scope) => {
+    // 設置 React 錯誤上下文
+    scope.setContext('react', {
+      componentStack: errorInfo.componentStack
+    });
+    
+    // 添加額外上下文
+    if (additionalContext) {
+      Object.entries(additionalContext).forEach(([key, value]) => {
+        scope.setContext(key, value);
+      });
+    }
+    
+    // 設置錯誤標籤
+    scope.setTag('error_boundary', 'react');
+    scope.setLevel('error');
+    
     Sentry.captureException(error);
   });
 };

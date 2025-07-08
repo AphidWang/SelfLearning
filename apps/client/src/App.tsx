@@ -27,15 +27,15 @@ import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
 import { UserAdminPage } from './pages/admin/UserAdminPage';
 import { AuthCallback } from './pages/AuthCallback.tsx';
-import { ErrorBoundary } from './config/sentry';
+import { ErrorBoundary, reportReactError } from './config/sentry';
 import { SentryTestButton } from './components/shared/SentryTestButton';
 
 // import { initGA } from './utils/analytics';
 
 // initGA();
 
-// 自訂錯誤邊界組件
-class CustomErrorBoundary extends React.Component<
+// 🚀 增強的錯誤邊界組件 - 捕捉 React Component Stack
+class EnhancedErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error: Error | null }
 > {
@@ -49,7 +49,16 @@ class CustomErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('React Error Boundary caught an error:', error, errorInfo);
+    console.error('🚨 [Enhanced Error Boundary] React 錯誤:', error);
+    console.error('🚨 [Component Stack]:', errorInfo.componentStack);
+    
+    // 🎯 使用新的 reportReactError 函數來報告錯誤，包含 componentStack
+    reportReactError(error, errorInfo, {
+      error_boundary: 'EnhancedErrorBoundary',
+      user_agent: navigator.userAgent,
+      url: window.location.href,
+      timestamp: new Date().toISOString()
+    });
   }
 
   render() {
@@ -62,10 +71,13 @@ class CustomErrorBoundary extends React.Component<
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">出現錯誤</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">React 組件錯誤</h2>
             <p className="text-gray-600 mb-4">
-              很抱歉，應用程式遇到了問題。請重新載入頁面或聯繫支援。
+              組件渲染時發生錯誤，錯誤已自動回報給開發團隊。
             </p>
+            <div className="text-sm text-gray-500 mb-4">
+              錯誤: {this.state.error?.message}
+            </div>
             <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -110,7 +122,7 @@ const SmartRedirect: React.FC = () => (
 
 function App() {
   return (
-    <CustomErrorBoundary>
+    <EnhancedErrorBoundary>
       <ErrorBoundary
         fallback={({ error, resetError }) => (
           <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -262,7 +274,7 @@ function App() {
         </ErrorProvider>
         <SentryTestButton />
       </ErrorBoundary>
-    </CustomErrorBoundary>
+    </EnhancedErrorBoundary>
   );
 }
 
