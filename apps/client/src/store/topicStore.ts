@@ -29,12 +29,8 @@ import { supabase, authService } from '../services/supabase';
 import { taskRecordStore } from './taskRecordStore';
 import { getTodayInTimezone, getYesterdayInTimezone, getDaysDifferenceInTimezone } from '../config/timezone';
 
-// 新增類型定義
-export interface TaskActionResult {
-  success: boolean;
-  task?: Task;
-  message?: string;
-}
+// 新增類型定義 - 使用統一的 MarkTaskResult
+export type TaskActionResult = MarkTaskResult;
 
 // 輔助函數：獲取用戶真實資料
 const getUsersData = async (userIds: string[]): Promise<{[key: string]: User}> => {
