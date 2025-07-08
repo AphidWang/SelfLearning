@@ -1,4 +1,5 @@
 import { supabase } from '../services/supabase';
+import { getTodayInTimezone } from '../config/timezone';
 
 export type MoodType = 'excited' | 'happy' | 'okay' | 'tired' | 'stressed';
 
@@ -43,7 +44,7 @@ class JournalStore {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未登入');
 
-      const journalDate = entry.date || new Date().toISOString().split('T')[0];
+      const journalDate = entry.date || getTodayInTimezone();
 
       // 如果沒有提供 completed_tasks，使用資料庫函數獲取
       let completed_tasks = entry.completed_tasks;
@@ -126,7 +127,7 @@ class JournalStore {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未登入');
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayInTimezone();
 
       const { data, error } = await supabase
         .from('daily_journals')
@@ -202,10 +203,14 @@ class JournalStore {
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
+      const startDateStr = getTodayInTimezone(); // 先獲取今天的日期
+      const actualStartDate = new Date(startDateStr);
+      actualStartDate.setDate(actualStartDate.getDate() - days);
+      const actualStartDateStr = actualStartDate.toISOString().split('T')[0];
 
       console.log('獲取心情統計:', {
         userId: user.id,
-        startDate: startDate.toISOString().split('T')[0],
+        startDate: actualStartDateStr,
         days
       });
 
@@ -213,7 +218,7 @@ class JournalStore {
         .from('daily_journals')
         .select('mood')
         .eq('user_id', user.id)
-        .gte('date', startDate.toISOString().split('T')[0]);
+        .gte('date', actualStartDateStr);
 
       if (error) {
         console.error('心情統計查詢失敗:', error);
@@ -249,10 +254,14 @@ class JournalStore {
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
+      const startDateStr = getTodayInTimezone(); // 先獲取今天的日期
+      const actualStartDate = new Date(startDateStr);
+      actualStartDate.setDate(actualStartDate.getDate() - days);
+      const actualStartDateStr = actualStartDate.toISOString().split('T')[0];
 
       console.log('獲取動力趨勢:', {
         userId: user.id,
-        startDate: startDate.toISOString().split('T')[0],
+        startDate: actualStartDateStr,
         days
       });
 
@@ -260,7 +269,7 @@ class JournalStore {
         .from('daily_journals')
         .select('date, motivation_level')
         .eq('user_id', user.id)
-        .gte('date', startDate.toISOString().split('T')[0])
+        .gte('date', actualStartDateStr)
         .order('date', { ascending: true });
 
       if (error) {

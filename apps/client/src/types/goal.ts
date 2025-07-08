@@ -595,7 +595,11 @@ export function canPerformTodayAction(task: Task): boolean {
     return task.status !== 'done';
   }
   
-  const today = new Date().toISOString().split('T')[0];
+  // 需要從 timezone config 導入，但這裡為了避免循環依賴，直接使用計算
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const localTime = new Date(utc + (8 * 3600000)); // UTC+8
+  const today = localTime.toISOString().split('T')[0];
   
   if (task.task_type === 'streak') {
     const config = task.task_config as StreakTaskConfig;

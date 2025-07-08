@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { BaseTaskCard, BaseTaskCardProps, useBaseTaskCard } from './BaseTaskCard';
 import { CountTaskConfig } from '../../../../types/goal';
+import { supabase } from '../../../../services/supabase';
 
 interface CountTaskCardProps extends BaseTaskCardProps {
   highlight?: boolean; // 是否啟用特化模式（週挑戰風格）
@@ -39,6 +40,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
 
   // 重置確認狀態
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [realCheckInTimes, setRealCheckInTimes] = useState<{[date: string]: string}>({});
 
   const { renderTopicTag, renderOwnerTag, renderBottomInfo } = useBaseTaskCard(task);
 
@@ -136,25 +138,66 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     return dates;
   }, [task.cycle_config, checkInDates]);
 
-  // 獲取詳細的打卡時間資料（模擬從 task_actions 表獲取）
+  // 載入真實的打卡時間資料
+  React.useEffect(() => {
+    const loadRealCheckInTimes = async () => {
+      if (!task.id || checkInDates.length === 0) return;
+      
+      try {
+        const { data: taskActions, error } = await supabase
+          .from('task_actions')
+          .select('action_date, created_at')
+          .eq('task_id', task.id)
+          .eq('action_type', 'check_in')
+          .in('action_date', checkInDates);
+
+        if (error) {
+          console.error('載入打卡時間失敗:', error);
+          return;
+        }
+
+        const timeMap: {[date: string]: string} = {};
+        taskActions?.forEach(action => {
+          // 使用 Intl.DateTimeFormat 正確處理時區轉換
+          const utcTime = new Date(action.created_at);
+          const timeStr = new Intl.DateTimeFormat('zh-TW', {
+            timeZone: 'Asia/Taipei',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(utcTime);
+          
+          timeMap[action.action_date] = timeStr;
+          console.log(`📅 打卡時間轉換: ${action.created_at} -> ${timeStr} (${action.action_date})`);
+        });
+
+        setRealCheckInTimes(timeMap);
+        console.log('✅ 載入真實打卡時間:', timeMap);
+      } catch (error) {
+        console.error('載入打卡時間錯誤:', error);
+      }
+    };
+
+    loadRealCheckInTimes();
+  }, [task.id, checkInDates]);
+
+  // 獲取詳細的打卡時間資料（使用真實時間）
   const checkInTimestamps = useMemo(() => {
     return checkInDates.map((date: string, index: number) => {
-      // 使用日期字串作為種子，產生穩定的隨機時間
-      const dateHash = date.split('-').reduce((acc, val) => acc + parseInt(val), 0);
-      const baseHour = 8 + (dateHash + index) % 12; // 8點到19點之間
-      const minute = (dateHash * 7 + index * 13) % 60; // 穩定的分鐘數
-      
       const dayOfWeek = new Date(date).getDay();
       const dayName = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'][dayOfWeek];
       
+      // 使用真實時間，如果沒有則顯示 "--:--"
+      const time = realCheckInTimes[date] || '--:--';
+      
       return {
         date,
-        time: `${baseHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+        time,
         dayName,
-        timestamp: new Date(`${date}T${baseHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`).getTime()
+        timestamp: new Date(`${date}T00:00:00`).getTime() + index // 簡單排序用
       };
     }).sort((a, b) => a.timestamp - b.timestamp); // 按時間排序
-  }, [checkInDates]);
+  }, [checkInDates, realCheckInTimes]);
 
   /**
    * 處理打卡操作

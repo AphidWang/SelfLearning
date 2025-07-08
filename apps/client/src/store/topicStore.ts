@@ -27,6 +27,7 @@ import {
 import type { TopicCollaborator, User } from '@self-learning/types';
 import { supabase, authService } from '../services/supabase';
 import { taskRecordStore } from './taskRecordStore';
+import { getTodayInTimezone, getYesterdayInTimezone, getDaysDifferenceInTimezone } from '../config/timezone';
 
 // 輔助函數：獲取用戶真實資料
 const getUsersData = async (userIds: string[]): Promise<{[key: string]: User}> => {
@@ -1255,7 +1256,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未認證');
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayInTimezone(); // 使用 UTC+8 時區
 
       // 記錄任務動作
       const { data: actionData, error: actionError } = await supabase
@@ -1314,10 +1315,19 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       }
 
       const progressData = taskData.progress_data || {};
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayInTimezone(); // 使用 UTC+8 時區
       const checkInDates = progressData.check_in_dates || [];
       
+      console.log('🔍 打卡檢查 (UTC+8):', {
+        taskId,
+        today,
+        checkInDates,
+        progressData,
+        includes: checkInDates.includes(today)
+      });
+      
       if (checkInDates.includes(today)) {
+        console.log('❌ 今天已經打卡了:', { today, checkInDates });
         return { success: false, message: '今天已經打卡了' };
       }
 
@@ -1326,15 +1336,19 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       let newProgressData;
 
       if (taskData.task_type === 'streak') {
-        // 連續型任務：計算連續天數
+        // 連續型任務：計算連續天數 (使用 UTC+8 時區)
         let currentStreak = 0;
         const sortedDates = newCheckInDates.sort();
         for (let i = sortedDates.length - 1; i >= 0; i--) {
-          const date = new Date(sortedDates[i]);
-          const expectedDate = new Date();
-          expectedDate.setDate(expectedDate.getDate() - currentStreak);
+          const checkDate = sortedDates[i];
+          const expectedDate = getTodayInTimezone();
           
-          if (date.toISOString().split('T')[0] === expectedDate.toISOString().split('T')[0]) {
+          // 計算預期日期（今天往前推 currentStreak 天）
+          const expectedDateObj = new Date(expectedDate + 'T00:00:00');
+          expectedDateObj.setDate(expectedDateObj.getDate() - currentStreak);
+          const expectedDateStr = expectedDateObj.toISOString().split('T')[0];
+          
+          if (checkDate === expectedDateStr) {
             currentStreak++;
           } else {
             break;
@@ -1472,7 +1486,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       const config = taskData.task_config || {};
       const progressData = taskData.progress_data || {};
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayInTimezone(); // 使用 UTC+8 時區
       const dailyRecords = progressData.daily_records || {};
       
       // 更新今日記錄
