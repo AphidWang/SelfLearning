@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
-import Header from './Header';
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -14,17 +13,16 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children, title }) => {
   // 移除認證檢查，因為路由層已經有 RoleProtectedRoute 保護
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-screen bg-gradient-to-br from-orange-50 to-pink-50 dark:from-gray-900 dark:to-indigo-900">
       <Sidebar 
         isOpen={sidebarOpen} 
         setIsOpen={setSidebarOpen}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
+        title={title}
       />
       
       <div className="flex-1 flex flex-col">
-        <Header title={title} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-        
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           {children}
         </main>

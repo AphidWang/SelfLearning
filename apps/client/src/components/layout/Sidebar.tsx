@@ -4,22 +4,35 @@ import {
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, Users, BookMarked, 
   Menu, X, LogOut, Map, ChevronLeft, ChevronRight, Target, Grid3X3, 
-  PenTool, Zap, SplitSquareHorizontal
+  PenTool, Zap, SplitSquareHorizontal, Sun, Moon, AlertTriangle
 } from 'lucide-react';
 import { useUser, UserRole } from '../../context/UserContext';
 import { UserProfileDialog } from '../user-manager';
+import { ReportDialog } from '../shared';
 
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   isCollapsed: boolean;
   setIsCollapsed: (isCollapsed: boolean) => void;
+  title: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIsCollapsed, title }) => {
   const { currentUser, logout, isLoading } = useUser();
   const location = useLocation();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [darkMode, setDarkMode] = React.useState(false);
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    document.documentElement.classList.toggle('dark');
+  };
+
+  const reportIssue = () => {
+    setShowReportDialog(true);
+  };
   
   // 根據當前路由決定顯示的導航項目
   const getNavigationItems = () => {
@@ -39,20 +52,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     
     if (pathname.startsWith('/student')) {
       const studentItems = [
-        { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
-        { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
-        { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-        { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
+        { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={16} /> },
+        { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={16} /> },
+        { name: '學習地圖', path: '/student/learning-map', icon: <Map size={16} /> },
+        { name: '日誌', path: '/student/journal', icon: <PenTool size={16} /> },
       ];
       
       // 如果有導師身份，加入導師視圖
       if (hasRole('mentor')) {
-        studentItems.push({ name: '導師視圖', path: '/mentor', icon: <Target size={20} /> });
+        studentItems.push({ name: '導師視圖', path: '/mentor', icon: <Target size={16} /> });
       }
       
       // 如果有管理員身份，加入用戶管理
       if (hasRole('admin')) {
-        studentItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+        studentItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={16} /> });
       }
       
       return {
@@ -64,9 +77,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     if (pathname.startsWith('/admin')) {
       return {
         items: [
-          { name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> },
-          { name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> },
-          { name: '導師視圖', path: '/mentor', icon: <Target size={20} /> },
+          { name: '用戶管理', path: '/admin/users', icon: <Users size={16} /> },
+          { name: '學生視圖', path: '/student', icon: <BookOpen size={16} /> },
+          { name: '導師視圖', path: '/mentor', icon: <Target size={16} /> },
         ],
         viewType: 'admin'
       };
@@ -74,18 +87,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     
     if (pathname.startsWith('/mentor')) {
       const mentorItems = [
-        { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
-        { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
+        { name: '儀表板', path: '/mentor', icon: <BookOpen size={16} /> },
+        { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={16} /> },
       ];
       
       // 如果有家長或學生身份，加入學生視圖
       if (hasRole('parent') || hasRole('student')) {
-        mentorItems.push({ name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> });
+        mentorItems.push({ name: '學生視圖', path: '/student', icon: <BookOpen size={16} /> });
       }
       
       // 如果有管理員身份，加入用戶管理
       if (hasRole('admin')) {
-        mentorItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+        mentorItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={16} /> });
       }
       
       return {
@@ -99,9 +112,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     if (role === 'admin') {
       return {
         items: [
-          { name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> },
-          { name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> },
-          { name: '導師視圖', path: '/mentor', icon: <Target size={20} /> },
+          { name: '用戶管理', path: '/admin/users', icon: <Users size={16} /> },
+          { name: '學生視圖', path: '/student', icon: <BookOpen size={16} /> },
+          { name: '導師視圖', path: '/mentor', icon: <Target size={16} /> },
         ],
         viewType: 'admin'
       };
@@ -109,18 +122,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     
     if (role === 'mentor') {
       const mentorItems = [
-        { name: '儀表板', path: '/mentor', icon: <BookOpen size={20} /> },
-        { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={20} /> },
+        { name: '儀表板', path: '/mentor', icon: <BookOpen size={16} /> },
+        { name: '課程規劃', path: '/mentor/curriculum', icon: <Map size={16} /> },
       ];
       
       // 如果有家長或學生身份，加入學生視圖
       if (hasRole('parent') || hasRole('student')) {
-        mentorItems.push({ name: '學生視圖', path: '/student', icon: <BookOpen size={20} /> });
+        mentorItems.push({ name: '學生視圖', path: '/student', icon: <BookOpen size={16} /> });
       }
       
       // 如果有管理員身份，加入用戶管理
       if (hasRole('admin')) {
-        mentorItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+        mentorItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={16} /> });
       }
       
       return {
@@ -131,20 +144,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
     
     // 預設為學生視圖 (student, parent, admin 都可以看)
     const studentItems = [
-      { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={20} /> },
-      { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={20} /> },
-      { name: '學習地圖', path: '/student/learning-map', icon: <Map size={20} /> },
-      { name: '日誌', path: '/student/journal', icon: <PenTool size={20} /> },
+      { name: '時間表', path: '/student/schedule', icon: <CalendarDays size={16} /> },
+      { name: '任務牆', path: '/student/task-wall', icon: <Grid3X3 size={16} /> },
+      { name: '學習地圖', path: '/student/learning-map', icon: <Map size={16} /> },
+      { name: '日誌', path: '/student/journal', icon: <PenTool size={16} /> },
     ];
     
     // 如果有導師身份，加入導師視圖
     if (hasRole('mentor')) {
-      studentItems.push({ name: '導師視圖', path: '/mentor', icon: <Target size={20} /> });
+      studentItems.push({ name: '導師視圖', path: '/mentor', icon: <Target size={16} /> });
     }
     
     // 如果有管理員身份，加入用戶管理
     if (hasRole('admin')) {
-      studentItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={20} /> });
+      studentItems.push({ name: '用戶管理', path: '/admin/users', icon: <Users size={16} /> });
     }
     
     return {
@@ -170,42 +183,74 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
 
       {/* Mobile menu button */}
       <button
-        className="fixed top-4 left-4 z-30 lg:hidden bg-indigo-600 text-white p-2 rounded-md"
+        className="fixed top-3 left-3 z-30 lg:hidden bg-gradient-to-r from-orange-400 to-pink-400 text-white p-2 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
         onClick={toggleSidebar}
       >
-        {isOpen ? <X size={20} /> : <Menu size={20} />}
+        {isOpen ? <X size={18} /> : <Menu size={18} />}
       </button>
 
       {/* Sidebar */}
       <div 
-        className={`fixed lg:relative bg-white dark:bg-gray-900 transform transition-all duration-300 ease-in-out ${
+        className={`fixed lg:relative bg-gradient-to-b from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 transform transition-all duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${
-          isCollapsed ? 'w-16' : 'w-64'
-        } h-full z-30 shadow-lg`}
+          isCollapsed ? 'w-20' : 'w-64'
+        } h-full z-30 shadow-2xl border-r-2 border-orange-200 dark:border-purple-500`}
       >
         {/* Collapse toggle button */}
         <button
           onClick={toggleCollapse}
-          className="hidden lg:flex absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-indigo-600 text-white items-center justify-center rounded-full shadow-lg hover:bg-indigo-700"
+          className="hidden lg:flex absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-gradient-to-r from-orange-400 to-pink-400 text-white items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110"
         >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {isCollapsed ? <ChevronRight size={10} /> : <ChevronLeft size={10} />}
         </button>
 
         <div className="flex flex-col h-full">
-          {/* Logo and brand */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <h1 className={`text-xl font-bold text-indigo-600 dark:text-indigo-400 truncate ${
-              isCollapsed ? 'text-center' : ''
-            }`}>
-              {isCollapsed ? '學習' : '學習進度追蹤'}
-            </h1>
-            {!isCollapsed && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {viewType === 'student' ? '學生版' : 
-                 viewType === 'mentor' ? '指導老師版' :
-                 viewType === 'admin' ? '管理員版' : '學生版'}
-              </p>
+          {/* Logo and brand with page title */}
+          <div className="p-4 border-b-2 border-orange-200 dark:border-purple-500 bg-gradient-to-r from-orange-100 to-pink-100 dark:from-gray-700 dark:to-gray-800">
+            {isCollapsed ? (
+              // 壓縮模式：顯示用戶頭像
+              !isLoading && currentUser && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setShowProfileDialog(true)}
+                    className="rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 transform hover:scale-105 p-1"
+                    title={`編輯 ${currentUser.name} 的個人資料`}
+                  >
+                    {currentUser.avatar ? (
+                      <img 
+                        src={currentUser.avatar} 
+                        alt={currentUser.name}
+                        className="w-8 h-8 rounded-full object-cover border-2 border-orange-300 dark:border-purple-400 shadow-lg"
+                      />
+                    ) : (
+                      <div 
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold border-2 border-orange-300 dark:border-purple-400 shadow-lg"
+                        style={{ backgroundColor: currentUser.color || '#FF6B6B' }}
+                      >
+                        {currentUser.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </button>
+                </div>
+              )
+            ) : (
+              // 展開模式：顯示完整資訊
+              <>
+                <h1 className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent truncate">
+                  🎓 學習追蹤
+                </h1>
+                <p className="text-xs text-orange-600 dark:text-purple-300 mt-1">
+                  {viewType === 'student' ? '🌟 學生版' : 
+                   viewType === 'mentor' ? '👨‍🏫 導師版' :
+                   viewType === 'admin' ? '🛠️ 管理版' : '🌟 學生版'}
+                </p>
+                <div className="mt-2 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                  <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                    {title}
+                  </h2>
+                </div>
+              </>
             )}
           </div>
 
@@ -213,11 +258,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="space-y-1 px-2">
               {isLoading ? (
-                <li className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                <li className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg">
                   載入中...
                 </li>
               ) : items.length === 0 ? (
-                <li className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                <li className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg">
                   {!currentUser ? '未登入' : '權限不足'}
                 </li>
               ) : (
@@ -226,17 +271,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
                   <NavLink
                     to={item.path}
                     className={({ isActive }) => 
-                      `flex items-center px-4 py-2.5 text-sm rounded-lg transition-colors ${
+                      `flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-200 transform hover:scale-105 ${
                         isActive && item.path === window.location.pathname
-                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 font-medium' 
-                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                          ? 'bg-gradient-to-r from-orange-400 to-pink-400 text-white shadow-lg font-medium' 
+                          : 'text-gray-700 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800 bg-white/50 dark:bg-gray-800/50 hover:shadow-md'
                       }`
                     }
                     onClick={() => setIsOpen(false)}
                     title={isCollapsed ? item.name : undefined}
                   >
-                    <span className={isCollapsed ? 'mx-auto' : 'mr-3'}>{item.icon}</span>
-                    {!isCollapsed && item.name}
+                    <span className={`${isCollapsed ? 'mx-auto' : 'mr-2'}`}>{item.icon}</span>
+                    {!isCollapsed && <span className="font-medium">{item.name}</span>}
                   </NavLink>
                 </li>
               ))
@@ -244,57 +289,89 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
             </ul>
           </nav>
 
+          {/* Control buttons */}
+          <div className="px-2 py-2 border-t-2 border-orange-200 dark:border-purple-500">
+            <div className={`flex gap-1 ${isCollapsed ? 'flex-col' : 'flex-row'}`}>
+              <button 
+                className={`${isCollapsed ? 'p-2 flex justify-center' : 'flex-1 px-3 py-1.5'} bg-gradient-to-r from-blue-400 to-purple-400 text-white rounded-lg hover:shadow-lg transition-all duration-200 transform hover:scale-105 text-sm font-medium`}
+                onClick={toggleDarkMode}
+                title={darkMode ? '切換到淺色模式' : '切換到深色模式'}
+              >
+                {darkMode ? <Sun size={14} /> : <Moon size={14} />}
+                {!isCollapsed && <span className="ml-1">{darkMode ? '淺色' : '深色'}</span>}
+              </button>
+              <button
+                className={`${isCollapsed ? 'p-2 flex justify-center' : 'flex-1 px-3 py-1.5'} bg-gradient-to-r from-red-400 to-pink-400 text-white rounded-lg hover:shadow-lg transition-all duration-200 transform hover:scale-105 text-sm font-medium`}
+                onClick={reportIssue}
+                title="回報問題"
+              >
+                <AlertTriangle size={14} />
+                {!isCollapsed && <span className="ml-1">回報</span>}
+              </button>
+            </div>
+          </div>
+
           {/* User profile and logout */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center">
-              {/* 可點擊的頭像區域 */}
-              {!isLoading && currentUser && (
-                <button
-                  onClick={() => setShowProfileDialog(true)}
-                  className={`rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
-                    isCollapsed ? 'w-full flex justify-center p-2' : 'flex items-center mr-3'
-                  }`}
-                  title={isCollapsed ? `編輯 ${currentUser.name} 的個人資料` : '編輯個人資料'}
-                >
-                  {currentUser.avatar ? (
-                    <img 
-                      src={currentUser.avatar} 
-                      alt={currentUser.name}
-                      className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
-                    />
-                  ) : (
-                    <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium border border-gray-200 dark:border-gray-600"
-                      style={{ backgroundColor: currentUser.color || '#FF6B6B' }}
-                    >
-                      {currentUser.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </button>
-              )}
-              
-              {!isCollapsed && !isLoading && currentUser && (
-                <>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {currentUser.name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {viewType === 'student' ? '學生' : 
-                       viewType === 'mentor' ? '指導老師' :
-                       viewType === 'admin' ? '管理員' : '學生'}
-                    </p>
-                  </div>
+          <div className="p-3 border-t-2 border-orange-200 dark:border-purple-500 bg-gradient-to-r from-orange-100 to-pink-100 dark:from-gray-700 dark:to-gray-800">
+            {isCollapsed ? (
+              // 壓縮模式：只顯示登出按鈕
+              !isLoading && currentUser && (
+                <div className="flex justify-center">
                   <button 
                     onClick={logout}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 transform hover:scale-110"
                     title="登出"
                   >
-                    <LogOut size={18} />
+                    <LogOut size={16} />
                   </button>
-                </>
-              )}
-            </div>
+                </div>
+              )
+            ) : (
+              // 展開模式：顯示完整用戶資訊
+              <div className="flex items-center">
+                {!isLoading && currentUser && (
+                  <>
+                    <button
+                      onClick={() => setShowProfileDialog(true)}
+                      className="flex items-center mr-2 p-1 rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 transform hover:scale-105"
+                      title="編輯個人資料"
+                    >
+                      {currentUser.avatar ? (
+                        <img 
+                          src={currentUser.avatar} 
+                          alt={currentUser.name}
+                          className="w-8 h-8 rounded-full object-cover border-2 border-orange-300 dark:border-purple-400 shadow-lg"
+                        />
+                      ) : (
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold border-2 border-orange-300 dark:border-purple-400 shadow-lg"
+                          style={{ backgroundColor: currentUser.color || '#FF6B6B' }}
+                        >
+                          {currentUser.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
+                        {currentUser.name}
+                      </p>
+                      <p className="text-xs text-orange-600 dark:text-purple-300 truncate">
+                        {viewType === 'student' ? '🌟 學生' : 
+                         viewType === 'mentor' ? '👨‍🏫 導師' :
+                         viewType === 'admin' ? '🛠️ 管理' : '🌟 學生'}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={logout}
+                      className="p-1.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 transform hover:scale-110"
+                      title="登出"
+                    >
+                      <LogOut size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -308,6 +385,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
           isAdminMode={false}
         />
       )}
+      
+      {/* Report Dialog */}
+      <ReportDialog
+        isOpen={showReportDialog}
+        onClose={() => setShowReportDialog(false)}
+      />
     </>
   );
 };
