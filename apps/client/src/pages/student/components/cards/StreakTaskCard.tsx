@@ -13,7 +13,7 @@
  * - 打卡日曆視覺化
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Flame, Calendar, Star, CheckCircle2, 
@@ -24,11 +24,15 @@ import { StreakTaskConfig } from '../../../../types/goal';
 
 interface StreakTaskCardProps extends BaseTaskCardProps {
   onTaskAction?: (taskId: string, action: 'check_in' | 'reset') => Promise<void>;
+  onTaskUpdate?: () => void; // 任務更新後的回調
 }
 
 export const StreakTaskCard: React.FC<StreakTaskCardProps> = (props) => {
   const { task, currentUserId, onTaskAction } = props;
   const { renderTopicTag, renderOwnerTag, renderBottomInfo } = useBaseTaskCard(task);
+
+  // 取消打卡確認狀態
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // 解析任務配置
   const taskConfig = task.task_config as StreakTaskConfig;
@@ -72,6 +76,36 @@ export const StreakTaskCard: React.FC<StreakTaskCardProps> = (props) => {
       await onTaskAction(task.id, 'check_in');
     } catch (error) {
       console.error('打卡失敗:', error);
+    }
+  };
+
+  /**
+   * 處理取消今日打卡
+   */
+  const handleCancelTodayCheckIn = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      // 這裡使用 topicStore 的 cancelTodayCheckIn 方法
+      const { useTopicStore } = await import('../../../../store/topicStore');
+      const result = await useTopicStore.getState().cancelTodayCheckIn(task.id);
+      
+      if (result.success) {
+        console.log('✅ 成功取消今日打卡');
+        // 觸發父組件重新載入任務資料
+        if (props.onTaskUpdate) {
+          props.onTaskUpdate();
+        }
+      } else {
+        console.error('❌ 取消打卡失敗:', result.message);
+        alert(result.message || '取消打卡失敗');
+      }
+      
+      setShowCancelConfirm(false);
+    } catch (error) {
+      console.error('取消今日打卡失敗:', error);
+      alert('取消打卡失敗');
+      setShowCancelConfirm(false);
     }
   };
 
@@ -230,49 +264,93 @@ export const StreakTaskCard: React.FC<StreakTaskCardProps> = (props) => {
   /**
    * 渲染背面內容（自定義操作按鈕）
    */
-  const renderBackContent = () => (
-    <div className="p-4 h-full flex flex-col items-center justify-center gap-4">
-      {/* 背面標題 */}
-      <div className="text-center">
-        <h4 className="text-sm font-bold text-gray-800 mb-1">
-          {task.title}
-        </h4>
-        <div className="text-xs text-gray-600">
-          連續挑戰：{currentStreak}/{targetDays} 天
+  const renderBackContent = () => {
+    // 取消打卡確認對話框
+    if (showCancelConfirm) {
+      return (
+        <div className="p-4 h-full flex flex-col items-center justify-center space-y-4">
+          <div className="text-center space-y-2">
+            <div className="text-2xl">🤔</div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-800">取消今日打卡</p>
+              <p className="text-xs text-gray-600">確定要取消今天的打卡嗎？</p>
+            </div>
+          </div>
+          <div className="flex gap-2 w-full">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCancelConfirm(false);
+              }}
+              className="flex-1 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg text-xs hover:bg-gray-200 transition-colors"
+            >
+              保留打卡
+            </button>
+            <button
+              onClick={handleCancelTodayCheckIn}
+              className="flex-1 py-2 px-3 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors"
+            >
+              確定取消
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 正常的背面內容
+    return (
+      <div className="p-4 h-full flex flex-col items-center justify-center gap-4">
+        {/* 背面標題 */}
+        <div className="text-center">
+          <h4 className="text-sm font-bold text-gray-800 mb-1">
+            {task.title}
+          </h4>
+          <div className="text-xs text-gray-600">
+            連續挑戰：{currentStreak}/{targetDays} 天
+          </div>
+        </div>
+
+        {/* 今日打卡按鈕 */}
+        <div className="w-full space-y-2">
+          {isCheckedInToday ? (
+            <motion.button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCancelConfirm(true);
+              }}
+              className="w-full py-2 px-3 bg-green-100 text-green-700 rounded-lg text-sm font-medium text-center border border-green-200 hover:bg-green-200 transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              title="點擊取消今日打卡"
+            >
+              今天已打卡 ✅
+            </motion.button>
+          ) : (
+            <motion.button
+              onClick={handleCheckIn}
+              className="w-full py-2 px-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg text-sm font-medium hover:from-orange-600 hover:to-red-600 transition-all shadow-lg flex items-center justify-center gap-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Flame className="w-4 h-4" />
+              繼續連續！
+            </motion.button>
+          )}
+          
+          {/* 學習記錄按鈕 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onOpenRecord?.(task);
+            }}
+            className="w-full py-2 px-3 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
+          >
+            📝 記錄心得
+          </button>
         </div>
       </div>
-
-      {/* 今日打卡按鈕 */}
-      <div className="w-full space-y-2">
-        {isCheckedInToday ? (
-          <div className="w-full py-2 px-3 bg-green-100 text-green-700 rounded-lg text-sm font-medium text-center border border-green-200">
-            今天已打卡 ✅
-          </div>
-        ) : (
-          <motion.button
-            onClick={handleCheckIn}
-            className="w-full py-2 px-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg text-sm font-medium hover:from-orange-600 hover:to-red-600 transition-all shadow-lg flex items-center justify-center gap-2"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Flame className="w-4 h-4" />
-            繼續連續！
-          </motion.button>
-        )}
-        
-        {/* 學習記錄按鈕 */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            props.onOpenRecord?.(task);
-          }}
-          className="w-full py-2 px-3 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
-        >
-          📝 記錄心得
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   /**
    * 渲染狀態指示器

@@ -28,7 +28,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@self-learning/types';
-import { ImageProcessor } from '../lib/imageProcessor';
+// 移除 ImageProcessor 導入 - 圖片處理邏輯移到 UI 層
 
 // Supabase 配置
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -180,36 +180,39 @@ export const authService = {
   }
 };
 
-// 頭像存儲服務
+// 頭像存儲服務 - 純粹的存儲服務，不處理圖片
 export const avatarService = {
-  // 支持的圖片格式 (由 ImageProcessor 處理)
-  SUPPORTED_FORMATS: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'],
-  
-  // 最大檔案大小 (50MB，處理後會壓縮)
-  MAX_FILE_SIZE: 50 * 1024 * 1024,
-
   // 頭像 bucket 名稱
   BUCKET_NAME: 'uploads',
 
   /**
-   * 驗證上傳的圖片檔案 (使用新的圖片處理模組)
+   * 基本檔案驗證 (不依賴 imageProcessor)
    */
-  async validateImageFile(file: File): Promise<{ isValid: boolean; error?: string }> {
-    try {
-      // 使用新的圖片處理模組進行驗證
-      const { validateImageFile } = await import('../lib/imageProcessor');
-      const result = await validateImageFile(file);
-      
-      return {
-        isValid: result.isValid,
-        error: result.error
-      };
-    } catch (error) {
-      return {
-        isValid: false,
-        error: `驗證失敗: ${error instanceof Error ? error.message : '未知錯誤'}`
+  validateFile(file: File): { isValid: boolean; error?: string } {
+    // 基本檔案檢查
+    if (!file) {
+      return { isValid: false, error: '請選擇一個檔案' };
+    }
+
+    // 檢查檔案大小 (50MB)
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return { 
+        isValid: false, 
+        error: `檔案過大，最大支援 ${(maxSize / 1024 / 1024).toFixed(0)}MB` 
       };
     }
+
+    // 基本格式檢查
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!supportedTypes.includes(file.type)) {
+      return { 
+        isValid: false, 
+        error: '不支援的檔案格式，請使用 JPEG、PNG、WebP 或 GIF' 
+      };
+    }
+
+    return { isValid: true };
   },
 
   /**
@@ -222,40 +225,29 @@ export const avatarService = {
   },
 
   /**
-   * 上傳頭像 (整合新的圖片處理模組)
+   * 上傳頭像 (接收已處理的檔案)
+   * 注意：圖片處理應該在 UI 層完成，這裡只負責上傳
    */
   async uploadAvatar(
     file: File, 
     userId: string,
     onProgress?: (progress: number) => void
-  ): Promise<{ path: string; url: string; processingInfo?: any }> {
+  ): Promise<{ path: string; url: string }> {
     try {
-      // 步驟 1: 驗證檔案 (5%)
-      onProgress?.(5);
-      const validation = await this.validateImageFile(file);
+      // 步驟 1: 基本驗證 (10%)
+      onProgress?.(10);
+      const validation = this.validateFile(file);
       if (!validation.isValid) {
         throw new Error(validation.error);
       }
 
-      // 步驟 2: 使用新的圖片處理模組處理圖片 (5-70%)
-      onProgress?.(10);
-      const processingResult = await ImageProcessor.processImage(file, {
-        maxSize: 4096, // 支援較大尺寸
-        fallbackMaxSize: 2500, // Supabase 限制 (用於 canvas-fallback)
-        quality: 0.8,
-        targetFormat: 'image/jpeg', // 統一轉為 JPEG 以節省空間
-        onProgress: (progress) => {
-          onProgress?.(10 + progress * 0.6); // 10-70%
-        }
-      });
-
-      // 步驟 3: 上傳處理後的檔案 (70-90%)
-      onProgress?.(75);
-      const path = this.generateAvatarPath(userId, processingResult.file.name);
+      // 步驟 2: 生成路徑並上傳 (10-90%)
+      onProgress?.(20);
+      const path = this.generateAvatarPath(userId, file.name);
 
       const { data, error } = await supabase.storage
         .from(this.BUCKET_NAME)
-        .upload(path, processingResult.file, {
+        .upload(path, file, {
           cacheControl: '3600',
           upsert: true
         });
@@ -265,9 +257,9 @@ export const avatarService = {
         throw new Error(`上傳失敗: ${error.message}`);
       }
 
-      onProgress?.(85);
+      onProgress?.(80);
 
-      // 步驟 4: 獲取公開 URL (90-100%)
+      // 步驟 3: 獲取公開 URL (90-100%)
       const { data: urlData } = supabase.storage
         .from(this.BUCKET_NAME)
         .getPublicUrl(data.path);
@@ -275,27 +267,14 @@ export const avatarService = {
       onProgress?.(100);
 
       console.log('頭像上傳成功:', {
-        originalSize: processingResult.originalSize,
-        processedSize: processingResult.processedSize,
-        compressionRatio: ((processingResult.originalSize - processingResult.processedSize) / processingResult.originalSize * 100).toFixed(1) + '%',
-        method: processingResult.method,
-        formatChanged: processingResult.formatChanged,
-        maxSizeUsed: processingResult.method === 'canvas-fallback' ? 2500 : 4096
+        path: data.path,
+        url: urlData.publicUrl,
+        fileSize: file.size
       });
 
       return {
         path: data.path,
-        url: urlData.publicUrl,
-        processingInfo: {
-          originalSize: processingResult.originalSize,
-          processedSize: processingResult.processedSize,
-          originalDimensions: processingResult.originalDimensions,
-          processedDimensions: processingResult.processedDimensions,
-          method: processingResult.method,
-          formatChanged: processingResult.formatChanged,
-          compressionRatio: ((processingResult.originalSize - processingResult.processedSize) / processingResult.originalSize * 100).toFixed(1) + '%',
-          maxSizeUsed: processingResult.method === 'canvas-fallback' ? 2500 : 4096
-        }
+        url: urlData.publicUrl
       };
 
     } catch (error) {

@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, X, Camera, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { avatarService } from '../../services/supabase';
+import { ImageProcessor, validateImageFile } from '../../lib/imageProcessor';
 
 interface AvatarUploadProps {
   currentAvatar?: string;
@@ -88,25 +89,38 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
     const previewUrl = URL.createObjectURL(file);
     setUploadState(prev => ({ ...prev, preview: previewUrl }));
 
-    // 開始上傳
+    // 開始處理和上傳
     setUploadState(prev => ({ ...prev, uploading: true }));
 
     try {
-      // 模擬進度更新
-      const progressInterval = setInterval(() => {
-        setUploadState(prev => {
-          if (prev.progress >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return { ...prev, progress: prev.progress + 10 };
-        });
-      }, 100);
+      // 步驟 1: 驗證檔案 (0-10%)
+      setUploadState(prev => ({ ...prev, progress: 5 }));
+      const validation = await validateImageFile(file);
+      if (!validation.isValid) {
+        throw new Error(validation.error);
+      }
 
-      // 上傳頭像
-      const result = await avatarService.uploadAvatar(file, userId);
+      // 步驟 2: 處理圖片 (10-70%)
+      setUploadState(prev => ({ ...prev, progress: 10 }));
+      const processedResult = await ImageProcessor.processImage(file, {
+        maxSize: 400, // 頭像不需要太大
+        quality: 0.8,
+        targetFormat: 'image/jpeg', // 統一格式
+        onProgress: (progress) => {
+          setUploadState(prev => ({ ...prev, progress: 10 + progress * 0.6 })); // 10-70%
+        }
+      });
+
+      // 步驟 3: 上傳處理後的檔案 (70-100%)
+      setUploadState(prev => ({ ...prev, progress: 70 }));
+      const result = await avatarService.uploadAvatar(
+        processedResult.file, 
+        userId,
+        (progress) => {
+          setUploadState(prev => ({ ...prev, progress: 70 + progress * 0.3 })); // 70-100%
+        }
+      );
       
-      clearInterval(progressInterval);
       setUploadState(prev => ({ 
         ...prev, 
         uploading: false, 
@@ -120,10 +134,17 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       // 通知父組件上傳成功
       onUploadSuccess(result.url);
 
-      // 現在直接使用原始 URL，不需要 fallback 邏輯
-
       // 更新預覽為服務器 URL
       setUploadState(prev => ({ ...prev, preview: result.url }));
+
+      // 記錄處理資訊
+      console.log('頭像處理完成:', {
+        originalSize: `${(processedResult.originalSize / 1024).toFixed(1)} KB`,
+        processedSize: `${(processedResult.processedSize / 1024).toFixed(1)} KB`,
+        compressionRatio: `${((1 - processedResult.processedSize / processedResult.originalSize) * 100).toFixed(1)}%`,
+        method: processedResult.method,
+        formatChanged: processedResult.formatChanged
+      });
 
       // 2秒後只清除成功狀態，保留預覽
       setTimeout(() => {
@@ -203,7 +224,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept={avatarService.SUPPORTED_FORMATS.join(',')}
+        accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
         onChange={(e) => handleFileSelect(e.target.files)}
         className="hidden"
       />
@@ -310,10 +331,10 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
                   點擊或拖拽圖片到此處
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  支持 PNG、JPEG、WebP、GIF、SVG
+                  支持 PNG、JPEG、WebP、GIF、HEIC
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-500">
-                  最大 10MB，會自動優化尺寸
+                  最大 50MB，會自動優化尺寸
                 </p>
               </>
             )}

@@ -75,6 +75,17 @@ describe('Topic Store - Basic Tests', () => {
     expect(typeof store.getTopicWithStructure).toBe('function');
   });
 
+  it('應該有任務動作相關的方法', () => {
+    const store = useTopicStore.getState();
+    
+    expect(typeof store.performTaskAction).toBe('function');
+    expect(typeof store.checkInTask).toBe('function');
+    expect(typeof store.addTaskCount).toBe('function');
+    expect(typeof store.addTaskAmount).toBe('function');
+    expect(typeof store.resetTaskProgress).toBe('function');
+    expect(typeof store.cancelTodayCheckIn).toBe('function');
+  });
+
   it('應該能正確設置和重置狀態', () => {
     const store = useTopicStore.getState();
     

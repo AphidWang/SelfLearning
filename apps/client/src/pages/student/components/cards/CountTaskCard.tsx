@@ -27,6 +27,7 @@ interface CountTaskCardProps extends BaseTaskCardProps {
   highlight?: boolean; // 是否啟用特化模式（週挑戰風格）
   onTaskAction?: (taskId: string, action: 'check_in' | 'reset') => Promise<void>;
   onMigrate?: () => void; // 遷移到新任務系統（特化模式用）
+  onTaskUpdate?: () => void; // 任務更新後的回調
 }
 
 export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
@@ -35,11 +36,14 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     currentUserId, 
     highlight = false, 
     onTaskAction, 
-    onMigrate
+    onMigrate,
+    onTaskUpdate
   } = props;
 
   // 重置確認狀態
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // 取消打卡確認狀態
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [realCheckInTimes, setRealCheckInTimes] = useState<{[date: string]: string}>({});
 
   const { renderTopicTag, renderOwnerTag, renderBottomInfo } = useBaseTaskCard(task);
@@ -146,7 +150,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
       try {
         const { data: taskActions, error } = await supabase
           .from('task_actions')
-          .select('action_date, created_at')
+          .select('action_date, action_timestamp')
           .eq('task_id', task.id)
           .eq('action_type', 'check_in')
           .in('action_date', checkInDates);
@@ -159,7 +163,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
         const timeMap: {[date: string]: string} = {};
         taskActions?.forEach(action => {
           // 使用 Intl.DateTimeFormat 正確處理時區轉換
-          const utcTime = new Date(action.created_at);
+          const utcTime = new Date(action.action_timestamp);
           const timeStr = new Intl.DateTimeFormat('zh-TW', {
             timeZone: 'Asia/Taipei',
             hour: '2-digit',
@@ -168,7 +172,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           }).format(utcTime);
           
           timeMap[action.action_date] = timeStr;
-          console.log(`📅 打卡時間轉換: ${action.created_at} -> ${timeStr} (${action.action_date})`);
+          console.log(`📅 打卡時間轉換: ${action.action_timestamp} -> ${timeStr} (${action.action_date})`);
         });
 
         setRealCheckInTimes(timeMap);
@@ -229,6 +233,39 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
   };
 
   /**
+   * 處理取消今日打卡
+   */
+  const handleCancelTodayCheckIn = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      // 這裡使用 topicStore 的 cancelTodayCheckIn 方法
+      const { useTopicStore } = await import('../../../../store/topicStore');
+      const result = await useTopicStore.getState().cancelTodayCheckIn(task.id);
+      
+      if (result.success) {
+        console.log('✅ 成功取消今日打卡');
+        // 重新載入打卡時間資料
+        setRealCheckInTimes({});
+        
+        // 觸發父組件重新載入任務資料
+        if (onTaskUpdate) {
+          onTaskUpdate();
+        }
+      } else {
+        console.error('❌ 取消打卡失敗:', result.message);
+        alert(result.message || '取消打卡失敗');
+      }
+      
+      setShowCancelConfirm(false);
+    } catch (error) {
+      console.error('取消今日打卡失敗:', error);
+      alert('取消打卡失敗');
+      setShowCancelConfirm(false);
+    }
+  };
+
+  /**
    * 渲染進度環
    */
   const renderProgressRing = () => {
@@ -279,93 +316,135 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           </div>
 
           <div className="relative z-10 p-4 h-full flex flex-col">
-            {/* 頂部：標籤 */}
-            <div className="mb-3">
-              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
-                <Trophy className="w-3 h-3" />
-                週挑戰
-              </div>
-            </div>
-
-            {/* 中間：任務標題和進度 */}
-            <div className="flex-1 flex flex-col justify-center">
-              <div className="mb-2">
-                <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">
-                  {task.title}
-                </h3>
-              </div>
-              
-              {/* 進度文字 */}
-              <div className="mb-3">
-                <div className="flex items-center gap-2 text-xs text-white/80">
-                  <span className="text-yellow-300">🎯</span>
-                  <span>{currentCount}/{targetCount} 次</span>
+            {showCancelConfirm ? (
+              // 取消打卡確認視窗 - 特化模式（全螢幕）
+              <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-2">
+                <div className="text-center space-y-3">
+                  <div className="text-3xl">🤔</div>
+                  <div className="space-y-1">
+                    <p className="text-base font-bold text-white">取消今日打卡</p>
+                    <p className="text-sm text-white/80">確定要取消今天的打卡嗎？</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCancelConfirm(false);
+                    }}
+                    className="flex-1 py-1.5 px-3 bg-white/20 rounded text-xs font-medium hover:bg-white/30 transition-colors text-white"
+                  >
+                    保留打卡
+                  </button>
+                  <button
+                    onClick={handleCancelTodayCheckIn}
+                    className="flex-1 py-1.5 px-3 bg-orange-500/80 rounded text-xs font-medium hover:bg-orange-500 transition-colors text-white"
+                  >
+                    確定取消
+                  </button>
                 </div>
               </div>
-            </div>
-
-            {/* 底部：打卡按鈕 */}
-            <div className="space-y-3">
-              {isCheckedInToday ? (
-                <div className="w-full py-3 rounded-xl font-bold text-sm bg-white/20 text-white/80 text-center border border-white/30">
-                  今天已完成 ✅
+            ) : (
+              // 正常的卡片內容
+              <>
+                {/* 頂部：標籤 */}
+                <div className="mb-3">
+                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
+                    <Trophy className="w-3 h-3" />
+                    週挑戰
+                  </div>
                 </div>
-              ) : (
-                <motion.button
-                  onClick={handleCheckIn}
-                  className="w-full py-3 rounded-xl font-bold text-sm transition-all shadow-lg bg-white/90 text-indigo-600 hover:bg-white hover:scale-105 active:scale-95"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  今天完成了 ✨
-                </motion.button>
-              )}
 
-              {/* 底部目標資訊和每日打卡 indicator */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-xs text-white/80">
-                  <Target className="w-3 h-3" />
-                  <span className="truncate">每週挑戰目標</span>
+                {/* 中間：任務標題和進度 */}
+                <div className="flex-1 flex flex-col justify-center">
+                  <div className="mb-2">
+                    <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">
+                      {task.title}
+                    </h3>
+                  </div>
+                  
+                  {/* 進度文字 */}
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 text-xs text-white/80">
+                      <span className="text-yellow-300">🎯</span>
+                      <span>{currentCount}/{targetCount} 次</span>
+                    </div>
+                  </div>
                 </div>
-                {/* 每日打卡 indicator - 7個小圓點 */}
-                <div className="flex gap-1">
-                  {weekDates.length > 0 ? (
-                    weekDates.map((date, i) => {
-                      const isChecked = checkInDates.includes(date);
-                      const now = new Date();
-                      const utc8Today = new Date(now.getTime() + (8 * 60 * 60 * 1000));
-                      const today = utc8Today.toISOString().split('T')[0];
-                      const isToday = date === today;
-                      
-                      return (
-                        <div
-                          key={i}
-                          className={`w-2 h-2 rounded-full transition-all ${
-                            isChecked 
-                              ? 'bg-yellow-300 shadow-sm' 
-                              : isToday 
-                                ? 'bg-white/80 ring-1 ring-white/60' 
-                                : 'bg-white/40'
-                          }`}
-                        />
-                      );
-                    })
+
+                {/* 底部：打卡按鈕 */}
+                <div className="space-y-3">
+                  {isCheckedInToday ? (
+                    <motion.button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCancelConfirm(true);
+                      }}
+                      className="w-full py-3 rounded-xl font-bold text-sm transition-all bg-white/20 text-white/80 text-center border border-white/30 hover:bg-white/30 active:scale-95"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      title="點擊取消今日打卡"
+                    >
+                      今天已完成 ✅
+                    </motion.button>
                   ) : (
-                    [...Array(7)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-2 h-2 rounded-full bg-white/40"
-                      />
-                    ))
+                    <motion.button
+                      onClick={handleCheckIn}
+                      className="w-full py-3 rounded-xl font-bold text-sm transition-all shadow-lg bg-white/90 text-indigo-600 hover:bg-white hover:scale-105 active:scale-95"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      今天完成了 ✨
+                    </motion.button>
                   )}
-                </div>
-              </div>
-            </div>
 
-            {/* 狀態指示器 - 右上角 */}
-            <div className="absolute top-2 right-2 text-lg transform hover:scale-125 transition-transform">
-              🎯
-            </div>
+                  {/* 底部目標資訊和每日打卡 indicator */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 text-xs text-white/80">
+                      <Target className="w-3 h-3" />
+                      <span className="truncate">每週挑戰目標</span>
+                    </div>
+                    {/* 每日打卡 indicator - 7個小圓點 */}
+                    <div className="flex gap-1">
+                      {weekDates.length > 0 ? (
+                        weekDates.map((date, i) => {
+                          const isChecked = checkInDates.includes(date);
+                          const now = new Date();
+                          const utc8Today = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+                          const today = utc8Today.toISOString().split('T')[0];
+                          const isToday = date === today;
+                          
+                          return (
+                            <div
+                              key={i}
+                              className={`w-2 h-2 rounded-full transition-all ${
+                                isChecked 
+                                  ? 'bg-yellow-300 shadow-sm' 
+                                  : isToday 
+                                    ? 'bg-white/80 ring-1 ring-white/60' 
+                                    : 'bg-white/40'
+                              }`}
+                            />
+                          );
+                        })
+                      ) : (
+                        [...Array(7)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-2 h-2 rounded-full bg-white/40"
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 狀態指示器 - 右上角 */}
+                <div className="absolute top-2 right-2 text-lg transform hover:scale-125 transition-transform">
+                  🎯
+                </div>
+              </>
+            )}
           </div>
         </div>
       );
@@ -394,17 +473,77 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
 
             {/* 計數資訊 */}
             <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">
-                {task.cycle_config?.cycle_type === 'weekly' && (
-                  <span className="text-yellow-600">🎯 週挑戰 • </span>
-                )}
-                已完成 {currentCount}/{targetCount} 次
-              </div>
-              
-              {isCompleted && (
-                <div className="text-xs text-green-600 font-medium">
-                  🎉 目標達成！
+              {showCancelConfirm ? (
+                // 取消打卡確認視窗 - 普通模式
+                <div className="space-y-3">
+                  <div className="text-center space-y-2">
+                    <div className="text-2xl">🤔</div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-gray-800">取消今日打卡</p>
+                      <p className="text-xs text-gray-600">確定要取消今天的打卡嗎？</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 w-full">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCancelConfirm(false);
+                      }}
+                      className="flex-1 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg text-xs hover:bg-gray-200 transition-colors"
+                    >
+                      保留打卡
+                    </button>
+                    <button
+                      onClick={handleCancelTodayCheckIn}
+                      className="flex-1 py-2 px-3 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors"
+                    >
+                      確定取消
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                // 正常的計數資訊和打卡按鈕
+                <>
+                  <div className="text-sm text-gray-600 mb-1">
+                    {task.cycle_config?.cycle_type === 'weekly' && (
+                      <span className="text-yellow-600">🎯 週挑戰 • </span>
+                    )}
+                    已完成 {currentCount}/{targetCount} 次
+                  </div>
+                  
+                  {isCompleted && (
+                    <div className="text-xs text-green-600 font-medium">
+                      🎉 目標達成！
+                    </div>
+                  )}
+
+                  {/* 打卡按鈕 - 普通模式 */}
+                  <div className="mt-2">
+                    {isCheckedInToday ? (
+                      <motion.button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowCancelConfirm(true);
+                        }}
+                        className="w-full py-2 px-3 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors border border-green-200"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        title="點擊取消今日打卡"
+                      >
+                        今天已完成 ✅
+                      </motion.button>
+                    ) : (
+                      <motion.button
+                        onClick={handleCheckIn}
+                        className="w-full py-2 px-3 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        今天完成了 📝
+                      </motion.button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
@@ -525,7 +664,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
             </div>
 
             {/* 底部 footer */}
-            {!showResetConfirm && (
+            {!showResetConfirm && !showCancelConfirm && (
               <div className="mt-3 pt-2 border-t border-white/20">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-white/80">已完成 {checkInTimestamps.length}/7 次</span>
