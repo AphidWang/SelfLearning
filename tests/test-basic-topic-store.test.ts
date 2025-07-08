@@ -50,6 +50,11 @@ describe('Topic Store - Basic Tests', () => {
     expect(typeof store.updateTask).toBe('function');
     expect(typeof store.deleteTask).toBe('function');
     
+    // 還原功能
+    expect(typeof store.restoreTopic).toBe('function');
+    expect(typeof store.restoreGoal).toBe('function');
+    expect(typeof store.restoreTask).toBe('function');
+    
     // 兼容性方法
     expect(typeof store.updateTopicCompat).toBe('function');
     expect(typeof store.updateGoalCompat).toBe('function');

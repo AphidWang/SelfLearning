@@ -133,6 +133,11 @@ interface TopicStore {
   updateTask: (taskId: string, expectedVersion: number, updates: Partial<Task>) => Promise<Task | null>;
   deleteTask: (taskId: string) => Promise<boolean>;
 
+  // === 還原功能 ===
+  restoreTopic: (id: string) => Promise<boolean>;
+  restoreGoal: (goalId: string) => Promise<boolean>;
+  restoreTask: (taskId: string) => Promise<boolean>;
+
   // === 參考資訊操作 ===
   
   // Topic 參考資訊
@@ -295,6 +300,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
           .from('topics')
           .select('*')
           .eq('owner_id', user.id)
+          .neq('status', 'archived')
           .order('updated_at', { ascending: false }),
         
         // 查詢協作主題 - 使用 JOIN 一次查詢完成
@@ -305,6 +311,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
             topics!inner(*)
           `)
           .eq('user_id', user.id)
+          .neq('topics.status', 'archived')
       ]);
 
       if (ownTopicsQuery.error) {
@@ -579,11 +586,12 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   getTopic: async (id: string) => {
     try {
-      // 獲取主題基本信息
+      // 獲取主題基本信息（過濾掉歸檔的主題）
       const { data: topic, error: topicError } = await supabase
         .from('topics')
         .select('*')
         .eq('id', id)
+        .neq('status', 'archived')
         .single();
 
       if (topicError) throw topicError;
@@ -844,26 +852,27 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   /**
-   * 刪除主題
+   * 刪除主題（歸檔）
    */
   deleteTopic: async (id: string) => {
     try {
       const { error } = await supabase
         .from('topics')
-        .delete()
+        .update({ status: 'archived' })
         .eq('id', id);
 
       if (error) throw error;
 
-      // 更新本地狀態
+      // 更新本地狀態 - 從列表中移除歸檔的主題
       set(state => ({
         topics: state.topics.filter(t => t.id !== id)
       }));
 
+      console.log(`📍 deleteTopic - 成功歸檔主題 ${id}`);
       return true;
     } catch (error: any) {
-      console.error('刪除主題失敗:', error);
-      set({ error: error.message || '刪除主題失敗' });
+      console.error('歸檔主題失敗:', error);
+      set({ error: error.message || '歸檔主題失敗' });
       return false;
     }
   },
@@ -950,17 +959,20 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       if (goalError) throw goalError;
 
+      // 為返回的目標添加 tasks 字段（確保向後兼容）
+      const goalWithTasks = { ...goalData, tasks: [] };
+
       // 更新本地狀態
       set(state => ({
         topics: state.topics.map(topic => ({
           ...topic,
           goals: (topic.goals || []).map(goal => 
-            goal.id === goalId ? { ...goal, ...goalData } : goal
+            goal.id === goalId ? { ...goal, ...goalWithTasks } : goal
           )
         }))
       }));
 
-      return goalData;
+      return goalWithTasks;
     } catch (error: any) {
       console.error('更新目標失敗:', error);
       set({ error: error.message || '更新目標失敗' });
@@ -969,18 +981,18 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   /**
-   * 刪除目標
+   * 刪除目標（歸檔）
    */
   deleteGoal: async (goalId: string) => {
     try {
       const { error } = await supabase
         .from('goals')
-        .delete()
+        .update({ status: 'archived' })
         .eq('id', goalId);
 
       if (error) throw error;
 
-      // 更新本地狀態
+      // 更新本地狀態 - 從列表中移除歸檔的目標
       set(state => ({
         topics: state.topics.map(topic => ({
           ...topic,
@@ -988,10 +1000,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         }))
       }));
 
+      console.log(`📍 deleteGoal - 成功歸檔目標 ${goalId}`);
       return true;
     } catch (error: any) {
-      console.error('刪除目標失敗:', error);
-      set({ error: error.message || '刪除目標失敗' });
+      console.error('歸檔目標失敗:', error);
+      set({ error: error.message || '歸檔目標失敗' });
       return false;
     }
   },
@@ -1122,18 +1135,18 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   /**
-   * 刪除任務
+   * 刪除任務（歸檔）
    */
   deleteTask: async (taskId: string) => {
     try {
       const { error } = await supabase
         .from('tasks')
-        .delete()
+        .update({ status: 'archived' })
         .eq('id', taskId);
 
       if (error) throw error;
 
-      // 更新本地狀態
+      // 更新本地狀態 - 從列表中移除歸檔的任務
       set(state => ({
         topics: state.topics.map(topic => ({
           ...topic,
@@ -1144,10 +1157,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         }))
       }));
 
+      console.log(`📍 deleteTask - 成功歸檔任務 ${taskId}`);
       return true;
     } catch (error: any) {
-      console.error('刪除任務失敗:', error);
-      set({ error: error.message || '刪除任務失敗' });
+      console.error('歸檔任務失敗:', error);
+      set({ error: error.message || '歸檔任務失敗' });
       return false;
     }
   },
@@ -2773,5 +2787,104 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     };
 
     return await get().updateTaskReferenceInfo(taskId, updatedReferenceInfo);
+  },
+
+  // === 還原功能 ===
+
+  /**
+   * 還原歸檔的主題
+   */
+  restoreTopic: async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('topics')
+        .update({ status: 'active' })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // 重新載入主題列表以顯示還原的主題
+      await get().fetchTopics();
+      
+      console.log(`📍 restoreTopic - 成功還原主題 ${id}`);
+      return true;
+    } catch (error: any) {
+      console.error('還原主題失敗:', error);
+      set({ error: error.message || '還原主題失敗' });
+      return false;
+    }
+  },
+
+  /**
+   * 還原歸檔的目標
+   */
+  restoreGoal: async (goalId: string) => {
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ status: 'todo' })
+        .eq('id', goalId);
+
+      if (error) throw error;
+
+      // 獲取目標所屬的主題並重新載入
+      const { data: goal, error: goalError } = await supabase
+        .from('goals')
+        .select('topic_id')
+        .eq('id', goalId)
+        .single();
+
+      if (!goalError && goal) {
+        await get().refreshTopic(goal.topic_id);
+      }
+      
+      console.log(`📍 restoreGoal - 成功還原目標 ${goalId}`);
+      return true;
+    } catch (error: any) {
+      console.error('還原目標失敗:', error);
+      set({ error: error.message || '還原目標失敗' });
+      return false;
+    }
+  },
+
+  /**
+   * 還原歸檔的任務
+   */
+  restoreTask: async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'todo' })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      // 獲取任務所屬的主題並重新載入
+      const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('goal_id')
+        .eq('id', taskId)
+        .single();
+
+      if (!taskError && task && task.goal_id) {
+        // 再查詢 goal 獲取 topic_id
+        const { data: goal, error: goalError } = await supabase
+          .from('goals')
+          .select('topic_id')
+          .eq('id', task.goal_id)
+          .single();
+
+        if (!goalError && goal && goal.topic_id) {
+          await get().refreshTopic(goal.topic_id);
+        }
+      }
+      
+      console.log(`📍 restoreTask - 成功還原任務 ${taskId}`);
+      return true;
+    } catch (error: any) {
+      console.error('還原任務失敗:', error);
+      set({ error: error.message || '還原任務失敗' });
+      return false;
+    }
   }
 })); 

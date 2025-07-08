@@ -2,6 +2,19 @@ import { vi, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
+// 設置測試環境的 base URL
+Object.defineProperty(global, 'location', {
+  value: {
+    origin: 'http://localhost:3000',
+    protocol: 'http:',
+    host: 'localhost:3000',
+    pathname: '/',
+    search: '',
+    hash: ''
+  },
+  writable: true
+});
+
 // 讀取認證 token
 let tokenData = null;
 try {
@@ -27,6 +40,32 @@ if (!process.env.VITE_SUPABASE_URL) {
 if (!process.env.VITE_SUPABASE_ANON_KEY) {
   process.env.VITE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 }
+
+// Mock fetch 來攔截 API 調用
+const originalFetch = global.fetch;
+global.fetch = vi.fn((input, init) => {
+  const url = typeof input === 'string' ? input : input.url;
+  
+  // 攔截 /api/users 相關的調用並返回模擬數據
+  if (url.includes('/api/users/collaborator-candidates')) {
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([
+        {
+          id: 'test-user-1',
+          name: 'Test User 1',
+          email: 'test1@example.com',
+          role: 'student',
+          roles: ['student']
+        }
+      ]),
+    } as Response);
+  }
+  
+  // 對於其他 API 調用，使用原始的 fetch
+  return originalFetch(input, init);
+});
 
 // 設置 localStorage mock（測試環境需要）
 const localStorageMock = {
