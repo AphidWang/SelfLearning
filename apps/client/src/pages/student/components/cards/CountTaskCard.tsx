@@ -78,77 +78,104 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
   const progress = targetCount > 0 ? (currentCount / targetCount) * 100 : 0;
   const isCompleted = currentCount >= targetCount;
   
-  // 檢查今天是否已經打卡 (使用 UTC+8)
-  const isCheckedInToday = useMemo(() => {
+  // 獲取台灣時間的今日日期字串
+  const getTaiwanToday = () => {
     const now = new Date();
-    const utc8Today = new Date(now.getTime() + (8 * 60 * 60 * 1000));
-    const today = utc8Today.toISOString().split('T')[0];
+    // 使用 en-CA locale 直接獲取 YYYY-MM-DD 格式
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Taipei'
+    }).format(now);
+  };
+
+  // 檢查今天是否已經打卡 (使用台灣時間)
+  const isCheckedInToday = useMemo(() => {
+    const today = getTaiwanToday();
     const isChecked = checkInDates.includes(today);
-    
-    console.log('🔍 打卡檢查:', {
-      taskTitle: localTask.title,
-      now: now.toISOString(),
-      utc8Today: utc8Today.toISOString(),
-      today,
-      checkInDates,
-      isChecked
-    });
     
     return isChecked;
   }, [checkInDates, localTask.title]);
 
+  // 獲取台灣時間的週一日期
+  const getTaiwanMondayOfCurrentWeek = () => {
+    const now = new Date();
+    
+    // 獲取台灣時間的今天日期字串 (YYYY-MM-DD)
+    const taipeiFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    
+    const todayStr = taipeiFormatter.format(now); // YYYY-MM-DD 格式
+    const today = new Date(todayStr + 'T00:00:00Z'); // 建立 UTC 日期對象
+    
+    // 計算週一
+    const dayOfWeek = today.getUTCDay(); // 使用 UTC 方法避免時區問題
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 週日時需要回推6天到週一
+    
+    const monday = new Date(today);
+    monday.setUTCDate(today.getUTCDate() - daysFromMonday);
+    
+    return monday;
+  };
+
   // 生成週日期（針對週循環任務）
   const weekDates = useMemo(() => {
+    console.log('🔍 週日期生成邏輯檢查:', {
+      taskTitle: localTask.title,
+      cycleType: localTask.cycle_config?.cycle_type,
+      cycleStart: localTask.cycle_config?.cycle_start_date
+    });
+    
     if (localTask.cycle_config?.cycle_type !== 'weekly') {
-      // 如果不是週循環，生成當前週的日期 (UTC+8，週一為起始)
-      const today = new Date();
-      // 轉換為 UTC+8 時區
-      const utc8Today = new Date(today.getTime() + (8 * 60 * 60 * 1000));
-      const startOfWeek = new Date(utc8Today);
-      // 週一為起始 (getDay() 返回 0=週日, 1=週一, ..., 6=週六)
-      const dayOfWeek = utc8Today.getDay();
-      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 週日時需要回推6天到週一
-      startOfWeek.setDate(utc8Today.getDate() - daysFromMonday);
+      console.log('📅 使用非週循環邏輯');
+      // 如果不是週循環，生成當前週的日期（台灣時間，週一為起始）
+      const mondayDate = getTaiwanMondayOfCurrentWeek();
       
       const dates: string[] = [];
       for (let i = 0; i < 7; i++) {
-        const date = new Date(startOfWeek);
-        date.setDate(startOfWeek.getDate() + i);
+        const date = new Date(mondayDate);
+        date.setUTCDate(mondayDate.getUTCDate() + i);
         dates.push(date.toISOString().split('T')[0]);
       }
+      console.log('📅 非週循環生成的週日期:', dates);
       return dates;
     }
     
     const cycleStart = localTask.cycle_config?.cycle_start_date;
     if (!cycleStart) {
-      // 如果沒有設置開始日期，使用當前週 (UTC+8，週一為起始)
-      const today = new Date();
-      const utc8Today = new Date(today.getTime() + (8 * 60 * 60 * 1000));
-      const startOfWeek = new Date(utc8Today);
-      const dayOfWeek = utc8Today.getDay();
-      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      startOfWeek.setDate(utc8Today.getDate() - daysFromMonday);
+      console.log('📅 週循環但無開始日期，使用當前週');
+      // 如果沒有設置開始日期，使用當前週（台灣時間，週一為起始）
+      const mondayDate = getTaiwanMondayOfCurrentWeek();
       
       const dates: string[] = [];
       for (let i = 0; i < 7; i++) {
-        const date = new Date(startOfWeek);
-        date.setDate(startOfWeek.getDate() + i);
+        const date = new Date(mondayDate);
+        date.setUTCDate(mondayDate.getUTCDate() + i);
         dates.push(date.toISOString().split('T')[0]);
       }
+      console.log('📅 週循環無開始日期生成的週日期:', dates);
       return dates;
     }
     
+    console.log('📅 週循環有開始日期，使用 cycleStart:', cycleStart);
     const dates: string[] = [];
-    const startDate = new Date(cycleStart);
+    const startDate = new Date(cycleStart + 'T00:00:00Z'); // 建立 UTC 日期對象
+    
+    // 確保從週一開始，無論 cycleStart 是週幾
+    const dayOfWeek = startDate.getUTCDay();
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 週日時需要回推6天到週一
+    startDate.setUTCDate(startDate.getUTCDate() - daysFromMonday);
     
     for (let i = 0; i < 7; i++) {
       const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
+      date.setUTCDate(startDate.getUTCDate() + i);
       dates.push(date.toISOString().split('T')[0]);
     }
     
-    console.log('週日期:', dates);
-    console.log('打卡日期:', checkInDates);
+    console.log('📅 週循環生成的週日期:', dates);
+    console.log('📅 打卡日期:', checkInDates);
     
     return dates;
   }, [localTask.cycle_config, checkInDates]);
@@ -518,9 +545,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                       {weekDates.length > 0 ? (
                         weekDates.map((date, i) => {
                           const isChecked = checkInDates.includes(date);
-                          const now = new Date();
-                          const utc8Today = new Date(now.getTime() + (8 * 60 * 60 * 1000));
-                          const today = utc8Today.toISOString().split('T')[0];
+                          const today = getTaiwanToday(); // 使用正確的台灣時間
                           const isToday = date === today;
                           
                           return (
