@@ -35,6 +35,10 @@ export const initSentry = () => {
       tracesSampleRate: 0, // 關閉 Performance Tracing
       sendDefaultPii: true,
       
+      // 🚀 Replay 配置 - 只在錯誤時記錄，節省配額
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 0.1,
+      
       // 🚀 啟用更好的錯誤追蹤
       integrations: [
         // 捕捉 React 組件錯誤和 component stack
@@ -50,11 +54,7 @@ export const initSentry = () => {
         }),
         
         // 捕捉更多的 React 錯誤資訊
-        Sentry.replayIntegration({
-          // 只在錯誤時記錄，節省配額
-          sessionSampleRate: 0,
-          errorSampleRate: 0.1
-        })
+        Sentry.replayIntegration()
       ],
       
       // 🎯 增強錯誤上下文捕捉
