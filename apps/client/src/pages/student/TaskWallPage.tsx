@@ -572,12 +572,10 @@ export const TaskWallPage = () => {
         goal.tasks?.forEach(task => {
           // 只顯示待完成和進行中的任務，排除已歸檔的任務
           if (task.status === 'todo' || task.status === 'in_progress') {
-            // 排除隱藏主題中的週挑戰任務，避免與 WeeklyQuickCard 重複
-            const isHiddenTopicWeeklyChallenge = 
-              topic.status === 'hidden' && 
-              task.special_flags?.includes(SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE);
+            // 排除所有週挑戰任務，避免與 WeeklyQuickCard 重複
+            const isWeeklyChallenge = task.special_flags?.includes(SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE);
             
-            if (!isHiddenTopicWeeklyChallenge) {
+            if (!isWeeklyChallenge) {
               tasks.push({
                 ...task,
                 topicId: topic.id,
