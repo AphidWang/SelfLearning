@@ -37,6 +37,70 @@ export interface WeeklyStats {
     start: string;
     end: string;
   };
+  
+  // 🎯 新增：更詳細的脈絡資訊
+  /** 每日打卡詳情 */
+  dailyCheckIns: {
+    date: string;
+    dayOfWeek: string;
+    checkInCount: number;
+    topics: {
+      id: string;
+      title: string;
+      subject: string;
+      recordCount: number;
+    }[];
+    energy: number | null;
+    mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed' | null;
+  }[];
+  
+  /** 能量狀態時間分布 */
+  energyTimeline: {
+    date: string;
+    energy: number;
+    mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed';
+    hasJournal: boolean;
+  }[];
+  
+  /** 進行中的任務 */
+  inProgressTasks: {
+    id: string;
+    title: string;
+    topic: string;
+    status: 'in_progress' | 'pending';
+    priority: 'low' | 'medium' | 'high';
+    daysInProgress: number;
+  }[];
+  
+  /** 週摘要 */
+  weekSummary: {
+    /** 本週關鍵字 */
+    keywords: string[];
+    /** AI 生成的週摘要 */
+    summary: string;
+    /** 最活躍的學習主題 */
+    mostActiveSubject: string;
+    /** 最有挑戰性的任務 */
+    mostChallengingTask: string | null;
+    /** 本週學習模式 */
+    learningPattern: 'consistent' | 'burst' | 'irregular' | 'balanced';
+  };
+  
+  /** 社交互動 */
+  socialInteractions: {
+    /** 協作的任務數量 */
+    collaborativeTaskCount: number;
+    /** 協作夥伴 */
+    collaborators: {
+      id: string;
+      name: string;
+      avatar: string;
+    }[];
+    /** 獲得的協助次數 */
+    helpReceived: number;
+    /** 提供的協助次數 */
+    helpProvided: number;
+  };
 }
 
 export interface RetroQuestion {

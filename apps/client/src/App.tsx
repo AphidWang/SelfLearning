@@ -26,6 +26,7 @@ import TaskWallPage from './pages/student/TaskWallPage';
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
 import { StudentRetro } from './pages/student/StudentRetro';
+import { StudentGroupRetro } from './pages/student/StudentGroupRetro';
 import { UserAdminPage } from './pages/admin/UserAdminPage';
 import { AuthCallback } from './pages/AuthCallback.tsx';
 import { ErrorBoundary, reportReactError } from './config/sentry';
@@ -212,6 +213,11 @@ function App() {
                     <Route path="/student/retro" element={
                       <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
                         <StudentRetro />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/group-retro" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <StudentGroupRetro />
                       </RoleProtectedRoute>
                     } />
                     <Route path="/student/goals" element={

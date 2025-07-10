@@ -57,6 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
         { name: '學習地圖', path: '/student/learning-map', icon: <Map size={16} /> },
         { name: '日誌', path: '/student/journal', icon: <PenTool size={16} /> },
         { name: '個人回顧', path: '/student/retro', icon: <RotateCcw size={16} /> },
+        { name: '小組討論', path: '/student/group-retro', icon: <Users size={16} /> },
       ];
       
       // 如果有導師身份，加入導師視圖
@@ -150,6 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
       { name: '學習地圖', path: '/student/learning-map', icon: <Map size={16} /> },
       { name: '日誌', path: '/student/journal', icon: <PenTool size={16} /> },
       { name: '個人回顧', path: '/student/retro', icon: <RotateCcw size={16} /> },
+      { name: '小組討論', path: '/student/group-retro', icon: <Users size={16} /> },
     ];
     
     // 如果有導師身份，加入導師視圖

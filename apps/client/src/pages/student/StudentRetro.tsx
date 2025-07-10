@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { PageLayout } from '../../components/layout/PageLayout';
+import PageLayout from '../../components/layout/PageLayout';
 import { PersonalRetroPanel } from '../../components/retro/PersonalRetroPanel';
 
 export const StudentRetro: React.FC = () => {

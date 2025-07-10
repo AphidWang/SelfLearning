@@ -35,9 +35,39 @@ import {
   Mic
 } from 'lucide-react';
 import { journalStore, type DailyJournal, type MoodType } from '../../store/journalStore';
+import { useRetroStore } from '../../store/retroStore';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
+import { PersonalRetroPanel } from '../../components/retro/PersonalRetroPanel';
 import PageLayout from '../../components/layout/PageLayout';
 import * as Sentry from '@sentry/react';
+
+// 混合內容類型定義
+interface JournalEntry {
+  id: string;
+  date: string;
+  type: 'journal';
+  content: string;
+  mood: MoodType;
+  motivation_level: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface RetroEntry {
+  id: string;
+  date: string;
+  type: 'retro';
+  weekId: string;
+  question: string;
+  answer: string;
+  mood: MoodType;
+  emoji?: string;
+  isCustomQuestion: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+type MixedEntry = JournalEntry | RetroEntry;
 
 const MOOD_CONFIG = {
   excited: { emoji: '🤩', label: '超興奮', color: '#FF6B6B', bgColor: '#FFE5E5' },
@@ -56,11 +86,12 @@ const MOTIVATION_CONFIG = {
 };
 
 const StudentJournal: React.FC = () => {
-  const [journals, setJournals] = useState<DailyJournal[]>([]);
+  const [mixedEntries, setMixedEntries] = useState<MixedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showRetroPanel, setShowRetroPanel] = useState(false);
   const [selectedJournal, setSelectedJournal] = useState<DailyJournal | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -70,37 +101,99 @@ const StudentJournal: React.FC = () => {
   const [motivationTrend, setMotivationTrend] = useState<Array<{ date: string; level: number }>>([]);
   const [selectedMood, setSelectedMood] = useState<MoodType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<'all' | 'journal' | 'retro'>('all');
+  const [retroStats, setRetroStats] = useState({ totalRetros: 0, thisWeekRetros: 0 });
+  
+  const { getAnswerHistory } = useRetroStore();
 
   const pageSize = 12;
 
   useEffect(() => {
     loadJournals();
     loadStats();
-  }, [currentPage, selectedMood, searchQuery]);
+  }, [currentPage, selectedMood, searchQuery, selectedType]);
 
   const loadJournals = async () => {
     try {
       setLoading(true);
-      const { journals: data, total } = await journalStore.getJournalHistory(
-        pageSize,
-        currentPage * pageSize
-      );
+      
+      // 並行載入日記和回顧數據
+      const [journalData, retroData] = await Promise.all([
+        journalStore.getJournalHistory(pageSize * 2, currentPage * pageSize), // 載入更多數據以確保混合後有足夠條目
+        getAnswerHistory ? getAnswerHistory() : Promise.resolve([])
+      ]);
 
-      // 簡單的前端過濾（實際應該在後端做）
-      let filteredJournals = data;
+      // 轉換日記數據
+      const journalEntries: JournalEntry[] = (journalData?.journals || []).map(journal => ({
+        id: journal.id,
+        date: journal.date,
+        type: 'journal' as const,
+        content: journal.content,
+        mood: journal.mood,
+        motivation_level: journal.motivation_level,
+        created_at: journal.created_at,
+        updated_at: journal.updated_at
+      }));
+
+      // 轉換回顧數據
+      const retroEntries: RetroEntry[] = retroData.map((retro: any) => ({
+        id: retro.id,
+        date: retro.date || retro.created_at.split('T')[0], // 取日期部分
+        type: 'retro' as const,
+        weekId: retro.week_id,
+        question: typeof retro.question === 'string' ? retro.question : retro.question?.question || retro.custom_question || '',
+        answer: retro.answer,
+        mood: retro.mood,
+        emoji: retro.emoji,
+        isCustomQuestion: retro.is_custom_question,
+        created_at: retro.created_at,
+        updated_at: retro.updated_at
+      }));
+
+      // 合併並按日期排序
+      const allEntries = [...journalEntries, ...retroEntries];
+      allEntries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      // 應用過濾器
+      let filteredEntries = allEntries;
+      
+      if (selectedType !== 'all') {
+        filteredEntries = allEntries.filter(entry => entry.type === selectedType);
+      }
+      
       if (selectedMood !== 'all') {
-        filteredJournals = data.filter(journal => journal.mood === selectedMood);
+        filteredEntries = filteredEntries.filter(entry => entry.mood === selectedMood);
       }
+      
       if (searchQuery) {
-        filteredJournals = filteredJournals.filter(journal => 
-          journal.content.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        filteredEntries = filteredEntries.filter(entry => {
+          const searchContent = entry.type === 'journal' 
+            ? (entry as JournalEntry).content 
+            : `${(entry as RetroEntry).question} ${(entry as RetroEntry).answer}`;
+          return searchContent.toLowerCase().includes(searchQuery.toLowerCase());
+        });
       }
 
-      setJournals(filteredJournals);
-      setTotalPages(Math.ceil(total / pageSize));
+      // 分頁
+      const startIndex = currentPage * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedEntries = filteredEntries.slice(startIndex, endIndex);
+
+      setMixedEntries(paginatedEntries);
+      setTotalPages(Math.ceil(filteredEntries.length / pageSize));
+      
+      // 更新回顧統計
+      const totalRetros = retroEntries.length;
+      const thisWeekStart = new Date();
+      thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay()); // 本週開始
+      const thisWeekRetros = retroEntries.filter(retro => 
+        new Date(retro.created_at) >= thisWeekStart
+      ).length;
+      
+      setRetroStats({ totalRetros, thisWeekRetros });
+      
     } catch (error) {
-      console.error('載入日記失敗:', error);
+      console.error('載入內容失敗:', error);
     } finally {
       setLoading(false);
     }
@@ -183,7 +276,7 @@ const StudentJournal: React.FC = () => {
     }
   };
 
-  // 安全計算總日記數，確保數值正確
+  // 安全計算總條目數，確保數值正確
   const totalJournals = Object.values(moodStats).reduce((a, b) => {
     const numA = typeof a === 'number' ? a : parseInt(String(a)) || 0;
     const numB = typeof b === 'number' ? b : parseInt(String(b)) || 0;
@@ -191,7 +284,7 @@ const StudentJournal: React.FC = () => {
   }, 0);
   
   // 調試：記錄計算過程
-  console.log('🔢 總日記數計算:', {
+  console.log('🔢 總條目數計算:', {
     moodStats,
     moodStatsValues: Object.values(moodStats),
     totalJournals,
@@ -372,16 +465,29 @@ const StudentJournal: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="搜尋日記內容..."
+                placeholder="搜尋日記或回顧內容..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none"
               />
             </div>
             
-            {/* 心情篩選 */}
+            {/* 類型篩選 */}
             <div className="flex items-center gap-2">
               <Filter className="w-5 h-5 text-gray-400" />
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as 'all' | 'journal' | 'retro')}
+                className="px-3 py-2 border border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none bg-white"
+              >
+                <option value="all">全部類型</option>
+                <option value="journal">📖 日記</option>
+                <option value="retro">🎯 回顧</option>
+              </select>
+            </div>
+            
+            {/* 心情篩選 */}
+            <div className="flex items-center gap-2">
               <select
                 value={selectedMood}
                 onChange={(e) => setSelectedMood(e.target.value as MoodType | 'all')}
@@ -396,37 +502,112 @@ const StudentJournal: React.FC = () => {
               </select>
             </div>
           </div>
+          
+          {/* 新增按鈕區域 */}
+          <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-gray-100">
+            <motion.button
+              onClick={() => setShowNewDialog(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <BookOpen className="w-4 h-4" />
+              寫日記
+            </motion.button>
+            
+            <motion.button
+              onClick={() => setShowRetroPanel(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Zap className="w-4 h-4" />
+              寫回顧
+            </motion.button>
+          </div>
         </motion.div>
 
         {/* 日誌列表 */}
         <div className="mt-8">
           {loading ? (
             <div>載入中...</div>
-          ) : journals.length === 0 ? (
-            <div>還沒有日誌記錄</div>
+          ) : mixedEntries.length === 0 ? (
+            <div>還沒有內容記錄</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {journals.map((journal, index) => {
-                const moodConfig = MOOD_CONFIG[journal.mood];
-                const motivationConfig = getMotivationConfig(journal.motivation_level);
-                const isJournalToday = isToday(journal.date);
+              {mixedEntries.map((entry, index) => {
+                                 if (entry.type === 'retro') {
+                   // Handle retro entries separately
+                   const retroEntry = entry as RetroEntry;
+                   const moodConfig = MOOD_CONFIG[retroEntry.mood];
+                   const isRetroToday = isToday(retroEntry.date);
+                  
+                  return (
+                    <motion.div
+                      key={retroEntry.id}
+                      className="bg-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer border-l-4 border-orange-400"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ y: -5 }}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🎯</span>
+                          <span className="text-sm text-gray-600 font-medium">
+                            {formatDate(retroEntry.date)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-100">
+                          <span className="text-sm font-medium text-orange-700">回顧</span>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-800 mb-2">{retroEntry.question}</h4>
+                        <p className="text-gray-600 text-sm line-clamp-3">{retroEntry.answer}</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+                          style={{ backgroundColor: moodConfig.bgColor }}
+                        >
+                          <span className="text-lg">{moodConfig.emoji}</span>
+                          <span className="text-sm font-medium" style={{ color: moodConfig.color }}>
+                            {moodConfig.label}
+                          </span>
+                        </div>
+                        {retroEntry.emoji && (
+                          <span className="text-lg">{retroEntry.emoji}</span>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                }
+                
+                // Handle journal entries
+                const journalEntry = entry as JournalEntry;
+                const moodConfig = MOOD_CONFIG[journalEntry.mood];
+                const motivationConfig = getMotivationConfig(journalEntry.motivation_level);
+                const isJournalToday = isToday(journalEntry.date);
                 
                 return (
                   <motion.div
-                    key={journal.id}
+                    key={journalEntry.id}
                     className="bg-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                     whileHover={{ y: -5 }}
-                    onClick={() => handleViewJournal(journal)}
+                    onClick={() => handleViewJournal(journalEntry as any)}
                   >
                     {/* 日期和操作 */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <span className="text-sm text-gray-600 font-medium">
-                          {formatDate(journal.date)}
+                          {formatDate(journalEntry.date)}
                         </span>
                       </div>
                       
@@ -436,7 +617,7 @@ const StudentJournal: React.FC = () => {
                             className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleEditJournal(journal);
+                              handleEditJournal(journalEntry as any);
                             }}
                           >
                             <Edit className="w-4 h-4" />
@@ -444,7 +625,7 @@ const StudentJournal: React.FC = () => {
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteJournal(journal.id);
+                              handleDeleteJournal(journalEntry.id);
                             }}
                             className="p-1 text-gray-400 hover:text-red-500 transition-colors"
                           >
@@ -480,19 +661,19 @@ const StudentJournal: React.FC = () => {
                     {/* 日誌內容 */}
                     <div className="mb-4">
                       <p className="text-gray-600 text-sm line-clamp-3">
-                        {journal.content || '沒有記錄內容'}
+                        {journalEntry.content || '沒有記錄內容'}
                       </p>
                     </div>
 
                     {/* 完成的任務 */}
-                    {journal.completed_tasks && journal.completed_tasks.length > 0 && (
+                    {(journalEntry as any).completed_tasks && (journalEntry as any).completed_tasks.length > 0 && (
                       <div className="mt-4">
                         <div className="flex items-center gap-2 mb-2">
                           <CheckCircle className="w-4 h-4 text-green-500" />
                           <h4 className="text-sm font-medium text-gray-700">完成的任務</h4>
                         </div>
                         <div className="space-y-2 max-h-32 overflow-y-auto">
-                          {journal.completed_tasks.map((task, taskIndex) => (
+                          {(journalEntry as any).completed_tasks.map((task: any, taskIndex: number) => (
                             <div
                               key={task.id || taskIndex}
                               className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-sm"
@@ -538,7 +719,7 @@ const StudentJournal: React.FC = () => {
                     )}
 
                     {/* 語音記錄指示器 */}
-                    {journal.has_voice_note && (
+                    {(journalEntry as any).has_voice_note && (
                       <div className="mt-4 flex items-center gap-2 text-purple-500 text-sm">
                         <Mic className="w-4 h-4" />
                         <span>有語音記錄</span>

@@ -256,10 +256,13 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       const [
         // 從 topicStore 獲取任務數據
         completedTasks,
+        inProgressTasksData,
         // 從 taskRecordStore 獲取記錄
         taskRecords,
         // 從 journalStore 獲取心情數據
-        journals
+        journals,
+        // 獲取協作資料
+        collaborativeData
       ] = await Promise.all([
         // 獲取本週完成的任務
         supabase.rpc('get_completed_tasks_for_week', {
@@ -267,6 +270,16 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
           week_end: weekEnd,
           user_id: user.id
         }),
+        // 獲取進行中的任務
+        supabase
+          .from('tasks')
+          .select(`
+            id, title, status, priority, created_at, updated_at,
+            goals!inner(id, title, topics!inner(id, title, subject))
+          `)
+          .eq('owner_id', user.id)
+          .in('status', ['in_progress', 'todo'])
+          .neq('status', 'archived'),
         // 獲取本週任務記錄
         taskRecordStore.getUserTaskRecords({
           start_date: weekStart,
@@ -279,12 +292,25 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
           .eq('user_id', user.id)
           .gte('date', weekStart)
           .lte('date', weekEnd)
+          .order('date', { ascending: true }),
+        // 獲取協作資料
+        supabase
+          .from('tasks')
+          .select(`
+            id, title, collaborators,
+            goals!inner(topics!inner(id, title))
+          `)
+          .contains('collaborators', [user.id])
+          .gte('updated_at', weekStart)
+          .lte('updated_at', weekEnd)
       ]);
       
       // 處理任務數據
       const tasks = completedTasks.data || [];
+      const inProgressTasks = inProgressTasksData.data || [];
       const records = taskRecords || [];
       const journalData = journals.data || [];
+      const collaborativeTasks = collaborativeData.data || [];
       
       // 計算打卡次數 (基於任務記錄)
       const checkInCount = records.length;
@@ -295,9 +321,12 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       // 計算平均能量 (基於日記的 motivation_level)
       const motivationLevels = journalData
         .map(j => j.motivation_level)
-        .filter(level => level != null);
+        .filter(level => level != null && level >= 1 && level <= 10); // 過濾有效範圍
+      
+
+      
       const averageEnergy = motivationLevels.length > 0 
-        ? Math.round(motivationLevels.reduce((a, b) => a + b, 0) / motivationLevels.length)
+        ? Math.min(5, Math.max(1, Math.round(motivationLevels.reduce((a, b) => a + b, 0) / motivationLevels.length))) // 限制在 1-5 範圍
         : 3; // 預設值
       
       // 處理主要任務清單
@@ -326,6 +355,148 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
         .sort((a, b) => b.progress - a.progress)
         .slice(0, 3);
       
+      // 🎯 新增：建立每日打卡詳情
+      interface DailyCheckIn {
+        date: string;
+        dayOfWeek: string;
+        checkInCount: number;
+        topics: any[];
+        energy: number | null;
+        mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed' | null;
+      }
+      
+      const dailyCheckIns: DailyCheckIn[] = [];
+      const startDate = new Date(weekStart);
+      const endDate = new Date(weekEnd);
+      
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const dayOfWeek = d.toLocaleDateString('zh-TW', { weekday: 'long' });
+        
+        // 該日的記錄 (使用 created_at 日期進行匹配)
+        const dayRecords = records.filter(r => r.created_at && r.created_at.startsWith(dateStr));
+        const dayJournal = journalData.find(j => j.date === dateStr);
+        
+        // 統計該日的任務
+        const taskStats = dayRecords.reduce((acc, record) => {
+          const taskTitle = record.title || '未命名任務';
+          const taskId = record.task_id;
+          
+          // 找到任務所屬的主題來確定 subject
+          let subject = '其他';
+          if (taskId) {
+            // 遍歷所有主題的所有目標的所有任務來找到對應的任務
+            for (const topic of topics) {
+              const foundTask = topic.goals?.some(goal => 
+                goal.tasks?.some(task => task.id === taskId)
+              );
+              if (foundTask) {
+                subject = topic.subject || '未分類';
+                break;
+              }
+            }
+          }
+          
+          // 使用任務標題作為 key（如果同一天有相同名稱的任務會合併計數）
+          const key = taskTitle;
+          if (!acc[key]) {
+            acc[key] = {
+              id: taskId || `record-${record.id}`,
+              title: taskTitle,
+              subject: subject,
+              recordCount: 0
+            };
+          }
+          acc[key].recordCount++;
+          return acc;
+        }, {} as Record<string, any>);
+        
+        dailyCheckIns.push({
+          date: dateStr,
+          dayOfWeek,
+          checkInCount: dayRecords.length,
+          topics: Object.values(taskStats),
+          energy: dayJournal?.motivation_level || null,
+          mood: dayJournal?.mood || null
+        });
+      }
+      
+      // 🎯 新增：能量狀態時間分布
+      const energyTimeline = journalData.map(journal => ({
+        date: journal.date,
+        energy: journal.motivation_level,
+        mood: journal.mood,
+        hasJournal: true
+      }));
+      
+      // 🎯 新增：進行中的任務
+      const processedInProgressTasks = inProgressTasks.map((task: any) => {
+        const daysSinceCreated = Math.floor(
+          (new Date().getTime() - new Date(task.created_at).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        
+        return {
+          id: task.id,
+          title: task.title,
+          topic: task.goals?.topics?.title || '未分類',
+          status: task.status,
+          priority: task.priority || 'medium',
+          daysInProgress: daysSinceCreated
+        };
+      });
+      
+      // 🎯 新增：週摘要生成
+      const completedTaskTitles = tasks.map((t: any) => t.title);
+      const activeSubjects = [...new Set(mainTopics.map(t => t.subject))];
+      const mostActiveSubject = activeSubjects[0] || '未分類';
+      
+      // 簡單的學習模式判斷
+      const dailyRecordCounts = dailyCheckIns.map(d => d.checkInCount);
+      const maxCount = Math.max(...dailyRecordCounts);
+      const avgCount = dailyRecordCounts.reduce((a, b) => a + b, 0) / dailyRecordCounts.length;
+      
+      let learningPattern: 'consistent' | 'burst' | 'irregular' | 'balanced' = 'balanced';
+      if (maxCount > avgCount * 2) {
+        learningPattern = 'burst';
+      } else if (dailyRecordCounts.filter(c => c > 0).length >= 5) {
+        learningPattern = 'consistent';
+      } else if (dailyRecordCounts.filter(c => c > 0).length <= 2) {
+        learningPattern = 'irregular';
+      }
+      
+      const weekSummary = {
+        keywords: [...new Set([
+          ...completedTaskTitles.slice(0, 3),
+          ...activeSubjects.slice(0, 2)
+        ])],
+        summary: `本週完成了 ${completedTaskCount} 個任務，主要專注在 ${mostActiveSubject} 的學習上。平均能量指數為 ${averageEnergy}/5，學習模式呈現${learningPattern === 'consistent' ? '穩定持續' : learningPattern === 'burst' ? '爆發式' : learningPattern === 'irregular' ? '不規律' : '平衡'}的特徵。`,
+        mostActiveSubject,
+        mostChallengingTask: processedInProgressTasks.find(t => t.daysInProgress > 3)?.title || null,
+        learningPattern
+      };
+      
+      // 🎯 新增：社交互動統計
+      const collaborators = collaborativeTasks.reduce((acc, task: any) => {
+        const collabs = task.collaborators || [];
+        collabs.forEach((collab: any) => {
+          if (collab.id !== user.id && !acc.some(c => c.id === collab.id)) {
+            acc.push({
+              id: collab.id,
+              name: collab.name || '協作夥伴',
+              avatar: collab.avatar || ''
+            });
+          }
+        });
+        return acc;
+      }, [] as any[]);
+      
+      const socialInteractions = {
+        collaborativeTaskCount: collaborativeTasks.length,
+        collaborators,
+        helpReceived: 0, // TODO: 實際統計
+        helpProvided: 0  // TODO: 實際統計
+      };
+      
       const weeklyStats: WeeklyStats = {
         checkInCount,
         completedTaskCount,
@@ -335,7 +506,13 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
         weekRange: {
           start: weekStart,
           end: weekEnd
-        }
+        },
+        // 🎯 新增的詳細脈絡資訊
+        dailyCheckIns,
+        energyTimeline,
+        inProgressTasks: processedInProgressTasks,
+        weekSummary,
+        socialInteractions
       };
       
       set({ currentWeekStats: weeklyStats, loading: false });

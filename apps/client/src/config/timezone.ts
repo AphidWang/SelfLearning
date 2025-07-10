@@ -118,4 +118,40 @@ export const getCurrentTimeInTimezone = (timezone: string = APP_TIMEZONE): Date 
   return new Date(dateStr);
 };
 
+/**
+ * 獲取指定日期所在週的開始日期（週一）
+ */
+export const getWeekStart = (date: string | Date = new Date(), timezone: string = APP_TIMEZONE): string => {
+  const targetDate = typeof date === 'string' ? new Date(date + 'T00:00:00') : new Date(date);
+  
+  // 在指定時區中獲取日期
+  const dateInTz = getDateInTimezone(targetDate, timezone);
+  const dateObj = new Date(dateInTz + 'T00:00:00');
+  
+  // 獲取星期幾 (0=週日, 1=週一, ..., 6=週六)
+  const dayOfWeek = dateObj.getDay();
+  
+  // 計算到週一的偏移量
+  const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // 週日的話往前推6天，其他往前推到週一
+  
+  const weekStart = new Date(dateObj);
+  weekStart.setDate(dateObj.getDate() + offset);
+  
+  return getDateInTimezone(weekStart, timezone);
+};
+
+/**
+ * 獲取指定日期所在週的結束日期（週日）
+ */
+export const getWeekEnd = (date: string | Date = new Date(), timezone: string = APP_TIMEZONE): string => {
+  const weekStart = getWeekStart(date, timezone);
+  const weekStartDate = new Date(weekStart + 'T00:00:00');
+  
+  // 週日是週一後的第6天
+  const weekEnd = new Date(weekStartDate);
+  weekEnd.setDate(weekStartDate.getDate() + 6);
+  
+  return getDateInTimezone(weekEnd, timezone);
+};
+
 console.log(`📅 時區配置已載入: ${APP_TIMEZONE} (${formatTimezone(APP_TIMEZONE_OFFSET)})`); 

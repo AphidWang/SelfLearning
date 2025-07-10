@@ -21,6 +21,9 @@ interface AnswerInputCardProps {
   isCustomQuestion: boolean;
   onSubmit: (answer: string, mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed', emoji?: string) => void;
   onBack: () => void;
+  submitButtonText?: string;
+  questionIndex?: number;
+  totalQuestions?: number;
 }
 
 export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
@@ -30,7 +33,10 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
   example,
   isCustomQuestion,
   onSubmit,
-  onBack
+  onBack,
+  submitButtonText = '提交回答',
+  questionIndex,
+  totalQuestions
 }) => {
   const [answer, setAnswer] = useState('');
   const [selectedMood, setSelectedMood] = useState<'excited' | 'happy' | 'okay' | 'tired' | 'stressed'>('okay');
@@ -41,11 +47,11 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
 
   // 心情選項
   const moodOptions = [
-    { value: 'excited', emoji: '🤩', label: '超興奮', color: 'from-pink-400 to-red-400' },
-    { value: 'happy', emoji: '😊', label: '開心', color: 'from-yellow-400 to-orange-400' },
-    { value: 'okay', emoji: '😌', label: '還好', color: 'from-blue-400 to-cyan-400' },
-    { value: 'tired', emoji: '😴', label: '有點累', color: 'from-purple-400 to-indigo-400' },
-    { value: 'stressed', emoji: '😰', label: '壓力大', color: 'from-gray-400 to-gray-500' }
+    { value: 'excited', emoji: '🤩', color: 'from-pink-400 to-red-400' },
+    { value: 'happy', emoji: '😊', color: 'from-yellow-400 to-orange-400' },
+    { value: 'okay', emoji: '😌', color: 'from-blue-400 to-cyan-400' },
+    { value: 'tired', emoji: '😴', color: 'from-purple-400 to-indigo-400' },
+    { value: 'stressed', emoji: '😰', color: 'from-gray-400 to-gray-500' }
   ] as const;
 
   // 常用表情符號
@@ -130,9 +136,16 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
       >
         <div className="flex items-center justify-center mb-4">
           <div className="text-3xl mr-2">{typeStyle.emoji}</div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
-            {isCustomQuestion ? '✏️ 自訂問題' : '💭 回顧時光'}
-          </h2>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+              {isCustomQuestion ? '✏️ 自訂問題' : '💭 回顧時光'}
+            </h2>
+            {questionIndex && totalQuestions && (
+              <p className="text-sm text-gray-600 mt-1">
+                問題 {questionIndex} / {totalQuestions}
+              </p>
+            )}
+          </div>
         </div>
         
         <div className={`mx-auto max-w-2xl p-6 rounded-xl bg-gradient-to-r ${typeStyle.color} text-white shadow-lg`}>
@@ -220,57 +233,29 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
         )}
       </AnimatePresence>
 
-      {/* 心情選擇 */}
+      {      /* 心情選擇 */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
         className="mb-6"
       >
-        <h4 className="font-medium text-gray-700 mb-4 text-center">現在的心情如何？</h4>
-        <div className="flex justify-center space-x-3">
+        <h4 className="font-medium text-gray-700 mb-3 text-center">現在的心情如何？</h4>
+        <div className="flex justify-center space-x-2">
           {moodOptions.map((mood) => (
             <motion.button
               key={mood.value}
               onClick={() => setSelectedMood(mood.value)}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+              className={`p-3 rounded-xl border-2 transition-all duration-200 ${
                 selectedMood === mood.value
                   ? `border-orange-400 bg-gradient-to-r ${mood.color} text-white shadow-lg`
                   : 'border-gray-200 bg-white/50 hover:border-gray-300'
               }`}
             >
-              <div className="text-2xl mb-1">{mood.emoji}</div>
-              <div className="text-xs font-medium">{mood.label}</div>
+              <div className="text-2xl">{mood.emoji}</div>
             </motion.button>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* 特殊表情符號選擇 */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="mb-8"
-      >
-        <h4 className="font-medium text-gray-700 mb-4 text-center">想加個特別的表情符號嗎？</h4>
-        <div className="flex justify-center space-x-2">
-          {['✨', '🌟', '💖', '🎉', '🚀', '🏆', '🌈', ''].map((emoji) => (
-            <button
-              key={emoji || 'none'}
-              onClick={() => setSelectedEmoji(emoji)}
-              className={`p-3 rounded-xl border-2 transition-all duration-200 ${
-                selectedEmoji === emoji
-                  ? 'border-orange-400 bg-orange-50 shadow-lg'
-                  : 'border-gray-200 bg-white/50 hover:border-gray-300'
-              }`}
-            >
-              {emoji || (
-                <span className="text-gray-500 text-sm">無</span>
-              )}
-            </button>
           ))}
         </div>
       </motion.div>
@@ -318,7 +303,7 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
           ) : (
             <>
               <span>✅</span>
-              <span>完成回顧</span>
+              <span>{submitButtonText}</span>
             </>
           )}
         </motion.button>

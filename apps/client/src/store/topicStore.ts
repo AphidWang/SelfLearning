@@ -1072,8 +1072,18 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   updateTask: async (taskId: string, expectedVersion: number, updates: Partial<Task>) => {
     try {
+      console.log('🔄 updateTask 開始:', { taskId, expectedVersion, updates });
+      
+             // 準備 completed_at 邏輯：當狀態變為 'done' 時自動設置
+      let completedAt = updates.completed_at;
+      if (updates.status === 'done' && !completedAt) {
+        completedAt = new Date().toISOString();
+      } else if (updates.status && updates.status !== 'done') {
+        completedAt = undefined;
+      }
+      
       const { data, error } = await supabase.rpc('safe_update_task', {
-        p_id: taskId,
+        p_id: taskId,                          // 修正：使用 p_id
         p_expected_version: expectedVersion,
         p_title: updates.title,
         p_description: updates.description,
@@ -1083,17 +1093,25 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         p_need_help: updates.need_help,
         p_help_message: updates.help_message,
         p_reply_message: updates.reply_message,
+        p_reply_at: null, // 暫時不支援
         p_replied_by: updates.replied_by,
+        p_completed_at: completedAt,           // 自動設置 completed_at
         p_completed_by: updates.completed_by,
         p_estimated_minutes: updates.estimated_minutes,
         p_actual_minutes: updates.actual_minutes
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ RPC 調用失敗:', error);
+        throw error;
+      }
+      
+      console.log('✅ RPC 調用成功:', data);
       
       const result = data as SafeUpdateResult;
       
       if (!result.success) {
+        console.error('❌ 更新失敗:', result);
         if (result.message === 'Version conflict detected') {
           throw new VersionConflictError(
             '任務已被其他用戶修改，請重新載入',
@@ -1111,7 +1129,12 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         .eq('id', taskId)
         .single();
 
-      if (taskError) throw taskError;
+      if (taskError) {
+        console.error('❌ 重新獲取任務數據失敗:', taskError);
+        throw taskError;
+      }
+
+      console.log('📊 更新後的任務數據:', taskData);
 
       // 更新本地狀態
       set(state => ({
@@ -1201,8 +1224,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       console.log('📤 準備更新任務狀態');
       const updatedTask = await get().updateTask(taskId, expectedVersion, {
         status: 'done',
-        completed_by: user.id,
-        completed_at: new Date().toISOString()
+        completed_by: user.id
+        // completed_at 會在 updateTask 中自動設置
       });
 
       if (updatedTask) {
@@ -1251,8 +1274,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     try {
       const updatedTask = await get().updateTask(taskId, expectedVersion, {
         status: 'todo',
-        completed_at: undefined,
-        completed_by: undefined
+        completed_by: undefined,
+        completed_at: undefined
       });
 
       if (updatedTask) {
