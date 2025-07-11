@@ -19,7 +19,7 @@ interface AnswerInputCardProps {
   hint?: string;
   example?: string;
   isCustomQuestion: boolean;
-  onSubmit: (answer: string, mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed', emoji?: string) => void;
+  onSubmit: (answer: string, emoji?: string) => void;
   onBack: () => void;
   submitButtonText?: string;
   questionIndex?: number;
@@ -39,20 +39,10 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
   totalQuestions
 }) => {
   const [answer, setAnswer] = useState('');
-  const [selectedMood, setSelectedMood] = useState<'excited' | 'happy' | 'okay' | 'tired' | 'stressed'>('okay');
   const [selectedEmoji, setSelectedEmoji] = useState<string>('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // 心情選項
-  const moodOptions = [
-    { value: 'excited', emoji: '🤩', color: 'from-pink-400 to-red-400' },
-    { value: 'happy', emoji: '😊', color: 'from-yellow-400 to-orange-400' },
-    { value: 'okay', emoji: '😌', color: 'from-blue-400 to-cyan-400' },
-    { value: 'tired', emoji: '😴', color: 'from-purple-400 to-indigo-400' },
-    { value: 'stressed', emoji: '😰', color: 'from-gray-400 to-gray-500' }
-  ] as const;
 
   // 常用表情符號
   const commonEmojis = [
@@ -108,7 +98,7 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
     
     setIsSubmitting(true);
     try {
-      await onSubmit(answer.trim(), selectedMood, selectedEmoji);
+      await onSubmit(answer.trim(), selectedEmoji);
     } finally {
       setIsSubmitting(false);
     }
@@ -233,32 +223,7 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
         )}
       </AnimatePresence>
 
-      {      /* 心情選擇 */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="mb-6"
-      >
-        <h4 className="font-medium text-gray-700 mb-3 text-center">現在的心情如何？</h4>
-        <div className="flex justify-center space-x-2">
-          {moodOptions.map((mood) => (
-            <motion.button
-              key={mood.value}
-              onClick={() => setSelectedMood(mood.value)}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className={`p-3 rounded-xl border-2 transition-all duration-200 ${
-                selectedMood === mood.value
-                  ? `border-orange-400 bg-gradient-to-r ${mood.color} text-white shadow-lg`
-                  : 'border-gray-200 bg-white/50 hover:border-gray-300'
-              }`}
-            >
-              <div className="text-2xl">{mood.emoji}</div>
-            </motion.button>
-          ))}
-        </div>
-      </motion.div>
+
 
       {/* 鼓勵訊息 */}
       <motion.div

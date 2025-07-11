@@ -47,8 +47,6 @@ interface CompletedRetroCardProps {
 
 // 已完成回顧小卡片組件
 const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit, onDelete }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
   const getMoodEmoji = (mood: string) => {
     const moodEmojis = {
       excited: '🤩',
@@ -70,17 +68,11 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
     });
   };
 
-  const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-2 border-green-200 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer"
-      onClick={() => setIsExpanded(!isExpanded)}
+      className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-2 border-green-200 shadow-md hover:shadow-lg transition-all duration-300"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
@@ -89,51 +81,18 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
             <span className="text-xs text-gray-500">{formatDate(answer.createdAt)}</span>
           </div>
           
-          <h4 className="font-medium text-gray-800 text-sm mb-1 line-clamp-2">
-            {truncateText(answer.question, 50)}
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            {answer.question}
           </h4>
           
-          <motion.div
-            initial={false}
-            animate={{
-              height: isExpanded ? 'auto' : '40px',
-              overflow: 'hidden'
-            }}
-            className="text-gray-600 text-sm"
-          >
-            <p className={isExpanded ? '' : 'line-clamp-2'}>
-              {answer.answer}
-            </p>
-          </motion.div>
-        </div>
-        
-        <div className="flex items-center space-x-1 ml-2">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-          >
-            <motion.div
-              animate={{ rotate: isExpanded ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ChevronDown className="w-4 h-4" />
-            </motion.div>
-          </motion.button>
+          <div className="text-gray-600 text-sm">
+            <p>{answer.answer}</p>
+          </div>
         </div>
       </div>
       
-      {isExpanded && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="mt-3 pt-3 border-t border-gray-200 flex justify-end space-x-2"
-        >
+      {(onEdit || onDelete) && (
+        <div className="mt-3 pt-3 border-t border-gray-200 flex justify-end space-x-2">
           {onEdit && (
             <button
               onClick={(e) => {
@@ -156,7 +115,7 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
               刪除
             </button>
           )}
-        </motion.div>
+        </div>
       )}
     </motion.div>
   );
@@ -397,7 +356,7 @@ export const PersonalRetroPanel: React.FC = () => {
   };
 
   // 處理回答提交
-  const handleAnswerSubmit = async (answer: string, mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed', emoji?: string) => {
+  const handleAnswerSubmit = async (answer: string, emoji?: string) => {
     try {
       const weekId = getWeekId();
       
@@ -407,7 +366,7 @@ export const PersonalRetroPanel: React.FC = () => {
           question: selectedQuestion,
           isCustomQuestion: false,
           answer,
-          mood,
+          mood: 'okay', // 默認心情
           emoji
         });
         

@@ -7,8 +7,8 @@
  * - 直接選擇確認
  */
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useRetroStore } from '../../store/retroStore';
 import type { RetroQuestion } from '../../types/retro';
 
@@ -29,6 +29,8 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customTopic, setCustomTopic] = useState('');
 
   // 問題類型對應的顏色和圖標
   const getQuestionStyle = (type: RetroQuestion['type']) => {
@@ -73,8 +75,8 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
       setIsDrawing(true);
       setSelectedQuestionId(null);
       
-      // 轉盤動畫延遲
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 轉盤動畫延遲 - 包含慢慢停止的效果
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       const excludeIds = drawnQuestions.map(q => q.id);
       const result = drawQuestions(excludeIds);
@@ -91,7 +93,7 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
   // 重抽
   const handleRedraw = () => {
     setSelectedQuestionId(null);
-    handleDraw();
+    setDrawnQuestions([]);
   };
 
   // 選擇問題
@@ -107,12 +109,21 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
     }
   };
 
-  // 初始抽取
-  useEffect(() => {
-    if (drawnQuestions.length === 0) {
-      handleDraw();
+  // 使用自定義主題
+  const handleCustomTopicConfirm = () => {
+    if (customTopic.trim()) {
+      const customQuestion: RetroQuestion = {
+        id: 'custom',
+        question: customTopic.trim(),
+        type: 'reflection',
+        ageGroup: 'all',
+        difficulty: 3,
+        tags: [],
+        hint: '這是你自己定義的回顧主題'
+      };
+      onQuestionSelect(customQuestion);
     }
-  }, []);
+  };
 
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-xl max-w-5xl mx-auto">
@@ -123,7 +134,7 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
             🎯 選擇回顧問題
           </h2>
           <p className="text-gray-600 text-sm">
-            從下面三張卡片中選擇一個問題開始你的回顧
+            {drawnQuestions.length === 0 ? '選擇一種方式開始你的回顧' : '從下面三張卡片中選擇一個問題開始你的回顧'}
           </p>
         </div>
         <button
@@ -137,42 +148,148 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
 
       {/* 轉盤動畫 */}
       {isDrawing && (
-        <div className="text-center py-12">
-          <div className="relative mb-8">
-            {/* 轉盤背景 */}
-            <div className="w-32 h-32 mx-auto relative">
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border-2 border-orange-200 shadow-lg">
+          {/* 標題 */}
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent mb-2">
+              🎲 問題幸運輪盤
+            </h2>
+            <p className="text-gray-600">
+              輪盤旋轉中，正在為你挑選最適合的回顧問題...
+            </p>
+          </div>
+
+                      <div className="relative w-64 h-64 mx-auto">
+              {/* 轉盤主體 */}
               <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
-                className="w-full h-full rounded-full bg-gradient-to-r from-orange-400 via-pink-400 to-purple-400 relative"
+                animate={{ rotate: [0, 360 * 5] }}
+                transition={{ 
+                  duration: 3, 
+                  ease: [0.25, 0.1, 0.25, 1],
+                  times: [0, 1]
+                }}
+                className="w-full h-full rounded-full bg-gradient-to-br from-orange-200 via-pink-200 to-purple-200 border-4 border-white shadow-lg flex items-center justify-center"
               >
-                {/* 轉盤分段 */}
-                <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center">
-                  <motion.div
-                    animate={{ rotate: -360 }}
-                    transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
-                    className="text-2xl"
-                  >
-                    🎯
-                  </motion.div>
-                </div>
-                
-                {/* 轉盤指針 */}
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
-                  <div className="w-0 h-0 border-l-4 border-r-4 border-b-8 border-l-transparent border-r-transparent border-b-orange-500"></div>
+                <div className="text-4xl animate-bounce">🎯</div>
+              </motion.div>
+            </div>
+        </div>
+      )}
+
+      {/* 初始選擇界面 */}
+      {!isDrawing && drawnQuestions.length === 0 && !showCustomInput && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* 轉盤抽取選項 */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border-2 border-orange-200 shadow-lg">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent mb-2">
+                🎲 問題幸運輪盤
+              </h3>
+              <p className="text-gray-600 text-sm">
+                讓命運來決定你的回顧主題
+              </p>
+            </div>
+
+            <div className="relative w-48 h-48 mx-auto mb-6">
+              {/* 可點擊的轉盤 */}
+              <motion.div
+                onClick={handleDraw}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-full h-full rounded-full bg-gradient-to-br from-orange-200 via-pink-200 to-purple-200 border-4 border-white shadow-lg flex items-center justify-center cursor-pointer hover:shadow-xl transition-all duration-300"
+              >
+                <div className="text-center">
+                  <div className="text-4xl mb-2">🎪</div>
+                  <div className="text-sm font-medium text-gray-700">點擊抽籤</div>
                 </div>
               </motion.div>
             </div>
+
+            <p className="text-center text-gray-600 text-sm">
+              點擊轉盤來抽取今天的回顧問題
+            </p>
           </div>
-          
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            <div className="text-lg font-medium text-gray-800 mb-2">🎪 問題轉盤旋轉中...</div>
-            <p className="text-gray-600">正在為你挑選最適合的回顧問題</p>
-          </motion.div>
+
+          {/* 自定義輸入選項 */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border-2 border-purple-200 shadow-lg h-full flex flex-col">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent mb-2">
+                ✍️ 自定義回顧主題
+              </h3>
+              <p className="text-gray-600 text-sm">
+                輸入你想要回顧的具體主題
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center justify-center flex-1 space-y-4">
+              <div className="text-6xl">📝</div>
+              <motion.button
+                onClick={() => setShowCustomInput(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-3 bg-gradient-to-r from-purple-400 to-indigo-400 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
+              >
+                <span>✨</span>
+                <span>自己輸入主題</span>
+              </motion.button>
+            </div>
+
+            <div className="text-center text-gray-600 text-sm">
+              例如：今天的學習狀況、某個專案的進展等
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 自定義輸入界面 */}
+      {showCustomInput && (
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border-2 border-purple-200 shadow-lg">
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-bold bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent mb-2">
+              ✍️ 自定義回顧主題
+            </h3>
+            <p className="text-gray-600 text-sm">
+              輸入你想要回顧的具體主題或問題
+            </p>
+          </div>
+
+          <div className="max-w-md mx-auto space-y-4">
+            <textarea
+              value={customTopic}
+              onChange={(e) => setCustomTopic(e.target.value)}
+              placeholder="例如：今天學習了什麼新技能？遇到了什麼挑戰？"
+              className="w-full p-4 border-2 border-purple-200 rounded-xl focus:border-purple-400 focus:outline-none bg-white/50 backdrop-blur-sm resize-none"
+              rows={4}
+            />
+            
+            <div className="flex space-x-3">
+              <motion.button
+                onClick={() => {
+                  setShowCustomInput(false);
+                  setCustomTopic('');
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-gray-400 to-gray-500 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                取消
+              </motion.button>
+              
+              <motion.button
+                onClick={handleCustomTopicConfirm}
+                disabled={!customTopic.trim()}
+                whileHover={customTopic.trim() ? { scale: 1.05 } : {}}
+                whileTap={customTopic.trim() ? { scale: 0.95 } : {}}
+                className={`flex-1 px-4 py-3 font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 ${
+                  customTopic.trim()
+                    ? 'bg-gradient-to-r from-purple-400 to-indigo-400 text-white'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                開始回顧
+              </motion.button>
+            </div>
+          </div>
         </div>
       )}
 
