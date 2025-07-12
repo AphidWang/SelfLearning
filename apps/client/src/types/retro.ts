@@ -8,6 +8,32 @@
  * - 遊戲化介面元素
  */
 
+// 🎯 新增：每日打卡詳情類型
+export interface DailyCheckIn {
+  date: string;
+  dayOfWeek: string;
+  checkInCount: number;
+  topics: {
+    id: string;
+    title: string;
+    subject: string;
+    recordCount: number;
+    checkInDates: string[];
+    taskRecords?: Array<{
+      id: string;
+      timestamp: string;
+    }>;
+  }[];
+  completedTasks?: Array<{
+    id: string;
+    title: string;
+    subject: string;
+    completedAt: string;
+  }>;
+  energy: number | null;
+  mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed' | null;
+}
+
 export interface WeeklyStats {
   /** 本週打卡次數 */
   checkInCount: number;
@@ -40,19 +66,7 @@ export interface WeeklyStats {
   
   // 🎯 新增：更詳細的脈絡資訊
   /** 每日打卡詳情 */
-  dailyCheckIns: {
-    date: string;
-    dayOfWeek: string;
-    checkInCount: number;
-    topics: {
-      id: string;
-      title: string;
-      subject: string;
-      recordCount: number;
-    }[];
-    energy: number | null;
-    mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed' | null;
-  }[];
+  dailyCheckIns: DailyCheckIn[];
   
   /** 能量狀態時間分布 */
   energyTimeline: {
@@ -86,21 +100,24 @@ export interface WeeklyStats {
     learningPattern: 'consistent' | 'burst' | 'irregular' | 'balanced';
   };
   
-  /** 社交互動 */
+  /** 社交互動統計 */
   socialInteractions: {
-    /** 協作的任務數量 */
+    /** 協作任務數量 */
     collaborativeTaskCount: number;
-    /** 協作夥伴 */
-    collaborators: {
+    /** 協作者清單 */
+    collaborators: Array<{
       id: string;
       name: string;
       avatar: string;
-    }[];
-    /** 獲得的協助次數 */
+    }>;
+    /** 收到的幫助次數 */
     helpReceived: number;
-    /** 提供的協助次數 */
+    /** 提供的幫助次數 */
     helpProvided: number;
   };
+
+  /** 任務打卡記錄 */
+  taskCheckInRecords: Record<string, { dates: string[]; count: number; }>;
 }
 
 export interface RetroQuestion {
@@ -168,12 +185,17 @@ export interface RetroSession {
 }
 
 export interface QuestionDraw {
-  /** 抽籤的三個問題 */
-  questions: RetroQuestion[];
+  /** 抽籤的問題（支援單個或多個） */
+  question?: RetroQuestion;
+  questions?: RetroQuestion[];
   /** 抽籤時間 */
-  drawTime: string;
+  drawTime?: string;
   /** 可重抽次數 */
-  rerollsLeft: number;
+  rerollsLeft?: number;
+  /** 問題庫總數 */
+  totalQuestions?: number;
+  /** 剩餘問題數 */
+  remainingQuestions?: number;
 }
 
 export interface RetroFilters {
@@ -185,6 +207,8 @@ export interface RetroFilters {
   questionType?: RetroQuestion['type'];
   /** 心情篩選 */
   mood?: RetroAnswer['mood'];
+  /** 排除的問題ID列表 */
+  excludeIds?: string[];
 }
 
 export interface RetroStats {

@@ -16,18 +16,29 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Calendar, Eye, BookOpen, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, Calendar, Eye, BookOpen, ExternalLink, Trash2, AlertTriangle } from 'lucide-react';
 import { useRetroStore } from '../../store/retroStore';
 import { journalStore, type DailyJournal } from '../../store/journalStore';
+import { createPortal } from 'react-dom';
 import { QuestionDrawGame } from './QuestionDrawGame';
 import { AnswerInputCard } from './AnswerInputCard';
 import { LoadingDots } from '../shared/LoadingDots';
 import { DailyJournalDialog } from '../../pages/student/components/DailyJournalDialog';
 import { subjects } from '../../styles/tokens';
 import type { RetroQuestion } from '../../types/retro';
+import { useTopicStore } from '../../store/topicStore';
 
 interface HoverTasksProps {
-  tasks: Array<{ title: string; recordCount: number; subject?: string }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    subject: string;
+    recordCount: number;
+    taskRecords: Array<{
+      id: string;
+      timestamp: string;
+    }>;
+  }>;
   isVisible: boolean;
   position: { x: number; y: number };
 }
@@ -47,6 +58,9 @@ interface CompletedRetroCardProps {
 
 // 已完成回顧小卡片組件
 const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit, onDelete }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const getMoodEmoji = (mood: string) => {
     const moodEmojis = {
       excited: '🤩',
@@ -60,6 +74,7 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
     return date.toLocaleDateString('zh-TW', { 
       month: 'short', 
       day: 'numeric', 
@@ -69,55 +84,106 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-2 border-green-200 shadow-md hover:shadow-lg transition-all duration-300"
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-lg">{getMoodEmoji(answer.mood)}</span>
-            <span className="text-xs text-gray-500">{formatDate(answer.createdAt)}</span>
-          </div>
-          
-          <h4 className="font-medium text-gray-800 text-sm mb-1">
-            {answer.question}
-          </h4>
-          
-          <div className="text-gray-600 text-sm">
-            <p>{answer.answer}</p>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-2 border-green-200 shadow-md hover:shadow-lg transition-all duration-300 relative group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-gray-800 text-sm mb-1 break-words">
+              {answer.question}
+            </h4>
+            <hr className="my-2 border-gray-200" />
+            <div className="text-gray-600 text-sm whitespace-pre-wrap break-words">
+              <p>{answer.answer}</p>
+            </div>
           </div>
         </div>
-      </div>
-      
-      {(onEdit || onDelete) && (
-        <div className="mt-3 pt-3 border-t border-gray-200 flex justify-end space-x-2">
-          {onEdit && (
-            <button
+
+        {/* 刪除按鈕 */}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
               onClick={(e) => {
                 e.stopPropagation();
-                onEdit();
+                setShowDeleteConfirm(true);
               }}
-              className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+              className="absolute -top-2 -right-2 w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-full flex items-center justify-center shadow-lg transition-colors"
             >
-              編輯
-            </button>
+              <Trash2 className="w-4 h-4" />
+            </motion.button>
           )}
-          {onDelete && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="text-xs text-red-600 hover:text-red-800 transition-colors"
-            >
-              刪除
-            </button>
-          )}
-        </div>
+        </AnimatePresence>
+
+        {/* 日期顯示 */}
+        {formatDate(answer.createdAt) && (
+          <div className="text-xs text-gray-500 mt-2">
+            {formatDate(answer.createdAt)}
+          </div>
+        )}
+      </motion.div>
+
+      {/* 刪除確認對話框 - 使用 Portal */}
+      {showDeleteConfirm && createPortal(
+        <motion.div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          style={{ zIndex: 9999 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <motion.div
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 w-full max-w-sm shadow-xl"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-800 dark:text-white">確認刪除回顧</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  此操作無法復原
+                </p>
+              </div>
+            </div>
+            
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              您確定要刪除這個回顧嗎？
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.();
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-3 py-1 text-sm bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors"
+              >
+                確認刪除
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>,
+        document.body
       )}
-    </motion.div>
+    </>
   );
 };
 
@@ -131,44 +197,57 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
     };
   };
 
+  // 修改 HoverTasksPanel 組件
   const HoverTasksPanel: React.FC<HoverTasksProps> = ({ tasks, isVisible, position }) => {
-  if (!isVisible || tasks.length === 0) return null;
+    if (!isVisible || tasks.length === 0) return null;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className="fixed z-50 bg-white rounded-xl shadow-xl border-2 border-orange-200 p-4 max-w-xs"
-      style={{
-        left: position.x,
-        top: position.y,
-        transform: 'translate(-50%, -120%)'
-      }}
-    >
-      <div className="text-sm font-medium text-gray-800 mb-2">📚 今日學習任務</div>
-      <div className="space-y-2">
-        {tasks.map((task, index) => {
-          const colors = getSubjectColor((task as any).subject || '其他');
-          return (
-            <div key={index} className="flex items-center justify-between text-sm">
-              <div className="flex items-center space-x-2 flex-1 min-w-0">
-                <div className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0`} />
-                <span className="text-gray-700 truncate">{task.title}</span>
+    const formatTime = (timestamp: string) => {
+      return new Date(timestamp).toLocaleTimeString('zh-TW', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    return (
+      <div
+        className="fixed z-50 bg-white rounded-xl shadow-xl border-2 border-blue-200 p-4 max-w-xs pointer-events-none animate-fadeIn"
+        style={{
+          left: position.x,
+          top: position.y - 16,
+          transform: 'translate(-50%, -100%)'
+        }}
+      >
+        <div className="text-sm font-medium text-gray-800 mb-2">📋 今日打卡任務</div>
+        <div className="space-y-3">
+          {tasks.map((task, index) => {
+            const colors = getSubjectColor(task.subject);
+            return (
+              <div key={index} className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                    <div className={`w-1.5 h-1.5 rounded-full ${colors.dot} flex-shrink-0`} />
+                    <span className="text-gray-700 truncate">{task.title}</span>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full ${colors.bg} ${colors.text}`}>
+                    {task.subject}
+                  </span>
+                </div>
+                
+                <div className="pl-3 space-y-1">
+                  {task.taskRecords.map((record, actionIndex) => (
+                    <div key={actionIndex} className="text-xs text-gray-600 flex items-center gap-2">
+                      <span>{formatTime(record.timestamp)}</span>
+                      <span className="text-blue-600">打卡記錄</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center space-x-2 flex-shrink-0">
-                <span className={`text-xs px-2 py-1 rounded-full ${colors.bg} ${colors.text}`}>
-                  {(task as any).subject || '其他'}
-                </span>
-                <span className="text-orange-600 font-medium">{task.recordCount}次</span>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </motion.div>
-  );
-};
+    );
+  };
 
 
 
@@ -184,7 +263,8 @@ export const PersonalRetroPanel: React.FC = () => {
     createAnswer,
     getAnswerHistory,
     getWeekId,
-    clearError
+    clearError,
+    deleteAnswer // 添加這個
   } = useRetroStore();
 
   const [selectedQuestion, setSelectedQuestion] = useState<RetroQuestion | null>(null);
@@ -209,7 +289,16 @@ export const PersonalRetroPanel: React.FC = () => {
   });
   const [hoverTasks, setHoverTasks] = useState<{
     visible: boolean;
-    tasks: Array<{ title: string; recordCount: number }>;
+    tasks: Array<{
+      id: string;
+      title: string;
+      subject: string;
+      recordCount: number;
+      taskRecords: Array<{
+        id: string;
+        timestamp: string;
+      }>;
+    }>;
     position: { x: number; y: number };
   }>({
     visible: false,
@@ -227,6 +316,8 @@ export const PersonalRetroPanel: React.FC = () => {
     journal: null,
     loading: false
   });
+
+  const [hoverTimer, setHoverTimer] = useState<NodeJS.Timeout | null>(null);
 
   // 載入週統計數據和已完成的回顧
   useEffect(() => {
@@ -291,34 +382,62 @@ export const PersonalRetroPanel: React.FC = () => {
   };
 
   // 處理打卡hover
-  const handleCheckInHover = (
+  const handleCheckInHover = async (
     event: React.MouseEvent,
-    tasks: Array<{ title: string; recordCount: number }>
+    checkInTasks: Array<{
+      id: string;
+      title: string;
+      subject: string;
+      recordCount: number;
+      taskRecords?: Array<{
+        id: string;
+        timestamp: string;
+      }>;
+    }>
   ) => {
-    console.log('🖱️ Hover on check-in:', { event, tasks });
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      setHoverTimer(null);
+    }
+
     const rect = event.currentTarget.getBoundingClientRect();
-    console.log('📍 Hover position:', { rect, left: rect.left, top: rect.top, width: rect.width });
-    
-    setHoverTasks({
-      visible: true,
-      tasks,
-      position: {
-        x: rect.left + rect.width / 2,
-        y: rect.top
-      }
-    });
-    
-    console.log('✅ Hover state updated:', {
-      visible: true,
-      tasksCount: tasks.length,
-      position: { x: rect.left + rect.width / 2, y: rect.top }
-    });
+
+    try {
+      // 現在任務詳情已經包含了 taskRecords，不需要額外查詢
+      const tasksWithRecords = checkInTasks
+        .filter(task => task.taskRecords && task.taskRecords.length > 0)
+        .map(task => ({
+          ...task,
+          taskRecords: task.taskRecords || []
+        }));
+
+      setHoverTasks({
+        visible: true,
+        tasks: tasksWithRecords,
+        position: {
+          x: rect.left + rect.width / 2,
+          y: rect.top
+        }
+      });
+    } catch (error) {
+      console.error('處理打卡記錄失敗:', error);
+    }
   };
 
   const handleCheckInLeave = () => {
-    console.log('🖱️ Mouse leave check-in');
-    setHoverTasks(prev => ({ ...prev, visible: false }));
+    const timer = setTimeout(() => {
+      setHoverTasks(prev => ({ ...prev, visible: false }));
+    }, 100);
+    setHoverTimer(timer);
   };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+      }
+    };
+  }, [hoverTimer]);
 
   // 處理日記查看
   const handleViewJournal = async (date: string) => {
@@ -420,6 +539,15 @@ export const PersonalRetroPanel: React.FC = () => {
     return '😴';
   };
 
+  // 獲取台灣時間的今日日期字串
+  const getTaiwanToday = () => {
+    const now = new Date();
+    // 使用 en-CA locale 直接獲取 YYYY-MM-DD 格式
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Taipei'
+    }).format(now);
+  };
+
   if (loading && !currentWeekStats) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -458,29 +586,28 @@ export const PersonalRetroPanel: React.FC = () => {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
                 ✨ 個人回顧時光
               </h1>
-              <p className="text-gray-600 text-sm">
-                {retroStep === 'ready' && '左側查看任務進度、能量變化和每日軌跡，右側開始深度反思'}
-                {retroStep === 'selecting' && '從三張卡片中選擇一個問題開始回顧'}
-                {retroStep === 'answering' && '參考左側的學習記錄，誠實分享你的想法和感受'}
-              </p>
             </div>
             
             {/* 狀態指示器 */}
             <div className="flex items-center space-x-6">
               {/* 流程狀態指示器 */}
               <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${retroStep === 'ready' ? 'bg-blue-400' : 'bg-gray-300'}`} />
-                <div className={`w-3 h-3 rounded-full ${retroStep === 'selecting' ? 'bg-purple-400' : 'bg-gray-300'}`} />
-                <div className={`w-3 h-3 rounded-full ${retroStep === 'answering' ? 'bg-orange-400' : 'bg-gray-300'}`} />
+                <div className={`w-3 h-3 rounded-full transition-colors ${
+                  completedRetros.length >= 1 ? 'bg-orange-400' : 'bg-gray-300'
+                }`} />
+                <div className={`w-3 h-3 rounded-full transition-colors ${
+                  completedRetros.length >= 2 ? 'bg-yellow-400' : 'bg-gray-300'
+                }`} />
+                <div className={`w-3 h-3 rounded-full transition-colors ${
+                  completedRetros.length >= 3 ? 'bg-green-400' : 'bg-gray-300'
+                }`} />
               </div>
-              
-              {/* 完成的回顧計數 */}
-              {completedRetros.length > 0 && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <span>📝</span>
-                  <span>本週已完成 {completedRetros.length} 個回顧</span>
-                </div>
-              )}
+              {/* 完成的回顧計數與提示 */}
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                {completedRetros.length === 0 && <span>寫下兩個心得完成這週的回顧喔</span>}
+                {completedRetros.length === 1 && <span>再寫一個心得回顧就完成了呢</span>}
+                {completedRetros.length >= 2 && <span>哇！你留下了 {completedRetros.length} 個心得, 真棒!</span>}
+              </div>
             </div>
           </motion.div>
         </div>
@@ -510,11 +637,11 @@ export const PersonalRetroPanel: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* 主要內容區域 - 重新調整布局 */}
+      {/* 主要內容區域 - 三欄布局 */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 左側：任務進度 + 能量變化 + 每日學習軌跡 */}
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* 左欄：任務進度 + 每日學習軌跡 */}
+          <div className="space-y-6 md:col-span-1">
             {/* 任務進度 */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -562,31 +689,37 @@ export const PersonalRetroPanel: React.FC = () => {
                       <div>
                         <h4 className="font-medium text-gray-700 mb-2">✅ 完成的任務</h4>
                         <div className="space-y-2">
-                          {currentWeekStats.mainTasks.slice(0, 3).map((task, index) => (
-                            <div
-                              key={task.id}
-                              className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h5 className="font-medium text-gray-800 text-sm">{task.title}</h5>
-                                  <p className="text-xs text-gray-600">{task.topic}</p>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  {[...Array(5)].map((_, i) => (
-                                    <span
-                                      key={i}
-                                      className={`text-xs ${
-                                        i < task.difficulty ? 'text-yellow-400' : 'text-gray-300'
-                                      }`}
-                                    >
-                                      ⭐
-                                    </span>
-                                  ))}
+                          {currentWeekStats.mainTasks.slice(0, 3).map((task, index) => {
+                            const colors = getSubjectColor(task.topic);
+                            return (
+                              <div
+                                key={task.id}
+                                className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                                    <div>
+                                      <h5 className="font-medium text-gray-800 text-sm">{task.title}</h5>
+                                      <p className={`text-xs ${colors.text}`}>{task.topic}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    {[...Array(5)].map((_, i) => (
+                                      <span
+                                        key={i}
+                                        className={`text-xs ${
+                                          i < task.difficulty ? 'text-yellow-400' : 'text-gray-300'
+                                        }`}
+                                      >
+                                        ⭐
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -596,25 +729,200 @@ export const PersonalRetroPanel: React.FC = () => {
                       <div>
                         <h4 className="font-medium text-gray-700 mb-2">🔄 正在進行</h4>
                         <div className="space-y-2">
-                          {currentWeekStats.inProgressTasks.slice(0, 3).map((task, index) => (
-                            <div
-                              key={task.id}
-                              className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-200"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h5 className="font-medium text-gray-800 text-sm">{task.title}</h5>
-                                  <p className="text-xs text-gray-600">{task.topic}</p>
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {task.daysInProgress > 0 && `${task.daysInProgress}天`}
+                          {currentWeekStats.inProgressTasks.slice(0, 3).map((task, index) => {
+                            const colors = getSubjectColor(task.topic);
+                            return (
+                              <div
+                                key={task.id}
+                                className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-200"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                                    <div>
+                                      <h5 className="font-medium text-gray-800 text-sm">{task.title}</h5>
+                                      <p className={`text-xs ${colors.text}`}>{task.topic}</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {task.daysInProgress > 0 && `${task.daysInProgress}天`}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+
+            {/* 每日學習軌跡 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-purple-200 shadow-lg"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                  <span className="mr-2">📅</span>
+                  每日學習軌跡
+                </h3>
+                <button
+                  onClick={() => toggleSection('dailyTrack')}
+                  className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
+                >
+                  {expandedSections.dailyTrack ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </button>
+              </div>
+              
+              <AnimatePresence>
+                {expandedSections.dailyTrack && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-3"
+                  >
+                    {currentWeekStats.dailyCheckIns.map((day, index) => (
+                      <motion.div
+                        key={day.date}
+                        data-date={day.date}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 + index * 0.05 }}
+                        className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 hover:shadow-md transition-all p-4"
+                      >
+                        <div className="flex flex-col gap-2">
+                          {/* 第一行：日期/星期 + 心情/動力/查看日記 */}
+                          <div className="flex items-center justify-between">
+                            {/* 左邊：日期/星期幾 */}
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm text-gray-500">
+                                {new Date(day.date).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}
+                              </div>
+                              <div className="text-sm font-medium text-gray-800">
+                                {day.dayOfWeek}
+                              </div>
+                            </div>
+                            
+                            {/* 右邊：心情/動力/查看日記 */}
+                            <div className="flex items-center space-x-3">
+                              {day.mood && (
+                                <span className="text-lg" title={`心情: ${day.mood}`}>
+                                  {getMoodEmoji(day.mood)}
+                                </span>
+                              )}
+                              {day.energy && (
+                                <span className="text-lg" title={`能量: ${day.energy}/5`}>
+                                  {getEnergyEmoji(day.energy)}
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handleViewJournal(day.date)}
+                                className="flex items-center space-x-1 text-xs text-gray-600 hover:text-purple-600 transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>查看日記</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 第二行：打卡次數和完成任務 */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {/* 打卡次數 - 只顯示打卡任務 */}
+                            {day.checkInCount > 0 && (
+                              <span
+                                className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors text-xs hover-tasks-trigger"
+                                onMouseEnter={(e) => handleCheckInHover(e, day.topics)}
+                                onMouseLeave={handleCheckInLeave}
+                              >
+                                {day.checkInCount} 次打卡
+                              </span>
+                            )}
+                            
+                            {/* 完成的任務 - 使用每日數據中的 completedTasks */}
+                            {(day.completedTasks || [])
+                              .slice(0, 3)
+                              .map((task, taskIndex) => {
+                                const colors = getSubjectColor(task.subject);
+                                return (
+                                  <span
+                                    key={taskIndex}
+                                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${colors.bg} ${colors.text}`}
+                                  >
+                                    <div className={`w-1.5 h-1.5 rounded-full ${colors.dot} mr-1.5`} />
+                                    ✅ {task.title}
+                                  </span>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+
+          {/* 中欄：本週學習回顧 + 能量變化 */}
+          <div className="space-y-6 md:col-span-1">
+            {/* 本週學習回顧 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-lg"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+                  📊 本週學習回顧
+                </h2>
+                <button
+                  onClick={() => toggleSection('summary')}
+                  className="p-2 hover:bg-orange-100 rounded-lg transition-colors"
+                >
+                  {expandedSections.summary ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {/* 核心數據摘要 */}
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-200 mb-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">{patternDisplay.emoji}</span>
+                  <span className="font-semibold text-gray-800">{patternDisplay.text}學習模式</span>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-lg font-bold text-blue-600">{currentWeekStats.checkInCount}</div>
+                    <div className="text-xs text-gray-600">次打卡</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-green-600">{currentWeekStats.completedTaskCount}</div>
+                    <div className="text-xs text-gray-600">完成任務</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-orange-600">{currentWeekStats.averageEnergy}/10</div>
+                    <div className="text-xs text-gray-600">平均能量</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 詳細摘要 */}
+              <AnimatePresence>
+                {expandedSections.summary && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4"
+                  >
+                    <p className="text-sm text-gray-700">
+                      {currentWeekStats.weekSummary.summary}
+                    </p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -678,282 +986,103 @@ export const PersonalRetroPanel: React.FC = () => {
                 </AnimatePresence>
               </motion.div>
             )}
-             
-             {/* 每日學習軌跡 */}
-             <motion.div
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ delay: 0.2 }}
-               className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-purple-200 shadow-lg"
-             >
-               <div className="flex items-center justify-between mb-4">
-                 <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-                   <span className="mr-2">📅</span>
-                   每日學習軌跡
-                 </h3>
-                 <button
-                   onClick={() => toggleSection('dailyTrack')}
-                   className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
-                 >
-                   {expandedSections.dailyTrack ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                 </button>
-               </div>
-               
-               <AnimatePresence>
-                 {expandedSections.dailyTrack && (
-                   <motion.div
-                     initial={{ opacity: 0, height: 0 }}
-                     animate={{ opacity: 1, height: 'auto' }}
-                     exit={{ opacity: 0, height: 0 }}
-                     className="space-y-3"
-                   >
-                     {currentWeekStats.dailyCheckIns.map((day, index) => (
-                       <motion.div
-                         key={day.date}
-                         initial={{ opacity: 0, x: -20 }}
-                         animate={{ opacity: 1, x: 0 }}
-                         transition={{ delay: 0.1 + index * 0.05 }}
-                         className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 hover:shadow-md transition-all p-4"
-                       >
-                         <div className="flex items-center justify-between">
-                           {/* 左邊：日期/星期幾 */}
-                           <div className="flex items-center space-x-3">
-                             <div className="text-sm font-medium text-gray-800 min-w-[60px]">
-                               {day.dayOfWeek}
-                             </div>
-                             <div className="text-xs text-gray-500">
-                               {new Date(day.date).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}
-                             </div>
-                             {day.checkInCount > 0 && (
-                               <span
-                                 className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors text-xs"
-                                 onMouseEnter={(e) => handleCheckInHover(e, day.topics)}
-                                 onMouseLeave={handleCheckInLeave}
-                               >
-                                 {day.checkInCount} 次打卡
-                               </span>
-                             )}
-                           </div>
-                           
-                           {/* 右邊：心情/動力/查看日記 */}
-                           <div className="flex items-center space-x-3">
-                             {day.mood && (
-                               <span className="text-lg" title={`心情: ${day.mood}`}>
-                                 {getMoodEmoji(day.mood)}
-                               </span>
-                             )}
-                             {day.energy && (
-                               <span className="text-lg" title={`能量: ${day.energy}/5`}>
-                                 {getEnergyEmoji(day.energy)}
-                               </span>
-                             )}
-                             <button
-                               onClick={() => handleViewJournal(day.date)}
-                               className="flex items-center space-x-1 text-xs text-gray-600 hover:text-purple-600 transition-colors"
-                             >
-                               <ExternalLink className="w-3 h-3" />
-                               <span>查看日記</span>
-                             </button>
-                           </div>
-                         </div>
-                         
-                         {/* 該日任務預覽 */}
-                         {day.topics.length > 0 && (
-                           <div className="mt-2 flex flex-wrap gap-1">
-                             {day.topics.slice(0, 3).map((task, taskIndex) => {
-                               const colors = getSubjectColor(task.subject || '其他');
-                               return (
-                                 <span
-                                   key={taskIndex}
-                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${colors.bg} ${colors.text}`}
-                                 >
-                                   <div className={`w-1.5 h-1.5 rounded-full ${colors.dot} mr-1.5`} />
-                                   {task.title}
-                                   {task.recordCount > 1 && (
-                                     <span className="ml-1 font-medium">({task.recordCount})</span>
-                                   )}
-                                 </span>
-                               );
-                             })}
-                             {day.topics.length > 3 && (
-                               <span className="text-gray-500 text-xs">
-                                 +{day.topics.length - 3} 更多
-                               </span>
-                             )}
-                           </div>
-                         )}
-                       </motion.div>
-                     ))}
-                   </motion.div>
-                 )}
-               </AnimatePresence>
-             </motion.div>
-           </div>
+          </div>
 
-           {/* 右側：本週學習回顧 + 回顧區 */}
-           <div className="space-y-6">
-             {/* 本週學習回顧 */}
-             <motion.div
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-lg"
-             >
-               <div className="flex items-center justify-between mb-4">
-                 <h2 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
-                   📊 本週學習回顧
-                 </h2>
-                 <button
-                   onClick={() => toggleSection('summary')}
-                   className="p-2 hover:bg-orange-100 rounded-lg transition-colors"
-                 >
-                   {expandedSections.summary ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                 </button>
-               </div>
+          {/* 右欄：本週回顧記錄 */}
+          <div className="space-y-6 md:col-span-2 lg:col-span-1">
+            {completedRetros.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-green-200 shadow-lg"
+              >
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center mb-4">
+                  <span className="mr-2">📝</span>
+                  本週回顧記錄
+                  <span className="ml-2 text-sm bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                    {completedRetros.length} 個
+                  </span>
+                </h3>
 
-               {/* 核心數據摘要 */}
-               <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-200 mb-4">
-                 <div className="flex items-center gap-3 mb-2">
-                   <span className="text-2xl">{patternDisplay.emoji}</span>
-                   <span className="font-semibold text-gray-800">{patternDisplay.text}學習模式</span>
-                 </div>
-                 <div className="grid grid-cols-3 gap-4 text-center">
-                   <div>
-                     <div className="text-lg font-bold text-blue-600">{currentWeekStats.checkInCount}</div>
-                     <div className="text-xs text-gray-600">次打卡</div>
-                   </div>
-                   <div>
-                     <div className="text-lg font-bold text-green-600">{currentWeekStats.completedTaskCount}</div>
-                     <div className="text-xs text-gray-600">完成任務</div>
-                   </div>
-                   <div>
-                     <div className="text-lg font-bold text-orange-600">{currentWeekStats.averageEnergy}/5</div>
-                     <div className="text-xs text-gray-600">平均能量</div>
-                   </div>
-                 </div>
-               </div>
-
-               {/* 詳細摘要 */}
-               <AnimatePresence>
-                 {expandedSections.summary && (
-                   <motion.div
-                     initial={{ opacity: 0, height: 0 }}
-                     animate={{ opacity: 1, height: 'auto' }}
-                     exit={{ opacity: 0, height: 0 }}
-                     className="space-y-4"
-                   >
-                     <p className="text-sm text-gray-700">
-                       {currentWeekStats.weekSummary.summary}
-                     </p>
-                     
-                     {/* 關鍵字標籤 */}
-                     {currentWeekStats.weekSummary.keywords.length > 0 && (
-                       <div className="flex flex-wrap gap-2">
-                         {currentWeekStats.weekSummary.keywords.map((keyword, index) => (
-                           <span
-                             key={index}
-                             className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gradient-to-r from-orange-100 to-pink-100 text-orange-700 border border-orange-200"
-                           >
-                             {keyword}
-                           </span>
-                         ))}
-                       </div>
-                     )}
-                   </motion.div>
-                 )}
-               </AnimatePresence>
-             </motion.div>
-
-            {/* 回顧問答區 */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="min-h-[300px]"
-            >
-              <AnimatePresence mode="wait">
-                {retroStep === 'ready' && (
-                  <motion.div
-                    key="ready"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="space-y-6"
-                  >
-                    {/* 已完成的回顧 */}
-                    {completedRetros.length > 0 && (
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-                          <span className="mr-2">📝</span>
-                          本週的回顧記錄
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {completedRetros.map((retro) => (
-                            <CompletedRetroCard
-                              key={retro.id}
-                              answer={retro}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 開始新回顧 */}
-                    <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border-2 border-orange-200 shadow-lg">
-                      <div className="text-center">
-                        <div className="text-6xl mb-4">🎯</div>
-                        <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                          {completedRetros.length > 0 ? '想要進行另一個回顧嗎？' : '準備好開始回顧了嗎？'}
-                        </h2>
-                        <p className="text-gray-600 mb-8">
-                          {completedRetros.length > 0 
-                            ? '每個問題都能帶來不同的反思角度，讓我們繼續探索學習旅程！'
-                            : '看看左側的任務進度、能量變化和每日軌跡，回想一下這週的點點滴滴，然後我們一起深入探索你的學習旅程！'
-                          }
-                        </p>
-                        
-                        <motion.button
-                          onClick={() => setShowQuestionModal(true)}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="px-8 py-4 bg-gradient-to-r from-orange-400 to-pink-400 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center mx-auto space-x-3"
-                        >
-                          <span>🎲</span>
-                          <span>{completedRetros.length > 0 ? '再抽一個問題' : '抽取回顧問題'}</span>
-                        </motion.button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {retroStep === 'answering' && selectedQuestion && (
-                  <motion.div
-                    key="answering"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                  >
-                    <AnswerInputCard
-                      question={selectedQuestion.question}
-                      questionType={selectedQuestion.type}
-                      hint={selectedQuestion.hint}
-                      example={selectedQuestion.example}
-                      isCustomQuestion={false}
-                      onSubmit={handleAnswerSubmit}
-                      onBack={handleRestart}
-                      submitButtonText="儲存"
+                <div className="space-y-4">
+                  {completedRetros.map((retro) => (
+                    <CompletedRetroCard
+                      key={retro.id}
+                      answer={retro}
+                      onDelete={async () => {
+                        try {
+                          await deleteAnswer(retro.id);
+                          await loadCompletedRetros();
+                        } catch (error) {
+                          console.error('刪除回顧失敗:', error);
+                        }
+                      }}
                     />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            <AnimatePresence mode="wait">
+              {retroStep === 'answering' && selectedQuestion ? (
+                <motion.div
+                  key="answering"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-lg"
+                >
+                  <AnswerInputCard
+                    question={selectedQuestion.question}
+                    questionType={selectedQuestion.type}
+                    hint={selectedQuestion.hint}
+                    example={selectedQuestion.example}
+                    isCustomQuestion={false}
+                    onSubmit={handleAnswerSubmit}
+                    onBack={handleRestart}
+                    submitButtonText="儲存"
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="draw-question"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-lg"
+                >
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">🎯</div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                      想要進行另一個回顧嗎？
+                    </h2>
+                    <p className="text-gray-600 mb-8">
+                      每個問題都能帶來不同的反思角度，讓我們繼續探索學習旅程！
+                    </p>
+                    
+                    <motion.button
+                      onClick={() => setShowQuestionModal(true)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-8 py-4 bg-gradient-to-r from-orange-400 to-pink-400 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center mx-auto space-x-3"
+                    >
+                      <span>🎲</span>
+                      <span>抽取回顧問題</span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
 
-      {/* 問題選擇 Modal */}
+      {/* Modal 相關 */}
       <AnimatePresence>
         {showQuestionModal && (
           <motion.div
+            key="question-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -961,6 +1090,7 @@ export const PersonalRetroPanel: React.FC = () => {
             onClick={() => setShowQuestionModal(false)}
           >
             <motion.div
+              key="question-modal-content"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -979,21 +1109,21 @@ export const PersonalRetroPanel: React.FC = () => {
       </AnimatePresence>
 
       {/* Hover 任務面板 */}
-      <AnimatePresence>
-        <HoverTasksPanel
-          tasks={hoverTasks.tasks}
-          isVisible={hoverTasks.visible}
-          position={hoverTasks.position}
-        />
-      </AnimatePresence>
+      {hoverTasks.visible && <HoverTasksPanel
+        tasks={hoverTasks.tasks}
+        isVisible={hoverTasks.visible}
+        position={hoverTasks.position}
+      />}
 
       {/* 日記查看 Modal */}
-      <DailyJournalDialog
-        isOpen={journalModal.isOpen}
-        onClose={() => setJournalModal(prev => ({ ...prev, isOpen: false }))}
-        mode="view"
-        initialData={journalModal.journal || undefined}
-      />
+      {journalModal.isOpen && (
+        <DailyJournalDialog
+          isOpen={journalModal.isOpen}
+          onClose={() => setJournalModal(prev => ({ ...prev, isOpen: false }))}
+          mode="view"
+          initialData={journalModal.journal || undefined}
+        />
+      )}
     </div>
   );
 }; 

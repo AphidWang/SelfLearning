@@ -443,7 +443,8 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
             energyTimeline: [],
             inProgressTasks: [],
             weekSummary: { keywords: [], summary: '', mostActiveSubject: '', mostChallengingTask: null, learningPattern: 'balanced' as const },
-            socialInteractions: { collaborativeTaskCount: 0, collaborators: [], helpReceived: 0, helpProvided: 0 }
+            socialInteractions: { collaborativeTaskCount: 0, collaborators: [], helpReceived: 0, helpProvided: 0 },
+            taskCheckInRecords: {} // 每個任務的打卡日期記錄
           };
           
           // 檢查是否完成個人 Retro (暫時隨機)

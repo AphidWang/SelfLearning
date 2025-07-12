@@ -22,7 +22,7 @@ interface QuestionDrawGameProps {
 export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
   onQuestionSelect,
   onBack,
-  drawnQuestions,
+  drawnQuestions = [],
   setDrawnQuestions
 }) => {
   const { drawQuestions } = useRetroStore();
@@ -79,9 +79,11 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       const excludeIds = drawnQuestions.map(q => q.id);
-      const result = drawQuestions(excludeIds);
+      const result = await drawQuestions({ excludeIds });
       
-      setDrawnQuestions(result.questions);
+      if (result?.questions) {
+        setDrawnQuestions(result.questions);
+      }
       setIsDrawing(false);
       
     } catch (error) {
@@ -134,7 +136,7 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
             🎯 選擇回顧問題
           </h2>
           <p className="text-gray-600 text-sm">
-            {drawnQuestions.length === 0 ? '選擇一種方式開始你的回顧' : '從下面三張卡片中選擇一個問題開始你的回顧'}
+            {(drawnQuestions?.length || 0) === 0 ? '選擇一種方式開始你的回顧' : '從下面三張卡片中選擇一個問題開始你的回顧'}
           </p>
         </div>
         <button
@@ -177,7 +179,7 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
       )}
 
       {/* 初始選擇界面 */}
-      {!isDrawing && drawnQuestions.length === 0 && !showCustomInput && (
+      {!isDrawing && (drawnQuestions?.length || 0) === 0 && !showCustomInput && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* 轉盤抽取選項 */}
           <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border-2 border-orange-200 shadow-lg">
@@ -294,10 +296,10 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
       )}
 
       {/* 三張問題卡片 */}
-      {!isDrawing && drawnQuestions.length > 0 && (
+      {!isDrawing && (drawnQuestions?.length || 0) > 0 && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {drawnQuestions.map((question, index) => {
+            {(drawnQuestions || []).map((question, index) => {
               const style = getQuestionStyle(question.type);
               const isSelected = selectedQuestionId === question.id;
               

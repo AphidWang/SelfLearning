@@ -22,7 +22,8 @@ import {
   Topic, Goal, Task, Bubble, GoalStatus, TaskStatus, TaskPriority,
   CreateTopicFromTemplateParams, SafeUpdateResult, TopicWithStructure, ActiveTaskResult,
   ReferenceInfo, ReferenceAttachment, ReferenceLink, TaskType, TaskConfig, CycleConfig, 
-  TaskProgressData, createDefaultTaskConfig, createDefaultCycleConfig, createDefaultProgressData
+  TaskProgressData, createDefaultTaskConfig, createDefaultCycleConfig, createDefaultProgressData,
+  TaskAction, TaskRecord
 } from '../types/goal';
 import type { TopicCollaborator, User } from '@self-learning/types';
 import { supabase, authService } from '../services/supabase';
@@ -118,6 +119,7 @@ interface TopicStore {
   
   // Topics 操作
   fetchTopics: () => Promise<void>;
+  fetchTopicsWithActions: () => Promise<void>;
   getTopic: (id: string) => Promise<Topic | null>;
   createTopic: (topic: Omit<Topic, 'id' | 'owner_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Topic | null>;
   updateTopic: (id: string, expectedVersion: number, updates: Partial<Topic>) => Promise<Topic | null>;
@@ -257,6 +259,209 @@ interface TopicStore {
    * 移除主題協作者
    */
   removeTopicCollaborator: (topicId: string, userId: string) => Promise<boolean>;
+
+  // === 新增：任務打卡記錄相關方法 ===
+  getTaskCheckInRecords: (taskIds: string[], date: string) => Promise<Array<{
+    task_id: string;
+    action_date: string;
+    action_timestamp: string;
+  }>>;
+
+  // === 新增：今日任務活動查詢方法 ===
+  
+  /**
+   * 獲取今日任務活動摘要
+   * 包含所有類型的"做了"：狀態變更、打卡、記錄等
+   */
+  getTodayTaskActivities: () => Promise<{
+    statusChanges: Array<{
+      task_id: string;
+      task_title: string;
+      old_status: string;
+      new_status: string;
+      changed_at: string;
+      topic_title: string;
+      goal_title: string;
+    }>;
+    checkIns: Array<{
+      task_id: string;
+      task_title: string;
+      action_timestamp: string;
+      action_data: any;
+      topic_title: string;
+      goal_title: string;
+    }>;
+    records: Array<{
+      task_id: string;
+      task_title: string;
+      record_id: string;
+      created_at: string;
+      topic_title: string;
+      goal_title: string;
+    }>;
+    totalActivities: number;
+  }>;
+
+  /**
+   * 獲取指定日期的任務活動摘要
+   */
+  getTaskActivitiesForDate: (date: string) => Promise<{
+    statusChanges: Array<{
+      task_id: string;
+      task_title: string;
+      old_status: string;
+      new_status: string;
+      changed_at: string;
+      topic_title: string;
+      goal_title: string;
+    }>;
+    checkIns: Array<{
+      task_id: string;
+      task_title: string;
+      action_timestamp: string;
+      action_data: any;
+      topic_title: string;
+      goal_title: string;
+    }>;
+    records: Array<{
+      task_id: string;
+      task_title: string;
+      record_id: string;
+      created_at: string;
+      topic_title: string;
+      goal_title: string;
+    }>;
+    totalActivities: number;
+  }>;
+
+  /**
+   * 獲取任務的今日動作記錄
+   */
+  getTaskTodayActions: (taskId: string) => Promise<Array<{
+    action_type: string;
+    action_timestamp: string;
+    action_data: any;
+  }>>;
+
+  /**
+   * 檢查任務今天是否有活動
+   * 包含：狀態變更、打卡、新增記錄
+   */
+  hasTaskActivityToday: (taskId: string) => Promise<boolean>;
+
+  /**
+   * 獲取用戶的每日活動統計
+   */
+  getDailyActivityStats: (startDate: string, endDate: string) => Promise<Array<{
+    date: string;
+    total_activities: number;
+    status_changes: number;
+    check_ins: number;
+    records: number;
+    active_tasks: string[]; // 有活動的任務ID列表
+  }>>;
+
+  // === 新增：統一的 Task 數據獲取方法 ===
+  
+  /**
+   * 獲取完整的 Task 數據（包含 records 和 actions）
+   * 使用 RPC 一次性 JOIN 所有相關數據
+   */
+  getTasksWithFullData: (filters?: {
+    task_ids?: string[];
+    goal_ids?: string[];
+    topic_ids?: string[];
+    date_range?: { start: string; end: string };
+    include_actions?: boolean;
+    include_records?: boolean;
+  }) => Promise<Array<Task & {
+    actions?: TaskAction[];
+    records?: TaskRecord[];
+  }>>;
+
+  /**
+   * 獲取指定日期的用戶任務活動
+   * 為 DailyJournal 提供的 helper function
+   */
+  getUserTaskActivitiesForDate: (date: string) => Promise<{
+    completed_tasks: Array<{
+      id: string;
+      title: string;
+      topic_title: string;
+      goal_title: string;
+      completed_at: string;
+      type: 'completed';
+    }>;
+    checked_in_tasks: Array<{
+      id: string;
+      title: string;
+      topic_title: string;
+      goal_title: string;
+      action_timestamp: string;
+      action_data: any;
+      type: 'check_in';
+    }>;
+    recorded_tasks: Array<{
+      id: string;
+      title: string;
+      topic_title: string;
+      goal_title: string;
+      record_id: string;
+      created_at: string;
+      type: 'record';
+    }>;
+    all_activities: Array<{
+      id: string;
+      title: string;
+      topic_title: string;
+      goal_title: string;
+      timestamp: string;
+      type: 'completed' | 'check_in' | 'record';
+      data?: any;
+    }>;
+  }>;
+
+  /**
+   * 獲取指定週期的主題進度摘要
+   * 為 retroStore 提供的 helper function
+   */
+  getTopicsProgressForWeek: (weekStart: string, weekEnd: string) => Promise<Array<{
+    topic_id: string;
+    topic_title: string;
+    topic_subject: string;
+    is_active: boolean; // 這週是否有活動
+    progress_snapshot: {
+      total_tasks: number;
+      completed_tasks: number;
+      completion_rate: number;
+      status_changes: number; // 這週狀態變更次數
+      check_ins: number; // 這週打卡次數
+      records: number; // 這週記錄次數
+    };
+    goals_summary: Array<{
+      goal_id: string;
+      goal_title: string;
+      total_tasks: number;
+      completed_tasks: number;
+      has_activity: boolean; // 這週是否有活動
+    }>;
+  }>>;
+
+  /**
+   * 獲取活躍主題（包含沒有本週活動的）
+   * 為 retroStore 提供完整的主題列表
+   */
+  getActiveTopicsWithProgress: () => Promise<Array<{
+    topic_id: string;
+    topic_title: string;
+    topic_subject: string;
+    status: string;
+    total_tasks: number;
+    completed_tasks: number;
+    completion_rate: number;
+    last_activity_date?: string;
+    has_recent_activity: boolean; // 最近7天是否有活動
+  }>>;
 }
 
 export const useTopicStore = create<TopicStore>((set, get) => ({
@@ -442,7 +647,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       });
 
       // 一次性獲取所有用戶資料
-      const usersMap = await getUsersData([...allUserIds]);
+      const usersMap = await getUsersData(Array.from(allUserIds));
       console.log('📍 fetchTopics - 批量獲取用戶資料成功:', Object.keys(usersMap).length);
       console.log(`⚡ 用戶資料查詢耗時: ${Math.round(performance.now() - usersStart)}ms`);
 
@@ -582,6 +787,58 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   },
 
   /**
+   * 獲取所有主題（使用 RPC 優化版本）
+   * 包含任務動作記錄和更完整的數據結構
+   */
+  fetchTopicsWithActions: async () => {
+    set({ loading: true, error: null });
+    const perfStart = performance.now();
+    console.log('⚡ fetchTopicsWithActions 開始執行...');
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.warn('用戶未登錄，無法獲取主題');
+        set({ loading: false, topics: [], error: null });
+        return;
+      }
+
+      console.log('📍 fetchTopicsWithActions - 用戶已認證:', user.id);
+
+      // 使用 RPC 一次性獲取包含任務動作的完整結構
+      const { data, error } = await supabase.rpc('get_user_topics_with_actions', {
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('RPC 獲取主題失敗:', error);
+        // 如果 RPC 不存在，回退到普通方法
+        if (error.code === '42883') { // function does not exist
+          console.warn('RPC 函數不存在，回退到普通查詢方法');
+          return await get().fetchTopics();
+        }
+        throw error;
+      }
+
+      console.log('📍 fetchTopicsWithActions - RPC 獲取成功');
+      
+      const totalTime = performance.now() - perfStart;
+      console.log(`⚡ fetchTopicsWithActions 總耗時: ${Math.round(totalTime)}ms`);
+      console.log(`⚡ 查詢統計: RPC 單次查詢`);
+      
+      set({ topics: data || [], loading: false });
+    } catch (error: any) {
+      console.error('獲取主題失敗:', error);
+      const errorMessage = error.message || '獲取主題失敗';
+      set({ loading: false, error: errorMessage });
+      
+      // 如果 RPC 失敗，可以選擇回退到普通方法
+      console.warn('RPC 方法失敗，回退到普通查詢方法');
+      return await get().fetchTopics();
+    }
+  },
+
+  /**
    * 獲取單一主題的完整結構
    */
   getTopic: async (id: string) => {
@@ -706,7 +963,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
           });
 
           // 獲取用戶資料
-          const goalTaskUsersMap = await getUsersData([...new Set(goalAndTaskUserIds)]);
+          const goalTaskUsersMap = await getUsersData(Array.from(new Set(goalAndTaskUserIds)));
 
           // 為 goal 設置 owner 和 collaborators
           const goalOwner = goal.owner_id && goalTaskUsersMap[goal.owner_id] ? goalTaskUsersMap[goal.owner_id] : null;
@@ -2909,5 +3166,346 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       set({ error: error.message || '還原任務失敗' });
       return false;
     }
-  }
+  },
+
+  // === 新增：獲取任務打卡記錄 ===
+  getTaskCheckInRecords: async (taskIds: string[], date: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('task_actions')
+        .select('task_id, action_date, action_timestamp')
+        .eq('action_type', 'check_in')
+        .eq('action_date', date)
+        .in('task_id', taskIds);
+
+      if (error) {
+        console.error('載入打卡記錄失敗:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('獲取打卡記錄失敗:', error);
+      return [];
+    }
+  },
+
+  // === 新增：今日任務活動查詢方法 ===
+  
+  /**
+   * 獲取今日任務活動摘要
+   * 包含所有類型的"做了"：狀態變更、打卡、記錄等
+   */
+  getTodayTaskActivities: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      const { data, error } = await supabase.rpc('get_today_task_activities', {
+        p_user_id: user.id
+      });
+
+      if (error) throw error;
+      return data || {
+        statusChanges: [],
+        checkIns: [],
+        records: [],
+        totalActivities: 0
+      };
+    } catch (error) {
+      console.error('獲取今日任務活動摘要失敗:', error);
+      return {
+        statusChanges: [],
+        checkIns: [],
+        records: [],
+        totalActivities: 0
+      };
+    }
+  },
+
+  /**
+   * 獲取指定日期的任務活動摘要
+   */
+  getTaskActivitiesForDate: async (date: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      const { data, error } = await supabase.rpc('get_task_activities_for_date', {
+        p_user_id: user.id,
+        p_date: date
+      });
+
+      if (error) throw error;
+      return data || {
+        statusChanges: [],
+        checkIns: [],
+        records: [],
+        totalActivities: 0
+      };
+    } catch (error) {
+      console.error('獲取指定日期的任務活動摘要失敗:', error);
+      return {
+        statusChanges: [],
+        checkIns: [],
+        records: [],
+        totalActivities: 0
+      };
+    }
+  },
+
+  /**
+   * 獲取任務的今日動作記錄
+   */
+  getTaskTodayActions: async (taskId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_task_today_actions', {
+        p_task_id: taskId
+      });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('獲取任務的今日動作記錄失敗:', error);
+      return [];
+    }
+  },
+
+  /**
+   * 檢查任務今天是否有活動
+   * 包含：狀態變更、打卡、新增記錄
+   */
+  hasTaskActivityToday: async (taskId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('has_task_activity_today', {
+        p_task_id: taskId
+      });
+
+      if (error) throw error;
+      return data || false;
+    } catch (error) {
+      console.error('檢查任務今天是否有活動失敗:', error);
+      return false;
+    }
+  },
+
+  /**
+   * 獲取用戶的每日活動統計
+   */
+  getDailyActivityStats: async (startDate: string, endDate: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      console.log('🔄 getDailyActivityStats - 調用 RPC 函數:', { startDate, endDate });
+
+      // 使用修復後的 RPC 函數（全部參數都是 text）
+      const { data, error } = await supabase.rpc('get_daily_activity_stats', {
+        p_user_id: user.id,
+        p_start_date: startDate,
+        p_end_date: endDate
+      });
+
+      if (error) {
+        console.error('RPC 調用失敗:', error);
+        throw error;
+      }
+
+      console.log('✅ getDailyActivityStats - RPC 調用成功:', data?.length || 0, '條記錄');
+      console.log('📊 getDailyActivityStats - 詳細數據:', JSON.stringify(data, null, 2));
+      
+      // 檢查每日數據的詳細內容
+      if (data && data.length > 0) {
+        data.forEach((dayData, index) => {
+          console.log(`📅 第${index + 1}天 (${dayData.date}):`, {
+            total_activities: dayData.total_activities,
+            status_changes: dayData.status_changes,
+            check_ins: dayData.check_ins,
+            records: dayData.records,
+            active_tasks_count: Array.isArray(dayData.active_tasks) ? dayData.active_tasks.length : 0,
+            active_tasks: dayData.active_tasks
+          });
+        });
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('獲取用戶的每日活動統計失敗:', error);
+      
+      // 回退到基本實現
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const result: Array<{
+        date: string;
+        total_activities: number;
+        status_changes: number;
+        check_ins: number;
+        records: number;
+        active_tasks: any[];
+      }> = [];
+      
+      // 生成日期範圍
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        result.push({
+          date: dateStr,
+          total_activities: 0,
+          status_changes: 0,
+          check_ins: 0,
+          records: 0,
+          active_tasks: []
+        });
+      }
+      
+      return result;
+    }
+  },
+
+  // === 新增：統一的 Task 數據獲取方法 ===
+  
+  /**
+   * 獲取完整的 Task 數據（包含 records 和 actions）
+   * 使用 RPC 一次性 JOIN 所有相關數據
+   */
+  getTasksWithFullData: async (filters?: {
+    task_ids?: string[];
+    goal_ids?: string[];
+    topic_ids?: string[];
+    date_range?: { start: string; end: string };
+    include_actions?: boolean;
+    include_records?: boolean;
+  }) => {
+    try {
+      const { data, error } = await supabase.rpc('get_tasks_with_full_data', {
+        p_task_ids: filters?.task_ids,
+        p_goal_ids: filters?.goal_ids,
+        p_topic_ids: filters?.topic_ids,
+        p_start_date: filters?.date_range?.start,
+        p_end_date: filters?.date_range?.end,
+        p_include_actions: filters?.include_actions,
+        p_include_records: filters?.include_records
+      });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('獲取 Task 數據失敗:', error);
+      return [];
+    }
+  },
+
+  /**
+   * 獲取指定日期的用戶任務活動
+   * 為 DailyJournal 提供的 helper function
+   */
+  getUserTaskActivitiesForDate: async (date: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_user_task_activities_for_date', {
+        p_date: date
+      });
+
+      if (error) throw error;
+      return data || {
+        completed_tasks: [],
+        checked_in_tasks: [],
+        recorded_tasks: [],
+        all_activities: []
+      };
+    } catch (error) {
+      console.error('獲取用戶任務活動失敗:', error);
+      return {
+        completed_tasks: [],
+        checked_in_tasks: [],
+        recorded_tasks: [],
+        all_activities: []
+      };
+    }
+  },
+
+  /**
+   * 獲取指定週期的主題進度摘要
+   * 為 retroStore 提供的 helper function
+   */
+  getTopicsProgressForWeek: async (weekStart: string, weekEnd: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_topics_progress_for_week', {
+        p_week_start: weekStart,
+        p_week_end: weekEnd
+      });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('獲取主題進度摘要失敗:', error);
+      // 回退到基本實現
+      try {
+        const topics = get().topics;
+        const result = topics
+          .filter(topic => topic.status !== 'archived')
+          .map(topic => ({
+            topic_id: topic.id,
+            topic_title: topic.title,
+            topic_subject: topic.subject || '未分類',
+            is_active: false, // 簡化版本無法判斷週活動
+            progress_snapshot: {
+              total_tasks: topic.goals?.reduce((sum, goal) => sum + (goal.tasks?.length || 0), 0) || 0,
+              completed_tasks: topic.goals?.reduce((sum, goal) => 
+                sum + (goal.tasks?.filter(task => task.status === 'done').length || 0), 0) || 0,
+              completion_rate: topic.progress || 0,
+              status_changes: 0,
+              check_ins: 0,
+              records: 0
+            },
+            goals_summary: topic.goals?.map(goal => ({
+              goal_id: goal.id,
+              goal_title: goal.title,
+              total_tasks: goal.tasks?.length || 0,
+              completed_tasks: goal.tasks?.filter(task => task.status === 'done').length || 0,
+              has_activity: false
+            })) || []
+          }));
+        return result;
+      } catch (fallbackError) {
+        console.error('回退實現也失敗:', fallbackError);
+        return [];
+      }
+    }
+  },
+
+  /**
+   * 獲取活躍主題（包含沒有本週活動的）
+   * 為 retroStore 提供完整的主題列表
+   */
+  getActiveTopicsWithProgress: async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_active_topics_with_progress');
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('獲取活躍主題失敗:', error);
+      // 回退到基本實現
+      try {
+        const topics = get().topics;
+        const result = topics
+          .filter(topic => topic.status === 'active' || topic.status === 'in-progress')
+          .map(topic => ({
+            topic_id: topic.id,
+            topic_title: topic.title,
+            topic_subject: topic.subject || '未分類',
+            status: topic.status,
+            total_tasks: topic.goals?.reduce((sum, goal) => sum + (goal.tasks?.length || 0), 0) || 0,
+            completed_tasks: topic.goals?.reduce((sum, goal) => 
+              sum + (goal.tasks?.filter(task => task.status === 'done').length || 0), 0) || 0,
+            completion_rate: topic.progress || 0,
+            last_activity_date: undefined,
+            has_recent_activity: false // 簡化版本無法判斷最近活動
+          }));
+        return result;
+      } catch (fallbackError) {
+        console.error('回退實現也失敗:', fallbackError);
+        return [];
+      }
+    }
+  },
 })); 

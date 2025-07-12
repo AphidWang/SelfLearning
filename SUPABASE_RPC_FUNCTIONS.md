@@ -85,6 +85,47 @@
 **調用位置**: `topicStore.performTaskAction()`  
 **特點**: 🔒 **Transaction 保證數據一致性**
 
+### `get_tasks_with_full_data(p_task_ids uuid[], p_goal_ids uuid[], p_topic_ids uuid[], p_start_date date, p_end_date date, p_include_actions boolean, p_include_records boolean)`
+**功能**: 獲取完整的 Task 數據，一次性 JOIN 所有相關數據  
+**用途**: 統一的 Task 數據獲取，避免多次查詢  
+**參數**: 
+- `p_task_ids`: 指定任務 ID 列表 (可選)
+- `p_goal_ids`: 指定目標 ID 列表 (可選)
+- `p_topic_ids`: 指定主題 ID 列表 (可選)
+- `p_start_date`: 日期範圍開始 (可選)
+- `p_end_date`: 日期範圍結束 (可選)
+- `p_include_actions`: 是否包含 task_actions
+- `p_include_records`: 是否包含 task_records
+**返回**: Task 列表，包含完整的 actions 和 records 數據  
+**調用位置**: `topicStore.getTasksWithFullData()`  
+**特點**: 🚀 **O(1) JOIN 查詢，高性能**
+
+### `get_user_task_activities_for_date(p_date date)`
+**功能**: 獲取指定日期的用戶任務活動摘要  
+**用途**: 為 DailyJournal 提供完整的當日活動數據  
+**參數**: 
+- `p_date`: 查詢日期
+**返回**: 包含完成任務、打卡記錄、學習記錄的完整活動列表  
+**調用位置**: `topicStore.getUserTaskActivitiesForDate()`  
+**特點**: 🎯 **專為 DailyJournal 優化**
+
+### `get_topics_progress_for_week(p_week_start date, p_week_end date)`
+**功能**: 獲取指定週期的主題進度摘要  
+**用途**: 為 retroStore 提供週回顧數據，包含沒有活動的主題  
+**參數**: 
+- `p_week_start`: 週開始日期
+- `p_week_end`: 週結束日期
+**返回**: 主題列表，包含進度快照和活動統計  
+**調用位置**: `topicStore.getTopicsProgressForWeek()`  
+**特點**: 📊 **包含所有活躍主題，即使沒有本週活動**
+
+### `get_active_topics_with_progress()`
+**功能**: 獲取所有活躍主題及其進度信息  
+**用途**: 為 retroStore 提供完整的主題列表和進度  
+**返回**: 活躍主題列表，包含完成率和最近活動狀態  
+**調用位置**: `topicStore.getActiveTopicsWithProgress()`  
+**特點**: 🔄 **包含最近活動檢查**
+
 ### `cancel_today_check_in_transaction(p_task_id uuid, p_user_id uuid, p_today date)`
 **功能**: 取消今日打卡的完整事務處理  
 **用途**: 確保取消打卡記錄和進度更新的原子性  
