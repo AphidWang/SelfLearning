@@ -406,12 +406,8 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
   // 參與者管理
   loadAvailableParticipants: async (filters?: ParticipantSelectionFilters) => {
     console.log('🟠 [groupRetroStore] loadAvailableParticipants 開始', { filters });
-    
     const state = get();
-    console.log('🟠 [groupRetroStore] 當前狀態:', { 
-      loading: state.loading, 
-      availableParticipants: state.availableParticipants.length 
-    });
+    console.log('🟠 [groupRetroStore] 當前狀態:', { loading: state.loading, participantsCount: state.availableParticipants.length });
     
     // 如果已經在載入中，避免重複載入
     if (state.loading) {
@@ -420,7 +416,7 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
     }
     
     try {
-      console.log('🟢 [groupRetroStore] 設置載入狀態 loading: true');
+      console.log('🟢 [groupRetroStore] 設置載入狀態');
       set({ loading: true, error: null });
       
       // 獲取用戶列表 - 使用協作者候選人 API
@@ -505,20 +501,16 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       // 應用篩選條件
       let filteredParticipants = participants;
       
-      console.log('🟢 [groupRetroStore] 應用篩選前參與者數量:', participants.length);
-      
       if (filters?.hasCompletedPersonalRetro !== undefined) {
         filteredParticipants = filteredParticipants.filter(p => 
           p.hasCompletedPersonalRetro === filters.hasCompletedPersonalRetro
         );
-        console.log('🟢 [groupRetroStore] 篩選 hasCompletedPersonalRetro 後數量:', filteredParticipants.length);
       }
       
       if (filters?.excludeUserIds?.length) {
         filteredParticipants = filteredParticipants.filter(p => 
           !filters.excludeUserIds!.includes(p.user.id)
         );
-        console.log('🟢 [groupRetroStore] 排除用戶後數量:', filteredParticipants.length);
       }
       
       if (filters?.searchQuery) {
@@ -527,16 +519,13 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
           p.user.name?.toLowerCase().includes(query) ||
           p.user.email?.toLowerCase().includes(query)
         );
-        console.log('🟢 [groupRetroStore] 搜尋篩選後數量:', filteredParticipants.length);
       }
       
-      console.log('🟢 [groupRetroStore] 設置最終結果並關閉載入狀態');
       set({ availableParticipants: filteredParticipants, loading: false });
-      console.log('🟢 [groupRetroStore] loadAvailableParticipants 完成，返回:', filteredParticipants.length);
       return filteredParticipants;
       
     } catch (error: any) {
-      console.error('🔴 [groupRetroStore] 載入可用參與者失敗:', error);
+      console.error('載入可用參與者失敗:', error);
       set({ error: error.message, loading: false });
       throw error;
     }

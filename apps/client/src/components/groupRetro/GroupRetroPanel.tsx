@@ -21,7 +21,7 @@
  * - 分步驟的引導流程
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, MessageSquare, Download, Settings, ChevronRight, CheckCircle2, Star, RefreshCw, Plus, Clock, Target } from 'lucide-react';
 import { useGroupRetroStore } from '../../store/groupRetroStore';
@@ -97,12 +97,14 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, onStepChange
 };
 
 export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => {
+  console.log('🔴 [GroupRetroPanel] 組件渲染開始');
+  
   const { currentUser } = useUser();
   const {
     currentSession,
     selectedParticipants,
     sessionProgress,
-    loading,
+    // loading,  // 移除：避免因 ParticipantSelector 的載入狀態導致父組件重新渲染
     error,
     createSession,
     getCurrentWeekSession,
@@ -117,6 +119,28 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
+  console.log('🔴 [GroupRetroPanel] 狀態:', {
+    currentStep: currentStep,
+    currentUser: currentUser?.id,
+    currentSession: currentSession?.id,
+    selectedParticipants: selectedParticipants.length,
+    // loading,  // 移除 loading 狀態記錄
+    error: !!error
+  });
+
+  // 使用 useRef 來穩定引用，避免重新渲染
+  const selectedParticipantsRef = useRef(selectedParticipants);
+  const createSessionRef = useRef(createSession);
+
+  console.log('🔴 [GroupRetroPanel] 組件狀態初始化完成');
+
+  // 更新 ref 當值變化時
+  useEffect(() => {
+    console.log('🔴 [GroupRetroPanel] 更新 ref useEffect 觸發');
+    selectedParticipantsRef.current = selectedParticipants;
+    createSessionRef.current = createSession;
+  }, [selectedParticipants, createSession]);
+
   // 計算當前週 ID
   const currentWeekId = useMemo(() => {
     const targetDate = new Date();
@@ -130,41 +154,54 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
 
   // 初始化時檢查是否有現存的會話
   useEffect(() => {
+    console.log('🔴 [GroupRetroPanel] 初始化 useEffect 觸發');
+    
     const checkExistingSession = async () => {
       try {
+        console.log('🔴 [GroupRetroPanel] 檢查現存會話');
         const existingSession = await getCurrentWeekSession();
         if (existingSession) {
+          console.log('🔴 [GroupRetroPanel] 找到現存會話，跳到概覽');
           // 如果有現存會話，直接跳到概覽步驟
           setCurrentStep('overview');
           setSessionTitle(existingSession.title);
         } else {
+          console.log('🔴 [GroupRetroPanel] 沒有現存會話，設置預設標題');
           // 生成預設標題
           const defaultTitle = `第 ${currentWeekId} 週共學討論`;
           setSessionTitle(defaultTitle);
         }
       } catch (error) {
-        console.error('檢查現存會話失敗:', error);
+        console.error('🔴 [GroupRetroPanel] 檢查現存會話失敗:', error);
       }
     };
 
-    if (currentUser) {
+    if (currentUser?.id) {
+      console.log('🔴 [GroupRetroPanel] 有 currentUser，開始檢查會話');
       checkExistingSession();
+    } else {
+      console.log('🔴 [GroupRetroPanel] 沒有 currentUser，跳過檢查');
     }
-  }, [currentUser, currentWeekId]); // 移除函數引用依賴項
+  }, [currentUser?.id, currentWeekId, getCurrentWeekSession]); // 修復：添加 getCurrentWeekSession 依賴
 
   // 清除錯誤
   useEffect(() => {
+    console.log('🔴 [GroupRetroPanel] 清除錯誤 useEffect 觸發, error:', error);
     if (error) {
+      console.log('🔴 [GroupRetroPanel] 設置錯誤清除定時器');
       const timer = setTimeout(() => {
+        console.log('🔴 [GroupRetroPanel] 清除錯誤');
         clearError();
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [error]); // 移除 clearError 函數引用依賴項
+  }, [error, clearError]); // 修復：添加 clearError 依賴
 
   // 創建會話
   const handleCreateSession = useCallback(async () => {
-    if (selectedParticipants.length < 2) {
+    const currentSelectedParticipants = selectedParticipantsRef.current;
+    
+    if (currentSelectedParticipants.length < 2) {
       toast.error('請至少選擇 2 位夥伴參與討論');
       return;
     }
@@ -174,7 +211,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
       const sessionData: CreateGroupRetroSessionData = {
         title: sessionTitle || `第 ${currentWeekId} 週共學討論`,
         weekId: currentWeekId,
-        participantIds: selectedParticipants.map(p => p.user.id),
+        participantIds: currentSelectedParticipants.map(p => p.user.id),
         settings: {
           autoGenerateQuestions: true,
           maxParticipants: 8,
@@ -183,7 +220,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
         }
       };
 
-      await createSession(sessionData);
+      await createSessionRef.current(sessionData);
       setCurrentStep('overview');
       
       toast.success('小組討論會話創建成功！', {
@@ -200,15 +237,16 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
     } finally {
       setIsCreatingSession(false);
     }
-  }, [sessionTitle, currentWeekId, selectedParticipants, createSession]); // 移除 canProceedToNextStep 依賴項
+  }, [sessionTitle, currentWeekId]); // 修復：移除 selectedParticipants 和 createSession 引用
 
   // 步驟切換
   const handleStepChange = useCallback((step: PanelStep) => {
     if (step === 'overview' && !currentSession) {
       // 如果要進入概覽但沒有會話，先創建會話
-      // 直接調用 createSession 而不是依賴 handleCreateSession
       const createSessionAndNavigate = async () => {
-        if (selectedParticipants.length < 2) {
+        const currentSelectedParticipants = selectedParticipantsRef.current;
+        
+        if (currentSelectedParticipants.length < 2) {
           toast.error('請至少選擇 2 位夥伴參與討論');
           return;
         }
@@ -218,7 +256,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
           const sessionData: CreateGroupRetroSessionData = {
             title: sessionTitle || `第 ${currentWeekId} 週共學討論`,
             weekId: currentWeekId,
-            participantIds: selectedParticipants.map(p => p.user.id),
+            participantIds: currentSelectedParticipants.map(p => p.user.id),
             settings: {
               autoGenerateQuestions: true,
               maxParticipants: 8,
@@ -227,7 +265,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
             }
           };
 
-          await createSession(sessionData);
+          await createSessionRef.current(sessionData);
           setCurrentStep('overview');
           
           toast.success('小組討論會話創建成功！', {
@@ -250,12 +288,13 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
       return;
     }
     setCurrentStep(step);
-  }, [currentSession, selectedParticipants, sessionTitle, currentWeekId, createSession]); // 移除 handleCreateSession 依賴項
+  }, [currentSession, sessionTitle, currentWeekId]); // 修復：移除 selectedParticipants 和 createSession 引用
 
   // 渲染主要內容
   const renderMainContent = () => {
     switch (currentStep) {
       case 'setup':
+        console.log('🔴 [GroupRetroPanel] 渲染 setup 步驟');
         return (
           <motion.div
             key="setup"
@@ -286,7 +325,10 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
               />
             </div>
 
-            <ParticipantSelector />
+            {(() => {
+              console.log('🔴 [GroupRetroPanel] 準備渲染 ParticipantSelector');
+              return <ParticipantSelector key="participant-selector" />;
+            })()}
 
             {/* 操作按鈕 */}
             <div className="flex justify-center">
@@ -459,13 +501,14 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
     }
   };
 
-  if (loading && !currentSession) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingDots />
-      </div>
-    );
-  }
+  // 移除：不再需要全局載入檢查，因為 loading 狀態已移除
+  // if (loading && !currentSession) {
+  //   return (
+  //     <div className="flex items-center justify-center h-64">
+  //       <LoadingDots />
+  //     </div>
+  //   );
+  // }
 
   return (
     <div 

@@ -163,7 +163,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
   
   // 使用 useRef 來跟蹤載入狀態，避免組件重新掛載時被重置
   const loadingStateRef = useRef({
-    isLoading: false,
     hasLoaded: false,
     lastFilters: ''
   });
@@ -179,35 +178,40 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
     removeParticipant
   } = useGroupRetroStore();
 
-  console.log('🔵 [ParticipantSelector] Store 狀態:', {
+  console.log('🔵 [ParticipantSelector] loadingStateRef.current:', loadingStateRef.current);
+  console.log('🔵 [ParticipantSelector] 狀態:', {
+    showOnlyCompleted,
+    searchQuery,
     availableParticipants: availableParticipants.length,
     selectedParticipants: selectedParticipants.length,
-    loading,
-    error
+    loading
   });
 
-  console.log('🔵 [ParticipantSelector] 載入狀態:', loadingStateRef.current);
+  // 計算當前篩選條件 - 統一使用簡單格式
+  const currentFilters = useMemo(() => {
+    const filters = `${showOnlyCompleted}-${searchQuery}`;
+    console.log('🟡 [ParticipantSelector] currentFilters 計算:', filters);
+    return filters;
+  }, [showOnlyCompleted, searchQuery]);
 
-  // 計算當前篩選條件
-  const currentFilters = useMemo(() => 
-    JSON.stringify({ showOnlyCompleted, searchQuery }), 
-    [showOnlyCompleted, searchQuery]
-  );
+  console.log('🔵 [ParticipantSelector] currentFilters:', currentFilters);
+  console.log('🔵 [ParticipantSelector] lastFilters:', loadingStateRef.current.lastFilters);
+  console.log('🔵 [ParticipantSelector] 篩選條件比較:', currentFilters === loadingStateRef.current.lastFilters);
 
   // 載入可用參與者
   useEffect(() => {
     console.log('🟡 [ParticipantSelector] useEffect 觸發');
-    console.log('🟡 [ParticipantSelector] 當前篩選條件:', currentFilters);
-    console.log('🟡 [ParticipantSelector] 載入狀態檢查:', {
-      isLoading: loadingStateRef.current.isLoading,
+    console.log('🟡 [ParticipantSelector] 狀態檢查:', {
+      storeLoading: loading,
       hasLoaded: loadingStateRef.current.hasLoaded,
       lastFilters: loadingStateRef.current.lastFilters,
-      filtersChanged: loadingStateRef.current.lastFilters !== currentFilters
+      currentFilters: currentFilters,
+      filtersEqual: loadingStateRef.current.lastFilters === currentFilters
     });
     
-    // 如果正在載入，就不要重複載入
-    if (loadingStateRef.current.isLoading) {
-      console.log('🔴 [ParticipantSelector] 正在載入中，跳過');
+    // 修復：統一使用 store 的 loading 狀態
+    if (loading) {
+      console.log('🔴 [ParticipantSelector] Store 正在載入中，跳過');
       return;
     }
     
@@ -217,46 +221,42 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
       return;
     }
     
+    console.log('🟢 [ParticipantSelector] 開始載入 - 條件滿足');
+    
     const loadParticipants = async () => {
-      console.log('🟢 [ParticipantSelector] 開始載入參與者');
-      
       try {
-        // 先設置載入狀態
+        // 立即設置本地載入狀態，避免重複觸發
         loadingStateRef.current = {
-          ...loadingStateRef.current,
-          isLoading: true
+          hasLoaded: false,
+          lastFilters: currentFilters // 預先設置以防止重複觸發
         };
         
-        console.log('🟢 [ParticipantSelector] 設置載入狀態完成');
-        
+        console.log('🟢 [ParticipantSelector] 調用 loadAvailableParticipants');
         await loadAvailableParticipants({
           hasCompletedPersonalRetro: showOnlyCompleted,
           searchQuery: searchQuery.trim() || undefined
         });
         
-        console.log('🟢 [ParticipantSelector] 載入完成');
-        
+        console.log('🟢 [ParticipantSelector] 載入成功，更新狀態');
         // 載入成功後更新狀態
         loadingStateRef.current = {
-          isLoading: false,
           hasLoaded: true,
           lastFilters: currentFilters
         };
         
-        console.log('🟢 [ParticipantSelector] 更新載入狀態為已完成');
+        console.log('🟢 [ParticipantSelector] 載入完成，最終狀態:', loadingStateRef.current);
       } catch (error) {
         console.error('🔴 [ParticipantSelector] 載入參與者失敗:', error);
         // 載入失敗時重置狀態
         loadingStateRef.current = {
-          ...loadingStateRef.current,
-          isLoading: false,
-          hasLoaded: false
+          hasLoaded: false,
+          lastFilters: ''
         };
       }
     };
     
     loadParticipants();
-  }, [currentFilters, showOnlyCompleted, searchQuery]); // 加入原始依賴項以確保正確觸發
+  }, [currentFilters]); // 修復：統一使用 currentFilters，移除 loading 避免額外觸發
   
   // 通知父組件選擇變化
   useEffect(() => {
@@ -264,7 +264,7 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
     if (onSelectionChange) {
       onSelectionChange(selectedParticipants);
     }
-  }, [selectedParticipants, onSelectionChange]);
+  }, [selectedParticipants]); // 修復：移除 onSelectionChange 依賴項，避免父組件重新渲染時觸發
 
   // 篩選和搜尋參與者
   const filteredParticipants = useMemo(() => {
@@ -296,13 +296,11 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
   
   // 處理參與者選擇
   const handleParticipantSelect = (participant: ParticipantWeeklySummary) => {
-    console.log('🟡 [ParticipantSelector] 選擇參與者:', participant.user.name);
     selectParticipant(participant);
   };
   
   // 處理參與者移除
   const handleParticipantRemove = (userId: string) => {
-    console.log('🟡 [ParticipantSelector] 移除參與者:', userId);
     removeParticipant(userId);
   };
   
@@ -310,18 +308,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
   const isParticipantSelected = (userId: string) => {
     return selectedParticipants.some(p => p.user.id === userId);
   };
-  
-  // 判斷是否可以選擇更多參與者
-  // 這裡的 maxParticipants 需要從 props 中獲取，目前暫時移除
-  // const canSelectMore = selectedParticipants.length < maxParticipants;
-  
-  console.log('🔵 [ParticipantSelector] 篩選結果:', {
-    filteredParticipants: filteredParticipants.length,
-    searchQuery,
-    showOnlyCompleted
-  });
-
-  console.log('🔵 [ParticipantSelector] 組件渲染結束');
 
   return (
     <div className="space-y-4">
