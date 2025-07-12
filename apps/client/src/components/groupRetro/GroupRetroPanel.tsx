@@ -34,6 +34,15 @@ import { ReplyInput } from './ReplyInput';
 import type { GroupRetroSession, CreateGroupRetroSessionData } from '../../types/groupRetro';
 import toast, { Toaster } from 'react-hot-toast';
 
+// Debug 開關
+const DEBUG_GROUP_RETRO_PANEL = false;
+
+const debugLog = (...args: any[]) => {
+  if (DEBUG_GROUP_RETRO_PANEL) {
+    console.log(...args);
+  }
+};
+
 interface GroupRetroPanelProps {
   onClose?: () => void;
 }
@@ -97,7 +106,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, onStepChange
 };
 
 export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => {
-  console.log('🔴 [GroupRetroPanel] 組件渲染開始');
+  debugLog('🔴 [GroupRetroPanel] 組件渲染開始');
   
   const { currentUser } = useUser();
   const {
@@ -119,7 +128,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  console.log('🔴 [GroupRetroPanel] 狀態:', {
+  debugLog('🔴 [GroupRetroPanel] 狀態:', {
     currentStep: currentStep,
     currentUser: currentUser?.id,
     currentSession: currentSession?.id,
@@ -132,11 +141,11 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
   const selectedParticipantsRef = useRef(selectedParticipants);
   const createSessionRef = useRef(createSession);
 
-  console.log('🔴 [GroupRetroPanel] 組件狀態初始化完成');
+  debugLog('🔴 [GroupRetroPanel] 組件狀態初始化完成');
 
   // 更新 ref 當值變化時
   useEffect(() => {
-    console.log('🔴 [GroupRetroPanel] 更新 ref useEffect 觸發');
+    debugLog('🔴 [GroupRetroPanel] 更新 ref useEffect 觸發');
     selectedParticipantsRef.current = selectedParticipants;
     createSessionRef.current = createSession;
   }, [selectedParticipants, createSession]);
@@ -154,19 +163,19 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
 
   // 初始化時檢查是否有現存的會話
   useEffect(() => {
-    console.log('🔴 [GroupRetroPanel] 初始化 useEffect 觸發');
+    debugLog('🔴 [GroupRetroPanel] 初始化 useEffect 觸發');
     
     const checkExistingSession = async () => {
       try {
-        console.log('🔴 [GroupRetroPanel] 檢查現存會話');
+        debugLog('🔴 [GroupRetroPanel] 檢查現存會話');
         const existingSession = await getCurrentWeekSession();
         if (existingSession) {
-          console.log('🔴 [GroupRetroPanel] 找到現存會話，跳到概覽');
+          debugLog('🔴 [GroupRetroPanel] 找到現存會話，跳到概覽');
           // 如果有現存會話，直接跳到概覽步驟
           setCurrentStep('overview');
           setSessionTitle(existingSession.title);
         } else {
-          console.log('🔴 [GroupRetroPanel] 沒有現存會話，設置預設標題');
+          debugLog('🔴 [GroupRetroPanel] 沒有現存會話，設置預設標題');
           // 生成預設標題
           const defaultTitle = `第 ${currentWeekId} 週共學討論`;
           setSessionTitle(defaultTitle);
@@ -177,20 +186,20 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
     };
 
     if (currentUser?.id) {
-      console.log('🔴 [GroupRetroPanel] 有 currentUser，開始檢查會話');
+      debugLog('🔴 [GroupRetroPanel] 有 currentUser，開始檢查會話');
       checkExistingSession();
     } else {
-      console.log('🔴 [GroupRetroPanel] 沒有 currentUser，跳過檢查');
+      debugLog('🔴 [GroupRetroPanel] 沒有 currentUser，跳過檢查');
     }
   }, [currentUser?.id, currentWeekId, getCurrentWeekSession]); // 修復：添加 getCurrentWeekSession 依賴
 
   // 清除錯誤
   useEffect(() => {
-    console.log('🔴 [GroupRetroPanel] 清除錯誤 useEffect 觸發, error:', error);
+    debugLog('🔴 [GroupRetroPanel] 清除錯誤 useEffect 觸發, error:', error);
     if (error) {
-      console.log('🔴 [GroupRetroPanel] 設置錯誤清除定時器');
+      debugLog('🔴 [GroupRetroPanel] 設置錯誤清除定時器');
       const timer = setTimeout(() => {
-        console.log('🔴 [GroupRetroPanel] 清除錯誤');
+        debugLog('🔴 [GroupRetroPanel] 清除錯誤');
         clearError();
       }, 5000);
       return () => clearTimeout(timer);
@@ -294,7 +303,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
   const renderMainContent = () => {
     switch (currentStep) {
       case 'setup':
-        console.log('🔴 [GroupRetroPanel] 渲染 setup 步驟');
+        debugLog('🔴 [GroupRetroPanel] 渲染 setup 步驟');
         return (
           <motion.div
             key="setup"
@@ -326,7 +335,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
             </div>
 
             {(() => {
-              console.log('🔴 [GroupRetroPanel] 準備渲染 ParticipantSelector');
+              debugLog('🔴 [GroupRetroPanel] 準備渲染 ParticipantSelector');
               return <ParticipantSelector key="participant-selector" />;
             })()}
 

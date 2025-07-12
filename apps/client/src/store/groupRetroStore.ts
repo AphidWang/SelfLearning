@@ -39,6 +39,15 @@ import type {
 } from '../types/groupRetro';
 import type { User } from '@self-learning/types';
 
+// Debug 開關
+const DEBUG_GROUP_RETRO_STORE = false;
+
+const debugLog = (...args: any[]) => {
+  if (DEBUG_GROUP_RETRO_STORE) {
+    console.log(...args);
+  }
+};
+
 interface GroupRetroStoreState {
   // 數據狀態
   currentSession: GroupRetroSession | null;
@@ -405,31 +414,31 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
 
   // 參與者管理
   loadAvailableParticipants: async (filters?: ParticipantSelectionFilters) => {
-    console.log('🟠 [groupRetroStore] loadAvailableParticipants 開始', { filters });
+    debugLog('🟠 [groupRetroStore] loadAvailableParticipants 開始', { filters });
     const state = get();
-    console.log('🟠 [groupRetroStore] 當前狀態:', { loading: state.loading, participantsCount: state.availableParticipants.length });
+    debugLog('🟠 [groupRetroStore] 當前狀態:', { loading: state.loading, participantsCount: state.availableParticipants.length });
     
     // 如果已經在載入中，避免重複載入
     if (state.loading) {
-      console.log('🔴 [groupRetroStore] 已在載入中，返回現有參與者');
+      debugLog('🔴 [groupRetroStore] 已在載入中，返回現有參與者');
       return state.availableParticipants;
     }
     
     try {
-      console.log('🟢 [groupRetroStore] 設置載入狀態');
+      debugLog('🟢 [groupRetroStore] 設置載入狀態');
       set({ loading: true, error: null });
       
       // 獲取用戶列表 - 使用協作者候選人 API
-      console.log('🟢 [groupRetroStore] 調用 userStore.getCollaboratorCandidates');
+      debugLog('🟢 [groupRetroStore] 調用 userStore.getCollaboratorCandidates');
       const userStore = useUserStore.getState();
       await userStore.getCollaboratorCandidates();
       const allUsers = userStore.users;
       
-      console.log('🟢 [groupRetroStore] 獲取到用戶數量:', allUsers.length);
+      debugLog('🟢 [groupRetroStore] 獲取到用戶數量:', allUsers.length);
       
       // 如果沒有用戶，直接設置為空數組並結束
       if (allUsers.length === 0) {
-        console.log('🟡 [groupRetroStore] 沒有用戶，設置空數組');
+        debugLog('🟡 [groupRetroStore] 沒有用戶，設置空數組');
         set({ availableParticipants: [], loading: false });
         return [];
       }
