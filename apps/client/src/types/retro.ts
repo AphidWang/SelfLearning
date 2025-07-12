@@ -209,6 +209,8 @@ export interface RetroFilters {
   mood?: RetroAnswer['mood'];
   /** 排除的問題ID列表 */
   excludeIds?: string[];
+  /** 抽取問題數量 */
+  count?: number;
 }
 
 export interface RetroStats {

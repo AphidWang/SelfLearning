@@ -79,7 +79,7 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       const excludeIds = drawnQuestions.map(q => q.id);
-      const result = await drawQuestions({ excludeIds });
+      const result = await drawQuestions({ excludeIds, count: 3 });
       
       if (result?.questions) {
         setDrawnQuestions(result.questions);
@@ -298,7 +298,7 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
       {/* 三張問題卡片 */}
       {!isDrawing && (drawnQuestions?.length || 0) > 0 && (
         <div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 items-stretch">
             {(drawnQuestions || []).map((question, index) => {
               const style = getQuestionStyle(question.type);
               const isSelected = selectedQuestionId === question.id;
@@ -309,13 +309,13 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className={`relative cursor-pointer transition-all duration-300 ${
+                  className={`relative cursor-pointer transition-all duration-300 h-full ${
                     isSelected ? 'transform scale-105' : 'hover:scale-102'
                   }`}
                   onClick={() => handleQuestionSelect(question)}
                 >
                   <div className={`
-                    p-6 rounded-2xl border-2 transition-all duration-300
+                    p-6 rounded-2xl border-2 transition-all duration-300 h-full flex flex-col
                     bg-gradient-to-br ${style.bg}
                     ${isSelected ? 'border-orange-400 shadow-xl ring-4 ring-orange-100' : `${style.border} shadow-lg hover:shadow-xl`}
                   `}>
@@ -329,20 +329,22 @@ export const QuestionDrawGame: React.FC<QuestionDrawGameProps> = ({
                       {question.type === 'planning' && '未來規劃'}
                     </div>
 
-                    {/* 問題內容 */}
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3 leading-relaxed">
-                      {question.question}
-                    </h3>
+                    {/* 問題內容 - 使用 flex-1 讓它佔據可用空間 */}
+                    <div className="flex-1 flex flex-col">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-3 leading-relaxed">
+                        {question.question}
+                      </h3>
 
-                    {/* 提示 */}
-                    {question.hint && (
-                      <p className="text-sm text-gray-600 mb-3">
-                        💡 {question.hint}
-                      </p>
-                    )}
+                      {/* 提示 */}
+                      {question.hint && (
+                        <p className="text-sm text-gray-600 mb-3">
+                          💡 {question.hint}
+                        </p>
+                      )}
+                    </div>
 
-                    {/* 難度指示器 */}
-                    <div className="flex items-center justify-between">
+                    {/* 難度指示器 - 固定在底部 */}
+                    <div className="flex items-center justify-between mt-auto">
                       <div className="flex items-center space-x-1">
                         {[...Array(5)].map((_, i) => (
                           <span

@@ -638,18 +638,18 @@ export const PersonalRetroPanel: React.FC = () => {
       </AnimatePresence>
 
       {/* 主要內容區域 - 三欄布局 */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* 左欄：任務進度 + 每日學習軌跡 */}
-          <div className="space-y-6 md:col-span-1">
+          <div className="space-y-4 md:col-span-1">
             {/* 任務進度 */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-green-200 shadow-lg"
+              className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-green-200 shadow-lg"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-gray-800 flex items-center">
                   <span className="mr-2">🎯</span>
                   任務進度
                 </h3>
@@ -662,15 +662,15 @@ export const PersonalRetroPanel: React.FC = () => {
               </div>
 
               {/* 任務摘要 */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 text-center">
-                  <div className="text-2xl mb-1">✅</div>
-                  <div className="text-lg font-bold text-green-600">{currentWeekStats.completedTaskCount}</div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200 text-center">
+                  <div className="text-xl mb-1">✅</div>
+                  <div className="text-base font-bold text-green-600">{currentWeekStats.completedTaskCount}</div>
                   <div className="text-xs text-gray-600">已完成</div>
                 </div>
-                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-200 text-center">
-                  <div className="text-2xl mb-1">🔄</div>
-                  <div className="text-lg font-bold text-blue-600">{currentWeekStats.inProgressTasks.length}</div>
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-200 text-center">
+                  <div className="text-xl mb-1">🔄</div>
+                  <div className="text-base font-bold text-blue-600">{currentWeekStats.inProgressTasks.length}</div>
                   <div className="text-xs text-gray-600">進行中</div>
                 </div>
               </div>
@@ -764,10 +764,10 @@ export const PersonalRetroPanel: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-purple-200 shadow-lg"
+              className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-purple-200 shadow-lg"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-gray-800 flex items-center">
                   <span className="mr-2">📅</span>
                   每日學習軌跡
                 </h3>
@@ -785,7 +785,7 @@ export const PersonalRetroPanel: React.FC = () => {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="space-y-3"
+                    className="space-y-2"
                   >
                     {currentWeekStats.dailyCheckIns.map((day, index) => (
                       <motion.div
@@ -794,7 +794,7 @@ export const PersonalRetroPanel: React.FC = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 + index * 0.05 }}
-                        className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 hover:shadow-md transition-all p-4"
+                        className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200 hover:shadow-md transition-all p-3"
                       >
                         <div className="flex flex-col gap-2">
                           {/* 第一行：日期/星期 + 心情/動力/查看日記 */}
@@ -870,15 +870,15 @@ export const PersonalRetroPanel: React.FC = () => {
           </div>
 
           {/* 中欄：本週學習回顧 + 能量變化 */}
-          <div className="space-y-6 md:col-span-1">
+          <div className="space-y-4 md:col-span-1">
             {/* 本週學習回顧 */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-lg"
+              className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-orange-200 shadow-lg"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
                   📊 本週學習回顧
                 </h2>
                 <button
@@ -890,22 +890,22 @@ export const PersonalRetroPanel: React.FC = () => {
               </div>
 
               {/* 核心數據摘要 */}
-              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-200 mb-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">{patternDisplay.emoji}</span>
-                  <span className="font-semibold text-gray-800">{patternDisplay.text}學習模式</span>
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-3 border border-yellow-200 mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">{patternDisplay.emoji}</span>
+                  <span className="font-medium text-gray-800 text-sm">{patternDisplay.text}學習模式</span>
                 </div>
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <div className="text-lg font-bold text-blue-600">{currentWeekStats.checkInCount}</div>
+                    <div className="text-base font-bold text-blue-600">{currentWeekStats.checkInCount}</div>
                     <div className="text-xs text-gray-600">次打卡</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-green-600">{currentWeekStats.completedTaskCount}</div>
+                    <div className="text-base font-bold text-green-600">{currentWeekStats.completedTaskCount}</div>
                     <div className="text-xs text-gray-600">完成任務</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-orange-600">{currentWeekStats.averageEnergy}/10</div>
+                    <div className="text-base font-bold text-orange-600">{currentWeekStats.averageEnergy}/10</div>
                     <div className="text-xs text-gray-600">平均能量</div>
                   </div>
                 </div>
@@ -934,10 +934,10 @@ export const PersonalRetroPanel: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-indigo-200 shadow-lg"
+                className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-indigo-200 shadow-lg"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-semibold text-gray-800 flex items-center">
                     <span className="mr-2">📊</span>
                     能量變化
                   </h3>
@@ -949,8 +949,8 @@ export const PersonalRetroPanel: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-200">
-                  <div className="flex items-end justify-between gap-1 h-20">
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3 border border-indigo-200">
+                  <div className="flex items-end justify-between gap-1 h-16">
                     {currentWeekStats.energyTimeline.map((point, index) => {
                       const height = (point.energy / 5) * 100;
                       return (
@@ -989,15 +989,15 @@ export const PersonalRetroPanel: React.FC = () => {
           </div>
 
           {/* 右欄：本週回顧記錄 */}
-          <div className="space-y-6 md:col-span-2 lg:col-span-1">
+          <div className="space-y-4 md:col-span-2 lg:col-span-1">
             {completedRetros.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-green-200 shadow-lg"
+                className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-green-200 shadow-lg"
               >
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center mb-4">
+                <h3 className="text-base font-semibold text-gray-800 flex items-center mb-3">
                   <span className="mr-2">📝</span>
                   本週回顧記錄
                   <span className="ml-2 text-sm bg-green-100 text-green-700 px-2 py-1 rounded-full">
@@ -1005,7 +1005,7 @@ export const PersonalRetroPanel: React.FC = () => {
                   </span>
                 </h3>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {completedRetros.map((retro) => (
                     <CompletedRetroCard
                       key={retro.id}
@@ -1031,7 +1031,7 @@ export const PersonalRetroPanel: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-lg"
+                  className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-orange-200 shadow-lg"
                 >
                   <AnswerInputCard
                     question={selectedQuestion.question}
@@ -1050,14 +1050,14 @@ export const PersonalRetroPanel: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border-2 border-orange-200 shadow-lg"
+                  className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-orange-200 shadow-lg"
                 >
                   <div className="text-center">
-                    <div className="text-6xl mb-4">🎯</div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                    <div className="text-4xl mb-3">🎯</div>
+                    <h2 className="text-lg font-bold text-gray-800 mb-3">
                       想要進行另一個回顧嗎？
                     </h2>
-                    <p className="text-gray-600 mb-8">
+                    <p className="text-gray-600 mb-6 text-sm">
                       每個問題都能帶來不同的反思角度，讓我們繼續探索學習旅程！
                     </p>
                     
@@ -1065,7 +1065,7 @@ export const PersonalRetroPanel: React.FC = () => {
                       onClick={() => setShowQuestionModal(true)}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="px-8 py-4 bg-gradient-to-r from-orange-400 to-pink-400 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center mx-auto space-x-3"
+                      className="px-6 py-3 bg-gradient-to-r from-orange-400 to-pink-400 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center mx-auto space-x-2"
                     >
                       <span>🎲</span>
                       <span>抽取回顧問題</span>

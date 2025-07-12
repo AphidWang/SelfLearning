@@ -70,7 +70,7 @@ interface RetroStoreState {
   
   // 其他方法
   getAnswerHistory: (filters?: RetroFilters) => Promise<RetroAnswer[]>;
-  drawQuestions: (filters?: RetroFilters) => Promise<QuestionDraw | null>;
+  drawQuestions: (filters?: RetroFilters & { count?: number }) => Promise<QuestionDraw | null>;
   createAnswer: (data: CreateRetroAnswerData) => Promise<RetroAnswer | null>;
   getWeekId: () => string;
   clearError: () => void;
@@ -617,9 +617,21 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未認證');
       
+      // 轉換欄位名稱以匹配資料庫表結構
+      const dbData = {
+        user_id: user.id,
+        week_id: data.weekId,
+        question: data.question,
+        is_custom_question: data.isCustomQuestion,
+        custom_question: data.customQuestion,
+        answer: data.answer,
+        mood: data.mood,
+        emoji: data.emoji
+      };
+      
       const { data: answer, error } = await supabase
         .from('retro_answers')
-        .insert([{ ...data, user_id: user.id }])
+        .insert([dbData])
         .select()
         .single();
       
@@ -929,8 +941,29 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
   }),
 
   // 其他方法實現
-  drawQuestions: async (filters?: RetroFilters) => {
-    return await get().drawQuestion(filters);
+  drawQuestions: async (filters?: RetroFilters & { count?: number }) => {
+    try {
+      const questionBank = get().questionBank;
+      const count = filters?.count || 3; // 預設抽取3個問題
+      const availableQuestions = questionBank.filter(q => !filters?.excludeIds?.includes(q.id));
+      
+      if (availableQuestions.length === 0) {
+        return null;
+      }
+      
+      // 隨機洗牌並選取指定數量的問題
+      const shuffled = [...availableQuestions].sort(() => Math.random() - 0.5);
+      const selectedQuestions = shuffled.slice(0, Math.min(count, shuffled.length));
+      
+      return {
+        questions: selectedQuestions,
+        totalQuestions: questionBank.length,
+        remainingQuestions: availableQuestions.length - selectedQuestions.length
+      };
+    } catch (error) {
+      console.error('抽取問題失敗:', error);
+      return null;
+    }
   },
   
   createAnswer: async (data: CreateRetroAnswerData) => {

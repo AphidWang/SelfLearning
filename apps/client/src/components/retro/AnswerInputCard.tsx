@@ -117,29 +117,29 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
   const wordCountInfo = getWordCountInfo();
 
   return (
-    <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border-2 border-orange-200 shadow-lg">
+    <div className="bg-white/80 backdrop-blur-md rounded-xl p-4 border-2 border-orange-200 shadow-lg">
       {/* 標題和問題顯示 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        className="text-center mb-4"
       >
-        <div className="flex items-center justify-center mb-4">
-          <div className="text-3xl mr-2">{typeStyle.emoji}</div>
+        <div className="flex items-center justify-center mb-3">
+          <div className="text-2xl mr-2">{typeStyle.emoji}</div>
           <div className="text-center">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
+            <h2 className="text-lg font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
               {isCustomQuestion ? '✏️ 自訂問題' : '💭 回顧時光'}
             </h2>
             {questionIndex && totalQuestions && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs text-gray-600 mt-1">
                 問題 {questionIndex} / {totalQuestions}
               </p>
             )}
           </div>
         </div>
         
-        <div className={`mx-auto max-w-2xl p-6 rounded-xl bg-gradient-to-r ${typeStyle.color} text-white shadow-lg`}>
-          <h3 className="text-lg font-medium mb-2">{question}</h3>
+        <div className={`mx-auto max-w-2xl p-4 rounded-lg bg-gradient-to-r ${typeStyle.color} text-white shadow-lg`}>
+          <h3 className="text-base font-medium mb-1">{question}</h3>
           {hint && (
             <p className="text-sm opacity-90">
               💡 {hint}
@@ -154,10 +154,10 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-200"
+          className="mb-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200"
         >
-          <h4 className="font-medium text-gray-700 mb-2 flex items-center">
-            <span className="mr-2">✨</span>
+          <h4 className="font-medium text-gray-700 mb-1 flex items-center text-sm">
+            <span className="mr-1">✨</span>
             參考示例
           </h4>
           <p className="text-sm text-gray-600 italic">"{example}"</p>
@@ -169,7 +169,7 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="mb-6"
+        className="mb-4"
       >
         <div className="relative">
           <textarea
@@ -177,14 +177,14 @@ export const AnswerInputCard: React.FC<AnswerInputCardProps> = ({
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             placeholder="在這裡寫下你的想法和感受... 想到什麼就寫什麼，沒有對錯之分 😊"
-            className="w-full min-h-[120px] max-h-[300px] p-4 border-2 border-orange-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent bg-white/50 backdrop-blur-sm"
+            className="w-full min-h-[80px] max-h-[200px] p-3 border-2 border-orange-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent bg-white/50 backdrop-blur-sm text-sm"
             style={{ overflow: 'hidden' }}
           />
           
           {/* 表情符號按鈕 */}
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="absolute bottom-4 right-4 p-2 text-2xl hover:bg-orange-100 rounded-lg transition-colors duration-200"
+            className="absolute bottom-3 right-3 p-1 text-lg hover:bg-orange-100 rounded-lg transition-colors duration-200"
             title="添加表情符號"
           >
             😊
