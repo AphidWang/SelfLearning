@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Calendar, Eye, BookOpen, ExternalLink, Trash2, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Calendar, Eye, BookOpen, ExternalLink, Trash2, AlertTriangle, Save, Trophy, Star, Heart, CheckCircle, X } from 'lucide-react';
 import { useRetroStore } from '../../store/retroStore';
 import { journalStore, type DailyJournal } from '../../store/journalStore';
 import { createPortal } from 'react-dom';
@@ -256,16 +256,23 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
 export const PersonalRetroPanel: React.FC = () => {
   const {
     currentWeekStats,
+    currentSession,
     loading,
     error,
     getCurrentWeekStats,
+    getCurrentSession,
     drawQuestions,
     createAnswer,
+    saveSessionAnswer,
+    updateSessionQuestions,
     getAnswerHistory,
     getWeekId,
     clearError,
     deleteAnswer // 添加這個
   } = useRetroStore();
+
+  // 追蹤載入狀態
+  const [loadingState, setLoadingState] = useState<'initial' | 'loading' | 'completed' | 'error'>('initial');
 
   const [selectedQuestion, setSelectedQuestion] = useState<RetroQuestion | null>(null);
   const [drawnQuestions, setDrawnQuestions] = useState<RetroQuestion[]>([]);
@@ -318,21 +325,91 @@ export const PersonalRetroPanel: React.FC = () => {
   });
 
   const [hoverTimer, setHoverTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRetroSaved, setIsRetroSaved] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [initialRetroCount, setInitialRetroCount] = useState(0);
 
-  // 載入週統計數據和已完成的回顧
+  // 載入週統計數據和當前 session
   useEffect(() => {
     const loadData = async () => {
+      console.log('🚀 PersonalRetroPanel - 開始載入數據...');
+      setLoadingState('loading');
       try {
-        await getCurrentWeekStats();
-        await loadCompletedRetros();
+        console.log('📞 PersonalRetroPanel - 準備調用 getCurrentWeekStats...');
+        const weekStatsPromise = getCurrentWeekStats();
+        console.log('📞 PersonalRetroPanel - 準備調用 getCurrentSession...');
+        const sessionPromise = getCurrentSession();
+        
+        console.log('⏳ PersonalRetroPanel - 等待 Promise.all 完成...');
+        const [weekStats, session] = await Promise.all([
+          weekStatsPromise,
+          sessionPromise
+        ]);
+        
+        console.log('📊 PersonalRetroPanel - 載入的週統計:', weekStats);
+        console.log('🎯 PersonalRetroPanel - 載入的 session:', session);
+        
+        // 如果 session 存在且有週統計數據，從 session 中提取已完成的回顧
+        if (session?.weeklyStats) {
+          console.log('📝 PersonalRetroPanel - 從 session 載入回顧...');
+          await loadCompletedRetrosFromSession(session);
+        } else {
+          console.log('📝 PersonalRetroPanel - 回退到直接載入回顧...');
+          await loadCompletedRetros();
+        }
+        
+        console.log('✅ PersonalRetroPanel - 數據載入完成');
+        setLoadingState('completed');
       } catch (error) {
-        console.error('載入數據失敗:', error);
+        console.error('❌ PersonalRetroPanel - 載入數據失敗:', error);
+        setLoadingState('error');
       }
     };
     loadData();
-  }, [getCurrentWeekStats]);
+  }, [getCurrentWeekStats, getCurrentSession]);
 
-  // 載入本週已完成的回顧
+  // 從 session 中載入已完成的回顧
+  const loadCompletedRetrosFromSession = async (session: any) => {
+    try {
+      console.log('📝 從 session 載入回顧記錄:', session);
+      
+      // 如果 session 有答案數據，直接使用
+      if (session.sessionAnswers && Array.isArray(session.sessionAnswers)) {
+        const formatted = session.sessionAnswers.map((answer: any) => ({
+          id: answer.id,
+          question: answer.question?.question || answer.customQuestion || '自定義問題',
+          answer: answer.answer,
+          mood: answer.mood,
+          emoji: answer.emoji,
+          createdAt: answer.createdAt
+        }));
+        
+        console.log('📝 從 session 提取的回顧記錄:', formatted);
+        setCompletedRetros(formatted);
+        
+        // 設定初始回顧數量，用於偵測變化
+        if (initialRetroCount === 0) {
+          setInitialRetroCount(formatted.length);
+          // 如果初始載入時就有2個以上回顧，假設已儲存
+          if (formatted.length >= 2) {
+            setIsRetroSaved(true);
+          }
+        }
+        return;
+      }
+      
+      // 回退到原來的方法
+      await loadCompletedRetros();
+    } catch (error) {
+      console.error('從 session 載入回顧失敗:', error);
+      // 回退到原來的方法
+      await loadCompletedRetros();
+    }
+  };
+
+  // 載入本週已完成的回顧 (回退方法)
   const loadCompletedRetros = async () => {
     try {
       // 使用正確的週開始和結束日期
@@ -368,6 +445,15 @@ export const PersonalRetroPanel: React.FC = () => {
       
       console.log('📝 本週回顧記錄:', formatted);
       setCompletedRetros(formatted);
+      
+      // 設定初始回顧數量，用於偵測變化
+      if (initialRetroCount === 0) {
+        setInitialRetroCount(formatted.length);
+        // 如果初始載入時就有2個以上回顧，假設已儲存
+        if (formatted.length >= 2) {
+          setIsRetroSaved(true);
+        }
+      }
     } catch (error) {
       console.error('載入已完成回顧失敗:', error);
     }
@@ -439,6 +525,17 @@ export const PersonalRetroPanel: React.FC = () => {
     };
   }, [hoverTimer]);
 
+  // 偵測回顧數量變化
+  useEffect(() => {
+    if (initialRetroCount > 0 && completedRetros.length !== initialRetroCount) {
+      setHasChanges(true);
+      // 如果從已儲存狀態變化，重置儲存狀態
+      if (isRetroSaved) {
+        setIsRetroSaved(false);
+      }
+    }
+  }, [completedRetros.length, initialRetroCount, isRetroSaved]);
+
   // 處理日記查看
   const handleViewJournal = async (date: string) => {
     console.log('📖 Opening journal for date:', date);
@@ -468,29 +565,80 @@ export const PersonalRetroPanel: React.FC = () => {
   };
 
   // 處理問題選擇
-  const handleQuestionSelect = (question: RetroQuestion) => {
-    setSelectedQuestion(question);
-    setShowQuestionModal(false);
-    setRetroStep('answering');
+  const handleQuestionSelect = async (question: RetroQuestion) => {
+    try {
+      setSelectedQuestion(question);
+      setShowQuestionModal(false);
+      setRetroStep('answering');
+
+      // 確保有 currentSession
+      let session = currentSession;
+      if (!session) {
+        console.log('🔄 沒有當前 session，創建新的...');
+        session = await getCurrentSession();
+        if (!session) {
+          throw new Error('無法創建或獲取 session');
+        }
+      }
+
+      // 如果這是新抽取的問題，更新 session 的問題記錄
+      if (drawnQuestions.length > 0) {
+        console.log('🎯 更新 session 的抽取問題:', drawnQuestions);
+        await updateSessionQuestions(session.id, drawnQuestions);
+      }
+    } catch (error) {
+      console.error('處理問題選擇失敗:', error);
+      // 即使更新 session 失敗，也允許繼續回答
+      setSelectedQuestion(question);
+      setShowQuestionModal(false);
+      setRetroStep('answering');
+    }
   };
 
   // 處理回答提交
   const handleAnswerSubmit = async (answer: string, emoji?: string) => {
     try {
+      if (!selectedQuestion) {
+        console.error('沒有選中的問題');
+        return;
+      }
+
+      // 確保有 currentSession
+      let session = currentSession;
+      if (!session) {
+        console.log('🔄 沒有當前 session，創建新的...');
+        session = await getCurrentSession();
+        if (!session) {
+          throw new Error('無法創建或獲取 session');
+        }
+      }
+
       const weekId = getWeekId();
       
-      if (selectedQuestion) {
-        await createAnswer({
-          weekId,
-          question: selectedQuestion,
-          isCustomQuestion: false,
-          answer,
-          mood: 'okay', // 默認心情
-          emoji
-        });
+      // 使用 session-based 保存
+      const savedAnswer = await saveSessionAnswer(session.id, {
+        weekId,
+        question: selectedQuestion,
+        isCustomQuestion: false,
+        answer,
+        mood: 'okay', // 默認心情
+        emoji
+      });
+
+      if (savedAnswer) {
+        console.log('✅ 答案保存成功:', savedAnswer);
         
-        // 儲存成功後，重新加載已完成的回顧並回到 ready 狀態
-        await loadCompletedRetros();
+        // 重新載入 session 以獲取最新數據
+        const updatedSession = await getCurrentSession();
+        if (updatedSession) {
+          await loadCompletedRetrosFromSession(updatedSession);
+        } else {
+          await loadCompletedRetros();
+        }
+        
+        // 標記有變化（新增了回顧）
+        setHasChanges(true);
+        
         setRetroStep('ready');
         setSelectedQuestion(null);
       }
@@ -548,23 +696,75 @@ export const PersonalRetroPanel: React.FC = () => {
     }).format(now);
   };
 
-  if (loading && !currentWeekStats) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <LoadingDots />
-          <p className="mt-4 text-gray-600">載入本週學習統計中...</p>
-        </div>
-      </div>
-    );
-  }
+  // 處理儲存回顧
+  const handleSaveRetro = async () => {
+    if (!currentWeekStats || !currentSession) return;
+    
+    setIsSaving(true);
+    try {
+      // 這裡可以添加實際的儲存邏輯，比如標記 session 為完成狀態
+      // 目前只是模擬保存過程
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setShowSaveDialog(false);
+      setIsSaving(false);
+      
+      // 標記為已儲存，重置變化狀態
+      setIsRetroSaved(true);
+      setHasChanges(false);
+      
+      // 可以在這裡添加成功提示或跳轉邏輯
+      console.log('✅ 回顧已儲存');
+    } catch (error) {
+      console.error('儲存失敗:', error);
+      setIsSaving(false);
+    }
+  };
+
+  // 獲取週期間的日期範圍文字
+  const getWeekDateRange = () => {
+    if (!currentWeekStats?.dailyCheckIns || currentWeekStats.dailyCheckIns.length === 0) {
+      return '';
+    }
+    
+    const dates = currentWeekStats.dailyCheckIns.map(d => new Date(d.date)).sort((a, b) => a.getTime() - b.getTime());
+    const firstDate = dates[0];
+    const lastDate = dates[dates.length - 1];
+    
+    return `${firstDate.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })} ~ ${lastDate.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}`;
+  };
+
+  // Debug logs
+  console.log('🔍 PersonalRetroPanel 渲染狀態:', {
+    loading,
+    hasCurrentWeekStats: !!currentWeekStats,
+    currentWeekStats: currentWeekStats ? 'exists' : 'null',
+    error,
+    loadingState
+  });
 
   if (!currentWeekStats) {
+    if (loadingState === 'loading' || loadingState === 'initial') {
+      console.log('📊 顯示載入中...');
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <LoadingDots />
+            <p className="mt-4 text-gray-600">載入本週學習統計中...</p>
+          </div>
+        </div>
+      );
+    }
+    
+    console.log('❌ 顯示暫無數據...');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="text-6xl mb-4">📊</div>
           <p className="text-gray-600">暫無本週學習數據</p>
+          {loadingState === 'error' && (
+            <p className="mt-2 text-red-600 text-sm">載入過程中發生錯誤</p>
+          )}
         </div>
       </div>
     );
@@ -608,6 +808,34 @@ export const PersonalRetroPanel: React.FC = () => {
                 {completedRetros.length === 1 && <span>再寫一個心得回顧就完成了呢</span>}
                 {completedRetros.length >= 2 && <span>哇！你留下了 {completedRetros.length} 個心得, 真棒!</span>}
               </div>
+              
+              {/* 儲存按鈕 - 只在完成2個以上回顧時顯示 */}
+              {completedRetros.length >= 2 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  key={isRetroSaved && !hasChanges ? 'saved' : 'save'}
+                >
+                  {isRetroSaved && !hasChanges ? (
+                    // 已儲存狀態
+                    <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white font-medium rounded-xl shadow-lg">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>回顧已儲存</span>
+                    </div>
+                  ) : (
+                    // 可儲存狀態
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowSaveDialog(true)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>儲存回顧</span>
+                    </motion.button>
+                  )}
+                </motion.div>
+              )}
             </div>
           </motion.div>
         </div>
@@ -1014,6 +1242,8 @@ export const PersonalRetroPanel: React.FC = () => {
                         try {
                           await deleteAnswer(retro.id);
                           await loadCompletedRetros();
+                          // 標記有變化（刪除了回顧）
+                          setHasChanges(true);
                         } catch (error) {
                           console.error('刪除回顧失敗:', error);
                         }
@@ -1124,6 +1354,153 @@ export const PersonalRetroPanel: React.FC = () => {
           initialData={journalModal.journal || undefined}
         />
       )}
+
+      {/* 儲存鼓勵對話框 */}
+      <AnimatePresence>
+        {showSaveDialog && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isSaving) {
+                setShowSaveDialog(false);
+              }
+            }}
+          >
+            <motion.div
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 標題區 */}
+              <div 
+                className="relative p-6 rounded-t-3xl text-white text-center"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                }}
+              >
+                {!isSaving && (
+                  <button
+                    onClick={() => setShowSaveDialog(false)}
+                    type="button"
+                    className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+                
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Trophy className="w-6 h-6" />
+                  <h2 className="text-xl font-bold">太棒了！</h2>
+                </div>
+                <p className="text-white/90 text-sm">
+                  你完成了這週的學習回顧
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* 成就統計 */}
+                <div className="text-center space-y-4">
+                  <div className="flex justify-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-400 rounded-full flex items-center justify-center">
+                      <Star className="w-10 h-10 text-white" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-gray-800">
+                      你在 {getWeekDateRange()} 期間的成就：
+                    </h3>
+                    
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <div className="text-2xl font-bold text-green-600">{currentWeekStats?.completedTaskCount || 0}</div>
+                          <div className="text-xs text-gray-600">完成任務</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-blue-600">{currentWeekStats?.checkInCount || 0}</div>
+                          <div className="text-xs text-gray-600">次打卡</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-orange-600">{completedRetros.length}</div>
+                          <div className="text-xs text-gray-600">個心得</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2 text-purple-600">
+                      <Heart className="w-5 h-5" />
+                      <span className="font-medium">回顧與紀錄是成長的關鍵</span>
+                    </div>
+                    
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      透過回顧，你不僅記錄了學習的足跡，更重要的是培養了反思的習慣。
+                      每一個心得都是你成長路上的寶貴財富！
+                    </p>
+                    
+                    <div className="flex items-center justify-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ scale: 0, rotate: 0 }}
+                          animate={{ scale: 1, rotate: 360 }}
+                          transition={{ delay: i * 0.1, duration: 0.5 }}
+                        >
+                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 動作按鈕 */}
+                <div className="space-y-3">
+                  <motion.button
+                    onClick={handleSaveRetro}
+                    disabled={isSaving}
+                    className={`w-full py-3 rounded-xl font-semibold text-base transition-all ${
+                      isSaving
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg hover:shadow-xl'
+                    }`}
+                    whileHover={!isSaving ? { scale: 1.02 } : {}}
+                    whileTap={!isSaving ? { scale: 0.98 } : {}}
+                  >
+                    {isSaving ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        儲存中...
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2">
+                        <CheckCircle className="w-5 h-5" />
+                        確認儲存
+                      </div>
+                    )}
+                  </motion.button>
+                  
+                  {!isSaving && (
+                    <button
+                      onClick={() => setShowSaveDialog(false)}
+                      className="w-full py-3 rounded-xl font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    >
+                      再補充一下
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }; 

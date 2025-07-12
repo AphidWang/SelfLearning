@@ -21,19 +21,15 @@
  * - 載入和空狀態
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Users, CheckCircle2, User, Star, Activity, BookOpen, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { Search, Users, Check, X, RefreshCw } from 'lucide-react';
 import { useGroupRetroStore } from '../../store/groupRetroStore';
-import { useUser } from '../../context/UserContext';
 import { LoadingDots } from '../shared/LoadingDots';
 import type { ParticipantWeeklySummary } from '../../types/groupRetro';
 
 interface ParticipantSelectorProps {
-  onParticipantSelect?: (participant: ParticipantWeeklySummary) => void;
-  onParticipantRemove?: (userId: string) => void;
-  maxParticipants?: number;
-  showOnlyRetroCompleted?: boolean;
+  onSelectionChange?: (participants: ParticipantWeeklySummary[]) => void;
 }
 
 interface ParticipantCardProps {
@@ -78,7 +74,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
           animate={{ scale: 1 }}
           exit={{ scale: 0 }}
         >
-          <CheckCircle2 className="w-4 h-4 text-white" />
+          <Check className="w-4 h-4 text-white" />
         </motion.div>
       )}
       
@@ -110,7 +106,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
               {user.name || '匿名用戶'}
             </h3>
             {hasCompletedPersonalRetro && (
-              <Star className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+              <Check className="w-4 h-4 text-yellow-500 flex-shrink-0" />
             )}
           </div>
           
@@ -124,14 +120,14 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
             <div className="space-y-1">
               {/* 能量狀態 */}
               <div className="flex items-center space-x-2">
-                <Activity className="w-3 h-3 text-gray-400" />
+                <RefreshCw className="w-3 h-3 text-gray-400" />
                 <span className="text-xs text-gray-600">{energyDescription}</span>
               </div>
               
               {/* 主要主題 */}
               {mainTopics.length > 0 && (
                 <div className="flex items-center space-x-2">
-                  <BookOpen className="w-3 h-3 text-gray-400" />
+                  <RefreshCw className="w-3 h-3 text-gray-400" />
                   <span className="text-xs text-gray-600 truncate">
                     {mainTopics.slice(0, 2).join(', ')}
                     {mainTopics.length > 2 && '...'}
@@ -141,7 +137,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
               
               {/* 打卡次數 */}
               <div className="flex items-center space-x-2">
-                <CheckCircle2 className="w-3 h-3 text-gray-400" />
+                <Check className="w-3 h-3 text-gray-400" />
                 <span className="text-xs text-gray-600">
                   本週打卡 {weeklyStats.checkInCount} 次
                 </span>
@@ -158,13 +154,21 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
   );
 };
 
-export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
-  onParticipantSelect,
-  onParticipantRemove,
-  maxParticipants = 8,
-  showOnlyRetroCompleted = true
-}) => {
-  const { currentUser } = useUser();
+export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSelectionChange }) => {
+  console.log('🔵 [ParticipantSelector] 組件渲染開始');
+  
+  // 組件狀態
+  const [showOnlyCompleted, setShowOnlyCompleted] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // 使用 useRef 來跟蹤載入狀態，避免組件重新掛載時被重置
+  const loadingStateRef = useRef({
+    isLoading: false,
+    hasLoaded: false,
+    lastFilters: ''
+  });
+
+  // Store 狀態
   const {
     availableParticipants,
     selectedParticipants,
@@ -174,34 +178,103 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
     selectParticipant,
     removeParticipant
   } = useGroupRetroStore();
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showOnlyCompleted, setShowOnlyCompleted] = useState(showOnlyRetroCompleted);
-  
+
+  console.log('🔵 [ParticipantSelector] Store 狀態:', {
+    availableParticipants: availableParticipants.length,
+    selectedParticipants: selectedParticipants.length,
+    loading,
+    error
+  });
+
+  console.log('🔵 [ParticipantSelector] 載入狀態:', loadingStateRef.current);
+
+  // 計算當前篩選條件
+  const currentFilters = useMemo(() => 
+    JSON.stringify({ showOnlyCompleted, searchQuery }), 
+    [showOnlyCompleted, searchQuery]
+  );
+
   // 載入可用參與者
   useEffect(() => {
+    console.log('🟡 [ParticipantSelector] useEffect 觸發');
+    console.log('🟡 [ParticipantSelector] 當前篩選條件:', currentFilters);
+    console.log('🟡 [ParticipantSelector] 載入狀態檢查:', {
+      isLoading: loadingStateRef.current.isLoading,
+      hasLoaded: loadingStateRef.current.hasLoaded,
+      lastFilters: loadingStateRef.current.lastFilters,
+      filtersChanged: loadingStateRef.current.lastFilters !== currentFilters
+    });
+    
+    // 如果正在載入，就不要重複載入
+    if (loadingStateRef.current.isLoading) {
+      console.log('🔴 [ParticipantSelector] 正在載入中，跳過');
+      return;
+    }
+    
+    // 如果篩選條件沒有變化且已經載入過，也不要重複載入
+    if (loadingStateRef.current.hasLoaded && loadingStateRef.current.lastFilters === currentFilters) {
+      console.log('🔴 [ParticipantSelector] 篩選條件未變化且已載入，跳過');
+      return;
+    }
+    
     const loadParticipants = async () => {
+      console.log('🟢 [ParticipantSelector] 開始載入參與者');
+      
       try {
+        // 先設置載入狀態
+        loadingStateRef.current = {
+          ...loadingStateRef.current,
+          isLoading: true
+        };
+        
+        console.log('🟢 [ParticipantSelector] 設置載入狀態完成');
+        
         await loadAvailableParticipants({
           hasCompletedPersonalRetro: showOnlyCompleted,
           searchQuery: searchQuery.trim() || undefined
         });
+        
+        console.log('🟢 [ParticipantSelector] 載入完成');
+        
+        // 載入成功後更新狀態
+        loadingStateRef.current = {
+          isLoading: false,
+          hasLoaded: true,
+          lastFilters: currentFilters
+        };
+        
+        console.log('🟢 [ParticipantSelector] 更新載入狀態為已完成');
       } catch (error) {
-        console.error('載入參與者失敗:', error);
+        console.error('🔴 [ParticipantSelector] 載入參與者失敗:', error);
+        // 載入失敗時重置狀態
+        loadingStateRef.current = {
+          ...loadingStateRef.current,
+          isLoading: false,
+          hasLoaded: false
+        };
       }
     };
     
     loadParticipants();
-  }, [loadAvailableParticipants, showOnlyCompleted, searchQuery]);
+  }, [currentFilters, showOnlyCompleted, searchQuery]); // 加入原始依賴項以確保正確觸發
   
+  // 通知父組件選擇變化
+  useEffect(() => {
+    console.log('🟡 [ParticipantSelector] 選擇變化通知 useEffect 觸發');
+    if (onSelectionChange) {
+      onSelectionChange(selectedParticipants);
+    }
+  }, [selectedParticipants, onSelectionChange]);
+
   // 篩選和搜尋參與者
   const filteredParticipants = useMemo(() => {
     let filtered = [...availableParticipants];
     
     // 排除當前用戶（如果需要）
-    if (currentUser) {
-      filtered = filtered.filter(p => p.user.id !== currentUser.id);
-    }
+    // 這裡的 currentUser 需要從 context 或 store 中獲取，目前暫時移除
+    // if (currentUser) {
+    //   filtered = filtered.filter(p => p.user.id !== currentUser.id);
+    // }
     
     // 搜尋過濾
     if (searchQuery.trim()) {
@@ -219,22 +292,18 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
     }
     
     return filtered;
-  }, [availableParticipants, currentUser, searchQuery, showOnlyCompleted]);
+  }, [availableParticipants, searchQuery, showOnlyCompleted]);
   
   // 處理參與者選擇
   const handleParticipantSelect = (participant: ParticipantWeeklySummary) => {
-    if (selectedParticipants.length >= maxParticipants) {
-      return;
-    }
-    
+    console.log('🟡 [ParticipantSelector] 選擇參與者:', participant.user.name);
     selectParticipant(participant);
-    onParticipantSelect?.(participant);
   };
   
   // 處理參與者移除
   const handleParticipantRemove = (userId: string) => {
+    console.log('🟡 [ParticipantSelector] 移除參與者:', userId);
     removeParticipant(userId);
-    onParticipantRemove?.(userId);
   };
   
   // 判斷參與者是否已選擇
@@ -243,8 +312,17 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
   };
   
   // 判斷是否可以選擇更多參與者
-  const canSelectMore = selectedParticipants.length < maxParticipants;
+  // 這裡的 maxParticipants 需要從 props 中獲取，目前暫時移除
+  // const canSelectMore = selectedParticipants.length < maxParticipants;
   
+  console.log('🔵 [ParticipantSelector] 篩選結果:', {
+    filteredParticipants: filteredParticipants.length,
+    searchQuery,
+    showOnlyCompleted
+  });
+
+  console.log('🔵 [ParticipantSelector] 組件渲染結束');
+
   return (
     <div className="space-y-4">
       {/* 搜尋和篩選器 */}
@@ -281,7 +359,7 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-gray-800 flex items-center gap-2">
               <Users className="w-4 h-4" />
-              已選擇的討論夥伴 ({selectedParticipants.length}/{maxParticipants})
+              已選擇的討論夥伴 ({selectedParticipants.length})
             </h4>
           </div>
           
@@ -333,11 +411,12 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
             <h4 className="font-medium text-gray-800">
               可選擇的夥伴 ({filteredParticipants.length})
             </h4>
-            {!canSelectMore && (
+            {/* 這裡的 maxParticipants 需要從 props 中獲取，目前暫時移除 */}
+            {/* {!canSelectMore && (
               <span className="text-sm text-orange-600">
                 已達到最大參與者數量
               </span>
-            )}
+            )} */}
           </div>
           
           {filteredParticipants.length === 0 ? (
@@ -350,18 +429,17 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <AnimatePresence>
-                {filteredParticipants.map((participant) => (
-                  <ParticipantCard
-                    key={participant.user.id}
-                    participant={participant}
-                    isSelected={isParticipantSelected(participant.user.id)}
-                    onSelect={() => handleParticipantSelect(participant)}
-                    onRemove={() => handleParticipantRemove(participant.user.id)}
-                    disabled={!canSelectMore && !isParticipantSelected(participant.user.id)}
-                  />
-                ))}
-              </AnimatePresence>
+              {filteredParticipants.map((participant) => (
+                <ParticipantCard
+                  key={participant.user.id}
+                  participant={participant}
+                  isSelected={isParticipantSelected(participant.user.id)}
+                  onSelect={() => handleParticipantSelect(participant)}
+                  onRemove={() => handleParticipantRemove(participant.user.id)}
+                  // 這裡的 maxParticipants 需要從 props 中獲取，目前暫時移除
+                  // disabled={!canSelectMore && !isParticipantSelected(participant.user.id)}
+                />
+              ))}
             </div>
           )}
         </div>

@@ -118,7 +118,15 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
   const [showSettings, setShowSettings] = useState(false);
 
   // 計算當前週 ID
-  const currentWeekId = useMemo(() => getWeekId(), [getWeekId]);
+  const currentWeekId = useMemo(() => {
+    const targetDate = new Date();
+    const year = targetDate.getFullYear();
+    const week = Math.ceil(
+      ((targetDate.getTime() - new Date(year, 0, 1).getTime()) / 86400000 + 1) / 7
+    );
+    const weekId = `${year}-W${week.toString().padStart(2, '0')}`;
+    return weekId;
+  }, []);
 
   // 初始化時檢查是否有現存的會話
   useEffect(() => {
@@ -142,35 +150,21 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
     if (currentUser) {
       checkExistingSession();
     }
-  }, [currentUser, getCurrentWeekSession, currentWeekId]);
+  }, [currentUser, currentWeekId]); // 移除函數引用依賴項
 
   // 清除錯誤
   useEffect(() => {
     if (error) {
-      const timer = setTimeout(clearError, 5000);
+      const timer = setTimeout(() => {
+        clearError();
+      }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [error, clearError]);
-
-  // 判斷是否可以進入下一步
-  const canProceedToNextStep = useCallback((step: PanelStep) => {
-    switch (step) {
-      case 'setup':
-        return selectedParticipants.length >= 2; // 至少需要2個參與者
-      case 'overview':
-        return currentSession !== null;
-      case 'discussion':
-        return currentSession !== null && currentSession.questions.length > 0;
-      case 'completed':
-        return sessionProgress?.completionPercentage === 100;
-      default:
-        return false;
-    }
-  }, [selectedParticipants.length, currentSession, sessionProgress]);
+  }, [error]); // 移除 clearError 函數引用依賴項
 
   // 創建會話
   const handleCreateSession = useCallback(async () => {
-    if (!canProceedToNextStep('setup')) {
+    if (selectedParticipants.length < 2) {
       toast.error('請至少選擇 2 位夥伴參與討論');
       return;
     }
@@ -206,17 +200,57 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
     } finally {
       setIsCreatingSession(false);
     }
-  }, [canProceedToNextStep, sessionTitle, currentWeekId, selectedParticipants, createSession]);
+  }, [sessionTitle, currentWeekId, selectedParticipants, createSession]); // 移除 canProceedToNextStep 依賴項
 
   // 步驟切換
   const handleStepChange = useCallback((step: PanelStep) => {
     if (step === 'overview' && !currentSession) {
       // 如果要進入概覽但沒有會話，先創建會話
-      handleCreateSession();
+      // 直接調用 createSession 而不是依賴 handleCreateSession
+      const createSessionAndNavigate = async () => {
+        if (selectedParticipants.length < 2) {
+          toast.error('請至少選擇 2 位夥伴參與討論');
+          return;
+        }
+
+        setIsCreatingSession(true);
+        try {
+          const sessionData: CreateGroupRetroSessionData = {
+            title: sessionTitle || `第 ${currentWeekId} 週共學討論`,
+            weekId: currentWeekId,
+            participantIds: selectedParticipants.map(p => p.user.id),
+            settings: {
+              autoGenerateQuestions: true,
+              maxParticipants: 8,
+              questionLimit: 5,
+              allowAnonymous: false
+            }
+          };
+
+          await createSession(sessionData);
+          setCurrentStep('overview');
+          
+          toast.success('小組討論會話創建成功！', {
+            duration: 3000,
+            style: {
+              background: '#10B981',
+              color: 'white',
+              borderRadius: '12px'
+            }
+          });
+        } catch (error) {
+          console.error('創建會話失敗:', error);
+          toast.error('創建會話失敗，請稍後再試');
+        } finally {
+          setIsCreatingSession(false);
+        }
+      };
+      
+      createSessionAndNavigate();
       return;
     }
     setCurrentStep(step);
-  }, [currentSession, handleCreateSession]);
+  }, [currentSession, selectedParticipants, sessionTitle, currentWeekId, createSession]); // 移除 handleCreateSession 依賴項
 
   // 渲染主要內容
   const renderMainContent = () => {
@@ -258,7 +292,7 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
             <div className="flex justify-center">
               <motion.button
                 onClick={handleCreateSession}
-                disabled={!canProceedToNextStep('setup') || isCreatingSession}
+                disabled={selectedParticipants.length < 2 || isCreatingSession}
                 className="px-8 py-3 bg-gradient-to-r from-orange-400 to-pink-400 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

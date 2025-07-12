@@ -17,10 +17,12 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const useUser = () => {
+  console.log('🟣 [UserContext] useUser hook 被調用');
   const context = useContext(UserContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useUser must be used within a UserProvider');
   }
+  console.log('🟣 [UserContext] useUser 返回 context:', { currentUser: context.currentUser?.name });
   return context;
 };
 
@@ -34,15 +36,9 @@ function UserProvider({ children }: { children: ReactNode }) {
     
     const initializeAuth = async () => {
       try {
-        console.log('🔄 [UserContext] 初始化認證狀態...');
         const user = await authService.getCurrentUser();
         
         if (isMounted) {
-          console.log('✅ [UserContext] 初始化完成', {
-            hasUser: !!user,
-            userId: user?.id,
-            roles: user?.roles
-          });
           setCurrentUser(user);
         }
       } catch (error) {
@@ -62,11 +58,6 @@ function UserProvider({ children }: { children: ReactNode }) {
     // 監聽認證狀態變化
     const { data: { subscription } } = authService.onAuthStateChange((user) => {
       if (isMounted) {
-        console.log('🔄 [UserContext] 認證狀態變化', {
-          hasUser: !!user,
-          userId: user?.id,
-          roles: user?.roles
-        });
         
         setCurrentUser(user);
         setIsLoading(false); // 確保載入狀態更新
@@ -128,13 +119,7 @@ function UserProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      console.log('🔄 [UserContext] 手動刷新用戶資料...');
       const user = await authService.getCurrentUser();
-      console.log('✅ [UserContext] 用戶資料刷新完成', {
-        hasUser: !!user,
-        userId: user?.id,
-        roles: user?.roles
-      });
       setCurrentUser(user);
     } catch (error) {
       console.error('❌ [UserContext] 刷新用戶資料失敗:', error);

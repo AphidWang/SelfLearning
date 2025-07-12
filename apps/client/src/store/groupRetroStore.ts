@@ -389,6 +389,7 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       // 這裡應該查詢當前週的會話
       // 暫時返回 currentSession 如果週 ID 匹配
       const currentSession = get().currentSession;
+      
       if (currentSession && currentSession.weekId === weekId) {
         return currentSession;
       }
@@ -404,13 +405,38 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
 
   // 參與者管理
   loadAvailableParticipants: async (filters?: ParticipantSelectionFilters) => {
+    console.log('🟠 [groupRetroStore] loadAvailableParticipants 開始', { filters });
+    
+    const state = get();
+    console.log('🟠 [groupRetroStore] 當前狀態:', { 
+      loading: state.loading, 
+      availableParticipants: state.availableParticipants.length 
+    });
+    
+    // 如果已經在載入中，避免重複載入
+    if (state.loading) {
+      console.log('🔴 [groupRetroStore] 已在載入中，返回現有參與者');
+      return state.availableParticipants;
+    }
+    
     try {
+      console.log('🟢 [groupRetroStore] 設置載入狀態 loading: true');
       set({ loading: true, error: null });
       
       // 獲取用戶列表 - 使用協作者候選人 API
+      console.log('🟢 [groupRetroStore] 調用 userStore.getCollaboratorCandidates');
       const userStore = useUserStore.getState();
       await userStore.getCollaboratorCandidates();
       const allUsers = userStore.users;
+      
+      console.log('🟢 [groupRetroStore] 獲取到用戶數量:', allUsers.length);
+      
+      // 如果沒有用戶，直接設置為空數組並結束
+      if (allUsers.length === 0) {
+        console.log('🟡 [groupRetroStore] 沒有用戶，設置空數組');
+        set({ availableParticipants: [], loading: false });
+        return [];
+      }
       
       // 獲取當前週統計數據
       const weekId = get().getWeekId();
@@ -479,16 +505,20 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       // 應用篩選條件
       let filteredParticipants = participants;
       
+      console.log('🟢 [groupRetroStore] 應用篩選前參與者數量:', participants.length);
+      
       if (filters?.hasCompletedPersonalRetro !== undefined) {
         filteredParticipants = filteredParticipants.filter(p => 
           p.hasCompletedPersonalRetro === filters.hasCompletedPersonalRetro
         );
+        console.log('🟢 [groupRetroStore] 篩選 hasCompletedPersonalRetro 後數量:', filteredParticipants.length);
       }
       
       if (filters?.excludeUserIds?.length) {
         filteredParticipants = filteredParticipants.filter(p => 
           !filters.excludeUserIds!.includes(p.user.id)
         );
+        console.log('🟢 [groupRetroStore] 排除用戶後數量:', filteredParticipants.length);
       }
       
       if (filters?.searchQuery) {
@@ -497,13 +527,16 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
           p.user.name?.toLowerCase().includes(query) ||
           p.user.email?.toLowerCase().includes(query)
         );
+        console.log('🟢 [groupRetroStore] 搜尋篩選後數量:', filteredParticipants.length);
       }
       
+      console.log('🟢 [groupRetroStore] 設置最終結果並關閉載入狀態');
       set({ availableParticipants: filteredParticipants, loading: false });
+      console.log('🟢 [groupRetroStore] loadAvailableParticipants 完成，返回:', filteredParticipants.length);
       return filteredParticipants;
       
     } catch (error: any) {
-      console.error('載入可用參與者失敗:', error);
+      console.error('🔴 [groupRetroStore] 載入可用參與者失敗:', error);
       set({ error: error.message, loading: false });
       throw error;
     }
@@ -913,7 +946,8 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
     const week = Math.ceil(
       ((targetDate.getTime() - new Date(year, 0, 1).getTime()) / 86400000 + 1) / 7
     );
-    return `${year}-W${week.toString().padStart(2, '0')}`;
+    const weekId = `${year}-W${week.toString().padStart(2, '0')}`;
+    return weekId;
   },
 
   clearError: () => {

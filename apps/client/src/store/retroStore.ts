@@ -13,6 +13,9 @@
  * - 負責數據整理和組合以滿足 UI 需求
  */
 
+// 🔧 Debug 開關
+const DEBUG_RETRO_STORE = true;
+
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import { httpInterceptor } from '../services/httpInterceptor';
@@ -74,6 +77,12 @@ interface RetroStoreState {
   createAnswer: (data: CreateRetroAnswerData) => Promise<RetroAnswer | null>;
   getWeekId: () => string;
   clearError: () => void;
+  
+  // 新的 Session-based 方法
+  getCurrentSession: () => Promise<RetroSession | null>;
+  saveSessionAnswer: (sessionId: string, data: CreateRetroAnswerData) => Promise<RetroAnswer | null>;
+  updateSessionQuestions: (sessionId: string, questions: RetroQuestion[]) => Promise<boolean>;
+  completeSession: (sessionId: string) => Promise<boolean>;
 }
 
 // 內建問題庫
@@ -243,7 +252,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       const weekStart = new Date(getWeekStart(today));
       const weekEnd = new Date(getWeekEnd(today));
       
-      console.log('🔍 獲取週統計:', { today, weekStart, weekEnd });
+      DEBUG_RETRO_STORE && console.log('🔍 獲取週統計:', { today, weekStart, weekEnd });
       
       // 獲取當前用戶
       const { data: { user } } = await supabase.auth.getUser();
@@ -256,17 +265,22 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       
       // 確保 topics 數據已載入 - 等待載入完成
       if (topicStore.topics.length === 0 || topicStore.loading) {
-        console.log('🔄 等待 topicStore 載入完成...');
-        await topicStore.fetchTopics();
-        
-        // 重新獲取最新的 store 狀態
-        topicStore = useTopicStore.getState();
-        
-        // 再次檢查是否載入成功
-        if (topicStore.topics.length === 0) {
-          console.warn('⚠️ topicStore 載入後仍然為空，可能用戶沒有任何主題');
-        } else {
-          console.log('✅ topicStore 載入完成，共', topicStore.topics.length, '個主題');
+        DEBUG_RETRO_STORE && console.log('🔄 等待 topicStore 載入完成...');
+        try {
+          await topicStore.fetchTopics();
+          
+          // 重新獲取最新的 store 狀態
+          topicStore = useTopicStore.getState();
+          
+          // 再次檢查是否載入成功
+          if (topicStore.topics.length === 0) {
+            DEBUG_RETRO_STORE && console.warn('⚠️ topicStore 載入後仍然為空，可能用戶沒有任何主題');
+          } else {
+            DEBUG_RETRO_STORE && console.log('✅ topicStore 載入完成，共', topicStore.topics.length, '個主題');
+          }
+        } catch (topicError) {
+          DEBUG_RETRO_STORE && console.warn('⚠️ topicStore 載入失敗，但繼續執行:', topicError);
+          // 不拋出異常，繼續執行後續邏輯
         }
       }
       
@@ -274,6 +288,13 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       const weekEndStr = weekEnd.toISOString().split('T')[0];
       
       // 🎯 使用 topicStore 的 helper functions 獲取結構化數據
+      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 開始並行獲取數據...');
+      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 當前 topicStore 狀態:', {
+        topics_count: topicStore.topics.length,
+        loading: topicStore.loading,
+        error: topicStore.error
+      });
+      
       const [
         // 獲取本週主題進度摘要（包含沒有活動的主題）
         topicsProgress,
@@ -281,33 +302,55 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
         activeTopics,
         // 獲取本週每日活動統計
         dailyStats,
-        // 從 journalStore 獲取本週日記
+        // 從 journalStore 獲取本週日記（加上錯誤處理）
         journalHistory
-      ] = await Promise.all([
+      ] = await Promise.allSettled([
         topicStore.getTopicsProgressForWeek(weekStartStr, weekEndStr),
         topicStore.getActiveTopicsWithProgress(),
         topicStore.getDailyActivityStats(weekStartStr, weekEndStr),
         journalStore.getJournalHistory(7, 0) // 獲取最近7天的日記
       ]);
       
-      console.log('🔍 retroStore - 獲取的 dailyStats:', JSON.stringify(dailyStats, null, 2));
+      DEBUG_RETRO_STORE && console.log('🔍 retroStore - Promise.allSettled 完成');
+      
+      // 處理 Promise.allSettled 的結果
+      const resolvedTopicsProgress = topicsProgress.status === 'fulfilled' ? topicsProgress.value : [];
+      const resolvedActiveTopics = activeTopics.status === 'fulfilled' ? activeTopics.value : [];
+      const resolvedDailyStats = dailyStats.status === 'fulfilled' ? dailyStats.value : [];
+      const resolvedJournalHistory = journalHistory.status === 'fulfilled' ? journalHistory.value : { journals: [], total: 0 };
+      
+      // 記錄任何失敗的請求
+      if (topicsProgress.status === 'rejected') {
+        console.warn('獲取主題進度失敗:', topicsProgress.reason);
+      }
+      if (activeTopics.status === 'rejected') {
+        console.warn('獲取活躍主題失敗:', activeTopics.reason);
+      }
+      if (dailyStats.status === 'rejected') {
+        console.warn('獲取每日統計失敗:', dailyStats.reason);
+      }
+      if (journalHistory.status === 'rejected') {
+        console.warn('獲取日記歷史失敗:', journalHistory.reason);
+      }
+      
+      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 獲取的 dailyStats:', JSON.stringify(resolvedDailyStats, null, 2));
       
       // 過濾本週的日記
-      const journalData = journalHistory.journals.filter(journal => 
+      const journalData = resolvedJournalHistory.journals.filter(journal => 
         journal.date >= weekStartStr && journal.date <= weekEndStr
       );
       
       // 🎯 計算總體統計
-      const totalCompletedTasks = topicsProgress.reduce((sum, topic) => 
+      const totalCompletedTasks = resolvedTopicsProgress.reduce((sum, topic) => 
         sum + topic.progress_snapshot.completed_tasks, 0
       );
       
       // 🎯 主要主題清單（包含沒有活動的活躍主題）
-      const mainTopics = activeTopics
+      const mainTopics = resolvedActiveTopics
         .filter(topic => topic.status !== 'archived')
         .map(topic => {
           // 找到對應的進度摘要
-          const progressInfo = topicsProgress.find(p => p.topic_id === topic.topic_id);
+          const progressInfo = resolvedTopicsProgress.find(p => p.topic_id === topic.topic_id);
           
           return {
             id: topic.topic_id,
@@ -374,10 +417,10 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       mainTasks.splice(5); // 只保留前5個
       
       // 🎯 每日打卡統計（使用 topicStore 的 dailyStats）
-      console.log('🔍 retroStore - 開始處理 dailyCheckIns，dailyStats 長度:', dailyStats.length);
+      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 開始處理 dailyCheckIns，dailyStats 長度:', resolvedDailyStats.length);
       const dailyCheckIns: DailyCheckIn[] = await Promise.all(
-        dailyStats.map(async (stat, index) => {
-          console.log(`🔍 retroStore - 處理第${index + 1}天 (${stat.date}):`, {
+        resolvedDailyStats.map(async (stat, index) => {
+          DEBUG_RETRO_STORE && console.log(`🔍 retroStore - 處理第${index + 1}天 (${stat.date}):`, {
             total_activities: stat.total_activities,
             check_ins: stat.check_ins,
             active_tasks_type: typeof stat.active_tasks,
@@ -401,14 +444,14 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
           }> = [];
           
           // 處理新的 JSONB 格式的 active_tasks
-          console.log(`🔍 retroStore - ${stat.date} active_tasks:`, stat.active_tasks);
+          DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} active_tasks:`, stat.active_tasks);
           if (stat.active_tasks && Array.isArray(stat.active_tasks)) {
-            console.log(`🔍 retroStore - ${stat.date} 有 ${stat.active_tasks.length} 個 active_tasks`);
+            DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} 有 ${stat.active_tasks.length} 個 active_tasks`);
             for (const taskData of stat.active_tasks) {
               if (taskData && typeof taskData === 'object') {
                 // 類型斷言
                 const task = taskData as any;
-                console.log(`🔍 retroStore - 處理任務:`, {
+                DEBUG_RETRO_STORE && console.log(`🔍 retroStore - 處理任務:`, {
                   id: task.id,
                   title: task.title,
                   topic_subject: task.topic_subject,
@@ -423,7 +466,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
                     timestamp: action.action_timestamp
                   }));
                 
-                console.log(`🔍 retroStore - 任務 ${task.title} 的打卡記錄:`, checkInRecords);
+                DEBUG_RETRO_STORE && console.log(`🔍 retroStore - 任務 ${task.title} 的打卡記錄:`, checkInRecords);
                 
                 taskDetails.push({
                   id: task.id,
@@ -435,9 +478,9 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
                 });
               }
             }
-          } else {
-            console.log(`🔍 retroStore - ${stat.date} active_tasks 不是陣列或為空:`, typeof stat.active_tasks);
-          }
+                      } else {
+              DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} active_tasks 不是陣列或為空:`, typeof stat.active_tasks);
+            }
           
           const validTaskDetails = taskDetails;
           
@@ -477,7 +520,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
             mood: dayJournal?.mood || null
           };
           
-          console.log(`🔍 retroStore - ${stat.date} 最終結果:`, {
+          DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} 最終結果:`, {
             checkInCount: result.checkInCount,
             topics_count: result.topics.length,
             completedTasks_count: result.completedTasks?.length || 0,
@@ -500,7 +543,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       }));
       
       // 🎯 進行中的任務（從活躍主題中提取）
-      const inProgressTasks = activeTopics
+      const inProgressTasks = resolvedActiveTopics
         .filter(topic => topic.has_recent_activity)
         .map(topic => ({
           id: topic.topic_id,
@@ -541,7 +584,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
           ...mainTasks.slice(0, 3).map(t => t.title),
           ...activeSubjects.slice(0, 2)
         ])),
-        summary: `本週完成了 ${totalCompletedTasks} 個任務，主要專注在 ${mostActiveSubject} 的學習上。平均能量指數為 ${averageEnergy}/5，學習模式呈現${learningPattern === 'consistent' ? '穩定持續' : learningPattern === 'burst' ? '爆發式' : learningPattern === 'irregular' ? '不規律' : '平衡'}的特徵。`,
+        summary: `本週完成了 ${totalCompletedTasks} 個任務，主要專注在 ${mostActiveSubject} 的學習上。平均能量指數為 ${averageEnergy}/10，學習模式呈現${learningPattern === 'consistent' ? '穩定持續' : learningPattern === 'burst' ? '爆發式' : learningPattern === 'irregular' ? '不規律' : '平衡'}的特徵。`,
         mostActiveSubject,
         mostChallengingTask: inProgressTasks.find(t => t.daysInProgress > 3)?.title || null,
         learningPattern
@@ -620,6 +663,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       // 轉換欄位名稱以匹配資料庫表結構
       const dbData = {
         user_id: user.id,
+        date: getTodayInTimezone(), // 添加日期欄位
         week_id: data.weekId,
         question: data.question,
         is_custom_question: data.isCustomQuestion,
@@ -981,6 +1025,157 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
     } catch (error: any) {
       console.error('獲取指定日期週統計失敗:', error);
       return null;
+    }
+  },
+
+  // === 新的 Session-based 方法 ===
+  
+  // 獲取或創建當前週的回顧 session
+  getCurrentSession: async () => {
+    try {
+      set({ loading: true, error: null });
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+      
+      const weekId = get().getWeekId();
+      
+      // 調用 RPC 函數獲取或創建 session
+      const { data, error } = await supabase.rpc('get_or_create_retro_session', {
+        p_user_id: user.id,
+        p_week_id: weekId
+      });
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const sessionData = data[0];
+        
+        // 將週統計數據轉換為前端期望的格式
+        let weeklyStats: WeeklyStats | null = null;
+        if (sessionData.week_stats && Array.isArray(sessionData.week_stats)) {
+          // 使用現有的 getCurrentWeekStats 邏輯來處理數據
+          const currentStats = get().currentWeekStats;
+          if (currentStats) {
+            weeklyStats = {
+              ...currentStats,
+              // 保持現有的週統計數據，只添加 session 特有的信息
+              sessionAnswers: sessionData.session_answers || []
+            } as WeeklyStats;
+          }
+        }
+        
+        // 轉換為前端格式
+        const session: RetroSession = {
+          id: sessionData.id,
+          weekId: sessionData.week_id,
+          userId: sessionData.user_id,
+          weeklyStats: weeklyStats || {} as WeeklyStats,
+          drawnQuestions: sessionData.questions_drawn || [],
+          status: sessionData.answers_completed >= 2 ? 'completed' : 'draft',
+          createdAt: sessionData.created_at,
+          updatedAt: sessionData.updated_at
+        };
+        
+        // 添加 sessionAnswers 到 session 中（作為額外屬性）
+        (session as any).sessionAnswers = sessionData.session_answers || [];
+        
+        set({ currentSession: session, loading: false });
+        return session;
+      }
+      
+      set({ loading: false });
+      return null;
+    } catch (error: any) {
+      console.error('獲取當前 session 失敗:', error);
+      set({ loading: false, error: error.message });
+      return null;
+    }
+  },
+  
+  // 保存 session 答案
+  saveSessionAnswer: async (sessionId: string, data: CreateRetroAnswerData) => {
+    try {
+      set({ loading: true, error: null });
+      
+      // 調用 RPC 函數保存答案
+      const { data: result, error } = await supabase.rpc('save_retro_answer', {
+        p_session_id: sessionId,
+        p_question: data.question,
+        p_answer: data.answer,
+        p_mood: data.mood,
+        p_is_custom_question: data.isCustomQuestion,
+        p_custom_question: data.customQuestion,
+        p_emoji: data.emoji
+      });
+      
+      if (error) throw error;
+      
+      if (result && result.length > 0) {
+        const answerData = result[0];
+        
+        const answer: RetroAnswer = {
+          id: answerData.id,
+          date: getTodayInTimezone(),
+          weekId: data.weekId,
+          userId: answerData.session_id, // 這裡需要調整
+          question: data.question,
+          isCustomQuestion: data.isCustomQuestion,
+          customQuestion: data.customQuestion,
+          answer: answerData.answer,
+          mood: answerData.mood,
+          emoji: answerData.emoji,
+          createdAt: answerData.created_at,
+          updatedAt: answerData.created_at
+        };
+        
+        set({ loading: false });
+        return answer;
+      }
+      
+      set({ loading: false });
+      return null;
+    } catch (error: any) {
+      console.error('保存 session 答案失敗:', error);
+      set({ loading: false, error: error.message });
+      return null;
+    }
+  },
+  
+  // 更新 session 的抽取問題
+  updateSessionQuestions: async (sessionId: string, questions: RetroQuestion[]) => {
+    try {
+      const { data, error } = await supabase.rpc('update_session_questions', {
+        p_session_id: sessionId,
+        p_questions: questions
+      });
+      
+      if (error) throw error;
+      
+      return data || false;
+    } catch (error: any) {
+      console.error('更新 session 問題失敗:', error);
+      return false;
+    }
+  },
+  
+  // 完成 session
+  completeSession: async (sessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('retro_sessions')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
+      
+      if (error) throw error;
+      
+      return true;
+    } catch (error: any) {
+      console.error('完成 session 失敗:', error);
+      return false;
     }
   }
 }));
