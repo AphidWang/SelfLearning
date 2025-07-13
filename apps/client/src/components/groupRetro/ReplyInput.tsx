@@ -288,9 +288,7 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
   const [replyMood, setReplyMood] = useState('');
   const [replyEmoji, setReplyEmoji] = useState('');
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
-  
-  // 檢查當前用戶是否已回覆
-  const currentUserReply = replies.find(r => r.userId === currentUser?.id);
+  const [selectedParticipant, setSelectedParticipant] = useState<string>(''); // 選擇的參與者
   
   // 統計回覆情況
   const repliedParticipants = new Set(replies.map(r => r.userId));
@@ -302,11 +300,17 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
       return;
     }
     
+    if (!selectedParticipant) {
+      toast.error('請選擇要代表的參與者');
+      return;
+    }
+    
     const replyData: CreateGroupRetroReplyData = {
       questionId: question.id,
       content: replyContent.trim(),
       mood: replyMood as GroupRetroReply['mood'] || undefined,
-      emoji: replyEmoji || undefined
+      emoji: replyEmoji || undefined,
+      onBehalfOf: selectedParticipant // 代表的參與者 ID
     };
     
     onAddReply(question.id, replyData);
@@ -315,6 +319,7 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
     setReplyContent('');
     setReplyMood('');
     setReplyEmoji('');
+    setSelectedParticipant('');
     setShowReplyForm(false);
   };
   
@@ -351,7 +356,7 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
           <div className="flex items-center space-x-2">
             <div className="w-24 bg-gray-200 rounded-full h-2">
               <div
-                className="bg-gradient-to-r from-orange-400 to-pink-400 h-2 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-blue-400 to-purple-400 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${(replies.length / participants.length) * 100}%` }}
               />
             </div>
@@ -370,10 +375,10 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
         </h4>
         
         {replies.length === 0 ? (
-          <div className="text-center py-8 bg-gray-50 rounded-xl">
-            <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p className="text-gray-600 text-sm">還沒有人回覆這個問題</p>
-            <p className="text-gray-500 text-xs mt-1">成為第一個分享想法的人吧！</p>
+          <div className="text-center py-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200">
+            <MessageSquare className="w-12 h-12 mx-auto mb-4 text-blue-300" />
+            <p className="text-blue-700 text-sm">還沒有人回覆這個問題</p>
+            <p className="text-blue-600 text-xs mt-1">成為第一個分享想法的人吧！</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -410,34 +415,52 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
         </div>
       )}
       
-      {/* 回覆輸入表單 */}
+      {/* 回覆輸入表單 - 單一帳號輸入模式 */}
       {currentUser && (
         <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-gray-200">
-          {!currentUserReply ? (
-            !showReplyForm ? (
-              <button
-                onClick={() => setShowReplyForm(true)}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-orange-400 to-pink-400 text-white rounded-lg hover:shadow-md transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>我也要回覆</span>
-              </button>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-orange-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold">
-                    {currentUser.name?.charAt(0)?.toUpperCase() || 'U'}
-                  </div>
-                  <h4 className="font-medium text-gray-800">分享你的想法</h4>
+          {!showReplyForm ? (
+            <button
+              onClick={() => setShowReplyForm(true)}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-blue-400 to-purple-400 text-white rounded-lg hover:shadow-md transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>代表夥伴輸入回覆</span>
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full flex items-center justify-center text-white font-bold">
+                  {currentUser.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
-                
-                <textarea
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
-                  placeholder="輸入你的回覆..."
-                />
+                <h4 className="font-medium text-gray-800">代表夥伴輸入回覆</h4>
+              </div>
+              
+              {/* 參與者選擇器 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  選擇要代表的夥伴
+                </label>
+                <select
+                  value={selectedParticipant}
+                  onChange={(e) => setSelectedParticipant(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                >
+                  <option value="">請選擇夥伴</option>
+                  {unrepliedParticipants.map((participant) => (
+                    <option key={participant.user.id} value={participant.user.id}>
+                      {participant.user.name || participant.user.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none"
+                placeholder="輸入夥伴的回覆..."
+              />
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
@@ -447,7 +470,7 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
                       <select
                         value={replyMood}
                         onChange={(e) => setReplyMood(e.target.value)}
-                        className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                        className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                       >
                         <option value="">選擇心情</option>
                         <option value="excited">🤩 興奮</option>
@@ -465,7 +488,7 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
                         type="text"
                         value={replyEmoji}
                         onChange={(e) => setReplyEmoji(e.target.value)}
-                        className="w-16 text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                        className="w-16 text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                         placeholder="😊"
                       />
                     </div>
@@ -480,7 +503,7 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
                     </button>
                     <button
                       onClick={handleAddReply}
-                      className="px-4 py-2 bg-gradient-to-r from-orange-400 to-pink-400 text-white rounded hover:shadow-md transition-all flex items-center space-x-2"
+                      className="px-4 py-2 bg-gradient-to-r from-blue-400 to-purple-400 text-white rounded hover:shadow-md transition-all flex items-center space-x-2"
                     >
                       <Send className="w-4 h-4" />
                       <span>發送回覆</span>
@@ -489,11 +512,23 @@ const QuestionReplies: React.FC<QuestionRepliesProps> = ({
                 </div>
               </div>
             )
-          ) : (
-            <div className="text-center text-gray-600">
+          }
+          
+          {/* 顯示還沒回覆的夥伴 */}
+          {unrepliedParticipants.length === 0 ? (
+            <div className="text-center text-gray-600 mt-4">
               <CheckCircle2 className="w-6 h-6 mx-auto mb-2 text-green-500" />
-              <p className="text-sm">你已經回覆了這個問題</p>
-              <p className="text-xs text-gray-500 mt-1">可以在上方查看和編輯你的回覆</p>
+              <p className="text-sm">所有夥伴都已經回覆了這個問題</p>
+            </div>
+          ) : (
+            <div className="text-center text-gray-600 mt-4">
+              <Users className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+              <p className="text-sm">
+                還有 {unrepliedParticipants.length} 位夥伴沒有回覆
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {unrepliedParticipants.map(p => p.user.name || p.user.email).join('、')}
+              </p>
             </div>
           )}
         </div>
@@ -588,6 +623,31 @@ export const ReplyInput: React.FC = () => {
           onDeleteReply={handleDeleteReply}
         />
       ))}
+      
+      {/* 完成討論按鈕 */}
+      {questions.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-center pt-6"
+        >
+          <motion.button
+            onClick={() => {
+              // 觸發完成討論事件
+              if (window.confirm('確定要完成討論嗎？完成後將進入結果總覽頁面。')) {
+                // 發送自定義事件給 GroupRetroPanel
+                window.dispatchEvent(new CustomEvent('completeDiscussion'));
+              }
+            }}
+            className="px-8 py-3 bg-gradient-to-r from-green-400 to-emerald-400 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            完成討論
+          </motion.button>
+        </motion.div>
+      )}
     </div>
   );
 }; 

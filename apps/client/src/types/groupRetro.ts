@@ -29,6 +29,8 @@ export interface ParticipantWeeklySummary {
   energyDescription: string;
   /** 參與者顏色標識 */
   colorTheme: string;
+  /** 最近一次個人 Retro 的時間 */
+  lastRetroDate?: string;
 }
 
 /** 小組討論問題 */
@@ -162,6 +164,8 @@ export interface CreateGroupRetroReplyData {
   content: string;
   mood?: GroupRetroReply['mood'];
   emoji?: string;
+  /** 代表的參與者 ID（單一帳號輸入模式） */
+  onBehalfOf?: string;
 }
 
 /** 更新回覆數據 */

@@ -6,7 +6,7 @@
  * - 支援多選功能
  * - 搜尋和篩選功能
  * - 顯示參與者的週進度概覽
- * - 僅顯示已完成個人 Retro 的用戶
+ * - 顯示最近一次個人 Retro 的時間和資料
  * 
  * 🏗️ 架構設計：
  * - 使用 GroupRetroStore 管理狀態
@@ -23,13 +23,13 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Users, Check, X, RefreshCw } from 'lucide-react';
+import { Search, Users, Check, X, RefreshCw, Clock } from 'lucide-react';
 import { useGroupRetroStore } from '../../store/groupRetroStore';
 import { LoadingDots } from '../shared/LoadingDots';
 import type { ParticipantWeeklySummary } from '../../types/groupRetro';
 
 // Debug 開關
-const DEBUG_PARTICIPANT_SELECTOR = false;
+const DEBUG_PARTICIPANT_SELECTOR = true;
 
 const debugLog = (...args: any[]) => {
   if (DEBUG_PARTICIPANT_SELECTOR) {
@@ -56,19 +56,38 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
   onRemove,
   disabled = false
 }) => {
-  const { user, weeklyStats, hasCompletedPersonalRetro, mainTopics, energyDescription, colorTheme } = participant;
+  const { user, weeklyStats, hasCompletedPersonalRetro, mainTopics, energyDescription, colorTheme, lastRetroDate } = participant;
   
   // 用戶頭像或初始化字母
   const userInitial = user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U';
+  
+  // 格式化 Retro 時間
+  const formatRetroTime = (date?: string) => {
+    if (!date) return '尚未完成';
+    
+    const retroDate = new Date(date);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - retroDate.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 24) {
+      return `${diffInHours} 小時前`;
+    } else if (diffInHours < 168) { // 7 days
+      const days = Math.floor(diffInHours / 24);
+      return `${days} 天前`;
+    } else {
+      return retroDate.toLocaleDateString('zh-TW', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+  };
   
   return (
     <motion.div
       className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer ${
         isSelected
           ? 'border-orange-400 bg-orange-50 shadow-lg'
-          : hasCompletedPersonalRetro
-          ? 'border-gray-200 bg-white hover:border-orange-300 hover:shadow-md'
-          : 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+          : 'border-gray-200 bg-white hover:border-orange-300 hover:shadow-md'
       }`}
       onClick={disabled ? undefined : (isSelected ? onRemove : onSelect)}
       whileHover={!disabled ? { scale: 1.02 } : {}}
@@ -88,11 +107,10 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
       )}
       
       {/* 個人 Retro 完成狀態 */}
-      {hasCompletedPersonalRetro && (
-        <div className="absolute top-2 right-2">
-          <div className="w-3 h-3 bg-green-500 rounded-full" title="已完成個人 Retro" />
-        </div>
-      )}
+      <div className="absolute top-2 right-2">
+        <div className={`w-3 h-3 rounded-full ${hasCompletedPersonalRetro ? 'bg-green-500' : 'bg-gray-300'}`} 
+             title={hasCompletedPersonalRetro ? '已完成個人 Retro' : '尚未完成個人 Retro'} />
+      </div>
       
       <div className="flex items-start space-x-4">
         {/* 用戶頭像 */}
@@ -115,7 +133,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
               {user.name || '匿名用戶'}
             </h3>
             {hasCompletedPersonalRetro && (
-              <Check className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+              <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
             )}
           </div>
           
@@ -125,38 +143,40 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
           </p>
           
           {/* 週進度概覽 */}
-          {hasCompletedPersonalRetro ? (
-            <div className="space-y-1">
-              {/* 能量狀態 */}
+          <div className="space-y-1">
+            {/* 最近 Retro 時間 */}
+            <div className="flex items-center space-x-2">
+              <Clock className="w-3 h-3 text-gray-400" />
+              <span className="text-xs text-gray-600">
+                Retro: {formatRetroTime(lastRetroDate)}
+              </span>
+            </div>
+            
+            {/* 能量狀態 */}
+            <div className="flex items-center space-x-2">
+              <RefreshCw className="w-3 h-3 text-gray-400" />
+              <span className="text-xs text-gray-600">{energyDescription}</span>
+            </div>
+            
+            {/* 主要主題 */}
+            {mainTopics.length > 0 && (
               <div className="flex items-center space-x-2">
                 <RefreshCw className="w-3 h-3 text-gray-400" />
-                <span className="text-xs text-gray-600">{energyDescription}</span>
-              </div>
-              
-              {/* 主要主題 */}
-              {mainTopics.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <RefreshCw className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-600 truncate">
-                    {mainTopics.slice(0, 2).join(', ')}
-                    {mainTopics.length > 2 && '...'}
-                  </span>
-                </div>
-              )}
-              
-              {/* 打卡次數 */}
-              <div className="flex items-center space-x-2">
-                <Check className="w-3 h-3 text-gray-400" />
-                <span className="text-xs text-gray-600">
-                  本週打卡 {weeklyStats.checkInCount} 次
+                <span className="text-xs text-gray-600 truncate">
+                  {mainTopics.slice(0, 2).join(', ')}
+                  {mainTopics.length > 2 && '...'}
                 </span>
               </div>
+            )}
+            
+            {/* 打卡次數 */}
+            <div className="flex items-center space-x-2">
+              <Check className="w-3 h-3 text-gray-400" />
+              <span className="text-xs text-gray-600">
+                本週打卡 {weeklyStats.checkInCount} 次
+              </span>
             </div>
-          ) : (
-            <div className="text-xs text-gray-500">
-              尚未完成個人 Retro
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -167,7 +187,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
   debugLog('🔵 [ParticipantSelector] 組件渲染開始');
   
   // 組件狀態
-  const [showOnlyCompleted, setShowOnlyCompleted] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
   // 使用 useRef 來跟蹤載入狀態，避免組件重新掛載時被重置
@@ -189,19 +208,18 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
 
   debugLog('🔵 [ParticipantSelector] loadingStateRef.current:', loadingStateRef.current);
   debugLog('🔵 [ParticipantSelector] 狀態:', {
-    showOnlyCompleted,
     searchQuery,
     availableParticipants: availableParticipants.length,
     selectedParticipants: selectedParticipants.length,
     loading
   });
 
-  // 計算當前篩選條件 - 統一使用簡單格式
+  // 計算當前篩選條件 - 只有搜尋查詢
   const currentFilters = useMemo(() => {
-    const filters = `${showOnlyCompleted}-${searchQuery}`;
+    const filters = searchQuery;
     debugLog('🟡 [ParticipantSelector] currentFilters 計算:', filters);
     return filters;
-  }, [showOnlyCompleted, searchQuery]);
+  }, [searchQuery]);
 
   debugLog('🔵 [ParticipantSelector] currentFilters:', currentFilters);
   debugLog('🔵 [ParticipantSelector] lastFilters:', loadingStateRef.current.lastFilters);
@@ -242,7 +260,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
         
         debugLog('🟢 [ParticipantSelector] 調用 loadAvailableParticipants');
         await loadAvailableParticipants({
-          hasCompletedPersonalRetro: showOnlyCompleted,
           searchQuery: searchQuery.trim() || undefined
         });
         
@@ -295,13 +312,8 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
       );
     }
     
-    // 僅顯示完成個人 Retro 的用戶
-    if (showOnlyCompleted) {
-      filtered = filtered.filter(p => p.hasCompletedPersonalRetro);
-    }
-    
     return filtered;
-  }, [availableParticipants, searchQuery, showOnlyCompleted]);
+  }, [availableParticipants, searchQuery]);
   
   // 處理參與者選擇
   const handleParticipantSelect = (participant: ParticipantWeeklySummary) => {
@@ -320,9 +332,8 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
 
   return (
     <div className="space-y-4">
-      {/* 搜尋和篩選器 */}
+      {/* 搜尋框 */}
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* 搜尋框 */}
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
@@ -332,19 +343,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           />
-        </div>
-        
-        {/* 篩選器 */}
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center space-x-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={showOnlyCompleted}
-              onChange={(e) => setShowOnlyCompleted(e.target.checked)}
-              className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
-            />
-            <span>僅顯示已完成個人 Retro</span>
-          </label>
         </div>
       </div>
       
@@ -406,12 +404,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
             <h4 className="font-medium text-gray-800">
               可選擇的夥伴 ({filteredParticipants.length})
             </h4>
-            {/* 這裡的 maxParticipants 需要從 props 中獲取，目前暫時移除 */}
-            {/* {!canSelectMore && (
-              <span className="text-sm text-orange-600">
-                已達到最大參與者數量
-              </span>
-            )} */}
           </div>
           
           {filteredParticipants.length === 0 ? (
@@ -419,7 +411,7 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
               <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
               <p className="text-sm">沒有找到符合條件的夥伴</p>
               <p className="text-xs text-gray-400 mt-1">
-                {showOnlyCompleted ? '請確認夥伴們已完成個人 Retro' : '試試調整搜尋條件'}
+                試試調整搜尋條件
               </p>
             </div>
           ) : (
@@ -431,8 +423,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
                   isSelected={isParticipantSelected(participant.user.id)}
                   onSelect={() => handleParticipantSelect(participant)}
                   onRemove={() => handleParticipantRemove(participant.user.id)}
-                  // 這裡的 maxParticipants 需要從 props 中獲取，目前暫時移除
-                  // disabled={!canSelectMore && !isParticipantSelected(participant.user.id)}
                 />
               ))}
             </div>

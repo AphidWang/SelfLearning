@@ -29,8 +29,8 @@ import { useUser } from '../../context/UserContext';
 import { LoadingDots } from '../shared/LoadingDots';
 import { ParticipantSelector } from './ParticipantSelector';
 import { ParticipantOverview } from './ParticipantOverview';
-import { DiscussionQuestions } from './DiscussionQuestions';
-import { ReplyInput } from './ReplyInput';
+import { IntegratedDiscussion } from './IntegratedDiscussion';
+import { GroupRetroResultsDashboard } from './GroupRetroResultsDashboard';
 import type { GroupRetroSession, CreateGroupRetroSessionData } from '../../types/groupRetro';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -48,7 +48,7 @@ interface GroupRetroPanelProps {
 }
 
 // 面板步驟狀態
-type PanelStep = 'setup' | 'overview' | 'discussion' | 'completed';
+type PanelStep = 'setup' | 'overview' | 'discussion' | 'results' | 'completed';
 
 interface StepIndicatorProps {
   currentStep: PanelStep;
@@ -61,6 +61,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, onStepChange
     { id: 'setup', title: '選擇夥伴', icon: Users },
     { id: 'overview', title: '週進度總覽', icon: Target },
     { id: 'discussion', title: '共學討論', icon: MessageSquare },
+    { id: 'results', title: '討論結果', icon: Star },
     { id: 'completed', title: '完成', icon: CheckCircle2 }
   ];
 
@@ -71,7 +72,8 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, onStepChange
           const Icon = step.icon;
           const isActive = currentStep === step.id;
           const isPassed = steps.findIndex(s => s.id === currentStep) > index;
-          const isClickable = canNavigate && (isPassed || isActive || index === steps.findIndex(s => s.id === currentStep) + 1);
+          // 完成步驟不能被點擊，只能自動跳轉
+          const isClickable = canNavigate && step.id !== 'completed' && (isPassed || isActive || index === steps.findIndex(s => s.id === currentStep) + 1);
 
           return (
             <React.Fragment key={step.id}>
@@ -204,7 +206,18 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [error, clearError]); // 修復：添加 clearError 依賴
+  }, [error, clearError]);
+
+  // 監聽完成討論事件
+  useEffect(() => {
+    const handleCompleteDiscussion = () => {
+      debugLog('🔴 [GroupRetroPanel] 收到完成討論事件，切換到結果頁面');
+      setCurrentStep('results');
+    };
+
+    window.addEventListener('completeDiscussion', handleCompleteDiscussion);
+    return () => window.removeEventListener('completeDiscussion', handleCompleteDiscussion);
+  }, []); // 修復：添加 clearError 依賴
 
   // 創建會話
   const handleCreateSession = useCallback(async () => {
@@ -437,8 +450,22 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
               </div>
             )}
 
-            <DiscussionQuestions />
-            <ReplyInput />
+            <IntegratedDiscussion />
+          </motion.div>
+        );
+
+      case 'results':
+        return (
+          <motion.div
+            key="results"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            <GroupRetroResultsDashboard 
+              onSaveComplete={() => setCurrentStep('completed')}
+            />
           </motion.div>
         );
 
