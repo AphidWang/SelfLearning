@@ -120,28 +120,46 @@ export const getCurrentTimeInTimezone = (timezone: string = APP_TIMEZONE): Date 
 
 /**
  * 獲取指定日期所在週的開始日期（週一）
+ * 統一使用週期計算邏輯
  */
 export const getWeekStart = (date: string | Date = new Date(), timezone: string = APP_TIMEZONE): string => {
-  const targetDate = typeof date === 'string' ? new Date(date + 'T00:00:00') : new Date(date);
+  let targetDate: Date;
+  if (typeof date === 'string') {
+    targetDate = new Date(date + 'T00:00:00');
+  } else {
+    targetDate = new Date(date);
+  }
   
-  // 在指定時區中獲取日期
+  // 轉換到指定時區
   const dateInTz = getDateInTimezone(targetDate, timezone);
   const dateObj = new Date(dateInTz + 'T00:00:00');
   
-  // 獲取星期幾 (0=週日, 1=週一, ..., 6=週六)
-  const dayOfWeek = dateObj.getDay();
+  const year = dateObj.getFullYear();
   
-  // 計算到週一的偏移量
-  const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // 週日的話往前推6天，其他往前推到週一
+  // 找到該日期所在週的週一
+  const dayOfWeek = dateObj.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(dateObj);
+  monday.setDate(dateObj.getDate() + daysToMonday);
   
-  const weekStart = new Date(dateObj);
-  weekStart.setDate(dateObj.getDate() + offset);
+  // 找到該年第一個週一
+  const firstDayOfYear = new Date(year, 0, 1);
+  const firstDayOfWeek = firstDayOfYear.getDay();
+  const daysToFirstMonday = firstDayOfWeek === 0 ? 1 : (8 - firstDayOfWeek) % 7;
+  const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
+  
+  // 計算指定週的週一
+  const daysDiff = Math.floor((monday.getTime() - firstMonday.getTime()) / (24 * 60 * 60 * 1000));
+  const week = Math.floor(daysDiff / 7) + 1;
+  const weekStart = new Date(firstMonday);
+  weekStart.setDate(firstMonday.getDate() + (week - 1) * 7);
   
   return getDateInTimezone(weekStart, timezone);
 };
 
 /**
  * 獲取指定日期所在週的結束日期（週日）
+ * 統一使用週期計算邏輯
  */
 export const getWeekEnd = (date: string | Date = new Date(), timezone: string = APP_TIMEZONE): string => {
   const weekStart = getWeekStart(date, timezone);
