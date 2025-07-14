@@ -19,7 +19,8 @@ const DEBUG_RETRO_STORE = true;
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import { httpInterceptor } from '../services/httpInterceptor';
-import { getTodayInTimezone, getWeekStart, getWeekEnd } from '../config/timezone';
+import { getTodayInTimezone } from '../config/timezone';
+import { generateWeekId, parseWeekId } from '../utils/weekUtils';
 import { useTopicStore } from './topicStore';
 import { taskRecordStore } from './taskRecordStore';
 import { journalStore } from './journalStore';
@@ -48,6 +49,10 @@ interface RetroStoreState {
   loading: boolean;
   error: string | null;
   drawAnimation: DrawAnimationState;
+  
+  // 新增：當前選中的週期
+  selectedWeekId: string | null;
+  selectedWeekIds: string[];
 
   // 核心功能
   getCurrentWeekStats: () => Promise<WeeklyStats | null>;
@@ -75,7 +80,7 @@ interface RetroStoreState {
   getAnswerHistory: (filters?: RetroFilters) => Promise<RetroAnswer[]>;
   drawQuestions: (filters?: RetroFilters & { count?: number }) => Promise<QuestionDraw | null>;
   createAnswer: (data: CreateRetroAnswerData) => Promise<RetroAnswer | null>;
-  getWeekId: () => string;
+  getWeekId: (date?: string | Date) => string;
   clearError: () => void;
   
   // 新的 Session-based 方法
@@ -83,6 +88,12 @@ interface RetroStoreState {
   saveSessionAnswer: (sessionId: string, data: CreateRetroAnswerData) => Promise<RetroAnswer | null>;
   updateSessionQuestions: (sessionId: string, questions: RetroQuestion[]) => Promise<boolean>;
   completeSession: (sessionId: string) => Promise<boolean>;
+  
+  // 週期管理方法
+  setSelectedWeek: (weekId: string, weekIds?: string[]) => void;
+  getSessionForWeek: (weekId: string) => Promise<RetroSession | null>;
+  getWeekStatsForWeek: (weekId: string) => Promise<WeeklyStats | null>;
+  loadWeekData: (weekId: string) => Promise<void>;
 }
 
 // 內建問題庫
@@ -242,388 +253,33 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
     currentStep: 'idle',
     progress: 0
   },
+  
+  // 週期狀態
+  selectedWeekId: null,
+  selectedWeekIds: [],
 
-  // 獲取當前週統計
+  // 獲取當前週統計 - 統一調用 getWeekStatsForWeek 確保邏輯一致
   getCurrentWeekStats: async () => {
     try {
-      set({ loading: true, error: null });
-      
+      // 獲取當前週期 ID
       const today = getTodayInTimezone();
-      const weekStart = new Date(getWeekStart(today));
-      const weekEnd = new Date(getWeekEnd(today));
+      const weekId = generateWeekId(today);
       
-      DEBUG_RETRO_STORE && console.log('🔍 獲取週統計:', { today, weekStart, weekEnd });
+      DEBUG_RETRO_STORE && console.log('🔍 獲取當前週統計，weekId:', weekId);
       
-      // 獲取當前用戶
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('用戶未認證');
-      }
+      // 直接調用 getWeekStatsForWeek 確保邏輯一致
+      const weekStats = await get().getWeekStatsForWeek(weekId);
       
-      // 🎯 通過各個 store 獲取數據，不直接查詢資料庫
-      let topicStore = useTopicStore.getState();
-      
-      // 確保 topics 數據已載入 - 等待載入完成
-      if (topicStore.topics.length === 0 || topicStore.loading) {
-        DEBUG_RETRO_STORE && console.log('🔄 等待 topicStore 載入完成...');
-        try {
-          await topicStore.fetchTopics();
-          
-          // 重新獲取最新的 store 狀態
-          topicStore = useTopicStore.getState();
-          
-          // 再次檢查是否載入成功
-          if (topicStore.topics.length === 0) {
-            DEBUG_RETRO_STORE && console.warn('⚠️ topicStore 載入後仍然為空，可能用戶沒有任何主題');
-          } else {
-            DEBUG_RETRO_STORE && console.log('✅ topicStore 載入完成，共', topicStore.topics.length, '個主題');
-          }
-        } catch (topicError) {
-          DEBUG_RETRO_STORE && console.warn('⚠️ topicStore 載入失敗，但繼續執行:', topicError);
-          // 不拋出異常，繼續執行後續邏輯
-        }
-      }
-      
-      const weekStartStr = weekStart.toISOString().split('T')[0];
-      const weekEndStr = weekEnd.toISOString().split('T')[0];
-      
-      // 🎯 使用 topicStore 的 helper functions 獲取結構化數據
-      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 開始並行獲取數據...');
-      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 當前 topicStore 狀態:', {
-        topics_count: topicStore.topics.length,
-        loading: topicStore.loading,
-        error: topicStore.error
+      // 更新 store 狀態，但不覆蓋用戶選擇的週期
+      set({ 
+        currentWeekStats: weekStats
+        // 移除 selectedWeekId: weekId，避免覆蓋用戶選擇
       });
       
-      const [
-        // 獲取本週主題進度摘要（包含沒有活動的主題）
-        topicsProgress,
-        // 獲取活躍主題的完整信息
-        activeTopics,
-        // 獲取本週每日活動統計
-        dailyStats,
-        // 從 journalStore 獲取本週日記（加上錯誤處理）
-        journalHistory
-      ] = await Promise.allSettled([
-        topicStore.getTopicsProgressForWeek(weekStartStr, weekEndStr),
-        topicStore.getActiveTopicsWithProgress(),
-        topicStore.getDailyActivityStats(weekStartStr, weekEndStr),
-        journalStore.getJournalHistory(7, 0) // 獲取最近7天的日記
-      ]);
-      
-      DEBUG_RETRO_STORE && console.log('🔍 retroStore - Promise.allSettled 完成');
-      
-      // 處理 Promise.allSettled 的結果
-      const resolvedTopicsProgress = topicsProgress.status === 'fulfilled' ? topicsProgress.value : [];
-      const resolvedActiveTopics = activeTopics.status === 'fulfilled' ? activeTopics.value : [];
-      const resolvedDailyStats = dailyStats.status === 'fulfilled' ? dailyStats.value : [];
-      const resolvedJournalHistory = journalHistory.status === 'fulfilled' ? journalHistory.value : { journals: [], total: 0 };
-      
-      // 記錄任何失敗的請求
-      if (topicsProgress.status === 'rejected') {
-        console.warn('獲取主題進度失敗:', topicsProgress.reason);
-      }
-      if (activeTopics.status === 'rejected') {
-        console.warn('獲取活躍主題失敗:', activeTopics.reason);
-      }
-      if (dailyStats.status === 'rejected') {
-        console.warn('獲取每日統計失敗:', dailyStats.reason);
-      }
-      if (journalHistory.status === 'rejected') {
-        console.warn('獲取日記歷史失敗:', journalHistory.reason);
-      }
-      
-      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 獲取的 dailyStats:', JSON.stringify(resolvedDailyStats, null, 2));
-      
-      // 過濾本週的日記
-      const journalData = resolvedJournalHistory.journals.filter(journal => 
-        journal.date >= weekStartStr && journal.date <= weekEndStr
-      );
-      
-      // 🎯 計算總體統計
-      const totalCompletedTasks = resolvedTopicsProgress.reduce((sum, topic) => 
-        sum + topic.progress_snapshot.completed_tasks, 0
-      );
-      
-      // 🎯 主要主題清單（包含沒有活動的活躍主題）
-      const mainTopics = resolvedActiveTopics
-        .filter(topic => topic.status !== 'archived')
-        .map(topic => {
-          // 找到對應的進度摘要
-          const progressInfo = resolvedTopicsProgress.find(p => p.topic_id === topic.topic_id);
-          
-          return {
-            id: topic.topic_id,
-            title: topic.topic_title,
-            subject: topic.topic_subject,
-            progress: topic.completion_rate,
-            taskCount: topic.total_tasks,
-            completedTaskCount: topic.completed_tasks,
-            hasActivity: progressInfo?.is_active || false, // 這週是否有活動
-            weeklyProgress: progressInfo?.progress_snapshot || {
-              total_tasks: topic.total_tasks,
-              completed_tasks: topic.completed_tasks,
-              completion_rate: topic.completion_rate,
-              status_changes: 0,
-              check_ins: 0,
-              records: 0
-            }
-          };
-        })
-        .sort((a, b) => {
-          // 有活動的排前面，然後按進度排序
-          if (a.hasActivity !== b.hasActivity) {
-            return b.hasActivity ? 1 : -1;
-          }
-          return b.progress - a.progress;
-        })
-        .slice(0, 5);
-      
-      // 🎯 主要任務清單（從已完成的任務中提取）
-      const mainTasks: Array<{
-        id: string;
-        title: string;
-        topic: string;
-        completedAt: string;
-        difficulty: number;
-      }> = [];
-      
-      // 從 topicStore 的 topics 中找到本週完成的任務
-      for (const topic of topicStore.topics) {
-        for (const goal of topic.goals || []) {
-          for (const task of goal.tasks || []) {
-            if (task.status === 'done' && task.completed_at) {
-              const completedDate = new Date(task.completed_at);
-              const weekStartDate = new Date(weekStartStr);
-              const weekEndDate = new Date(weekEndStr);
-              
-              // 檢查是否在本週完成
-              if (completedDate >= weekStartDate && completedDate <= weekEndDate) {
-                mainTasks.push({
-                  id: task.id,
-                  title: task.title,
-                  topic: topic.subject || '未分類',
-                  completedAt: task.completed_at,
-                  difficulty: 3 // 預設難度，可以從 task 的其他屬性獲取
-                });
-              }
-            }
-          }
-        }
-      }
-      
-      // 按完成時間排序，最近完成的在前面
-      mainTasks.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
-      mainTasks.splice(5); // 只保留前5個
-      
-      // 🎯 每日打卡統計（使用 topicStore 的 dailyStats）
-      DEBUG_RETRO_STORE && console.log('🔍 retroStore - 開始處理 dailyCheckIns，dailyStats 長度:', resolvedDailyStats.length);
-      const dailyCheckIns: DailyCheckIn[] = await Promise.all(
-        resolvedDailyStats.map(async (stat, index) => {
-          DEBUG_RETRO_STORE && console.log(`🔍 retroStore - 處理第${index + 1}天 (${stat.date}):`, {
-            total_activities: stat.total_activities,
-            check_ins: stat.check_ins,
-            active_tasks_type: typeof stat.active_tasks,
-            active_tasks_length: Array.isArray(stat.active_tasks) ? stat.active_tasks.length : 'not array'
-          });
-          
-          const dayOfWeek = new Date(stat.date).toLocaleDateString('zh-TW', { weekday: 'long' });
-          const dayJournal = journalData.find(j => j.date === stat.date);
-          
-          // 🎯 處理任務詳細信息 - 現在 active_tasks 是 JSONB 格式
-          const taskDetails: Array<{
-            id: string;
-            title: string;
-            subject: string;
-            recordCount: number;
-            checkInDates: string[];
-            taskRecords: Array<{
-              id: string;
-              timestamp: string;
-            }>;
-          }> = [];
-          
-          // 處理新的 JSONB 格式的 active_tasks
-          DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} active_tasks:`, stat.active_tasks);
-          if (stat.active_tasks && Array.isArray(stat.active_tasks)) {
-            DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} 有 ${stat.active_tasks.length} 個 active_tasks`);
-            for (const taskData of stat.active_tasks) {
-              if (taskData && typeof taskData === 'object') {
-                // 類型斷言
-                const task = taskData as any;
-                DEBUG_RETRO_STORE && console.log(`🔍 retroStore - 處理任務:`, {
-                  id: task.id,
-                  title: task.title,
-                  topic_subject: task.topic_subject,
-                  actions_count: task.actions ? task.actions.length : 0
-                });
-                
-                // 計算打卡記錄
-                const checkInRecords = (task.actions || [])
-                  .filter((action: any) => action.action_type === 'check_in')
-                  .map((action: any) => ({
-                    id: action.id,
-                    timestamp: action.action_timestamp
-                  }));
-                
-                DEBUG_RETRO_STORE && console.log(`🔍 retroStore - 任務 ${task.title} 的打卡記錄:`, checkInRecords);
-                
-                taskDetails.push({
-                  id: task.id,
-                  title: task.title,
-                  subject: task.topic_subject || '未分類',
-                  recordCount: checkInRecords.length,
-                  checkInDates: [stat.date],
-                  taskRecords: checkInRecords
-                });
-              }
-            }
-                      } else {
-              DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} active_tasks 不是陣列或為空:`, typeof stat.active_tasks);
-            }
-          
-          const validTaskDetails = taskDetails;
-          
-          // 從 taskDetails 中計算真正的打卡次數（只計算有打卡記錄的任務）
-          const actualCheckInCount = taskDetails.reduce((sum, task) => sum + task.recordCount, 0);
-          
-          // 從 active_tasks 中找出該日完成的任務
-          const completedTasksToday: Array<{
-            id: string;
-            title: string;
-            subject: string;
-            completedAt: string;
-          }> = [];
-          if (stat.active_tasks && Array.isArray(stat.active_tasks)) {
-            for (const taskData of stat.active_tasks) {
-              if (taskData && typeof taskData === 'object') {
-                const task = taskData as any;
-                if (task.status === 'done') {
-                  completedTasksToday.push({
-                    id: task.id,
-                    title: task.title,
-                    subject: task.topic_subject || '未分類',
-                    completedAt: stat.date // 使用當日日期
-                  });
-                }
-              }
-            }
-          }
-          
-          const result = {
-            date: stat.date,
-            dayOfWeek,
-            checkInCount: actualCheckInCount, // 使用計算出的真實打卡次數
-            topics: validTaskDetails,
-            completedTasks: completedTasksToday, // 新增：該日完成的任務
-            energy: dayJournal?.motivation_level || null,
-            mood: dayJournal?.mood || null
-          };
-          
-          DEBUG_RETRO_STORE && console.log(`🔍 retroStore - ${stat.date} 最終結果:`, {
-            checkInCount: result.checkInCount,
-            topics_count: result.topics.length,
-            completedTasks_count: result.completedTasks?.length || 0,
-            energy: result.energy,
-            mood: result.mood,
-            原始_check_ins: stat.check_ins,
-            計算後_checkInCount: actualCheckInCount
-          });
-          
-          return result;
-        })
-      );
-      
-      // 🎯 能量狀態時間分布
-      const energyTimeline = journalData.map(journal => ({
-        date: journal.date,
-        energy: journal.motivation_level,
-        mood: journal.mood,
-        hasJournal: true
-      }));
-      
-      // 🎯 進行中的任務（從活躍主題中提取）
-      const inProgressTasks = resolvedActiveTopics
-        .filter(topic => topic.has_recent_activity)
-        .map(topic => ({
-          id: topic.topic_id,
-          title: topic.topic_title,
-          topic: topic.topic_subject,
-          status: 'in_progress' as const,
-          priority: 'medium' as const,
-          daysInProgress: topic.last_activity_date ? 
-            Math.floor((new Date().getTime() - new Date(topic.last_activity_date).getTime()) / (1000 * 60 * 60 * 24)) : 0
-        }))
-        .slice(0, 10);
-      
-      // 🎯 週摘要生成
-      const activeSubjects = Array.from(new Set(mainTopics.map(t => t.subject)));
-      const mostActiveSubject = activeSubjects[0] || '未分類';
-      
-      // 計算平均能量
-      const energyValues = journalData.map(j => j.motivation_level).filter(e => e !== null);
-      const averageEnergy = energyValues.length > 0 ? 
-        Math.round(energyValues.reduce((a, b) => a + b, 0) / energyValues.length) : 0;
-      
-      // 學習模式判斷
-      const dailyCheckInCounts = dailyCheckIns.map(d => d.checkInCount);
-      const maxCount = Math.max(...dailyCheckInCounts);
-      const avgCount = dailyCheckInCounts.reduce((a, b) => a + b, 0) / dailyCheckInCounts.length;
-      
-      let learningPattern: 'consistent' | 'burst' | 'irregular' | 'balanced' = 'balanced';
-      if (maxCount > avgCount * 2) {
-        learningPattern = 'burst';
-      } else if (dailyCheckInCounts.filter(c => c > 0).length >= 5) {
-        learningPattern = 'consistent';
-      } else if (dailyCheckInCounts.filter(c => c > 0).length <= 2) {
-        learningPattern = 'irregular';
-      }
-      
-      const weekSummary = {
-        keywords: Array.from(new Set([
-          ...mainTasks.slice(0, 3).map(t => t.title),
-          ...activeSubjects.slice(0, 2)
-        ])),
-        summary: `本週完成了 ${totalCompletedTasks} 個任務，主要專注在 ${mostActiveSubject} 的學習上。平均能量指數為 ${averageEnergy}/10，學習模式呈現${learningPattern === 'consistent' ? '穩定持續' : learningPattern === 'burst' ? '爆發式' : learningPattern === 'irregular' ? '不規律' : '平衡'}的特徵。`,
-        mostActiveSubject,
-        mostChallengingTask: inProgressTasks.find(t => t.daysInProgress > 3)?.title || null,
-        learningPattern
-      };
-      
-      // 🎯 社交互動統計 (簡化版本)
-      const socialInteractions = {
-        collaborativeTaskCount: 0, // TODO: 從 topicStore 獲取協作任務數
-        collaborators: [], // TODO: 從 topicStore 獲取協作者列表
-        helpReceived: 0,
-        helpProvided: 0
-      };
-      
-      // 🎯 計算總打卡次數
-      const totalCheckInCount = dailyCheckIns.reduce((sum, day) => sum + day.checkInCount, 0);
-      
-      const weeklyStats: WeeklyStats = {
-        checkInCount: totalCheckInCount,
-        completedTaskCount: totalCompletedTasks,
-        averageEnergy,
-        mainTasks,
-        mainTopics,
-        weekRange: {
-          start: weekStartStr,
-          end: weekEndStr
-        },
-        dailyCheckIns,
-        energyTimeline,
-        inProgressTasks,
-        weekSummary,
-        socialInteractions,
-        taskCheckInRecords: {} // 每個任務的打卡日期記錄
-      };
-      
-      set({ currentWeekStats: weeklyStats, loading: false });
-      return weeklyStats;
+      return weekStats;
     } catch (error: any) {
-      console.error('獲取週統計失敗:', error);
-      set({ loading: false, error: error.message || '獲取週統計失敗' });
+      console.error('獲取當前週統計失敗:', error);
+      set({ loading: false, error: error.message || '獲取當前週統計失敗' });
       return null;
     }
   },
@@ -953,12 +609,9 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
     }
   },
 
-  // 獲取週ID
-  getWeekId: (date?: string) => {
-    const targetDate = date ? new Date(date) : new Date();
-    const year = targetDate.getFullYear();
-    const weekNum = Math.ceil((targetDate.getTime() - new Date(year, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
-    return `${year}-W${weekNum.toString().padStart(2, '0')}`;
+  // 獲取週ID (委託到統一的工具函數)
+  getWeekId: (date?: string | Date) => {
+    return generateWeekId(date);
   },
 
   // 清除錯誤
@@ -1017,11 +670,8 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
   // 獲取指定日期的週統計
   getWeekStatsForDate: async (date: string) => {
     try {
-      const weekStart = getWeekStart(date);
-      const weekEnd = getWeekEnd(date);
-      
-      // 重新使用 getCurrentWeekStats 的邏輯，但使用指定的日期
-      return await get().getCurrentWeekStats();
+      const weekId = generateWeekId(date);
+      return await get().getWeekStatsForWeek(weekId);
     } catch (error: any) {
       console.error('獲取指定日期週統計失敗:', error);
       return null;
@@ -1176,6 +826,233 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
     } catch (error: any) {
       console.error('完成 session 失敗:', error);
       return false;
+    }
+  },
+
+  // === 週期管理方法 ===
+  
+  // 設定當前選中的週期
+  setSelectedWeek: (weekId: string, weekIds?: string[]) => {
+    set({ 
+      selectedWeekId: weekId,
+      selectedWeekIds: weekIds || [weekId]
+    });
+  },
+
+  // 獲取指定週期的 session
+  getSessionForWeek: async (weekId: string) => {
+    try {
+      set({ loading: true, error: null });
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+      
+      // 調用 RPC 函數獲取或創建指定週期的 session
+      const { data, error } = await supabase.rpc('get_or_create_retro_session', {
+        p_user_id: user.id,
+        p_week_id: weekId
+      });
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const sessionData = data[0];
+        
+        // 轉換為前端格式
+        const session: RetroSession = {
+          id: sessionData.id,
+          weekId: sessionData.week_id,
+          userId: sessionData.user_id,
+          weeklyStats: {} as WeeklyStats, // 將在 loadWeekData 中載入
+          drawnQuestions: sessionData.questions_drawn || [],
+          status: sessionData.answers_completed >= 2 ? 'completed' : 'draft',
+          createdAt: sessionData.created_at,
+          updatedAt: sessionData.updated_at
+        };
+        
+        // 添加 sessionAnswers 到 session 中（作為額外屬性）
+        (session as any).sessionAnswers = sessionData.session_answers || [];
+        
+        set({ currentSession: session, loading: false });
+        return session;
+      }
+      
+      set({ loading: false });
+      return null;
+    } catch (error: any) {
+      console.error('獲取週期 session 失敗:', error);
+      set({ loading: false, error: error.message });
+      return null;
+    }
+  },
+
+  // 獲取指定週期的統計資料 - 🆕 使用 topicStore 的統一 RPC 方法
+  getWeekStatsForWeek: async (weekId: string) => {
+    try {
+      // 使用統一的週期解析邏輯
+      const { parseWeekId } = await import('../utils/weekUtils');
+      const weekInfo = parseWeekId(weekId);
+      
+      if (!weekInfo) {
+        throw new Error(`無效的週期 ID: ${weekId}`);
+      }
+      
+      const weekStartStr = weekInfo.startDate;
+      const weekEndStr = weekInfo.endDate;
+      
+      DEBUG_RETRO_STORE && console.log('🔍 retroStore.getWeekStatsForWeek - 使用統一 RPC:', { weekId, weekStartStr, weekEndStr });
+      
+      set({ loading: true, error: null });
+      
+      // 🆕 調用 topicStore 的統一 RPC 方法
+      const topicStore = useTopicStore.getState();
+      const retroSummary = await topicStore.getRetroWeekSummary(weekStartStr, weekEndStr);
+      
+      DEBUG_RETRO_STORE && console.log('📊 RPC 返回數據:', {
+        dailyDays: retroSummary.daily_data.length,
+        weekTotals: retroSummary.week_data,
+        completedTasks: retroSummary.completed_data.length,
+        activeTopics: retroSummary.topics_data.length
+      });
+
+      // 🔄 轉換為前端期望的格式
+      const dailyCheckIns = retroSummary.daily_data.map(day => ({
+        date: day.date,
+        dayOfWeek: day.dayOfWeek,
+        checkInCount: day.check_ins,
+        taskRecordCount: day.records,
+        totalActivities: day.total_activities,
+        completedTasks: day.active_tasks
+          ? day.active_tasks.filter((t: any) => t.task_status === 'done').map((t: any) => ({
+              id: t.id,
+              title: t.title,
+              subject: t.subject
+            }))
+          : [],
+        topics: day.active_tasks || [],
+        mood: null,
+        energy: null
+      }));
+      
+      // 🧮 從 RPC 數據計算週總統計
+      const totalCheckIns = retroSummary.week_data.total_check_ins;
+      const totalTaskRecords = retroSummary.week_data.total_records;
+      const totalActivities = retroSummary.week_data.total_activities;
+      const totalCompletions = retroSummary.week_data.total_completed;
+      
+      // 🎯 轉換主要任務清單
+      const mainTasks = retroSummary.completed_data.map(task => ({
+        id: task.id,
+        title: task.title,
+        topic: task.topic,
+        completedAt: task.completed_at,
+        difficulty: task.difficulty
+      }));
+      
+      // 🎯 轉換主要主題清單
+      const mainTopics = retroSummary.topics_data.map(topic => ({
+        id: topic.id,
+        title: topic.title,
+        subject: topic.subject,
+        progress: topic.progress,
+        taskCount: topic.total_tasks,
+        completedTaskCount: topic.completed_tasks,
+        hasActivity: topic.has_activity,
+        weeklyProgress: {
+          total_tasks: topic.total_tasks,
+          completed_tasks: topic.completed_tasks,
+          completion_rate: topic.progress,
+          status_changes: topic.week_activities,
+          check_ins: 0,
+          records: 0
+        }
+      })).slice(0, 5);
+
+      // 📊 建構完整的週統計對象
+      const weeklyStats: WeeklyStats = {
+        weekId,
+        weekStart: weekStartStr,
+        weekEnd: weekEndStr,
+        completedTaskCount: totalCompletions,
+        averageEnergy: null,
+        totalCheckIns,
+        totalTaskRecords,
+        totalActivities,
+        inProgressTasks: [],
+        mainTasks,
+        activeTasks: [],
+        dailyCheckIns,
+        learningPatterns: [],
+        weekSummary: {
+          totalLearningHours: totalActivities,
+          completedGoals: 0,
+          averageEfficiency: 0.75,
+          learningPattern: 'morning',
+          topPerformanceDay: dailyCheckIns.reduce((prev, current) => 
+            (current.totalActivities > prev.totalActivities) ? current : prev, dailyCheckIns[0]
+          )?.dayOfWeek || '無',
+          improvementAreas: []
+        }
+      };
+
+      // 設置 store 狀態
+      set({ 
+        currentWeekStats: weeklyStats,
+        loading: false
+      });
+
+      DEBUG_RETRO_STORE && console.log('✅ retroStore.getWeekStatsForWeek 完成 (使用統一 RPC):', {
+        weekId,
+        completedTasks: weeklyStats.completedTaskCount,
+        totalCheckIns: weeklyStats.totalCheckIns,
+        totalTaskRecords: weeklyStats.totalTaskRecords,
+        totalActivities: weeklyStats.totalActivities,
+        dailyDays: weeklyStats.dailyCheckIns.length
+      });
+
+      return weeklyStats;
+    } catch (error: any) {
+      console.error('❌ retroStore.getWeekStatsForWeek 失敗:', error);
+      set({ loading: false, error: error.message });
+      return null;
+    }
+  },
+
+  // 載入指定週期的完整數據
+  loadWeekData: async (weekId: string) => {
+    try {
+      set({ loading: true, error: null });
+      
+      DEBUG_RETRO_STORE && console.log('🔄 載入週期數據:', weekId);
+      
+      // 並行載入 session 和統計數據
+      const [session, stats] = await Promise.all([
+        get().getSessionForWeek(weekId),
+        get().getWeekStatsForWeek(weekId)
+      ]);
+      
+      // 如果有 session，更新其中的週統計數據
+      if (session && stats) {
+        const updatedSession = {
+          ...session,
+          weeklyStats: stats
+        };
+        set({ currentSession: updatedSession });
+      }
+      
+      // 更新選中的週期
+      set({ 
+        selectedWeekId: weekId,
+        selectedWeekIds: [weekId]
+      });
+      
+      set({ loading: false });
+      
+      DEBUG_RETRO_STORE && console.log('✅ 週期數據載入完成:', { weekId, hasSession: !!session, hasStats: !!stats });
+    } catch (error: any) {
+      console.error('載入週期數據失敗:', error);
+      set({ loading: false, error: error.message });
+      throw error;
     }
   }
 }));
