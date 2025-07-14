@@ -173,7 +173,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
             <div className="flex items-center space-x-2">
               <Check className="w-3 h-3 text-gray-400" />
               <span className="text-xs text-gray-600">
-                本週打卡 {weeklyStats.checkInCount} 次
+                本週打卡 {weeklyStats.totalCheckIns} 次
               </span>
             </div>
           </div>
