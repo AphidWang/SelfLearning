@@ -451,13 +451,12 @@ export const PersonalRetroPanel: React.FC = () => {
         console.log('📝 從 session 提取的回顧記錄:', formatted);
         setCompletedRetros(formatted);
         
-        // 設定初始回顧數量，用於偵測變化
-        if (initialRetroCount === 0) {
-          setInitialRetroCount(formatted.length);
-          // 如果初始載入時就有2個以上回顧，假設已儲存
-          if (formatted.length >= 2) {
-            setIsRetroSaved(true);
-          }
+        // 初始化時正確設 isRetroSaved/hasChanges
+        if (formatted.length >= 2) {
+          setIsRetroSaved(true);
+          setHasChanges(false);
+        } else {
+          setIsRetroSaved(false);
         }
         return;
       }
@@ -499,13 +498,12 @@ export const PersonalRetroPanel: React.FC = () => {
       console.log('📝 本週回顧記錄:', formatted);
       setCompletedRetros(formatted);
       
-      // 設定初始回顧數量，用於偵測變化
-      if (initialRetroCount === 0) {
-        setInitialRetroCount(formatted.length);
-        // 如果初始載入時就有2個以上回顧，假設已儲存
-        if (formatted.length >= 2) {
-          setIsRetroSaved(true);
-        }
+      // 初始化時正確設 isRetroSaved/hasChanges
+      if (formatted.length >= 2) {
+        setIsRetroSaved(true);
+        setHasChanges(false);
+      } else {
+        setIsRetroSaved(false);
       }
     } catch (error) {
       console.error('載入已完成回顧失敗:', error);
@@ -870,15 +868,9 @@ export const PersonalRetroPanel: React.FC = () => {
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  key={isRetroSaved && !hasChanges ? 'saved' : 'save'}
+                  key={hasChanges ? 'save' : 'saved'}
                 >
-                  {isRetroSaved && !hasChanges ? (
-                    // 已儲存狀態
-                    <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white font-medium rounded-xl shadow-lg">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>回顧已儲存</span>
-                    </div>
-                  ) : (
+                  {hasChanges ? (
                     // 可儲存狀態
                     <motion.button
                       whileHover={{ scale: 1.05 }}
@@ -889,6 +881,12 @@ export const PersonalRetroPanel: React.FC = () => {
                       <Save className="w-4 h-4" />
                       <span>儲存回顧</span>
                     </motion.button>
+                  ) : (
+                    // 已儲存狀態
+                    <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white font-medium rounded-xl shadow-lg">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>回顧已儲存</span>
+                    </div>
                   )}
                 </motion.div>
               )}
