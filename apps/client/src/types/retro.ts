@@ -8,39 +8,23 @@
  * - 遊戲化介面元素
  */
 
-// 🎯 新增：每日打卡詳情類型
-export interface DailyCheckIn {
-  date: string;
-  dayOfWeek: string;
-  checkInCount: number;
-  topics: {
-    id: string;
-    title: string;
-    subject: string;
-    recordCount: number;
-    checkInDates: string[];
-    taskRecords?: Array<{
-      id: string;
-      timestamp: string;
-    }>;
-  }[];
-  completedTasks?: Array<{
-    id: string;
-    title: string;
-    subject: string;
-    completedAt: string;
-  }>;
-  energy: number | null;
-  mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed' | null;
-}
-
 export interface WeeklyStats {
-  /** 本週打卡次數 */
-  checkInCount: number;
+  /** 週期標識 */
+  weekId: string;
+  /** 週開始日期 */
+  weekStart: string;
+  /** 週結束日期 */
+  weekEnd: string;
   /** 完成的任務數量 */
   completedTaskCount: number;
   /** 本週平均能量/情緒指標 (1-5) */
-  averageEnergy: number;
+  averageEnergy: number | null;
+  /** 本週總打卡次數（狀態變化） */
+  totalCheckIns: number;
+  /** 本週總任務記錄數量（學習記錄） */
+  totalTaskRecords: number;
+  /** 本週總活動數量（打卡 + 任務記錄） */
+  totalActivities: number;
   /** 本週主要完成的任務清單 */
   mainTasks: {
     id: string;
@@ -49,33 +33,6 @@ export interface WeeklyStats {
     completedAt: string;
     difficulty: number;
   }[];
-  /** 本週主要主題清單 */
-  mainTopics: {
-    id: string;
-    title: string;
-    subject: string;
-    progress: number;
-    taskCount: number;
-    completedTaskCount: number;
-  }[];
-  /** 週開始和結束日期 */
-  weekRange: {
-    start: string;
-    end: string;
-  };
-  
-  // 🎯 新增：更詳細的脈絡資訊
-  /** 每日打卡詳情 */
-  dailyCheckIns: DailyCheckIn[];
-  
-  /** 能量狀態時間分布 */
-  energyTimeline: {
-    date: string;
-    energy: number;
-    mood: 'excited' | 'happy' | 'okay' | 'tired' | 'stressed';
-    hasJournal: boolean;
-  }[];
-  
   /** 進行中的任務 */
   inProgressTasks: {
     id: string;
@@ -85,39 +42,70 @@ export interface WeeklyStats {
     priority: 'low' | 'medium' | 'high';
     daysInProgress: number;
   }[];
+  /** 活躍任務清單 */
+  activeTasks: {
+    id: string;
+    title: string;
+    subject: string;
+    progress: number;
+    taskCount: number;
+    completedTaskCount: number;
+    hasActivity: boolean;
+    weeklyProgress: {
+      total_tasks: number;
+      completed_tasks: number;
+      completion_rate: number;
+      status_changes: number;
+      check_ins: number;
+      records: number;
+    };
+  }[];
+  
+  // 🎯 新增：更詳細的脈絡資訊
+  /** 每日打卡詳情 */
+  dailyCheckIns: {
+    date: string;
+    dayOfWeek: string;
+    checkInCount: number;      // 打卡次數（狀態變化）
+    taskRecordCount: number;   // 任務記錄次數（學習記錄）
+    totalActivities: number;   // 總活動數
+    completedTasks: Array<{
+      id: string;
+      title: string;
+      subject: string;
+    }>;
+    topics: Array<{
+      id: string;
+      title: string;
+      subject: string;
+      recordCount: number;
+      taskRecords: Array<{
+        id: string;
+        timestamp: string;
+      }>;
+    }>;
+    mood?: string | null;
+    energy?: number | null;
+  }[];
+  
+  /** 學習模式 */
+  learningPatterns: string[];
   
   /** 週摘要 */
   weekSummary: {
-    /** 本週關鍵字 */
-    keywords: string[];
-    /** AI 生成的週摘要 */
-    summary: string;
-    /** 最活躍的學習主題 */
-    mostActiveSubject: string;
-    /** 最有挑戰性的任務 */
-    mostChallengingTask: string | null;
+    /** 總學習時數 */
+    totalLearningHours: number;
+    /** 完成的目標數 */
+    completedGoals: number;
+    /** 平均效率 */
+    averageEfficiency: number;
     /** 本週學習模式 */
-    learningPattern: 'consistent' | 'burst' | 'irregular' | 'balanced';
+    learningPattern: 'morning' | 'evening' | 'consistent' | 'burst' | 'irregular' | 'balanced';
+    /** 表現最好的日子 */
+    topPerformanceDay: string;
+    /** 改善建議 */
+    improvementAreas: string[];
   };
-  
-  /** 社交互動統計 */
-  socialInteractions: {
-    /** 協作任務數量 */
-    collaborativeTaskCount: number;
-    /** 協作者清單 */
-    collaborators: Array<{
-      id: string;
-      name: string;
-      avatar: string;
-    }>;
-    /** 收到的幫助次數 */
-    helpReceived: number;
-    /** 提供的幫助次數 */
-    helpProvided: number;
-  };
-
-  /** 任務打卡記錄 */
-  taskCheckInRecords: Record<string, { dates: string[]; count: number; }>;
 }
 
 export interface RetroQuestion {
@@ -274,4 +262,7 @@ export interface RetroResponse<T> {
   success: boolean;
   data?: T;
   error?: RetroError;
-} 
+}
+
+// 導出 DailyCheckIn 類型供其他模組使用
+export type DailyCheckIn = WeeklyStats['dailyCheckIns'][0]; 
