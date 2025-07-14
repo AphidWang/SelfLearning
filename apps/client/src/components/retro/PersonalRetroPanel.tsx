@@ -217,10 +217,13 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
           transform: 'translate(-50%, -100%)'
         }}
       >
-        <div className="text-sm font-medium text-gray-800 mb-2">📋 今日打卡任務</div>
+        <div className="text-sm font-medium text-gray-800 mb-2">📋 今日任務活動</div>
         <div className="space-y-3">
           {tasks.map((task, index) => {
             const colors = getSubjectColor(task.subject);
+            const hasTaskRecords = task.taskRecords && task.taskRecords.length > 0;
+            const hasCheckIns = task.recordCount > 0 && !hasTaskRecords;
+            
             return (
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -234,12 +237,22 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
                 </div>
                 
                 <div className="pl-3 space-y-1">
-                  {task.taskRecords.map((record, actionIndex) => (
-                    <div key={actionIndex} className="text-xs text-gray-600 flex items-center gap-2">
+                  {/* 顯示任務記錄 */}
+                  {hasTaskRecords && task.taskRecords.map((record, recordIndex) => (
+                    <div key={recordIndex} className="text-xs text-gray-600 flex items-center gap-2">
+                      <span>📔</span>
                       <span>{formatTime(record.timestamp)}</span>
-                      <span className="text-blue-600">打卡記錄</span>
+                      <span className="text-orange-600">學習記錄</span>
                     </div>
                   ))}
+                  
+                  {/* 顯示打卡記錄 */}
+                  {hasCheckIns && (
+                    <div className="text-xs text-gray-600 flex items-center gap-2">
+                      <span>🔔</span>
+                      <span className="text-blue-600">打卡記錄</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -260,7 +273,9 @@ export const PersonalRetroPanel: React.FC = () => {
     loading,
     error,
     getCurrentWeekStats,
+    getWeekStatsForWeek,
     getCurrentSession,
+    getSessionForWeek, // 添加這個
     drawQuestions,
     createAnswer,
     saveSessionAnswer,
@@ -268,8 +283,18 @@ export const PersonalRetroPanel: React.FC = () => {
     getAnswerHistory,
     getWeekId,
     clearError,
-    deleteAnswer // 添加這個
+    deleteAnswer,
+    completeSession,
+    selectedWeekId // 新增：獲取當前選中的週期
   } = useRetroStore();
+
+  // 🔍 專門監聽 selectedWeekId 變化
+  useEffect(() => {
+    console.log('📅 selectedWeekId 變化:', {
+      新值: selectedWeekId,
+      時間戳: new Date().toISOString()
+    });
+  }, [selectedWeekId]);
 
   // 追蹤載入狀態
   const [loadingState, setLoadingState] = useState<'initial' | 'loading' | 'completed' | 'error'>('initial');
@@ -331,16 +356,44 @@ export const PersonalRetroPanel: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const [initialRetroCount, setInitialRetroCount] = useState(0);
 
+  // 幫你加一個 util，統一 session 取得
+  const getSession = async () => {
+    if (!selectedWeekId) throw new Error('selectedWeekId 不應為空');
+    return await getSessionForWeek(selectedWeekId);
+  };
+
   // 載入週統計數據和當前 session
   useEffect(() => {
+    console.log('🔄 PersonalRetroPanel - useEffect 觸發!');
+    // 依賴項變化檢查:
+    console.log('🔍 依賴項變化檢查:', { 
+      selectedWeekId, 
+      hasGetCurrentWeekStats: !!getCurrentWeekStats,
+      hasGetWeekStatsForWeek: !!getWeekStatsForWeek,
+      // refreshCounter
+    });
+    
     const loadData = async () => {
       console.log('🚀 PersonalRetroPanel - 開始載入數據...');
+      console.log('🔍 PersonalRetroPanel - 當前狀態:', { 
+        selectedWeekId, 
+        hasCurrentWeekStats: !!currentWeekStats,
+        loading 
+      });
+      
       setLoadingState('loading');
       try {
-        console.log('📞 PersonalRetroPanel - 準備調用 getCurrentWeekStats...');
-        const weekStatsPromise = getCurrentWeekStats();
-        console.log('📞 PersonalRetroPanel - 準備調用 getCurrentSession...');
-        const sessionPromise = getCurrentSession();
+        // 根據是否有選中週期來決定載入邏輯
+        let weekStatsPromise;
+        let sessionPromise;
+        if (selectedWeekId) {
+          console.log('📞 PersonalRetroPanel - 載入選中週期數據:', selectedWeekId);
+          weekStatsPromise = getWeekStatsForWeek(selectedWeekId);
+          sessionPromise = getSession();
+        } else {
+          // 理論上不應該進來
+          throw new Error('selectedWeekId 不應為空，請檢查 UI 狀態');
+        }
         
         console.log('⏳ PersonalRetroPanel - 等待 Promise.all 完成...');
         const [weekStats, session] = await Promise.all([
@@ -349,6 +402,11 @@ export const PersonalRetroPanel: React.FC = () => {
         ]);
         
         console.log('📊 PersonalRetroPanel - 載入的週統計:', weekStats);
+        if (weekStats && weekStats.dailyCheckIns) {
+          weekStats.dailyCheckIns.forEach((row: any, idx: number) => {
+            console.log(`[DEBUG] dailyCheckIns[${idx}]`, row);
+          });
+        }
         console.log('🎯 PersonalRetroPanel - 載入的 session:', session);
         
         // 如果 session 存在且有週統計數據，從 session 中提取已完成的回顧
@@ -362,13 +420,17 @@ export const PersonalRetroPanel: React.FC = () => {
         
         console.log('✅ PersonalRetroPanel - 數據載入完成');
         setLoadingState('completed');
+        // 🔄 強制觸發重新渲染
+        // setRefreshCounter(prev => prev + 1);
       } catch (error) {
         console.error('❌ PersonalRetroPanel - 載入數據失敗:', error);
         setLoadingState('error');
       }
     };
+    
+    // 當 selectedWeekId 變化時重新載入，或首次載入時
     loadData();
-  }, [getCurrentWeekStats, getCurrentSession]);
+  }, [selectedWeekId]);
 
   // 從 session 中載入已完成的回顧
   const loadCompletedRetrosFromSession = async (session: any) => {
@@ -412,20 +474,11 @@ export const PersonalRetroPanel: React.FC = () => {
   // 載入本週已完成的回顧 (回退方法)
   const loadCompletedRetros = async () => {
     try {
-      // 使用正確的週開始和結束日期
-      const today = new Date().toISOString().split('T')[0]; // 取得今天的日期 YYYY-MM-DD
-      const currentDate = new Date(today);
+      // 使用統一的週期計算邏輯
+      const { getWeekStart, getWeekEnd } = await import('../../utils/weekUtils');
       
-      // 計算本週開始日期（週一）
-      const dayOfWeek = currentDate.getDay();
-      const diff = currentDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // 調整到週一
-      const weekStart = new Date(currentDate.setDate(diff));
-      const weekStartStr = weekStart.toISOString().split('T')[0];
-      
-      // 計算本週結束日期（週日）
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      const weekEndStr = weekEnd.toISOString().split('T')[0];
+      const weekStartStr = getWeekStart();
+      const weekEndStr = getWeekEnd();
       
       console.log('🔍 查詢本週回顧:', { weekStartStr, weekEndStr });
       
@@ -571,11 +624,10 @@ export const PersonalRetroPanel: React.FC = () => {
       setShowQuestionModal(false);
       setRetroStep('answering');
 
-      // 確保有 currentSession
+      // 統一 session 取得
       let session = currentSession;
       if (!session) {
-        console.log('🔄 沒有當前 session，創建新的...');
-        session = await getCurrentSession();
+        session = await getSession();
         if (!session) {
           throw new Error('無法創建或獲取 session');
         }
@@ -583,12 +635,10 @@ export const PersonalRetroPanel: React.FC = () => {
 
       // 如果這是新抽取的問題，更新 session 的問題記錄
       if (drawnQuestions.length > 0) {
-        console.log('🎯 更新 session 的抽取問題:', drawnQuestions);
         await updateSessionQuestions(session.id, drawnQuestions);
       }
     } catch (error) {
       console.error('處理問題選擇失敗:', error);
-      // 即使更新 session 失敗，也允許繼續回答
       setSelectedQuestion(question);
       setShowQuestionModal(false);
       setRetroStep('answering');
@@ -603,11 +653,10 @@ export const PersonalRetroPanel: React.FC = () => {
         return;
       }
 
-      // 確保有 currentSession
+      // 統一 session 取得
       let session = currentSession;
       if (!session) {
-        console.log('🔄 沒有當前 session，創建新的...');
-        session = await getCurrentSession();
+        session = await getSession();
         if (!session) {
           throw new Error('無法創建或獲取 session');
         }
@@ -626,19 +675,27 @@ export const PersonalRetroPanel: React.FC = () => {
       });
 
       if (savedAnswer) {
-        console.log('✅ 答案保存成功:', savedAnswer);
-        
+        // 先 append 到 completedRetros，避免 reload 前畫面消失
+        setCompletedRetros(prev => [
+          ...prev,
+          {
+            id: savedAnswer.id,
+            question: savedAnswer.question?.question || savedAnswer.customQuestion || '自定義問題',
+            answer: savedAnswer.answer,
+            mood: savedAnswer.mood,
+            emoji: savedAnswer.emoji,
+            createdAt: savedAnswer.createdAt
+          }
+        ]);
         // 重新載入 session 以獲取最新數據
-        const updatedSession = await getCurrentSession();
+        const updatedSession = await getSession();
         if (updatedSession) {
           await loadCompletedRetrosFromSession(updatedSession);
         } else {
           await loadCompletedRetros();
         }
-        
         // 標記有變化（新增了回顧）
         setHasChanges(true);
-        
         setRetroStep('ready');
         setSelectedQuestion(null);
       }
@@ -702,22 +759,30 @@ export const PersonalRetroPanel: React.FC = () => {
     
     setIsSaving(true);
     try {
-      // 這裡可以添加實際的儲存邏輯，比如標記 session 為完成狀態
-      // 目前只是模擬保存過程
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 🎯 真正的儲存邏輯：完成當前 session
+      const success = await completeSession(currentSession.id);
       
-      setShowSaveDialog(false);
-      setIsSaving(false);
-      
-      // 標記為已儲存，重置變化狀態
-      setIsRetroSaved(true);
-      setHasChanges(false);
-      
-      // 可以在這裡添加成功提示或跳轉邏輯
-      console.log('✅ 回顧已儲存');
+      if (success) {
+        setShowSaveDialog(false);
+        setIsSaving(false);
+        
+        // 標記為已儲存，重置變化狀態
+        setIsRetroSaved(true);
+        setHasChanges(false);
+        
+        console.log('✅ 回顧已儲存並完成');
+        
+        // 重新載入 session 以更新狀態
+        await getSession();
+      } else {
+        throw new Error('完成 session 失敗');
+      }
     } catch (error) {
       console.error('儲存失敗:', error);
       setIsSaving(false);
+      
+      // 可以添加錯誤提示 UI
+      alert('儲存失敗，請重試');
     }
   };
 
@@ -733,15 +798,6 @@ export const PersonalRetroPanel: React.FC = () => {
     
     return `${firstDate.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })} ~ ${lastDate.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}`;
   };
-
-  // Debug logs
-  console.log('🔍 PersonalRetroPanel 渲染狀態:', {
-    loading,
-    hasCurrentWeekStats: !!currentWeekStats,
-    currentWeekStats: currentWeekStats ? 'exists' : 'null',
-    error,
-    loadingState
-  });
 
   if (!currentWeekStats) {
     if (loadingState === 'loading' || loadingState === 'initial') {
@@ -770,7 +826,7 @@ export const PersonalRetroPanel: React.FC = () => {
     );
   }
 
-  const patternDisplay = getLearningPatternDisplay(currentWeekStats.weekSummary.learningPattern);
+  const patternDisplay = getLearningPatternDisplay(currentWeekStats.weekSummary?.learningPattern || 'balanced');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50">
@@ -866,7 +922,7 @@ export const PersonalRetroPanel: React.FC = () => {
       </AnimatePresence>
 
       {/* 主要內容區域 - 三欄布局 */}
-      <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="max-w-7xl mx-auto px-6 py-4" key={currentWeekStats?.weekId}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* 左欄：任務進度 + 每日學習軌跡 */}
           <div className="space-y-4 md:col-span-1">
@@ -890,7 +946,7 @@ export const PersonalRetroPanel: React.FC = () => {
               </div>
 
               {/* 任務摘要 */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-3 gap-3 mb-3">
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200 text-center">
                   <div className="text-xl mb-1">✅</div>
                   <div className="text-base font-bold text-green-600">{currentWeekStats.completedTaskCount}</div>
@@ -900,6 +956,11 @@ export const PersonalRetroPanel: React.FC = () => {
                   <div className="text-xl mb-1">🔄</div>
                   <div className="text-base font-bold text-blue-600">{currentWeekStats.inProgressTasks.length}</div>
                   <div className="text-xs text-gray-600">進行中</div>
+                </div>
+                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg p-3 border border-orange-200 text-center">
+                  <div className="text-xl mb-1">📔</div>
+                  <div className="text-base font-bold text-orange-600">{currentWeekStats.totalTaskRecords || 0}</div>
+                  <div className="text-xs text-gray-600">任務記錄</div>
                 </div>
               </div>
 
@@ -1059,16 +1120,27 @@ export const PersonalRetroPanel: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* 第二行：打卡次數和完成任務 */}
+                          {/* 第二行：打卡次數、任務記錄和完成任務 */}
                           <div className="flex items-center gap-2 flex-wrap">
-                            {/* 打卡次數 - 只顯示打卡任務 */}
+                            {/* 打卡次數 - 狀態變化記錄 */}
                             {day.checkInCount > 0 && (
                               <span
                                 className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors text-xs hover-tasks-trigger"
-                                onMouseEnter={(e) => handleCheckInHover(e, day.topics)}
+                                onMouseEnter={(e) => handleCheckInHover(e, day.topics.filter(t => t.recordCount > 0 && !t.taskRecords?.length))}
                                 onMouseLeave={handleCheckInLeave}
                               >
-                                {day.checkInCount} 次打卡
+                                🔔 {day.checkInCount} 次打卡
+                              </span>
+                            )}
+                            
+                            {/* 任務記錄 - 學習過程記錄 */}
+                            {day.taskRecordCount > 0 && (
+                              <span
+                                className="inline-flex items-center px-2 py-1 rounded-full bg-orange-100 text-orange-700 cursor-pointer hover:bg-orange-200 transition-colors text-xs hover-tasks-trigger"
+                                onMouseEnter={(e) => handleCheckInHover(e, day.topics.filter(t => t.taskRecords?.length > 0))}
+                                onMouseLeave={handleCheckInLeave}
+                              >
+                                📔 {day.taskRecordCount} 個記錄
                               </span>
                             )}
                             
@@ -1125,7 +1197,7 @@ export const PersonalRetroPanel: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <div className="text-base font-bold text-blue-600">{currentWeekStats.checkInCount}</div>
+                    <div className="text-base font-bold text-blue-600">{currentWeekStats.totalCheckIns}</div>
                     <div className="text-xs text-gray-600">次打卡</div>
                   </div>
                   <div>
@@ -1133,7 +1205,7 @@ export const PersonalRetroPanel: React.FC = () => {
                     <div className="text-xs text-gray-600">完成任務</div>
                   </div>
                   <div>
-                    <div className="text-base font-bold text-orange-600">{currentWeekStats.averageEnergy}/10</div>
+                    <div className="text-base font-bold text-orange-600">{currentWeekStats.averageEnergy || 0}/5</div>
                     <div className="text-xs text-gray-600">平均能量</div>
                   </div>
                 </div>
@@ -1149,7 +1221,9 @@ export const PersonalRetroPanel: React.FC = () => {
                     className="space-y-4"
                   >
                     <p className="text-sm text-gray-700">
-                      {currentWeekStats.weekSummary.summary}
+                      本週學習模式：{patternDisplay.text}，共完成 {currentWeekStats.completedTaskCount} 個任務，
+                      進行了 {currentWeekStats.totalCheckIns} 次打卡，記錄了 {currentWeekStats.totalTaskRecords || 0} 個學習心得。
+                      {currentWeekStats.averageEnergy && `平均能量指數為 ${currentWeekStats.averageEnergy.toFixed(1)}/5。`}
                     </p>
                   </motion.div>
                 )}
@@ -1157,7 +1231,7 @@ export const PersonalRetroPanel: React.FC = () => {
             </motion.div>
 
             {/* 能量變化圖表 */}
-            {currentWeekStats.energyTimeline.length > 0 && (
+            {currentWeekStats.dailyCheckIns.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1179,8 +1253,8 @@ export const PersonalRetroPanel: React.FC = () => {
 
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3 border border-indigo-200">
                   <div className="flex items-end justify-between gap-1 h-16">
-                    {currentWeekStats.energyTimeline.map((point, index) => {
-                      const height = (point.energy / 5) * 100;
+                    {currentWeekStats.dailyCheckIns.map((day, index) => {
+                      const height = day.energy ? (day.energy / 5) * 100 : (day.totalActivities / Math.max(...currentWeekStats.dailyCheckIns.map(d => d.totalActivities))) * 100;
                       return (
                         <div key={index} className="flex flex-col items-center flex-1">
                           <motion.div
@@ -1189,10 +1263,10 @@ export const PersonalRetroPanel: React.FC = () => {
                             initial={{ height: 0 }}
                             animate={{ height: `${height}%` }}
                             transition={{ delay: 0.5 + index * 0.1 }}
-                            title={`${point.date}: ${point.energy}/5`}
+                            title={`${day.date}: ${day.energy || '未記錄'}${day.energy ? '/5' : ''}`}
                           />
                           <div className="text-xs text-gray-500 mt-1">
-                            {getMoodEmoji(point.mood)}
+                            {day.mood ? getMoodEmoji(day.mood) : '😐'}
                           </div>
                         </div>
                       );
@@ -1241,7 +1315,13 @@ export const PersonalRetroPanel: React.FC = () => {
                       onDelete={async () => {
                         try {
                           await deleteAnswer(retro.id);
-                          await loadCompletedRetros();
+                          // reload 當前 session
+                          const updatedSession = await getSession();
+                          if (updatedSession) {
+                            await loadCompletedRetrosFromSession(updatedSession);
+                          } else {
+                            setCompletedRetros([]); // 沒有 session 就清空
+                          }
                           // 標記有變化（刪除了回顧）
                           setHasChanges(true);
                         } catch (error) {
@@ -1424,7 +1504,7 @@ export const PersonalRetroPanel: React.FC = () => {
                           <div className="text-xs text-gray-600">完成任務</div>
                         </div>
                         <div>
-                          <div className="text-2xl font-bold text-blue-600">{currentWeekStats?.checkInCount || 0}</div>
+                          <div className="text-2xl font-bold text-blue-600">{currentWeekStats?.totalCheckIns || 0}</div>
                           <div className="text-xs text-gray-600">次打卡</div>
                         </div>
                         <div>
