@@ -65,5 +65,9 @@ VITE_GA_ID=<your-ga-id>
 - `ARCHITECTURE.md`: 詳細的技術架構說明
 - `DESIGN.md`: 設計系統規範
 
+## 專案規則
+
+- 所有 Supabase RPC function 新增、修改、棄用，必須同步更新 SUPABASE_RPC_FUNCTIONS.md，確保文件與資料庫一致。
+
 ## 授權
 MIT License
