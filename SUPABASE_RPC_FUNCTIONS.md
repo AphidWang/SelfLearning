@@ -266,3 +266,349 @@
 - **2024-01-08**: 新增 `perform_task_action_transaction` 和 `cancel_today_check_in_transaction` 函數
 - **2024-01-08**: 標記舊版本的打卡函數為已棄用
 - **2024-01-08**: 建立此文檔 
+
+---
+# Supabase RPC Function SQL 實作
+
+---
+-- safe_update_topic
+---
+```sql
+CREATE OR REPLACE FUNCTION safe_update_topic(
+  p_topic_id UUID,
+  p_expected_version INTEGER,
+  p_updates JSONB
+) RETURNS JSONB AS $$
+DECLARE
+  v_current_version INTEGER;
+  v_result JSONB;
+BEGIN
+  -- 檢查版本號
+  SELECT version INTO v_current_version
+  FROM topics
+  WHERE id = p_topic_id;
+
+  IF v_current_version IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', '主題不存在');
+  END IF;
+
+  IF v_current_version != p_expected_version THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'message', '版本衝突',
+      'current_version', v_current_version
+    );
+  END IF;
+
+  -- 執行更新，版本號+1
+  UPDATE topics 
+  SET 
+    title = COALESCE((p_updates->>'title')::VARCHAR, title),
+    description = COALESCE(p_updates->>'description', description),
+    subject = COALESCE(p_updates->>'subject', subject),
+    status = COALESCE(p_updates->>'status', status),
+    version = version + 1,
+    updated_at = NOW()
+  WHERE id = p_topic_id
+  RETURNING to_jsonb(topics.*) INTO v_result;
+
+  RETURN jsonb_build_object('success', true, 'data', v_result);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+-- safe_update_goal
+---
+```sql
+CREATE OR REPLACE FUNCTION safe_update_goal(
+  p_goal_id UUID,
+  p_expected_version INTEGER,
+  p_updates JSONB
+) RETURNS JSONB AS $$
+DECLARE
+  v_current_version INTEGER;
+  v_result JSONB;
+BEGIN
+  -- 檢查版本號
+  SELECT version INTO v_current_version
+  FROM goals
+  WHERE id = p_goal_id;
+
+  IF v_current_version IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', '目標不存在');
+  END IF;
+
+  IF v_current_version != p_expected_version THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'message', '版本衝突',
+      'current_version', v_current_version
+    );
+  END IF;
+
+  -- 執行更新，版本號+1
+  UPDATE goals 
+  SET 
+    title = COALESCE((p_updates->>'title')::VARCHAR, title),
+    description = COALESCE(p_updates->>'description', description),
+    status = COALESCE(p_updates->>'status', status),
+    priority = COALESCE(p_updates->>'priority', priority),
+    need_help = COALESCE((p_updates->>'need_help')::BOOLEAN, need_help),
+    help_message = COALESCE(p_updates->>'help_message', help_message),
+    version = version + 1,
+    updated_at = NOW()
+  WHERE id = p_goal_id
+  RETURNING to_jsonb(goals.*) INTO v_result;
+
+  RETURN jsonb_build_object('success', true, 'data', v_result);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+-- safe_update_task
+---
+```sql
+CREATE OR REPLACE FUNCTION safe_update_task(
+  p_task_id UUID,
+  p_expected_version INTEGER,
+  p_updates JSONB
+) RETURNS JSONB AS $$
+DECLARE
+  v_current_version INTEGER;
+  v_result JSONB;
+BEGIN
+  -- 檢查版本號
+  SELECT version INTO v_current_version
+  FROM tasks
+  WHERE id = p_task_id;
+
+  IF v_current_version IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', '任務不存在');
+  END IF;
+
+  IF v_current_version != p_expected_version THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'message', '版本衝突',
+      'current_version', v_current_version
+    );
+  END IF;
+
+  -- 執行更新，版本號+1
+  UPDATE tasks 
+  SET 
+    title = COALESCE((p_updates->>'title')::VARCHAR, title),
+    description = COALESCE(p_updates->>'description', description),
+    status = COALESCE(p_updates->>'status', status),
+    priority = COALESCE(p_updates->>'priority', priority),
+    need_help = COALESCE((p_updates->>'need_help')::BOOLEAN, need_help),
+    help_message = COALESCE(p_updates->>'help_message', help_message),
+    completed_at = CASE 
+      WHEN p_updates->>'status' = 'done' THEN NOW()
+      WHEN p_updates->>'status' != 'done' THEN NULL
+      ELSE completed_at
+    END,
+    version = version + 1,
+    updated_at = NOW()
+  WHERE id = p_task_id
+  RETURNING to_jsonb(tasks.*) INTO v_result;
+
+  RETURN jsonb_build_object('success', true, 'data', v_result);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+-- get_active_tasks_for_user
+---
+```sql
+CREATE OR REPLACE FUNCTION get_active_tasks_for_user(p_user_id UUID DEFAULT NULL)
+RETURNS TABLE (
+  task_id UUID,
+  task_title VARCHAR,
+  task_description TEXT,
+  task_status VARCHAR,
+  task_priority VARCHAR,
+  task_due_date TIMESTAMP WITH TIME ZONE,
+  task_need_help BOOLEAN,
+  goal_id UUID,
+  goal_title VARCHAR,
+  topic_id UUID,
+  topic_title VARCHAR,
+  topic_subject VARCHAR
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    t.id,
+    t.title,
+    t.description,
+    t.status,
+    t.priority,
+    t.due_date,
+    t.need_help,
+    g.id,
+    g.title,
+    tn.id,
+    tn.title,
+    tn.subject
+  FROM tasks t
+  JOIN goals g ON t.goal_id = g.id
+  JOIN topics tn ON g.topic_id = tn.id
+  LEFT JOIN topic_collaborators tc ON tn.id = tc.topic_id
+  WHERE 
+    t.status IN ('todo', 'in_progress')
+    AND g.status != 'archived'
+    AND tn.status != 'archived'
+    AND (
+      tn.owner_id = COALESCE(p_user_id, auth.uid()) OR
+      tc.user_id = COALESCE(p_user_id, auth.uid())
+    )
+  ORDER BY 
+    CASE t.status WHEN 'in_progress' THEN 1 ELSE 2 END,
+    CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+    t.updated_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+-- get_topic_with_structure
+---
+```sql
+CREATE OR REPLACE FUNCTION get_topic_with_structure(p_topic_id UUID)
+RETURNS TABLE (
+  topic_data JSONB,
+  goals_data JSONB,
+  tasks_data JSONB
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH topic_info AS (
+    SELECT to_jsonb(tn.*) as topic_json
+    FROM topics tn
+    WHERE tn.id = p_topic_id
+  ),
+  goals_info AS (
+    SELECT jsonb_agg(to_jsonb(g.*)) as goals_json
+    FROM goals g
+    WHERE g.topic_id = p_topic_id
+    AND g.status != 'archived'
+  ),
+  tasks_info AS (
+    SELECT jsonb_agg(to_jsonb(t.*)) as tasks_json
+    FROM tasks t
+    JOIN goals g ON t.goal_id = g.id
+    WHERE g.topic_id = p_topic_id
+    AND t.status != 'archived'
+    AND g.status != 'archived'
+  )
+  SELECT 
+    ti.topic_json,
+    COALESCE(gi.goals_json, '[]'::jsonb),
+    COALESCE(tsi.tasks_json, '[]'::jsonb)
+  FROM topic_info ti
+  CROSS JOIN goals_info gi
+  CROSS JOIN tasks_info tsi;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+-- perform_task_action_transaction
+---
+```sql
+CREATE OR REPLACE FUNCTION perform_task_action_transaction(
+  p_task_id TEXT,
+  p_action_type TEXT,
+  p_action_date DATE,
+  p_action_timestamp TIMESTAMP WITH TIME ZONE,
+  p_user_id UUID,
+  p_action_data JSONB DEFAULT '{}'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  action_id UUID;
+  event_id UUID;
+  task_title TEXT;
+  result JSON;
+BEGIN
+  -- 檢查用戶權限
+  IF auth.uid() != p_user_id THEN
+    RETURN json_build_object('success', false, 'message', 'Unauthorized');
+  END IF;
+  
+  -- 獲取任務標題用於事件記錄
+  SELECT title INTO task_title FROM tasks WHERE id = p_task_id::uuid;
+  
+  IF task_title IS NULL THEN
+    RETURN json_build_object('success', false, 'message', 'Task not found');
+  END IF;
+  
+  -- 檢查是否今天已經執行過相同動作（避免重複打卡）
+  IF EXISTS (
+    SELECT 1 FROM task_actions 
+    WHERE task_id = p_task_id 
+      AND action_type = p_action_type 
+      AND action_timestamp::date = p_action_date
+      AND user_id = p_user_id
+  ) THEN
+    RETURN json_build_object('success', false, 'message', 'Action already performed today');
+  END IF;
+  
+  -- 1. 記錄到 task_actions 表
+  INSERT INTO task_actions (
+    task_id, 
+    action_type, 
+    action_timestamp,
+    action_date,
+    user_id, 
+    action_data
+  )
+  VALUES (
+    p_task_id,
+    p_action_type,
+    p_action_timestamp,
+    p_action_date,
+    p_user_id,
+    p_action_data
+  )
+  RETURNING id INTO action_id;
+  
+  -- 2. 記錄到 user_events 表
+  SELECT record_user_event(
+    'task',
+    p_task_id,
+    'check_in',
+    jsonb_build_object(
+      'action_id', action_id,
+      'action_type', p_action_type,
+      'action_data', p_action_data,
+      'task_title', task_title
+    )
+  ) INTO event_id;
+  
+  -- 返回成功結果
+  RETURN json_build_object(
+    'success', true,
+    'message', 'Task action recorded successfully',
+    'action_id', action_id,
+    'event_id', event_id
+  );
+  
+EXCEPTION
+  WHEN OTHERS THEN
+    -- 發生錯誤時回滾事務
+    RETURN json_build_object(
+      'success', false,
+      'message', SQLERRM,
+      'error_code', SQLSTATE
+    );
+END;
+$$;
+``` 
