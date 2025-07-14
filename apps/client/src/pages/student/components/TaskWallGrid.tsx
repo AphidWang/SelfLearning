@@ -173,6 +173,22 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
     }
   };
 
+  /**
+   * 生成唯一的 key，確保不會有重複或空值
+   */
+  const generateUniqueKey = (card: CardData, index: number, prefix: string) => {
+    const baseId = card.data.id || `temp-${card.type}-${index}`;
+    return `${prefix}-${card.type}-${baseId}-${index}`;
+  };
+
+  /**
+   * 生成唯一的 layoutId，確保動畫正常工作
+   */
+  const generateLayoutId = (card: CardData, index: number, prefix: string) => {
+    const baseId = card.data.id || `temp-${card.type}-${index}`;
+    return `${prefix}-${card.type}-${baseId}`;
+  };
+
   // 分離特殊卡片和普通卡片
   const highlightCards = cards.filter(card => card.highlight);
   const normalCards = cards.filter(card => !card.highlight);
@@ -199,12 +215,12 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
             <div className="flex flex-wrap gap-4 justify-center w-full">
               {highlightCards.map((card, index) => (
                 <motion.div
-                  key={`highlight-${card.type}-${card.data.id}`}
+                  key={generateUniqueKey(card, index, 'highlight')}
                   className="w-full max-w-sm"
                   variants={cardVariants}
                   custom={index}
                   layout
-                  layoutId={`highlight-${card.type}-${card.data.id}`}
+                  layoutId={generateLayoutId(card, index, 'highlight')}
                   initial="hidden"
                   animate="visible"
                   exit="exit"
@@ -271,12 +287,12 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
           >
             {normalCards.map((card, index) => (
               <motion.div
-                key={`normal-${card.type}-${card.data.id}`}
+                key={generateUniqueKey(card, index, 'normal')}
                 className="flex justify-center"
                 variants={cardVariants}
                 custom={index + highlightCards.length} // 調整動畫延遲
                 layout
-                layoutId={`normal-${card.type}-${card.data.id}`}
+                layoutId={generateLayoutId(card, index, 'normal')}
                 initial="hidden"
                 animate="visible"
                 exit="exit"
