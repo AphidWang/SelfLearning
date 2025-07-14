@@ -18,7 +18,8 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import { httpInterceptor } from '../services/httpInterceptor';
-import { getTodayInTimezone, getWeekStart, getWeekEnd } from '../config/timezone';
+import { getTodayInTimezone } from '../config/timezone';
+import { generateWeekId } from '../utils/weekUtils';
 import { useUserStore } from './userStore';
 import { useRetroStore } from './retroStore';
 import type {
@@ -62,6 +63,10 @@ interface GroupRetroStoreState {
   error: string | null;
   sessionProgress: GroupRetroProgress | null;
   
+  // 新增：當前選中的週期
+  selectedWeekId: string | null;
+  selectedWeekIds: string[];
+  
   // 操作方法
   // 會話管理
   createSession: (data: CreateGroupRetroSessionData) => Promise<GroupRetroSession>;
@@ -97,9 +102,14 @@ interface GroupRetroStoreState {
   exportSession: (sessionId: string, format: 'json' | 'csv' | 'markdown') => Promise<GroupRetroExportData>;
   
   // 工具方法
-  getWeekId: (date?: string) => string;
+  getWeekId: (date?: string | Date) => string;
   clearError: () => void;
   reset: () => void;
+  
+  // 週期管理方法
+  setSelectedWeek: (weekId: string, weekIds?: string[]) => void;
+  getSessionForWeek: (weekId: string) => Promise<GroupRetroSession | null>;
+  loadWeekData: (weekId: string) => Promise<void>;
 }
 
 // 預設小組討論問題庫
@@ -236,6 +246,10 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
   loading: false,
   error: null,
   sessionProgress: null,
+  
+  // 週期狀態
+  selectedWeekId: null,
+  selectedWeekIds: [],
 
   // 會話管理
   createSession: async (data: CreateGroupRetroSessionData) => {
@@ -730,42 +744,31 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
           
           // 建立週統計資料
           const weeklyStats = {
-            checkInCount: hasCompletedPersonalRetro ? Math.floor(Math.random() * 7) + 1 : 0,
+            weekId,
+            weekStart: '2024-01-01',
+            weekEnd: '2024-01-07',
+            totalCheckIns: hasCompletedPersonalRetro ? Math.floor(Math.random() * 7) + 1 : 0,
+            totalTaskRecords: hasCompletedPersonalRetro ? Math.floor(Math.random() * 5) + 1 : 0,
+            totalActivities: hasCompletedPersonalRetro ? Math.floor(Math.random() * 12) + 2 : 0,
             completedTaskCount: hasCompletedPersonalRetro ? Math.floor(Math.random() * 10) + 3 : 0,
             averageEnergy: hasCompletedPersonalRetro ? Math.floor(Math.random() * 5) + 1 : 3,
             mainTasks: [],
-            mainTopics: detectedTopics.slice(0, 3).map((title, index) => ({
-              id: `${index + 1}`,
-              title,
-              subject: title.includes('數學') ? '數學' : title.includes('英文') ? '英文' : title.includes('程式') ? '電腦' : '其他',
-              progress: hasCompletedPersonalRetro ? Math.random() * 100 : 0,
-              taskCount: hasCompletedPersonalRetro ? Math.floor(Math.random() * 8) + 2 : 0,
-              completedTaskCount: hasCompletedPersonalRetro ? Math.floor(Math.random() * 5) + 1 : 0
-            })),
-            weekRange: { start: '2024-01-01', end: '2024-01-07' },
-            dailyCheckIns: [],
-            energyTimeline: [],
+            activeTasks: [],
             inProgressTasks: [],
+            dailyCheckIns: [],
+            learningPatterns: [],
             weekSummary: { 
-              keywords: detectedTopics.slice(0, 3), 
-              summary: hasCompletedPersonalRetro ? '本週持續學習中' : '準備開始學習', 
-              mostActiveSubject: detectedTopics[0] || '一般學習', 
-              mostChallengingTask: null, 
-              learningPattern: 'balanced' as const 
-            },
-            socialInteractions: { 
-              collaborativeTaskCount: 0, 
-              collaborators: [], 
-              helpReceived: 0, 
-              helpProvided: 0 
-            },
-            taskCheckInRecords: {}
+              totalLearningHours: hasCompletedPersonalRetro ? Math.floor(Math.random() * 20) + 5 : 0,
+              completedGoals: hasCompletedPersonalRetro ? Math.floor(Math.random() * 3) + 1 : 0,
+              averageEfficiency: hasCompletedPersonalRetro ? Math.random() * 0.5 + 0.5 : 0.5,
+              learningPattern: 'balanced' as const,
+              topPerformanceDay: '週三',
+              improvementAreas: []
+            }
           };
           
           // 生成主要主題
-          const mainTopics = weeklyStats.mainTopics
-            .slice(0, 3)
-            .map(topic => topic.title);
+          const mainTopics = detectedTopics.slice(0, 3);
           
           // 生成能量描述
           const energyDescriptions = ['需要休息', '有點累', '普通', '還不錯', '充滿活力'];
@@ -792,31 +795,27 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
           participants.push({
             user,
             weeklyStats: {
-              checkInCount: 0,
+              weekId: '',
+              weekStart: '',
+              weekEnd: '',
+              totalCheckIns: 0,
+              totalTaskRecords: 0,
+              totalActivities: 0,
               completedTaskCount: 0,
               averageEnergy: 3,
               mainTasks: [],
-              mainTopics: [
-                { id: '1', title: '學習準備中', subject: '其他', progress: 0, taskCount: 0, completedTaskCount: 0 }
-              ],
-              weekRange: { start: '2024-01-01', end: '2024-01-07' },
+              activeTasks: [],
               dailyCheckIns: [],
-              energyTimeline: [],
               inProgressTasks: [],
-              weekSummary: { 
-                keywords: [], 
-                summary: '準備開始學習', 
-                mostActiveSubject: '', 
-                mostChallengingTask: null, 
-                learningPattern: 'balanced' as const 
-              },
-              socialInteractions: { 
-                collaborativeTaskCount: 0, 
-                collaborators: [], 
-                helpReceived: 0, 
-                helpProvided: 0 
-              },
-              taskCheckInRecords: {}
+              learningPatterns: [],
+              weekSummary: {
+                totalLearningHours: 0,
+                completedGoals: 0,
+                averageEfficiency: 0.5,
+                learningPattern: 'balanced' as const,
+                topPerformanceDay: '無',
+                improvementAreas: []
+              }
             },
             hasCompletedPersonalRetro: false,
             mainTopics: ['學習準備中'],
@@ -1377,15 +1376,9 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
     }
   },
 
-  // 工具方法
-  getWeekId: (date?: string) => {
-    const targetDate = date ? new Date(date) : new Date();
-    const year = targetDate.getFullYear();
-    const week = Math.ceil(
-      ((targetDate.getTime() - new Date(year, 0, 1).getTime()) / 86400000 + 1) / 7
-    );
-    const weekId = `${year}-W${week.toString().padStart(2, '0')}`;
-    return weekId;
+  // 工具方法 (委託到統一的工具函數)
+  getWeekId: (date?: string | Date) => {
+    return generateWeekId(date);
   },
 
   clearError: () => {
@@ -1400,7 +1393,75 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       recentSessions: [],
       loading: false,
       error: null,
-      sessionProgress: null
+      sessionProgress: null,
+      selectedWeekId: null,
+      selectedWeekIds: []
     });
+  },
+
+  // === 週期管理方法 ===
+  
+  // 設定當前選中的週期
+  setSelectedWeek: (weekId: string, weekIds?: string[]) => {
+    set({ 
+      selectedWeekId: weekId,
+      selectedWeekIds: weekIds || [weekId]
+    });
+  },
+
+  // 獲取指定週期的 session
+  getSessionForWeek: async (weekId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      const { data: sessions, error } = await supabase
+        .from('group_retro_sessions')
+        .select('id')
+        .eq('week_id', weekId)
+        .or(`created_by.eq.${user.id},participant_ids.cs.{${user.id}}`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      
+      if (sessions && sessions.length > 0) {
+        return await get().getSession(sessions[0].id);
+      }
+      
+      return null;
+      
+    } catch (error: any) {
+      console.error('獲取指定週期會話失敗:', error);
+      set({ error: error.message });
+      return null;
+    }
+  },
+
+  // 載入指定週期的完整數據
+  loadWeekData: async (weekId: string) => {
+    try {
+      set({ loading: true, error: null });
+      
+      debugLog('🔄 載入週期數據:', weekId);
+      
+      // 載入該週期的會話
+      const session = await get().getSessionForWeek(weekId);
+      
+      // 更新選中的週期
+      set({ 
+        selectedWeekId: weekId,
+        selectedWeekIds: [weekId],
+        currentSession: session
+      });
+      
+      set({ loading: false });
+      
+      debugLog('✅ 週期數據載入完成:', { weekId, hasSession: !!session });
+    } catch (error: any) {
+      console.error('載入週期數據失敗:', error);
+      set({ loading: false, error: error.message });
+      throw error;
+    }
   }
 })); 
