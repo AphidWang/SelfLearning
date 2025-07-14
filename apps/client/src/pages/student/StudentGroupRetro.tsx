@@ -6,6 +6,7 @@
  * - 使用 PageLayout 提供一致的頁面佈局
  * - 整合 GroupRetroPanel 組件
  * - 確保用戶數據載入完成後再顯示組件
+ * - 支援週期管理和切換
  * 
  * 🏗️ 架構設計：
  * - 遵循頁面組件的設計模式
@@ -19,15 +20,34 @@
  * - 良好的用戶體驗
  * - 載入狀態指示器
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import PageLayout from '../../components/layout/PageLayout';
 import {GroupRetroPanel} from '../../components/groupRetro/GroupRetroPanel';
+import { WeekSelector } from '../../components/shared/WeekSelector';
 import { useUserStore } from '../../store/userStore';
+import { useGroupRetroStore } from '../../store/groupRetroStore';
 import { LoadingDots } from '../../components/shared/LoadingDots';
 
 export const StudentGroupRetro: React.FC = () => {
-  const { getCollaboratorCandidates, users, loading } = useUserStore();
+  const { getCollaboratorCandidates, users, loading: userLoading } = useUserStore();
+  const {
+    selectedWeekId,
+    selectedWeekIds,
+    loading: retroLoading,
+    setSelectedWeek,
+    loadWeekData,
+    getWeekId
+  } = useGroupRetroStore();
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // 初始化當前週期
+  useEffect(() => {
+    const currentWeekId = getWeekId();
+    if (!selectedWeekId) {
+      setSelectedWeek(currentWeekId);
+      loadWeekData(currentWeekId);
+    }
+  }, [selectedWeekId, setSelectedWeek, loadWeekData, getWeekId]);
 
   useEffect(() => {
     const initializeUsers = async () => {
@@ -53,8 +73,18 @@ export const StudentGroupRetro: React.FC = () => {
     initializeUsers();
   }, []); // 只在組件掛載時執行一次
 
+  // 處理週期變更
+  const handleWeekChange = useCallback(async (weekId: string, weekIds: string[]) => {
+    try {
+      setSelectedWeek(weekId, weekIds);
+      await loadWeekData(weekId);
+    } catch (error) {
+      console.error('切換週期失敗:', error);
+    }
+  }, [setSelectedWeek, loadWeekData]);
+
   // 顯示載入狀態
-  if (!isInitialized || loading) {
+  if (!isInitialized || userLoading) {
     return (
       <PageLayout title="🤝 小組討論">
         <div className="flex items-center justify-center h-64">
@@ -69,7 +99,20 @@ export const StudentGroupRetro: React.FC = () => {
 
   return (
     <PageLayout title="🤝 小組討論">
-      <GroupRetroPanel />
+      <div className="container mx-auto p-4">
+        {/* 週期選擇器 */}
+        <WeekSelector
+          selectedWeekId={selectedWeekId || undefined}
+          selectedWeekIds={selectedWeekIds}
+          allowMultiWeek={true}
+          onChange={handleWeekChange}
+          loading={retroLoading}
+          title="討論週期"
+        />
+        
+        {/* 小組討論面板 */}
+        <GroupRetroPanel />
+      </div>
     </PageLayout>
   );
 }; 
