@@ -180,6 +180,22 @@ CREATE TABLE IF NOT EXISTS task_records (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 任務動作記錄表（打卡、狀態變更等）
+CREATE TABLE IF NOT EXISTS task_actions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  action_type VARCHAR(20) NOT NULL CHECK (action_type IN ('check_in', 'add_count', 'add_amount', 'complete', 'reset', 'status_change')),
+  action_data JSONB DEFAULT '{}'::jsonb, -- 動作相關數據（如：計數、累計量等）
+  action_date DATE NOT NULL, -- 動作日期（用於業務邏輯，如防止重複打卡）
+  action_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- 精確的動作時間戳
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  -- 防止同一任務同一天重複特定動作的約束
+  UNIQUE(task_id, action_type, action_date, user_id)
+);
+
 -- ========================================
 -- 索引優化
 -- ========================================
@@ -226,6 +242,12 @@ CREATE INDEX IF NOT EXISTS idx_task_records_topic_id ON task_records(topic_id);
 CREATE INDEX IF NOT EXISTS idx_task_records_user_id ON task_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_task_records_created_at ON task_records(created_at DESC);
 
+-- task_actions 索引
+CREATE INDEX IF NOT EXISTS idx_task_actions_task_id ON task_actions(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_actions_user_id ON task_actions(user_id);
+CREATE INDEX IF NOT EXISTS idx_task_actions_action_date ON task_actions(action_date);
+CREATE INDEX IF NOT EXISTS idx_task_actions_action_type ON task_actions(action_type);
+
 -- 複合索引（性能優化）
 CREATE INDEX IF NOT EXISTS idx_goals_topic_status ON goals(topic_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_goal_status ON tasks(goal_id, status);
@@ -270,6 +292,11 @@ CREATE TRIGGER update_task_records_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_task_actions_updated_at
+  BEFORE UPDATE ON task_actions
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
 -- ========================================
 -- Row Level Security (RLS) 政策
 -- ========================================
@@ -282,6 +309,7 @@ ALTER TABLE topic_collaborators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_actions ENABLE ROW LEVEL SECURITY;
 
 -- 清理和重建所有 RLS 政策
 DO $$ 
@@ -738,3 +766,53 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 資料庫架構狀態: ✅ 完整的模板和主題管理系統 + 正規化結構
 -- 包含: 舊 JSONB 結構 + 新正規化結構 + 完整 RLS + 版本控制 + 高性能查詢
 -- 最後更新: 2025-01-06
+
+-- ========================================
+-- Task Records 和 Task Actions 的 RLS 政策
+-- ========================================
+
+-- Task Records 政策
+DO $$ 
+BEGIN
+    -- 清理可能存在的舊政策
+    DROP POLICY IF EXISTS "Users can view own task records" ON task_records;
+    DROP POLICY IF EXISTS "Users can create task records" ON task_records;
+    DROP POLICY IF EXISTS "Users can update own task records" ON task_records;
+    DROP POLICY IF EXISTS "Users can delete own task records" ON task_records;
+
+    -- 創建新政策
+    CREATE POLICY "Users can view own task records" ON task_records
+        FOR SELECT USING (user_id = auth.uid());
+
+    CREATE POLICY "Users can create task records" ON task_records
+        FOR INSERT WITH CHECK (user_id = auth.uid());
+
+    CREATE POLICY "Users can update own task records" ON task_records
+        FOR UPDATE USING (user_id = auth.uid());
+
+    CREATE POLICY "Users can delete own task records" ON task_records
+        FOR DELETE USING (user_id = auth.uid());
+END $$;
+
+-- Task Actions 政策
+DO $$ 
+BEGIN
+    -- 清理可能存在的舊政策
+    DROP POLICY IF EXISTS "Users can view own task actions" ON task_actions;
+    DROP POLICY IF EXISTS "Users can create task actions" ON task_actions;
+    DROP POLICY IF EXISTS "Users can update own task actions" ON task_actions;
+    DROP POLICY IF EXISTS "Users can delete own task actions" ON task_actions;
+
+    -- 創建新政策
+    CREATE POLICY "Users can view own task actions" ON task_actions
+        FOR SELECT USING (user_id = auth.uid());
+
+    CREATE POLICY "Users can create task actions" ON task_actions
+        FOR INSERT WITH CHECK (user_id = auth.uid());
+
+    CREATE POLICY "Users can update own task actions" ON task_actions
+        FOR UPDATE USING (user_id = auth.uid());
+
+    CREATE POLICY "Users can delete own task actions" ON task_actions
+        FOR DELETE USING (user_id = auth.uid());
+END $$;
