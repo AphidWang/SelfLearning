@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { useTopicStore } from '../apps/client/src/store/topicStore';
+import { useTaskStore } from '../apps/client/src/store/taskStore';
+import { useGoalStore } from '../apps/client/src/store/goalStore';
 import { SUBJECTS } from '../apps/client/src/constants/subjects';
 import { initTestAuth, cleanupTestData } from '../vitest.setup';
 
@@ -7,7 +9,9 @@ import { initTestAuth, cleanupTestData } from '../vitest.setup';
 // referenced in SUPABASE_RPC_FUNCTIONS.md.
 
 describe('TopicStore RPC helpers', () => {
-  let store: ReturnType<typeof useTopicStore.getState>;
+  let topicStore: ReturnType<typeof useTopicStore.getState>;
+  let goalStore: ReturnType<typeof useGoalStore.getState>;
+  let taskStore: ReturnType<typeof useTaskStore.getState>;
   let createdTopicId: string | null = null;
   let createdGoalId: string | null = null;
   let createdTaskId: string | null = null;
@@ -17,8 +21,10 @@ describe('TopicStore RPC helpers', () => {
   });
 
   beforeEach(() => {
-    store = useTopicStore.getState();
-    store.reset();
+    topicStore = useTopicStore.getState();
+    goalStore = useGoalStore.getState();
+    taskStore = useTaskStore.getState();
+    topicStore.reset();
     createdTopicId = null;
     createdGoalId = null;
     createdTaskId = null;
@@ -27,7 +33,7 @@ describe('TopicStore RPC helpers', () => {
   afterEach(async () => {
     if (createdTopicId) {
       try {
-        await store.deleteTopic(createdTopicId);
+        await topicStore.deleteTopic(createdTopicId);
       } catch (err) {
         console.warn('failed to cleanup topic', err);
       }
@@ -39,7 +45,7 @@ describe('TopicStore RPC helpers', () => {
   });
 
   const createBasicData = async () => {
-    const topic = await store.createTopic({
+    const topic = await topicStore.createTopic({
       title: 'RPC 測試主題',
       description: 'for rpc tests',
       subject: SUBJECTS.MATH,
@@ -54,7 +60,7 @@ describe('TopicStore RPC helpers', () => {
     if (!topic) throw new Error('failed to create topic');
     createdTopicId = topic.id;
 
-    const goal = await store.addGoal(topic.id, {
+    const goal = await goalStore.addGoal(topic.id, {
       title: 'rpc goal',
       description: 'goal',
       status: 'todo',
@@ -65,7 +71,7 @@ describe('TopicStore RPC helpers', () => {
     if (!goal) throw new Error('failed to create goal');
     createdGoalId = goal.id;
 
-    const task = await store.addTask(goal.id, {
+    const task = await taskStore.addTask(goal.id, {
       title: 'rpc task',
       description: 'task',
       status: 'todo',
@@ -96,10 +102,10 @@ describe('TopicStore RPC helpers', () => {
     const { taskId } = await createBasicData();
 
     // perform a check-in so there is activity
-    await store.performTaskAction(taskId, 'check_in');
+    await taskStore.performTaskAction(taskId, 'check_in');
 
     const today = new Date().toISOString().split('T')[0];
-    const result = await store.getUserTaskActivitiesForDate(today);
+    const result = await taskStore.getUserTaskActivitiesForDate(today);
 
     // 基本檢查
     expect(result).toBeDefined();
@@ -138,7 +144,7 @@ describe('TopicStore RPC helpers', () => {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    const result = await store.getTopicsProgressForWeek(
+    const result = await topicStore.getTopicsProgressForWeek(
       weekStart.toISOString().split('T')[0],
       weekEnd.toISOString().split('T')[0]
     );
@@ -149,7 +155,7 @@ describe('TopicStore RPC helpers', () => {
   it('getActiveTopicsWithProgress should list active topics', async () => {
     await createBasicData();
 
-    const result = await store.getActiveTopicsWithProgress();
+    const result = await topicStore.getActiveTopicsWithProgress();
     expect(Array.isArray(result)).toBe(true);
   });
 });
