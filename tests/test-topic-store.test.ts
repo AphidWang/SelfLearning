@@ -189,7 +189,7 @@ describe('TopicStore', () => {
       expect(goal).toBeDefined();
 
       const updatedTitle = '更新後的目標';
-      const result = await goalStore.updateGoalCompat(testTopic!.id, goal!.id, { title: updatedTitle });
+      const result = await goalStore.updateGoal(goal!.id, goal!.version, { title: updatedTitle });
       expect(result).toBeDefined();
       expect(result?.title).toBe(updatedTitle);
       expect(result?.tasks).toEqual([]);

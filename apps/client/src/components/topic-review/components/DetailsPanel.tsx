@@ -76,6 +76,7 @@ import { GoalStatusManager } from './GoalStatusManager';
 import { TaskStatusManager } from './TaskStatusManager';
 import { ReferenceInfoPanel } from './ReferenceInfoPanel';
 import toast from 'react-hot-toast';
+import { useGoalStore } from '../../../store/goalStore';
 
 interface DetailsPanelProps {
   topic: Topic;
@@ -157,9 +158,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     if (!selectedGoal) return;
     
     await handleUpdate(async () => {
-      await updateGoalCompat(topic.id, selectedGoal.id, { status });
+      // 換成 goalStore 的 updateGoal
+      // 需傳 goalId, version, updates
+      await useGoalStore.getState().updateGoal(selectedGoal.id, selectedGoal.version, { status });
     });
-  }, [selectedGoal, topic.id, updateGoalCompat, handleUpdate]);
+  }, [selectedGoal, handleUpdate]);
 
   // 編輯保存處理
   const handleSaveEdit = useCallback(async () => {

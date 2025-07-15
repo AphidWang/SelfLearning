@@ -19,6 +19,7 @@ import { stateMachine } from './config/stateMachine';
 import { EventType } from './config/events';
 import { MindmapStateController } from './controller/MindmapStateController';
 import { STATE_PROMPTS } from '../../lib/ai/config/prompts/states';
+import { useGoalStore } from '../../store/goalStore';
 
 // 系統錯誤
 class SystemError extends Error {
@@ -463,7 +464,9 @@ export class MindMapService {
   async updateGoal(goalId: string, updates: Goal) {
     if (!this.currentTopicId) return null;
 
-    return await useTopicStore.getState().updateGoalCompat(this.currentTopicId, goalId, updates);
+    // 換成 goalStore 的 updateGoal
+    const version = updates.version ?? 0;
+    return await useGoalStore.getState().updateGoal(goalId, version, updates);
   }
 
   async addTask(goalId: string, task: Task) {
