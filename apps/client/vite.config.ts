@@ -21,6 +21,13 @@ export default defineConfig({
     }
   },
   build: {
-    sourcemap: true,
+    sourcemap: false, // 關掉 sourcemap 避免 framer-motion 錯誤
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'framer-motion': ['framer-motion'], // 把 framer-motion 單獨打包
+        }
+      }
+    }
   },
 });
