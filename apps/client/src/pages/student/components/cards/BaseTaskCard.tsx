@@ -550,6 +550,7 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
               ${highlight ? `, 0 0 0 2px ${task.subjectStyle.accent}40` : ''}
             `,
             backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
             pointerEvents: isFlipped ? 'none' : 'auto'
           }}
         >
@@ -572,6 +573,7 @@ export const BaseTaskCard: React.FC<BaseTaskCardProps & {
             `,
             transform: 'rotateY(180deg)',
             backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
             pointerEvents: isFlipped ? 'auto' : 'none'
           }}
         >
