@@ -1,0 +1,119 @@
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { useTopicStore } from '../apps/client/src/store/topicStore';
+import { SUBJECTS } from '../apps/client/src/constants/subjects';
+import { initTestAuth, cleanupTestData } from '../vitest.setup';
+
+// This test suite focuses on RPC based helper functions in topicStore
+// referenced in SUPABASE_RPC_FUNCTIONS.md.
+
+describe('TopicStore RPC helpers', () => {
+  let store: ReturnType<typeof useTopicStore.getState>;
+  let createdTopicId: string | null = null;
+  let createdGoalId: string | null = null;
+  let createdTaskId: string | null = null;
+
+  beforeAll(async () => {
+    await initTestAuth();
+  });
+
+  beforeEach(() => {
+    store = useTopicStore.getState();
+    store.reset();
+    createdTopicId = null;
+    createdGoalId = null;
+    createdTaskId = null;
+  });
+
+  afterEach(async () => {
+    if (createdTopicId) {
+      try {
+        await store.deleteTopic(createdTopicId);
+      } catch (err) {
+        console.warn('failed to cleanup topic', err);
+      }
+    }
+  });
+
+  afterAll(async () => {
+    await cleanupTestData();
+  });
+
+  const createBasicData = async () => {
+    const topic = await store.createTopic({
+      title: 'RPC 測試主題',
+      description: 'for rpc tests',
+      subject: SUBJECTS.MATH,
+      type: '學習目標',
+      category: 'learning',
+      status: 'active',
+      goals: [],
+      bubbles: [],
+      is_collaborative: false,
+      show_avatars: true
+    });
+    if (!topic) throw new Error('failed to create topic');
+    createdTopicId = topic.id;
+
+    const goal = await store.addGoal(topic.id, {
+      title: 'rpc goal',
+      description: 'goal',
+      status: 'todo',
+      priority: 'medium',
+      order_index: 0,
+      tasks: []
+    });
+    if (!goal) throw new Error('failed to create goal');
+    createdGoalId = goal.id;
+
+    const task = await store.addTask(goal.id, {
+      title: 'rpc task',
+      description: 'task',
+      status: 'todo',
+      priority: 'medium',
+      order_index: 0,
+      need_help: false,
+      dueDate: new Date().toISOString()
+    });
+    if (!task) throw new Error('failed to create task');
+    createdTaskId = task.id;
+
+    return { topicId: topic.id, goalId: goal.id, taskId: task.id };
+  };
+
+  it('getUserTaskActivitiesForDate should return activity data', async () => {
+    const { taskId } = await createBasicData();
+
+    // perform a check-in so there is activity
+    await store.performTaskAction(taskId, 'check_in');
+
+    const today = new Date().toISOString().split('T')[0];
+    const result = await store.getUserTaskActivitiesForDate(today);
+
+    expect(result).toBeDefined();
+    expect(Array.isArray(result.all_activities)).toBe(true);
+  });
+
+  it('getTopicsProgressForWeek should return progress data', async () => {
+    await createBasicData();
+
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const result = await store.getTopicsProgressForWeek(
+      weekStart.toISOString().split('T')[0],
+      weekEnd.toISOString().split('T')[0]
+    );
+
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('getActiveTopicsWithProgress should list active topics', async () => {
+    await createBasicData();
+
+    const result = await store.getActiveTopicsWithProgress();
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
