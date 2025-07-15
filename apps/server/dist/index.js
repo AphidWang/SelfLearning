@@ -12,6 +12,7 @@ const cors_1 = __importDefault(require("cors"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const chat_1 = __importDefault(require("./routes/chat"));
 const users_1 = __importDefault(require("./routes/users"));
+const report_1 = __importDefault(require("./routes/report"));
 const path_1 = __importDefault(require("path"));
 exports.app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ exports.app.use((req, res, next) => {
 exports.app.use('/api/auth', auth_1.default);
 exports.app.use('/api/chat', chat_1.default);
 exports.app.use('/api/users', users_1.default);
+exports.app.use('/api', report_1.default);
 exports.app.use(express_1.default.static(path_1.default.join(__dirname, '../../client/dist')));
 // 確保所有路由都返回 index.html
 exports.app.get('*', (req, res) => {

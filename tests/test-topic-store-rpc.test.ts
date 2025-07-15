@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { useTopicStore } from '../apps/client/src/store/topicStore.full';
+import { useTopicStore } from '../apps/client/src/store/topicStore';
 import { useTaskStore } from '../apps/client/src/store/taskStore';
 import { useGoalStore } from '../apps/client/src/store/goalStore';
+import { getTopicsProgressForWeek, getActiveTopicsWithProgress } from '../apps/client/src/store/progressQueries';
 import { SUBJECTS } from '../apps/client/src/constants/subjects';
 import { initTestAuth, cleanupTestData } from '../vitest.setup';
 
@@ -24,7 +25,6 @@ describe('TopicStore RPC helpers', () => {
     topicStore = useTopicStore.getState();
     goalStore = useGoalStore.getState();
     taskStore = useTaskStore.getState();
-    topicStore.reset();
     createdTopicId = null;
     createdGoalId = null;
     createdTaskId = null;
@@ -100,17 +100,24 @@ describe('TopicStore RPC helpers', () => {
 
   it('getUserTaskActivitiesForDate should return activity data', async () => {
     const { taskId } = await createBasicData();
+    console.log('=== DEBUG taskId:', taskId);
 
     // perform a check-in so there is activity
-    await taskStore.performTaskAction(taskId, 'check_in');
+    const actionResult = await taskStore.performTaskAction(taskId, 'check_in');
+    console.log('=== DEBUG performTaskAction result:', actionResult);
 
     const today = new Date().toISOString().split('T')[0];
+    console.log('=== DEBUG today:', today);
     const result = await taskStore.getUserTaskActivitiesForDate(today);
+    console.log('=== DEBUG getUserTaskActivitiesForDate result:', result);
 
     // 基本檢查
     expect(result).toBeDefined();
     expect(result.all_activities).toBeDefined();
     expect(Array.isArray(result.all_activities)).toBe(true);
+    if (result.all_activities.length === 0) {
+      console.error('❌ all_activities is empty! taskId:', taskId, 'actionResult:', actionResult, 'result:', result);
+    }
     expect(result.all_activities.length).toBeGreaterThan(0);
 
     // 檢查打卡活動
@@ -144,7 +151,7 @@ describe('TopicStore RPC helpers', () => {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    const result = await topicStore.getTopicsProgressForWeek(
+    const result = await getTopicsProgressForWeek(
       weekStart.toISOString().split('T')[0],
       weekEnd.toISOString().split('T')[0]
     );
@@ -155,7 +162,7 @@ describe('TopicStore RPC helpers', () => {
   it('getActiveTopicsWithProgress should list active topics', async () => {
     await createBasicData();
 
-    const result = await topicStore.getActiveTopicsWithProgress();
+    const result = await getActiveTopicsWithProgress();
     expect(Array.isArray(result)).toBe(true);
   });
 });

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { useTopicStore } from '../apps/client/src/store/topicStore';
 import { useGoalStore } from '../apps/client/src/store/goalStore';
-import { useTaskStore, type TaskActionResult } from '../apps/client/src/store/taskStore';
+import { useTaskStore } from '../apps/client/src/store/taskStore';
+import type { TaskActionResult } from '../apps/client/src/types/goal';
 import { initTestAuth } from '../vitest.setup';
 import { supabase } from '../apps/client/src/services/supabase';
 
@@ -24,7 +25,6 @@ describe('Task Action Transactions', () => {
   beforeEach(async () => {
     // 確保每個測試開始時都有乾淨的狀態
     const topicStore = useTopicStore.getState();
-    topicStore.reset();
     const goalStore = useGoalStore.getState();
     const taskStore = useTaskStore.getState();
 
@@ -113,7 +113,7 @@ describe('Task Action Transactions', () => {
   });
 
   it('應該能成功執行打卡操作', async () => {
-    const store = useTaskStore.getState();
+    const taskStore = useTaskStore.getState();
     
     // 執行打卡操作
     const result = await taskStore.performTaskAction(testTaskId, 'check_in');
@@ -131,11 +131,11 @@ describe('Task Action Transactions', () => {
     const store = useTaskStore.getState();
     
     // 第一次打卡
-    const firstResult = await taskStore.performTaskAction(testTaskId, 'check_in');
+    const firstResult = await store.performTaskAction(testTaskId, 'check_in');
     expect(firstResult.success).toBe(true);
     
     // 第二次打卡（同一天）
-    const secondResult = await taskStore.performTaskAction(testTaskId, 'check_in');
+    const secondResult = await store.performTaskAction(testTaskId, 'check_in');
     expect(secondResult.success).toBe(false);
     if (!secondResult.success && secondResult.message) {
       expect(secondResult.message).toContain('已經執行過');
@@ -148,14 +148,14 @@ describe('Task Action Transactions', () => {
     const store = useTaskStore.getState();
     
     // 先打卡
-    const checkInResult = await taskStore.performTaskAction(testTaskId, 'check_in');
+    const checkInResult = await store.performTaskAction(testTaskId, 'check_in');
     expect(checkInResult.success).toBe(true);
     if (checkInResult.success && checkInResult.task) {
       expect(checkInResult.task.progress_data.current_count).toBe(1);
     }
     
     // 取消打卡
-    const cancelResult = await taskStore.cancelTodayCheckIn(testTaskId);
+    const cancelResult = await store.cancelTodayCheckIn(testTaskId);
     expect(cancelResult.success).toBe(true);
     if (cancelResult.success && cancelResult.task) {
       expect(cancelResult.task.progress_data.current_count).toBe(0);
@@ -169,7 +169,7 @@ describe('Task Action Transactions', () => {
     const store = useTaskStore.getState();
     
     // 先打卡幾次（模擬多天）
-    await taskStore.performTaskAction(testTaskId, 'check_in');
+    await store.performTaskAction(testTaskId, 'check_in');
     
     // 手動添加一些歷史打卡記錄（模擬多天打卡）
     const { data: { user } } = await supabase.auth.getUser();
@@ -211,7 +211,7 @@ describe('Task Action Transactions', () => {
       .eq('id', testTaskId);
     
     // 重置任務
-    const resetResult = await taskStore.performTaskAction(testTaskId, 'reset');
+    const resetResult = await store.performTaskAction(testTaskId, 'reset');
     expect(resetResult.success).toBe(true);
     if (resetResult.success && resetResult.task) {
       expect(resetResult.task.progress_data.current_count).toBe(0);
@@ -226,7 +226,7 @@ describe('Task Action Transactions', () => {
     const store = useTaskStore.getState();
     
     // 執行打卡操作
-    const result = await taskStore.performTaskAction(testTaskId, 'check_in');
+    const result = await store.performTaskAction(testTaskId, 'check_in');
     expect(result.success).toBe(true);
     
     // 檢查 task_actions 表
@@ -259,7 +259,7 @@ describe('Task Action Transactions', () => {
     const store = useTaskStore.getState();
     
     // 嘗試對不存在的任務執行操作
-    const result = await taskStore.performTaskAction('non-existent-task-id', 'check_in');
+    const result = await store.performTaskAction('non-existent-task-id', 'check_in');
     expect(result.success).toBe(false);
     if (!result.success && result.message) {
       // 修改期望的錯誤訊息，因為 RPC 函數會返回 UUID 語法錯誤
@@ -322,7 +322,7 @@ describe('Task Action Transactions', () => {
     }
     
     // 執行第7次打卡（今天）
-    const result = await taskStore.performTaskAction(testTaskId, 'check_in');
+    const result = await store.performTaskAction(testTaskId, 'check_in');
     expect(result.success).toBe(true);
     if (result.success && result.task) {
       expect(result.task.progress_data.current_count).toBe(7);

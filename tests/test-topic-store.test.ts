@@ -23,7 +23,6 @@ describe('TopicStore', () => {
     topicStore = useTopicStore.getState();
     goalStore = useGoalStore.getState();
     taskStore = useTaskStore.getState();
-    topicStore.reset();
   });
 
   afterEach(async () => {
@@ -67,7 +66,9 @@ describe('TopicStore', () => {
       if (result?.id) createdTopics.push(result.id);
 
       // 驗證資料庫中的資料
+      console.log('=== DEBUG savedTopic:', result!.id);
       const savedTopic = await topicStore.getTopic(result!.id);
+      console.log('=== DEBUG savedTopic:', savedTopic);
       expect(savedTopic).toBeDefined();
       expect(savedTopic?.title).toBe(mockTopic.title);
       expect(savedTopic?.goals).toEqual([]);
@@ -80,7 +81,7 @@ describe('TopicStore', () => {
       expect(topic).toBeDefined();
       
       const updatedTitle = '更新後的主題';
-      const result = await topicStore.updateTopicCompat(topic!.id, { title: updatedTitle });
+      const result = await topicStore.updateTopic(topic!.id, topic!.version, { title: updatedTitle });
       expect(result).toBeDefined();
       expect(result?.title).toBe(updatedTitle);
       expect(result?.goals).toEqual([]);
@@ -295,7 +296,11 @@ describe('TopicStore', () => {
         priority: 'medium' as const,
         order_index: 0,
         need_help: false,
-        dueDate: new Date().toISOString()
+        dueDate: new Date().toISOString(),
+        task_type: 'single' as const,
+        task_config: { type: 'single' } as const,
+        cycle_config: { cycle_type: 'none' as const, auto_reset: false },
+        progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 }
       };
 
       const result = await taskStore.addTask(testGoal!.id, task);
@@ -317,11 +322,15 @@ describe('TopicStore', () => {
         priority: 'medium' as const,
         order_index: 0,
         need_help: false,
-        dueDate: new Date().toISOString()
+        dueDate: new Date().toISOString(),
+        task_type: 'single' as const,
+        task_config: { type: 'single' } as const,
+        cycle_config: { cycle_type: 'none' as const, auto_reset: false },
+        progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 }
       });
-      expect(task).toBeDefined();
+      if (!task) throw new Error('addTask failed');
 
-      const result = await taskStore.updateTaskCompat(testTopic!.id, testGoal!.id, task!.id, { status: 'done' });
+      const result = await taskStore.updateTask(task.id, task.version, { status: 'done' });
       expect(result).toBeDefined();
       expect(result?.status).toBe('done');
 
@@ -339,9 +348,13 @@ describe('TopicStore', () => {
         priority: 'medium' as const,
         order_index: 0,
         need_help: false,
-        dueDate: new Date().toISOString()
+        dueDate: new Date().toISOString(),
+        task_type: 'single' as const,
+        task_config: { type: 'single' } as const,
+        cycle_config: { cycle_type: 'none' as const, auto_reset: false },
+        progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 }
       });
-      expect(task).toBeDefined();
+      if (!task) throw new Error('addTask failed');
 
       const result = await taskStore.deleteTask(task!.id);
       expect(result).toBe(true);
@@ -369,9 +382,13 @@ describe('TopicStore', () => {
         priority: 'medium' as const,
         order_index: 0,
         need_help: false,
-        dueDate: new Date().toISOString()
+        dueDate: new Date().toISOString(),
+        task_type: 'single' as const,
+        task_config: { type: 'single' } as const,
+        cycle_config: { cycle_type: 'none' as const, auto_reset: false },
+        progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 }
       });
-      expect(task).toBeDefined();
+      if (!task) throw new Error('addTask failed');
 
       // 先歸檔任務
       await taskStore.deleteTask(task!.id);
