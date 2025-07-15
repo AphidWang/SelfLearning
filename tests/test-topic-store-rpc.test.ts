@@ -72,7 +72,19 @@ describe('TopicStore RPC helpers', () => {
       priority: 'medium',
       order_index: 0,
       need_help: false,
-      dueDate: new Date().toISOString()
+      dueDate: new Date().toISOString(),
+      task_type: 'single',
+      task_config: {
+        type: 'single'
+      },
+      cycle_config: {
+        cycle_type: 'none',
+        auto_reset: false
+      },
+      progress_data: {
+        last_updated: new Date().toISOString(),
+        completion_percentage: 0
+      }
     });
     if (!task) throw new Error('failed to create task');
     createdTaskId = task.id;
@@ -89,8 +101,32 @@ describe('TopicStore RPC helpers', () => {
     const today = new Date().toISOString().split('T')[0];
     const result = await store.getUserTaskActivitiesForDate(today);
 
+    // 基本檢查
     expect(result).toBeDefined();
+    expect(result.all_activities).toBeDefined();
     expect(Array.isArray(result.all_activities)).toBe(true);
+    expect(result.all_activities.length).toBeGreaterThan(0);
+
+    // 檢查打卡活動
+    expect(result.checked_in_tasks).toBeDefined();
+    expect(Array.isArray(result.checked_in_tasks)).toBe(true);
+    const checkedIn = result.checked_in_tasks.find(
+      t => t.id === taskId && t.type === 'check_in'
+    );
+    expect(checkedIn).toBeDefined();
+    expect(checkedIn).toMatchObject({
+      id: taskId,
+      title: 'rpc task',
+      type: 'check_in'
+    });
+
+    // 檢查所有活動列表
+    const activity = result.all_activities[0];
+    expect(activity).toMatchObject({
+      id: taskId,
+      title: 'rpc task',
+      type: 'check_in'
+    });
   });
 
   it('getTopicsProgressForWeek should return progress data', async () => {

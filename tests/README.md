@@ -18,6 +18,12 @@ yarn test tests/test-topic-store.test.ts  # 1/10 通過 (Mock 設置複雜)
 ## 運行測試
 
 ### 運行所有測試
+
+### 先獲取token
+```bash
+node tests/test-login.js
+```
+
 ```bash
 yarn test
 ```

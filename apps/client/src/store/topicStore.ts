@@ -3538,16 +3538,77 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   getUserTaskActivitiesForDate: async (date: string) => {
     try {
-      const { data, error } = await supabase.rpc('get_user_task_activities_for_date', {
-        p_date: date
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      // 使用同一個 RPC 函數，但只取一天的資料
+      const { data, error } = await supabase.rpc('get_user_task_activities_summary', {
+        p_user_id: user.id,
+        p_week_start: date,
+        p_week_end: date
       });
 
       if (error) throw error;
-      return data || {
-        completed_tasks: [],
-        checked_in_tasks: [],
-        recorded_tasks: [],
-        all_activities: []
+
+      // 從 daily_data 中取出當天的資料
+      const dayData = data[0]?.daily_data?.[0];
+      if (!dayData) {
+        return {
+          completed_tasks: [],
+          checked_in_tasks: [],
+          recorded_tasks: [],
+          all_activities: []
+        };
+      }
+
+      // 整理活動資料
+      const activeTasks = dayData.active_tasks || [];
+      const completedTasks = activeTasks.filter(task => task.type === 'completed').map(task => ({
+        id: task.id,
+        title: task.title,
+        topic_title: task.subject,
+        goal_title: task.goal_title,
+        completed_at: task.completed_at,
+        type: 'completed' as const
+      }));
+
+      const checkedInTasks = activeTasks.filter(task => task.type === 'check_in').map(task => ({
+        id: task.id,
+        title: task.title,
+        topic_title: task.subject,
+        goal_title: task.goal_title,
+        action_timestamp: task.action_timestamp,
+        action_data: task.action_data,
+        type: 'check_in' as const
+      }));
+
+      const recordedTasks = activeTasks.filter(task => task.type === 'record').map(task => ({
+        id: task.id,
+        title: task.title,
+        topic_title: task.subject,
+        goal_title: task.goal_title,
+        record_id: task.action_data?.record_id,
+        created_at: task.action_timestamp,
+        type: 'record' as const
+      }));
+
+      // 合併所有活動並按時間排序
+      const allActivities = [...completedTasks, ...checkedInTasks, ...recordedTasks]
+        .sort((a, b) => {
+          const timeA = a.type === 'completed' ? a.completed_at :
+                       a.type === 'check_in' ? a.action_timestamp :
+                       a.created_at;
+          const timeB = b.type === 'completed' ? b.completed_at :
+                       b.type === 'check_in' ? b.action_timestamp :
+                       b.created_at;
+          return new Date(timeB).getTime() - new Date(timeA).getTime();
+        });
+
+      return {
+        completed_tasks: completedTasks,
+        checked_in_tasks: checkedInTasks,
+        recorded_tasks: recordedTasks,
+        all_activities: allActivities
       };
     } catch (error) {
       console.error('獲取用戶任務活動失敗:', error);
@@ -3557,6 +3618,57 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         recorded_tasks: [],
         all_activities: []
       };
+    }
+  },
+
+  /**
+   * 🆕 獲取回顧週摘要（統一 RPC 方法）
+   * 為 retroStore 提供統一的數據獲取接口
+   */
+  getRetroWeekSummary: async (weekStart: string, weekEnd: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      console.log('🔄 topicStore.getRetroWeekSummary - 調用統一 RPC:', { weekStart, weekEnd });
+
+      // 使用新的 RPC 函數名稱
+      const { data, error } = await supabase.rpc('get_user_task_activities_summary', {
+        p_user_id: user.id,
+        p_week_start: weekStart,
+        p_week_end: weekEnd
+      });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        console.warn('⚠️ RPC 返回空數據');
+        return {
+          daily_data: [],
+          week_data: {
+            total_check_ins: 0,
+            total_records: 0,
+            total_completed: 0,
+            total_activities: 0,
+            active_days: 0
+          },
+          completed_data: [],
+          topics_data: []
+        };
+      }
+
+      const result = data[0];
+      console.log('✅ topicStore.getRetroWeekSummary - RPC 調用成功:', {
+        dailyDays: result.daily_data?.length || 0,
+        weekTotals: result.week_data,
+        completedTasks: result.completed_data?.length || 0,
+        activeTopics: result.topics_data?.length || 0
+      });
+
+      return result;
+    } catch (error) {
+      console.error('❌ topicStore.getRetroWeekSummary 失敗:', error);
+      throw error;
     }
   },
 
@@ -3644,70 +3756,6 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         console.error('回退實現也失敗:', fallbackError);
         return [];
       }
-    }
-  },
-
-  /**
-   * 🆕 獲取回顧週摘要（統一 RPC 方法）
-   * 為 retroStore 提供統一的數據獲取接口
-   */
-  getRetroWeekSummary: async (weekStart: string, weekEnd: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('用戶未認證');
-
-      console.log('🔄 topicStore.getRetroWeekSummary - 調用統一 RPC:', { weekStart, weekEnd });
-
-      // 🔄 RPC: 獲取回顧週摘要（統一數據接口）
-      // 參數: 用戶ID、週開始日期、週結束日期
-      // 返回: { daily_data, week_data, completed_data, topics_data }
-      const { data, error } = await supabase.rpc('get_retro_week_summary', {
-        p_user_id: user.id,
-        p_week_start: new Date(weekStart),
-        p_week_end: new Date(weekEnd)
-      });
-
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
-        console.warn('⚠️ RPC 返回空數據');
-        return {
-          daily_data: [],
-          week_data: {
-            total_check_ins: 0,
-            total_records: 0,
-            total_completed: 0,
-            total_activities: 0,
-            active_days: 0
-          },
-          completed_data: [],
-          topics_data: []
-        };
-      }
-
-      const result = data[0];
-      console.log('✅ topicStore.getRetroWeekSummary - RPC 調用成功:', {
-        dailyDays: result.daily_data?.length || 0,
-        weekTotals: result.week_data,
-        completedTasks: result.completed_data?.length || 0,
-        activeTopics: result.topics_data?.length || 0
-      });
-
-      return {
-        daily_data: result.daily_data || [],
-        week_data: result.week_data || {
-          total_check_ins: 0,
-          total_records: 0,
-          total_completed: 0,
-          total_activities: 0,
-          active_days: 0
-        },
-        completed_data: result.completed_data || [],
-        topics_data: result.topics_data || []
-      };
-    } catch (error) {
-      console.error('❌ topicStore.getRetroWeekSummary 失敗:', error);
-      throw error;
     }
   },
 })); 
