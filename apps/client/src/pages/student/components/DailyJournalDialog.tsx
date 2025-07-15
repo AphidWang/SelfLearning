@@ -146,6 +146,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
 }) => {
   const navigate = useNavigate();
   const { topics } = useTopicStore();
+  const topicStore = useTopicStore(); // <--- 修正這裡
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
   const [motivationLevel, setMotivationLevel] = useState<MotivationLevel | null>(null);
   const [journalContent, setJournalContent] = useState('');
@@ -184,41 +185,36 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
         // 設定今天的日期範圍
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // 獲取今天的任務記錄
-        const records = await taskRecordStore.getUserTaskRecords({
-          start_date: today.toISOString(),
-          end_date: tomorrow.toISOString()
-        });
-        setTodayTaskRecords(records);
+        // 使用 topicStore 的 getUserTaskActivitiesForDate 獲取今天的任務活動
+        const activities = await topicStore.getUserTaskActivitiesForDate(
+          today.toISOString().split('T')[0]
+        );
 
-        // 從 topics 中獲取今天完成的任務
-        const completedTasks: CompletedTask[] = [];
-        if (topics && Array.isArray(topics)) {
-          topics.forEach(topic => {
-            topic.goals?.forEach(goal => {
-              goal.tasks?.forEach(task => {
-                if (task.status === 'done' && task.completed_at) {
-                  const completedDate = new Date(task.completed_at);
-                  completedDate.setHours(0, 0, 0, 0);
-                  if (completedDate.getTime() === today.getTime()) {
-                    completedTasks.push({
-                      id: task.id,
-                      title: task.title,
-                      type: 'completed',
-                      time: task.completed_at,
-                      category: topic.title,
-                      assignedTo: goal.title
-                    });
-                  }
-                }
-              });
-            });
-          });
-        }
-        setTodayCompletedTasks(completedTasks);
+        // 設置任務記錄
+        setTodayTaskRecords(activities.checked_in_tasks.map(task => ({
+          id: `${task.id}-${task.action_timestamp}`,
+          task_id: task.id,
+          title: task.title,
+          created_at: task.action_timestamp,
+          difficulty: task.action_data?.difficulty || 3,
+          updated_at: task.action_timestamp,
+          author_id: '', // 或適合的預設值
+          message: '',
+          files: [],
+          tags: []
+        })));
+
+        // 設置完成的任務
+        setTodayCompletedTasks(activities.completed_tasks.map(task => ({
+          id: task.id,
+          title: task.title,
+          type: 'completed' as const,
+          time: task.completed_at,
+          category: task.topic_title,
+          assignedTo: task.goal_title
+        })));
+
       } catch (error) {
         console.error('Failed to fetch today tasks:', error);
       }

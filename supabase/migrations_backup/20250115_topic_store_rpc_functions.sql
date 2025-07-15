@@ -1,3 +1,15 @@
+-- 首先建立 exec_sql 函數
+CREATE OR REPLACE FUNCTION public.exec_sql(sql_statement text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  EXECUTE sql_statement;
+END;
+$$;
+
+-- 原本的 RPC 函數定義
 -- Topic Store RPC Functions Migration
 -- 定義所有 topicStore 相關的 RPC 函數
 -- Created: 2025-01-15
@@ -430,120 +442,160 @@ AS $$
   ORDER BY ds.date;
 $$;
 
--- 獲取回顧週摘要
-CREATE OR REPLACE FUNCTION public.get_retro_week_summary(
-  p_user_id UUID,
-  p_week_start DATE,
-  p_week_end DATE
+-- 重命名並保持相同功能的 RPC 函數
+CREATE OR REPLACE FUNCTION public.get_user_task_activities_summary(
+  p_user_id uuid,
+  p_week_start date,
+  p_week_end date
 )
 RETURNS TABLE(
-  daily_data JSONB,
-  week_data JSONB,
-  completed_data JSONB,
-  topics_data JSONB
+  daily_data jsonb,
+  week_data jsonb,
+  completed_data jsonb,
+  topics_data jsonb
 )
 LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
+AS $function$
 DECLARE
-  v_daily_data JSONB;
-  v_week_data JSONB;
-  v_completed_data JSONB;
-  v_topics_data JSONB;
+  daily_data JSONB;
+  week_data JSONB;
+  completed_data JSONB;
+  topics_data JSONB;
 BEGIN
-  -- 每日數據統計
-  WITH daily_stats AS (
+  -- 1. daily_data: 每日 event + 任務 join
+  SELECT jsonb_agg(
+    jsonb_build_object(
+      'date', day_series.date,
+      'dayOfWeek', CASE EXTRACT(DOW FROM day_series.date)
+        WHEN 0 THEN '日'
+        WHEN 1 THEN '一'
+        WHEN 2 THEN '二'
+        WHEN 3 THEN '三'
+        WHEN 4 THEN '四'
+        WHEN 5 THEN '五'
+        WHEN 6 THEN '六'
+      END,
+      'check_ins', COALESCE(day_counts.check_ins, 0),
+      'records', COALESCE(day_counts.records, 0),
+      'completed_tasks', COALESCE(day_counts.completed_tasks, 0),
+      'total_activities', COALESCE(day_counts.total_activities, 0),
+      'active_tasks', COALESCE(day_counts.active_tasks, '[]'::jsonb)
+    )
+    ORDER BY day_series.date
+  ) INTO daily_data
+  FROM generate_series(p_week_start, p_week_end, '1 day'::interval) AS day_series(date)
+  LEFT JOIN (
     SELECT 
-      DATE(ue.created_at) as date,
+      DATE(ue.created_at) as event_date,
       COUNT(*) FILTER (WHERE ue.event_type = 'task.check_in') as check_ins,
       COUNT(*) FILTER (WHERE ue.event_type = 'task.record_added') as records,
-      COUNT(*) FILTER (WHERE ue.event_type = 'task.status_changed') as completed_tasks,
-      COUNT(*) as total_activities
+      COUNT(*) FILTER (WHERE ue.event_type = 'task.status_changed' AND (ue.content->>'to_status') = 'done') as completed_tasks,
+      COUNT(DISTINCT ue.entity_id) as total_activities,
+      jsonb_agg(
+        jsonb_build_object(
+          'id', ue.entity_id,
+          'title', t.title,
+          'subject', COALESCE(topic.subject, '未分類'),
+          'goal_title', g.title,
+          'task_status', t.status,
+          'completed_at', t.completed_at,
+          'type', CASE 
+            WHEN ue.event_type = 'task.check_in' THEN 'check_in'
+            WHEN ue.event_type = 'task.record_added' THEN 'record'
+            WHEN ue.event_type = 'task.status_changed' AND (ue.content->>'to_status') = 'done' THEN 'completed'
+            ELSE 'other'
+          END,
+          'action_timestamp', ue.created_at,
+          'action_data', ue.content
+        )
+      ) as active_tasks
     FROM user_events ue
+    LEFT JOIN tasks t ON t.id::text = ue.entity_id
+    LEFT JOIN goals g ON t.goal_id = g.id
+    LEFT JOIN topics topic ON g.topic_id = topic.id
     WHERE ue.user_id = p_user_id
-      AND DATE(ue.created_at) BETWEEN p_week_start AND p_week_end
       AND ue.entity_type = 'task'
+      AND DATE(ue.created_at) BETWEEN p_week_start AND p_week_end
     GROUP BY DATE(ue.created_at)
-  )
-  SELECT jsonb_agg(
-    jsonb_build_object(
-      'date', ds.date,
-      'dayOfWeek', EXTRACT(dow FROM ds.date),
-      'check_ins', COALESCE(dst.check_ins, 0),
-      'records', COALESCE(dst.records, 0),
-      'completed_tasks', COALESCE(dst.completed_tasks, 0),
-      'total_activities', COALESCE(dst.total_activities, 0),
-      'active_tasks', '[]'::jsonb
-    ) ORDER BY ds.date
-  ) INTO v_daily_data
-  FROM generate_series(p_week_start, p_week_end, interval '1 day') ds(date)
-  LEFT JOIN daily_stats dst ON ds.date::date = dst.date;
-  
-  -- 週總計數據
+  ) day_counts ON day_series.date = day_counts.event_date;
+
+  -- 2. week_data: 週聚合
   SELECT jsonb_build_object(
-    'total_check_ins', COUNT(*) FILTER (WHERE ue.event_type = 'task.check_in'),
-    'total_records', COUNT(*) FILTER (WHERE ue.event_type = 'task.record_added'),
-    'total_completed', COUNT(*) FILTER (WHERE ue.event_type = 'task.status_changed'),
-    'total_activities', COUNT(*),
-    'active_days', COUNT(DISTINCT DATE(ue.created_at))
-  ) INTO v_week_data
+    'total_check_ins', COALESCE(SUM(CASE WHEN ue.event_type = 'task.check_in' THEN 1 ELSE 0 END), 0),
+    'total_records', COALESCE(SUM(CASE WHEN ue.event_type = 'task.record_added' THEN 1 ELSE 0 END), 0),
+    'total_completed', COALESCE(SUM(CASE WHEN ue.event_type = 'task.status_changed' AND (ue.content->>'to_status') = 'done' THEN 1 ELSE 0 END), 0),
+    'total_activities', COALESCE(COUNT(DISTINCT ue.entity_id), 0),
+    'active_days', COALESCE(COUNT(DISTINCT DATE(ue.created_at)), 0)
+  ) INTO week_data
   FROM user_events ue
   WHERE ue.user_id = p_user_id
-    AND DATE(ue.created_at) BETWEEN p_week_start AND p_week_end
-    AND ue.entity_type = 'task';
-  
-  -- 完成的任務數據
-  SELECT jsonb_agg(
-    jsonb_build_object(
-      'id', t.id,
-      'title', t.title,
-      'topic', tp.title,
-      'goal_title', g.title,
-      'completed_at', t.completed_at,
-      'difficulty', 3
-    )
-  ) INTO v_completed_data
-  FROM tasks t
-  JOIN goals g ON t.goal_id = g.id
-  JOIN topics tp ON g.topic_id = tp.id
-  WHERE t.status = 'done'
-    AND t.completed_at BETWEEN p_week_start AND p_week_end + interval '1 day'
-    AND (t.completed_by = p_user_id OR tp.owner_id = p_user_id);
-  
-  -- 主題數據
-  SELECT jsonb_agg(
-    jsonb_build_object(
-      'id', tp.id,
-      'title', tp.title,
-      'subject', tp.subject,
-      'progress', COALESCE(
-        ROUND(
-          (COUNT(t.id) FILTER (WHERE t.status = 'done'))::numeric * 100.0 / 
-          NULLIF(COUNT(t.id), 0), 0
-        ), 0
-      ),
-      'total_tasks', COUNT(t.id),
-      'completed_tasks', COUNT(t.id) FILTER (WHERE t.status = 'done'),
-      'has_activity', COUNT(ue.id) > 0,
-      'week_activities', COUNT(ue.id)
-    )
-  ) INTO v_topics_data
-  FROM topics tp
-  LEFT JOIN goals g ON tp.id = g.topic_id
-  LEFT JOIN tasks t ON g.id = t.goal_id
-  LEFT JOIN user_events ue ON (
-    ue.entity_id = t.id 
     AND ue.entity_type = 'task'
-    AND ue.user_id = p_user_id
-    AND DATE(ue.created_at) BETWEEN p_week_start AND p_week_end
-  )
-  WHERE tp.owner_id = p_user_id
-    AND tp.status != 'archived'
-  GROUP BY tp.id, tp.title, tp.subject;
-  
-  RETURN QUERY SELECT v_daily_data, v_week_data, v_completed_data, v_topics_data;
+    AND DATE(ue.created_at) BETWEEN p_week_start AND p_week_end;
+
+  -- 3. completed_data: 用 daily_data 的 active_tasks 算
+  SELECT COALESCE(jsonb_agg(x), '[]'::jsonb) INTO completed_data
+  FROM (
+    SELECT DISTINCT ON (t.id)
+      jsonb_build_object(
+        'id', t.id,
+        'title', t.title,
+        'topic', COALESCE(topic.subject, '未分類'),
+        'goal_title', g.title,
+        'completed_at', t.completed_at
+      ) AS x
+    FROM user_events ue
+    LEFT JOIN tasks t ON t.id::text = ue.entity_id
+    LEFT JOIN goals g ON t.goal_id = g.id
+    LEFT JOIN topics topic ON g.topic_id = topic.id
+    WHERE ue.user_id = p_user_id
+      AND ue.entity_type = 'task'
+      AND t.status = 'done'
+      AND t.completed_at IS NOT NULL
+      AND DATE(t.completed_at) BETWEEN p_week_start AND p_week_end
+    ORDER BY t.id, t.completed_at DESC
+    LIMIT 10
+  ) sub;
+
+  -- 4. topics_data: 活躍主題摘要
+  SELECT COALESCE(jsonb_agg(
+    jsonb_build_object(
+      'id', topic.id,
+      'title', topic.title,
+      'subject', COALESCE(topic.subject, '未分類'),
+      'progress', CASE 
+        WHEN topic_stats.total_tasks = 0 THEN 0
+        ELSE CAST((topic_stats.completed_tasks::NUMERIC / topic_stats.total_tasks::NUMERIC) * 100 AS INTEGER)
+      END,
+      'total_tasks', topic_stats.total_tasks,
+      'completed_tasks', topic_stats.completed_tasks,
+      'has_activity', topic_stats.week_activities > 0,
+      'week_activities', topic_stats.week_activities
+    )
+    ORDER BY topic_stats.week_activities DESC, topic_stats.completed_tasks DESC
+  ), '[]'::jsonb) INTO topics_data
+  FROM topics topic
+  LEFT JOIN (
+    SELECT 
+      topic.id as topic_id,
+      COUNT(t.id) as total_tasks,
+      COUNT(CASE WHEN t.status = 'done' THEN 1 END) as completed_tasks,
+      COUNT(DISTINCT ue.entity_id) FILTER (WHERE DATE(ue.created_at) BETWEEN p_week_start AND p_week_end) as week_activities
+    FROM topics topic
+    LEFT JOIN goals g ON topic.id = g.topic_id AND g.status != 'archived'
+    LEFT JOIN tasks t ON g.id = t.goal_id AND t.status != 'archived'
+    LEFT JOIN user_events ue ON t.id::TEXT = ue.entity_id 
+      AND ue.entity_type = 'task'
+      AND ue.user_id = p_user_id
+    WHERE topic.owner_id = p_user_id AND topic.status != 'archived'
+    GROUP BY topic.id
+  ) topic_stats ON topic.id = topic_stats.topic_id
+  WHERE topic.owner_id = p_user_id AND topic.status != 'archived'
+  LIMIT 5;
+
+  -- 返回結果
+  RETURN QUERY SELECT daily_data, week_data, completed_data, topics_data;
 END;
-$$;
+$function$;
 
 -- ============================================================================
 -- Grant permissions
