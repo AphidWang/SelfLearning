@@ -603,6 +603,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
   getDailyActivityStats: async (startDate, endDate) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
       const { data, error } = await supabase.rpc('get_daily_activity_stats_v2', {
         p_user_id: user.id,
         p_start_date: startDate,
