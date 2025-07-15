@@ -4,7 +4,9 @@ import { Target, ChevronRight, Plus, Calendar, ArrowRight, Sparkles, BookOpen, L
 import { AIAssistant } from '../../components/goals/AIAssistant';
 import { ActionItem } from '../../components/goals/ActionItem';
 import { goalTemplates } from '../../constants/goalTemplates';
-import { useTopicStore, type MarkTaskResult } from '../../store/topicStore';
+import { useTopicStore } from '../../store/topicStore';
+import { useTaskStore } from '../../store/taskStore';
+import { useGoalStore } from '../../store/goalStore';
 import type { Task } from '../../types/goal';
 import type { Topic } from '../../types/goal';
 import { GOAL_STATUSES, GOAL_SOURCES } from '../../constants/goals';
@@ -16,9 +18,12 @@ import { FloatingAssistant } from '../../components/assistant/FloatingAssistant'
 import { useAssistant } from '../../hooks/useAssistant';
 import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
+import type { TaskActionResult } from '../../types/goal';
 
 const StudentPlanning: React.FC = () => {
-  const { topics, updateTopicCompat: updateTopic, updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo, fetchTopics, createTopic, addGoal } = useTopicStore();
+  const { topics, updateTopic, fetchTopicsWithActions: fetchTopics, createTopic } = useTopicStore();
+  const { updateTask, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTaskStore();
+  const { addGoal } = useGoalStore();
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [showNewTopicModal, setShowNewTopicModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -60,7 +65,7 @@ const StudentPlanning: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await useTopicStore.getState().fetchTopics();
+      await useTopicStore.getState().fetchTopicsWithActions();
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入主題時發生錯誤');
     } finally {
@@ -106,7 +111,7 @@ const StudentPlanning: React.FC = () => {
     const task = goal.tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    updateTaskInfo(topicId, goalId, taskId, {
+    updateTask(task.id, task.version ?? 0, {
       title: task.title,
       description: task.description,
       priority: task.priority,
@@ -141,12 +146,12 @@ const StudentPlanning: React.FC = () => {
 
   const handleTaskStatusChange = async (topicId: string, goalId: string, task: Task) => {
     try {
-      let result: MarkTaskResult;
+      let result: TaskActionResult;
       
       if (task.status === 'done') {
-        result = await markTaskTodo(topicId, goalId, task.id);
+        result = await markTaskTodo(task.id, task.version ?? 0);
       } else {
-        result = await markTaskCompleted(topicId, goalId, task.id);
+        result = await markTaskCompleted(task.id, task.version ?? 0);
       }
       
       if (!result.success) {
@@ -164,7 +169,7 @@ const StudentPlanning: React.FC = () => {
 
   const handleTaskEdit = async (topicId: string, goalId: string, task: Task) => {
     try {
-      const updatedTask = await updateTaskInfo(topicId, goalId, task.id, {
+      const updatedTask = await updateTask(task.id, task.version ?? 0, {
         title: task.title,
         description: task.description,
         priority: task.priority,
@@ -187,7 +192,9 @@ const StudentPlanning: React.FC = () => {
   };
 
   const handleDeleteTopic = (topicId: string) => {
-    updateTopic(topicId, { status: 'archived' });
+    const topic = topics.find(t => t.id === topicId);
+    if (!topic) return;
+    updateTopic(topicId, topic.version ?? 0, { status: 'archived' });
   };
 
   const handleAddNewTopic = (newTopic: Topic) => {
@@ -201,7 +208,7 @@ const StudentPlanning: React.FC = () => {
         editedTopic.title?.trim() !== '' &&
         editedTopic.description?.trim() !== '') {
       setIsEditing(false);
-      updateTopic(editedTopic.id, editedTopic);
+      updateTopic(editedTopic.id, editedTopic.version ?? 0, editedTopic);
       setSelectedTopic(editedTopic);
       setHasAttemptedSave(false);
       setSavedTopicIds(prev => new Set(prev).add(editedTopic.id));
@@ -209,7 +216,7 @@ const StudentPlanning: React.FC = () => {
   };
 
   const handleUpdateTopic = (topic: Topic) => {
-    updateTopic(topic.id, topic);
+    updateTopic(topic.id, topic.version ?? 0, topic);
   };
 
   const handleTopicSelect = (topic: Topic) => {
@@ -252,7 +259,7 @@ const StudentPlanning: React.FC = () => {
     if (!selectedTopic?.goals) return;
     
     try {
-      const newGoal = await useTopicStore.getState().addGoal(selectedTopic.id, {
+      const newGoal = await useGoalStore.getState().addGoal(selectedTopic.id, {
         title: '新目標',
         description: '',
         status: 'todo',

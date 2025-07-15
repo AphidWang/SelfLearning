@@ -21,6 +21,7 @@ import { X, Mic, Save, Smile, Zap, Heart, BookOpen, History, CheckCircle, Play }
 import { journalStore, type MoodType, type CreateJournalEntry, type CompletedTask, type DailyJournal } from '../../../store/journalStore';
 import { taskRecordStore, type TaskRecord } from '../../../store/taskRecordStore';
 import { useTopicStore } from '../../../store/topicStore';
+import { useTaskStore } from '../../../store/taskStore';
 import { useNavigate } from 'react-router-dom';
 import { Task } from '../../../types/goal';
 
@@ -147,6 +148,7 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
   const navigate = useNavigate();
   const { topics } = useTopicStore();
   const topicStore = useTopicStore(); // <--- 修正這裡
+  const taskStore = useTaskStore();
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
   const [motivationLevel, setMotivationLevel] = useState<MotivationLevel | null>(null);
   const [journalContent, setJournalContent] = useState('');
@@ -186,8 +188,8 @@ export const DailyJournalDialog: React.FC<DailyJournalDialogProps> = ({
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // 使用 topicStore 的 getUserTaskActivitiesForDate 獲取今天的任務活動
-        const activities = await topicStore.getUserTaskActivitiesForDate(
+        // 使用 taskStore 的 getUserTaskActivitiesForDate 獲取今天的任務活動
+        const activities = await taskStore.getUserTaskActivitiesForDate(
           today.toISOString().split('T')[0]
         );
 

@@ -43,6 +43,9 @@ import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
 import { SPECIAL_TASK_FLAGS, hasWeeklyQuickChallenge } from '../../types/goal';
 import { LoadingDots } from '../../components/shared/LoadingDots';
 import { TaskRecordHistoryDialog } from './components/TaskRecordHistoryDialog';
+import { useTaskStore } from '../../store/taskStore';
+import { useGoalStore } from '../../store/goalStore';
+import { getCompletionRate } from '../../store/progressQueries';
 
 /**
  * 任務牆配置介面
@@ -94,20 +97,16 @@ export const TaskWallPage = () => {
   
   // Store hooks with error handling
   const { 
-    fetchTopics, 
+    fetchTopicsWithActions: fetchTopics, 
     topics, 
-    addTask,
     createTopic,
-    addGoal,
-    deleteTask,
-    markTaskCompletedCompat: markTaskCompleted,
-    markTaskInProgressCompat: markTaskInProgress,
-    markTaskTodoCompat: markTaskTodo,
-    performTaskAction,
-    clearError,
+    getActiveGoals,
+    getActiveTopics,
     loading, 
-    error
+    error,
   } = useTopicStore();
+  const { addTask, deleteTask, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTaskStore();
+  const { addGoal } = useGoalStore();
   
   const { users, getCollaboratorCandidates } = useUserStore();
   const { currentUser, isLoading: userLoading } = useUser();
@@ -184,12 +183,13 @@ export const TaskWallPage = () => {
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => {
-        clearError();
+        // clearError();
+        useTopicStore.setState({ error: null }); // 直接 patch
       }, 5000); // 5秒後自動清除錯誤
 
       return () => clearTimeout(timer);
     }
-  }, [error, clearError]);
+  }, [error]);
 
   // 從資料庫載入已完成任務到完成收藏
   useEffect(() => {
@@ -261,7 +261,7 @@ export const TaskWallPage = () => {
       // 使用專門的狀態切換函數
       switch (newStatus) {
         case 'done':
-          result = await markTaskCompleted(topicId, goalId, taskId, true); // 要求學習記錄
+          result = await markTaskCompleted(taskId, 0, true); // 只傳 taskId, version, requireRecord
           
           if (!result.success) {
             if (result.requiresRecord) {
@@ -306,7 +306,7 @@ export const TaskWallPage = () => {
           break;
           
         case 'in_progress':
-          result = await markTaskInProgress(topicId, goalId, taskId);
+          result = await markTaskInProgress(taskId, 0);
           if (!result.success) {
             toast.error(result.message);
             return;
@@ -314,7 +314,7 @@ export const TaskWallPage = () => {
           break;
           
         case 'todo':
-          result = await markTaskTodo(topicId, goalId, taskId);
+          result = await markTaskTodo(taskId, 0);
           if (!result.success) {
             toast.error(result.message);
             return;
@@ -368,7 +368,7 @@ export const TaskWallPage = () => {
   ) => {
     try {
       // 使用專門的狀態切換函數
-      await markTaskInProgress(topicId, goalId, taskId);
+      await markTaskInProgress(taskId, 0);
     } catch (error) {
       console.error('恢復任務失敗:', error);
     }

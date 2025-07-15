@@ -1,4 +1,6 @@
 import { useTopicStore } from '../../../store/topicStore';
+import { useGoalStore } from '../../../store/goalStore';
+import { useTaskStore } from '../../../store/taskStore';
 import type { Tool } from './types';
 import type { Topic, Goal, Task } from '../../../types/goal';
 
@@ -16,7 +18,10 @@ export const createTopicTool: Tool<{ topic: string }, Topic> = {
       goals: [],
       owner_id: '',  // 這會由 store 處理
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      is_collaborative: false,
+      show_avatars: false,
+      version: 1
     };
     topicStore.addTopic(newTopic);
     return newTopic;
@@ -32,12 +37,19 @@ export const createGoalTool: Tool<{ goal_name: string }, Goal> = {
     const selectedTopicId = topicStore.selectedTopicId;
     if (!selectedTopicId) throw new Error('No topic selected');
 
+    const goalStore = useGoalStore.getState();
+    const taskStore = useTaskStore.getState();
     const newGoal: Goal = {
       id: `${selectedTopicId}-${Date.now()}`,
       title: params.goal_name,
+      topic_id: selectedTopicId,
+      status: 'todo',
+      priority: 'medium',
+      order_index: 0,
+      version: 1,
       tasks: []
     };
-    topicStore.addGoal(selectedTopicId, newGoal);
+    await goalStore.addGoal(selectedTopicId, newGoal);
     return newGoal;
   }
 };
@@ -51,12 +63,22 @@ export const createTaskTool: Tool<{ task_name: string; goal_id: string }, Task> 
     const selectedTopicId = topicStore.selectedTopicId;
     if (!selectedTopicId) throw new Error('No topic selected');
 
+    const taskStore = useTaskStore.getState();
     const newTask: Task = {
       id: `${params.goal_id}-${Date.now()}`,
       title: params.task_name,
-      status: 'todo'
+      status: 'todo',
+      goal_id: params.goal_id,
+      priority: 'medium',
+      order_index: 0,
+      task_type: 'single',
+      task_config: { type: 'single' },
+      cycle_config: { cycle_type: 'none', auto_reset: false },
+      progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 },
+      need_help: false,
+      version: 1
     };
-    topicStore.addTask(params.goal_id, newTask);
+    await taskStore.addTask(params.goal_id, newTask);
     return newTask;
   }
 };
@@ -70,14 +92,20 @@ export const useTemplateGoalsTool: Tool<void, string[]> = {
     const selectedTopicId = topicStore.selectedTopicId;
     if (!selectedTopicId) throw new Error('No topic selected');
 
+    const goalStore = useGoalStore.getState();
     const templateGoals = ['觀察', '行動', '紀錄', '分享'];
     const goals = templateGoals.map(goalName => {
       const goal: Goal = {
         id: `${selectedTopicId}-${Date.now()}-${goalName}`,
         title: goalName,
+        topic_id: selectedTopicId,
+        status: 'todo',
+        priority: 'medium',
+        order_index: 0,
+        version: 1,
         tasks: []
       };
-      topicStore.addGoal(selectedTopicId, goal);
+      goalStore.addGoal(selectedTopicId, goal);
       return goal;
     });
 
@@ -97,10 +125,7 @@ export const completeTopicTool: Tool<void, boolean> = {
     const topic = topicStore.topics.find(t => t.id === selectedTopicId);
     if (!topic) return false;
 
-    topicStore.updateTopicCompat(selectedTopicId, {
-      ...topic,
-      status: 'completed'
-    });
+    await topicStore.updateTopic(selectedTopicId, topic.version, { status: 'completed' });
     return true;
   }
 };
@@ -117,10 +142,7 @@ export const markAsBookmarkTool: Tool<void, boolean> = {
     const topic = topicStore.topics.find(t => t.id === selectedTopicId);
     if (!topic) return false;
 
-    topicStore.updateTopicCompat(selectedTopicId, {
-      ...topic,
-      status: 'archived'
-    });
+    await topicStore.updateTopic(selectedTopicId, topic.version, { status: 'archived' });
     return true;
   }
 }; 

@@ -4,6 +4,7 @@ import { useUserStore } from '../../../store/userStore';
 import { useAsyncOperation, ErrorPatterns } from '../../../utils/errorHandler';
 import type { Topic, Goal, Task } from '../../../types/goal';
 import type { User } from '@self-learning/types';
+import { getCompletionRate } from '../../../store/progressQueries';
 
 interface Collaborator extends User {
   permission: 'view' | 'edit';
@@ -34,7 +35,6 @@ export const useTopicReview = (topicId: string) => {
     disableTopicCollaboration,
     inviteTopicCollaborator,
     removeTopicCollaborator,
-    getCompletionRate,
   } = useTopicStore();
   
   const { getCollaboratorCandidates, users } = useUserStore();
@@ -266,7 +266,7 @@ export const useTopicReview = (topicId: string) => {
       handleUpdatePermissions,
     },
     computed: {
-      progress: state.topic ? getCompletionRate(state.topic.id) : 0,
+      progress: state.topic ? getCompletionRate(state.topic) : 0,
       collaborators: state.collaborators,
       availableUsers: state.availableUsers,
     }

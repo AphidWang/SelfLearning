@@ -68,6 +68,8 @@ import {
 import type { Topic, Goal, Task, TaskStatus, GoalStatus } from '../../../types/goal';
 import type { User as UserType } from '@self-learning/types';
 import { useTopicStore } from '../../../store/topicStore';
+import { useTaskStore } from '../../../store/taskStore';
+import { useGoalStore } from '../../../store/goalStore';
 import { UserAvatar } from '../../learning-map/UserAvatar';
 import { CollaborationManager } from '../../learning-map/CollaborationManager';
 import { TaskRecordInterface } from './TaskRecordInterface';
@@ -76,7 +78,6 @@ import { GoalStatusManager } from './GoalStatusManager';
 import { TaskStatusManager } from './TaskStatusManager';
 import { ReferenceInfoPanel } from './ReferenceInfoPanel';
 import toast from 'react-hot-toast';
-import { useGoalStore } from '../../../store/goalStore';
 
 interface DetailsPanelProps {
   topic: Topic;
@@ -100,20 +101,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   onTaskSelect
 }) => {
   const { 
-    addTask, updateTaskInfo, deleteTask, updateGoal, deleteGoal, 
-    setGoalOwner, addGoalCollaborator, removeGoalCollaborator,
-    setTaskOwner, addTaskCollaborator, removeTaskCollaborator,
-    addGoal, enableTopicCollaboration, disableTopicCollaboration, inviteTopicCollaborator,
+    enableTopicCollaboration, disableTopicCollaboration, inviteTopicCollaborator,
     removeTopicCollaborator,
-    markTaskCompletedCompat: markTaskCompleted,
-    markTaskInProgressCompat: markTaskInProgress,
-    markTaskTodoCompat: markTaskTodo,
-    updateGoalCompat,
-    // 參考資訊方法
-    updateTopicReferenceInfo, addTopicAttachment, removeTopicAttachment, addTopicLink, removeTopicLink,
-    updateGoalReferenceInfo, addGoalAttachment, removeGoalAttachment, addGoalLink, removeGoalLink,
-    updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink
+    updateTopicReferenceInfo, addTopicAttachment, removeTopicAttachment, addTopicLink, removeTopicLink
   } = useTopicStore();
+  const {
+    setGoalOwner, addGoalCollaborator, removeGoalCollaborator,
+    addGoal, updateGoalReferenceInfo, addGoalAttachment, removeGoalAttachment, addGoalLink, removeGoalLink
+  } = useGoalStore();
+  const { addTask, deleteTask, markTaskCompleted, markTaskInProgress, markTaskTodo, updateTask, updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink } = useTaskStore();
 
   // 編輯狀態
   const [isEditing, setIsEditing] = useState(false);
@@ -175,10 +171,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     };
     
     await handleUpdate(async () => {
-      await updateTaskInfo(topic.id, selectedGoal.id, selectedTask.id, taskInfo);
+      await updateTask(selectedTask.id, selectedTask.version ?? 0, taskInfo);
     });
     setIsEditing(false);
-  }, [editTitle, editDescription, selectedTask, selectedGoal, topic.id, updateTaskInfo, handleUpdate]);
+  }, [editTitle, editDescription, selectedTask, selectedGoal, topic.id, updateTask, handleUpdate]);
 
   // 開始編輯
   const handleStartEdit = useCallback(() => {
@@ -235,40 +231,40 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   const handleSetOwner = useCallback(async (user: UserType) => {
     if (selectedTask && selectedGoal) {
       await handleUpdate(async () => {
-        await setTaskOwner(topic.id, selectedGoal.id, selectedTask.id, user.id);
+        await setGoalOwner(topic.id, selectedGoal.id, user.id);
       });
     } else if (selectedGoal) {
       await handleUpdate(async () => {
         await setGoalOwner(topic.id, selectedGoal.id, user.id);
       });
     }
-  }, [selectedTask, selectedGoal, topic.id, setTaskOwner, setGoalOwner, handleUpdate]);
+  }, [selectedTask, selectedGoal, setGoalOwner, handleUpdate]);
 
   // 新增協作者
   const handleAddCollaborator = useCallback(async (user: UserType) => {
     if (selectedTask && selectedGoal) {
       await handleUpdate(async () => {
-        await addTaskCollaborator(topic.id, selectedGoal.id, selectedTask.id, user.id);
+        await addGoalCollaborator(topic.id, selectedGoal.id, user.id);
       });
     } else if (selectedGoal) {
       await handleUpdate(async () => {
         await addGoalCollaborator(topic.id, selectedGoal.id, user.id);
       });
     }
-  }, [selectedTask, selectedGoal, topic.id, addTaskCollaborator, addGoalCollaborator, handleUpdate]);
+  }, [selectedTask, selectedGoal, addGoalCollaborator, handleUpdate]);
 
   // 移除協作者
   const handleRemoveCollaborator = useCallback(async (userId: string) => {
     if (selectedTask && selectedGoal) {
       await handleUpdate(async () => {
-        await removeTaskCollaborator(topic.id, selectedGoal.id, selectedTask.id, userId);
+        await removeGoalCollaborator(topic.id, selectedGoal.id, userId);
       });
     } else if (selectedGoal) {
       await handleUpdate(async () => {
         await removeGoalCollaborator(topic.id, selectedGoal.id, userId);
       });
     }
-  }, [selectedTask, selectedGoal, topic.id, removeTaskCollaborator, removeGoalCollaborator, handleUpdate]);
+  }, [selectedTask, selectedGoal, removeGoalCollaborator, handleUpdate]);
 
 
 
@@ -916,11 +912,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   onTaskSelect
 }) => {
   const { 
-    updateTaskInfo, deleteTask, setTaskOwner, addTaskCollaborator,
-          removeTaskCollaborator, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo,
-    // 參考資訊方法
-    updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink
-  } = useTopicStore();
+    deleteTask, markTaskCompleted, markTaskInProgress, markTaskTodo, updateTask, updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink
+  } = useTaskStore();
+  const { setTaskOwner, addTaskCollaborator, removeTaskCollaborator } = useTaskStore();
   
   // 編輯狀態
   const [isEditing, setIsEditing] = useState(false);
@@ -957,15 +951,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         let result;
         switch (status) {
           case 'todo':
-            result = await markTaskTodo(topic.id, goal.id, task.id);
+            result = await markTaskTodo(task.id, task.version ?? 0);
             success = result.success;
             break;
           case 'in_progress':
-            result = await markTaskInProgress(topic.id, goal.id, task.id);
+            result = await markTaskInProgress(task.id, task.version ?? 0);
             success = result.success;
             break;
           case 'done':
-            result = await markTaskCompleted(topic.id, goal.id, task.id);
+            result = await markTaskCompleted(task.id, task.version ?? 0);
             success = result.success;
             break;
         }
@@ -1000,10 +994,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     };
     
     await handleUpdate(async () => {
-      await updateTaskInfo(topic.id, goal.id, task.id, taskInfo);
+      await updateTask(task.id, task.version ?? 0, taskInfo);
     });
     setIsEditing(false);
-  }, [editTitle, editDescription, task, goal, topic.id, updateTaskInfo, handleUpdate]);
+  }, [editTitle, editDescription, task, goal, topic.id, updateTask, handleUpdate]);
 
   // 開始編輯
   const handleStartEdit = useCallback(() => {
@@ -1023,21 +1017,21 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   // 協作者管理
   const handleSetOwner = useCallback(async (user: UserType) => {
     await handleUpdate(async () => {
-      await setTaskOwner(topic.id, goal.id, task.id, user.id);
+      await setTaskOwner(task.id, user.id);
     });
-  }, [task, goal, topic.id, setTaskOwner, handleUpdate]);
+  }, [task, setTaskOwner, handleUpdate]);
 
   const handleAddCollaborator = useCallback(async (user: UserType) => {
     await handleUpdate(async () => {
-      await addTaskCollaborator(topic.id, goal.id, task.id, user.id);
+      await addTaskCollaborator(task.id, user.id);
     });
-  }, [task, goal, topic.id, addTaskCollaborator, handleUpdate]);
+  }, [task, addTaskCollaborator, handleUpdate]);
 
   const handleRemoveCollaborator = useCallback(async (userId: string) => {
     await handleUpdate(async () => {
-      await removeTaskCollaborator(topic.id, goal.id, task.id, userId);
+      await removeTaskCollaborator(task.id, userId);
     });
-  }, [task, goal, topic.id, removeTaskCollaborator, handleUpdate]);
+  }, [task, removeTaskCollaborator, handleUpdate]);
 
   // 渲染協作者管理
   const renderCollaboratorManager = () => {

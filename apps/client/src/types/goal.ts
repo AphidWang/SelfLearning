@@ -149,6 +149,13 @@ export const SPECIAL_TASK_FLAGS = {
 export type SpecialTaskFlag = typeof SPECIAL_TASK_FLAGS[keyof typeof SPECIAL_TASK_FLAGS];
 
 /**
+ * 任務動作結果型別，供 taskStore、topicStore 等多處共用
+ */
+export type TaskActionResult =
+  | { success: true; task: Task }
+  | { success: false; message: string; requiresRecord?: boolean };
+
+/**
  * 任務動作記錄
  */
 export interface TaskAction {

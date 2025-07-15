@@ -22,6 +22,7 @@ import {
 import { BaseTaskCard, BaseTaskCardProps, useBaseTaskCard } from './BaseTaskCard';
 import { CountTaskConfig } from '../../../../types/goal';
 import { supabase } from '../../../../services/supabase';
+import { useTaskStore } from '../../../../store/taskStore';
 
 interface CountTaskCardProps extends BaseTaskCardProps {
   highlight?: boolean; // 是否啟用特化模式（週挑戰風格）
@@ -47,6 +48,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
   const [realCheckInTimes, setRealCheckInTimes] = useState<{[date: string]: string}>({});
   // 新增：本地任務狀態
   const [localTask, setLocalTask] = useState(task);
+  const taskStore = useTaskStore();
   // 新增：打卡操作載入狀態
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   // 新增：當前顯示的記錄索引（背面用）
@@ -262,9 +264,8 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
       const isWeeklyChallenge = localTask.special_flags?.includes('weekly_quick_challenge');
       
       if (isWeeklyChallenge) {
-        // 週挑戰任務：直接調用 topicStore 的 checkInTask 方法，只更新本地狀態
-        const { useTopicStore } = await import('../../../../store/topicStore');
-        const result = await useTopicStore.getState().checkInTask(localTask.id);
+        // 週挑戰任務：直接調用 taskStore 的 checkInTask 方法，只更新本地狀態
+        const result = await taskStore.checkInTask(localTask.id);
         
         if (result.success && result.task) {
           console.log('✅ 週挑戰打卡成功，更新本地狀態');
@@ -339,9 +340,8 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
       const isWeeklyChallenge = localTask.special_flags?.includes('weekly_quick_challenge');
       
       if (isWeeklyChallenge) {
-        // 週挑戰任務：直接調用 topicStore 的 cancelTodayCheckIn 方法，只更新本地狀態
-        const { useTopicStore } = await import('../../../../store/topicStore');
-        const result = await useTopicStore.getState().cancelTodayCheckIn(localTask.id);
+        // 週挑戰任務：直接調用 taskStore 的 cancelTodayCheckIn 方法，只更新本地狀態
+        const result = await taskStore.cancelTodayCheckIn(localTask.id);
         
         if (result.success && result.task) {
           console.log('✅ 週挑戰取消打卡成功，更新本地狀態');
@@ -375,8 +375,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
         }
       } else {
         // 普通任務：使用原來的方式
-        const { useTopicStore } = await import('../../../../store/topicStore');
-        const result = await useTopicStore.getState().cancelTodayCheckIn(localTask.id);
+        const result = await taskStore.cancelTodayCheckIn(localTask.id);
         
         if (result.success) {
           console.log('✅ 普通任務取消打卡成功');

@@ -20,6 +20,7 @@ import { EventType } from './config/events';
 import { MindmapStateController } from './controller/MindmapStateController';
 import { STATE_PROMPTS } from '../../lib/ai/config/prompts/states';
 import { useGoalStore } from '../../store/goalStore';
+import { useTaskStore } from '../../store/taskStore';
 
 // 系統錯誤
 class SystemError extends Error {
@@ -442,8 +443,8 @@ export class MindMapService {
       return null;
     }
 
-    // 直接使用 topicStore 返回的目標
-    const newGoal = await useTopicStore.getState().addGoal(this.currentTopicId, goal);
+    // 直接使用 goalStore 返回的目標
+    const newGoal = await useGoalStore.getState().addGoal(this.currentTopicId, goal);
     console.log('✅ 目標已新增到 store', { newGoal });
     return newGoal;
   }
@@ -456,7 +457,7 @@ export class MindMapService {
       return null;
     }
 
-    const result = await useTopicStore.getState().updateTopicCompat(this.currentTopicId, topic);
+    const result = await useTopicStore.getState().updateTopic(this.currentTopicId, topic.version, topic);
     console.log('✅ 主題更新結果', { result });
     return result;
   }
@@ -471,7 +472,7 @@ export class MindMapService {
 
   async addTask(goalId: string, task: Task) {
     if (!this.currentTopicId) return null;
-    return await useTopicStore.getState().addTask(goalId, task);
+    return await useTaskStore.getState().addTask(goalId, task);
   }
 
   async updateTask(goalId: string, taskId: string, updates: Task) {
@@ -482,19 +483,19 @@ export class MindMapService {
       return null;
     }
 
-    const result = await useTopicStore.getState().updateTaskCompat(this.currentTopicId, goalId, taskId, updates);
+    const result = await useTaskStore.getState().updateTask(taskId, updates.version ?? 0, updates);
     console.log('🔄 更新結果', { result });
     return result;
   }
 
   async deleteGoal(goalId: string) {
     if (!this.currentTopicId) return null;
-    return await useTopicStore.getState().deleteGoal(goalId);
+    return await useGoalStore.getState().deleteGoal(goalId);
   }
 
   async deleteTask(goalId: string, taskId: string) {
     if (!this.currentTopicId) return null;
-    return await useTopicStore.getState().deleteTask(taskId);
+    return await useTaskStore.getState().deleteTask(taskId);
   }
 
   // Bubble 相關方法

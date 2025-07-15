@@ -39,6 +39,8 @@ import type {
   RetroResponse,
   DailyCheckIn
 } from '../types/retro';
+import { useTaskStore } from './taskStore';
+const { getUserTaskActivitiesForDateRange } = useTaskStore.getState();
 
 interface RetroStoreState {
   currentWeekStats: WeeklyStats | null;
@@ -904,69 +906,66 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       
       set({ loading: true, error: null });
       
-      // 🆕 調用 topicStore 的統一 RPC 方法
-      const topicStore = useTopicStore.getState();
-      const retroSummary = await topicStore.getRetroWeekSummary(weekStartStr, weekEndStr);
+      // 🆕 改用 getUserTaskActivitiesForDate
+      const retroSummary = await getUserTaskActivitiesForDateRange(weekStartStr, weekEndStr);
       
-      DEBUG_RETRO_STORE && console.log('📊 RPC 返回數據:', {
-        dailyDays: retroSummary.daily_data.length,
-        weekTotals: retroSummary.week_data,
-        completedTasks: retroSummary.completed_data.length,
-        activeTopics: retroSummary.topics_data.length
-      });
+      // 🔍 檢查返回數據結構
+      if (!retroSummary) {
+        throw new Error('RPC 函數返回空數據');
+      }
+      
+      DEBUG_RETRO_STORE && console.log('📊 RPC 返回數據:', retroSummary);
 
-      // 🔄 轉換為前端期望的格式
-      const dailyCheckIns = retroSummary.daily_data.map(day => ({
-        date: day.date,
-        dayOfWeek: day.dayOfWeek,
-        checkInCount: day.check_ins,
-        taskRecordCount: day.records,
-        totalActivities: day.total_activities,
-        completedTasks: day.active_tasks
-          ? day.active_tasks.filter((t: any) => t.task_status === 'done').map((t: any) => ({
-              id: t.id,
-              title: t.title,
-              subject: t.subject
-            }))
-          : [],
-        topics: day.active_tasks || [],
-        mood: null,
-        energy: null
-      }));
+      // 🔄 根據 RPC 函數返回結構處理數據
+      // retroSummary 格式：{ daily_data, week_data, completed_data, topics_data }
+      const dailyData = retroSummary.daily_data || [];
+      const weekData = retroSummary.week_data || {};
+      const completedData = retroSummary.completed_data || [];
+      const topicsData = retroSummary.topics_data || [];
+      
+      // 🔄 轉換每日簽到資料
+      const dailyCheckIns = dailyData.flatMap((day: any) => {
+        const activeTasks = day.active_tasks || [];
+        return activeTasks.filter((task: any) => task.type === 'check_in').map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          topic: task.subject,
+          goal: task.goal_title,
+          actionTimestamp: task.action_timestamp,
+          actionData: task.action_data,
+          type: task.type,
+          date: task.action_timestamp ? task.action_timestamp.split('T')[0] : day.date,
+          dayOfWeek: day.dayOfWeek || '',
+        }));
+      });
       
       // 🧮 從 RPC 數據計算週總統計
-      const totalCheckIns = retroSummary.week_data.total_check_ins;
-      const totalTaskRecords = retroSummary.week_data.total_records;
-      const totalActivities = retroSummary.week_data.total_activities;
-      const totalCompletions = retroSummary.week_data.total_completed;
+      const totalCheckIns = weekData.total_check_ins || 0;
+      const totalTaskRecords = weekData.total_records || 0;
+      const totalActivities = weekData.total_activities || 0;
+      const totalCompletions = weekData.total_completed || 0;
       
       // 🎯 轉換主要任務清單
-      const mainTasks = retroSummary.completed_data.map(task => ({
+      const mainTasks = completedData.map((task: any) => ({
         id: task.id,
         title: task.title,
         topic: task.topic,
+        goal: task.goal_title,
         completedAt: task.completed_at,
-        difficulty: task.difficulty
+        type: 'completed' as const
       }));
       
       // 🎯 轉換主要主題清單
-      const mainTopics = retroSummary.topics_data.map(topic => ({
+      const mainTopics = topicsData.map((topic: any) => ({
         id: topic.id,
         title: topic.title,
         subject: topic.subject,
         progress: topic.progress,
-        taskCount: topic.total_tasks,
-        completedTaskCount: topic.completed_tasks,
+        totalTasks: topic.total_tasks,
+        completedTasks: topic.completed_tasks,
         hasActivity: topic.has_activity,
-        weeklyProgress: {
-          total_tasks: topic.total_tasks,
-          completed_tasks: topic.completed_tasks,
-          completion_rate: topic.progress,
-          status_changes: topic.week_activities,
-          check_ins: 0,
-          records: 0
-        }
-      })).slice(0, 5);
+        weekActivities: topic.week_activities
+      }));
 
       // 📊 建構完整的週統計對象
       const weeklyStats: WeeklyStats = {
