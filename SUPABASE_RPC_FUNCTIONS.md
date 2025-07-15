@@ -21,12 +21,6 @@
 **返回**: 任務列表，包含任務詳情和進度信息  
 **調用位置**: `topicStore.getActiveTasksForUser()`
 
-### `get_topic_with_structure(p_topic_id uuid)`
-**功能**: 獲取主題的完整結構，包含目標和任務  
-**用途**: 主題詳情頁面一次性載入完整的主題結構  
-**返回**: 主題及其下屬目標和任務的完整結構  
-**調用位置**: `topicStore.getTopicWithStructure()`
-
 ### `get_completed_tasks_for_date(target_date date, target_user_id uuid)`
 **功能**: 獲取指定日期用戶完成的任務  
 **用途**: 日記系統自動載入當天完成的任務  

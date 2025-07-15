@@ -60,7 +60,7 @@ export const StudentLearningMap: React.FC = () => {
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
   const [showDailyReview, setShowDailyReview] = useState(false);
 
-  const { topics, addTopic, getCompletionRate, fetchTopics } = useTopicStore();
+  const { topics, addTopic, getCompletionRate, fetchTopicsWithActions } = useTopicStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
   const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
@@ -74,8 +74,8 @@ export const StudentLearningMap: React.FC = () => {
 
   useEffect(() => {
     // 初始化載入主題數據
-    const { fetchTopics } = useTopicStore.getState();
-    fetchTopics();
+    const { fetchTopicsWithActions } = useTopicStore.getState();
+    fetchTopicsWithActions();
   }, []);
 
   const selectedTopic = topics.find(t => t.id === selectedTopicId);
@@ -117,7 +117,7 @@ export const StudentLearningMap: React.FC = () => {
     // 模板選擇完成後的回調
     setShowTemplateBrowser(false);
     // 刷新主題列表以獲取新建立的主題
-    await fetchTopics();
+    await fetchTopicsWithActions();
   };
 
   const handleCreateBlankTopic = async () => {
