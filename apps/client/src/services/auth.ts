@@ -82,6 +82,36 @@ export const authService = {
     console.log('🧹 [Auth] 本地儲存已清除');
   },
 
+  // 服務端登出 - 通過 API 路由登出
+  async serverLogout(): Promise<void> {
+    console.log('🚪 [Auth] 開始服務端登出流程...');
+    
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        const response = await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          console.log('✅ [Auth] 服務端登出成功');
+        } else {
+          console.warn('⚠️ [Auth] 服務端登出失敗:', await response.text());
+        }
+      }
+    } catch (error) {
+      console.error('❌ [Auth] 服務端登出失敗:', error);
+    }
+    
+    // 無論服務端登出是否成功，都要清除本地狀態
+    await this.logout();
+  },
+
   // 更新當前用戶
   async updateCurrentUser(updates: Partial<User>): Promise<void> {
     console.log('🔄 [Auth] 更新用戶資料...', updates);

@@ -50,6 +50,23 @@ interface TopicStore {
   inviteTopicCollaborator: (topicId: string, userId: string, permission?: 'view' | 'edit') => Promise<boolean>;
   removeTopicCollaborator: (topicId: string, userId: string) => Promise<boolean>;
 
+  // RPC helpers
+  getTopicsProgressForWeek: (weekStart: string, weekEnd: string) => Promise<Array<{
+    topic_id: string;
+    topic_title: string;
+    total_tasks: number;
+    completed_tasks: number;
+    progress_percentage: number;
+  }>>;
+  getActiveTopicsWithProgress: () => Promise<Array<{
+    topic_id: string;
+    topic_title: string;
+    total_tasks: number;
+    completed_tasks: number;
+    in_progress_tasks: number;
+    progress_percentage: number;
+  }>>;
+
   // Calculation helpers
   getCompletionRate: (topicId: string) => number;
   calculateProgress: (topic: Topic) => number;

@@ -29,6 +29,8 @@ import { StudentRetro } from './pages/student/StudentRetro';
 import { StudentGroupRetro } from './pages/student/StudentGroupRetro';
 import { UserAdminPage } from './pages/admin/UserAdminPage';
 import { AuthCallback } from './pages/AuthCallback.tsx';
+import Logout from './pages/Logout';
+import EmergencyLogout from './pages/EmergencyLogout';
 import { ErrorBoundary, reportReactError } from './config/sentry';
 import { SentryTestButton } from './components/shared/SentryTestButton';
 
@@ -163,6 +165,8 @@ function App() {
                 <Router>
                   <Routes>
                     <Route path="/login" element={<Login />} />
+                    <Route path="/logout" element={<Logout />} />
+                    <Route path="/emergency-logout" element={<EmergencyLogout />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     
                     {/* Preview Routes */}

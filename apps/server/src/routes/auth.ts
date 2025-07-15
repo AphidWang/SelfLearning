@@ -210,6 +210,41 @@ router.get('/token-status', authenticateSupabaseToken, async (req, res) => {
   }
 });
 
+// 登出路由
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (token) {
+      try {
+        // 嘗試使用 Supabase 登出
+        const { error } = await supabaseAdmin.auth.admin.signOut(token);
+        if (error) {
+          console.warn('Supabase 登出失敗:', error);
+        } else {
+          console.log('Supabase 登出成功');
+        }
+      } catch (error) {
+        console.warn('Supabase 登出過程中發生錯誤:', error);
+      }
+    }
+    
+    res.json({ 
+      success: true,
+      message: '登出成功',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('登出路由錯誤:', error);
+    res.status(500).json({ 
+      success: false,
+      message: '登出失敗',
+      error: String(error)
+    });
+  }
+});
+
 // 錯誤處理中間件
 const authErrorHandler = (error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('認證錯誤:', error);

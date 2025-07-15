@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { useTopicStore } from '../apps/client/src/store/topicStore';
+import { useTopicStore } from '../apps/client/src/store/topicStore.full';
 import { useTaskStore } from '../apps/client/src/store/taskStore';
 import { useGoalStore } from '../apps/client/src/store/goalStore';
 import { SUBJECTS } from '../apps/client/src/constants/subjects';
