@@ -873,6 +873,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       console.log('📍 fetchTopicsWithActions - 用戶已認證:', user.id);
 
+      // 🔄 RPC: 獲取用戶主題（包含任務動作）
+      // 參數: 用戶ID
+      // 返回: 完整的主題結構數組，包含任務動作記錄
       // 使用 RPC 一次性獲取包含任務動作的完整結構
       const { data, error } = await supabase.rpc('get_user_topics_with_actions', {
         p_user_id: user.id
@@ -1128,6 +1131,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   updateTopic: async (id: string, expectedVersion: number, updates: Partial<Topic>) => {
     try {
+      // 🔄 RPC: 安全更新主題（樂觀鎖定）
+      // 參數: 主題ID、期望版本號、更新欄位
+      // 返回: { success: boolean, message: string, current_version?: number }
       const { data, error } = await supabase.rpc('safe_update_topic', {
         p_id: id,
         p_expected_version: expectedVersion,
@@ -1250,6 +1256,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   updateGoal: async (goalId: string, expectedVersion: number, updates: Partial<Goal>) => {
     try {
+      // 🔄 RPC: 安全更新目標（樂觀鎖定）
+      // 參數: 目標ID、期望版本號、更新欄位
+      // 返回: { success: boolean, message: string, current_version?: number }
       const { data, error } = await supabase.rpc('safe_update_goal', {
         p_id: goalId,
         p_expected_version: expectedVersion,
@@ -1407,6 +1416,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         completedAt = undefined;
       }
       
+      // 🔄 RPC: 安全更新任務（樂觀鎖定）
+      // 參數: 任務ID、期望版本號、更新欄位
+      // 返回: { success: boolean, message: string, current_version?: number }
       const { data, error } = await supabase.rpc('safe_update_task', {
         p_id: taskId,                          // 修正：使用 p_id
         p_expected_version: expectedVersion,
@@ -1631,6 +1643,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       console.log('🔄 performTaskAction - 使用新版事務函數:', { taskId, actionType, today });
 
+      // 🔄 RPC: 執行任務動作事務（打卡、計數等）
+      // 參數: 任務ID、動作類型、日期、時間戳、用戶ID、動作數據
+      // 返回: { success: boolean, message: string, task: Task, action_id: string, event_id: string }
       // 🆕 使用新的事務函數，同時記錄到 task_actions 和 user_events
       const { data, error } = await supabase.rpc('perform_task_action_transaction', {
         p_task_id: taskId, // 已經是 UUID 類型
@@ -1711,6 +1726,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       const today = getTodayInTimezone(); // 使用 UTC+8 時區
 
+      // 🔄 RPC: 取消今日打卡事務
+      // 參數: 任務ID、用戶ID、日期
+      // 返回: { success: boolean, message: string, task: Task }
       // 使用 transaction 確保數據一致性
       const { data, error } = await supabase.rpc('cancel_today_check_in_transaction', {
         p_task_id: taskId,
@@ -1758,6 +1776,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未認證');
 
+      // 🔄 RPC: 獲取用戶活躍任務
+      // 參數: 用戶ID
+      // 返回: ActiveTaskResult[] - 包含任務詳情、主題、目標資訊
       const { data, error } = await supabase.rpc('get_active_tasks_for_user', {
         p_user_id: user.id
       });
@@ -1776,6 +1797,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
    */
   getTopicWithStructure: async (topicId: string) => {
     try {
+      // 🔄 RPC: 獲取主題完整結構
+      // 參數: 主題ID
+      // 返回: TopicWithStructure - 包含所有層級的完整數據
       const { data, error } = await supabase.rpc('get_topic_with_structure', {
         p_topic_id: topicId
       });
@@ -3383,6 +3407,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       console.log('🔄 getDailyActivityStats - 調用基於事件的 RPC 函數:', { startDate, endDate });
 
+      // 🔄 RPC: 獲取每日活動統計 V2（基於統一事件追蹤）
+      // 參數: 用戶ID、開始日期、結束日期
+      // 返回: 每日活動統計數組，包含完成任務、打卡、記錄等數據
       // 🆕 優先使用基於 user_events 的新統計函數
       const { data: newData, error: newError } = await supabase.rpc('get_daily_activity_stats_v2', {
         p_user_id: user.id,
@@ -3631,6 +3658,9 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
       console.log('🔄 topicStore.getRetroWeekSummary - 調用統一 RPC:', { weekStart, weekEnd });
 
+      // 🔄 RPC: 獲取回顧週摘要（統一數據接口）
+      // 參數: 用戶ID、週開始日期、週結束日期
+      // 返回: { daily_data, week_data, completed_data, topics_data }
       const { data, error } = await supabase.rpc('get_retro_week_summary', {
         p_user_id: user.id,
         p_week_start: new Date(weekStart),
