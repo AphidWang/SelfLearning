@@ -39,6 +39,8 @@ interface WeekSelectorProps {
   loading?: boolean;
   /** 組件標題 */
   title?: string;
+  /** 是否禁用所有互動 */
+  disabled?: boolean;
 }
 
 export const WeekSelector: React.FC<WeekSelectorProps> = ({
@@ -47,7 +49,8 @@ export const WeekSelector: React.FC<WeekSelectorProps> = ({
   allowMultiWeek = false,
   onChange,
   loading = false,
-  title = "選擇回顧週期"
+  title = "選擇回顧週期",
+  disabled = false
 }) => {
   const [showMultiSelect, setShowMultiSelect] = useState(false);
 
@@ -153,7 +156,8 @@ export const WeekSelector: React.FC<WeekSelectorProps> = ({
         {allowMultiWeek && (
           <motion.button
             onClick={handleToggleMultiSelect}
-            className="flex items-center gap-2 px-3 py-1 text-sm bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-lg border border-orange-200 dark:border-orange-800 hover:scale-105 transition-all duration-200"
+            disabled={disabled || loading}
+            className="flex items-center gap-2 px-3 py-1 text-sm bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-lg border border-orange-200 dark:border-orange-800 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -173,7 +177,7 @@ export const WeekSelector: React.FC<WeekSelectorProps> = ({
             {/* 前一週按鈕 */}
             <motion.button
               onClick={handlePreviousWeek}
-              disabled={loading}
+              disabled={loading || disabled}
               className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-orange-400 to-pink-400 text-white rounded-xl shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -207,7 +211,7 @@ export const WeekSelector: React.FC<WeekSelectorProps> = ({
             {/* 下一週按鈕 */}
             <motion.button
               onClick={handleNextWeek}
-              disabled={loading}
+              disabled={loading || disabled}
               className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-orange-400 to-pink-400 text-white rounded-xl shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -234,13 +238,14 @@ export const WeekSelector: React.FC<WeekSelectorProps> = ({
                   <motion.button
                     key={week.weekId}
                     onClick={() => handleWeekToggle(week.weekId)}
+                    disabled={disabled || loading}
                     className={`relative p-3 rounded-xl border-2 transition-all duration-200 ${
                       isSelected
                         ? 'bg-gradient-to-r from-orange-400 to-pink-400 text-white border-orange-300'
                         : 'bg-white/50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-orange-300 dark:hover:border-orange-700'
-                    }`}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    } ${(disabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    whileHover={!(disabled || loading) ? { scale: 1.02 } : {}}
+                    whileTap={!(disabled || loading) ? { scale: 0.98 } : {}}
                   >
                     <div className="font-medium text-sm">
                       {week.weekId}

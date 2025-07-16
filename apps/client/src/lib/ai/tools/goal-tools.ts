@@ -74,7 +74,6 @@ export const createTaskTool: Tool<{ task_name: string; goal_id: string }, Task> 
       task_type: 'single',
       task_config: { type: 'single' },
       cycle_config: { cycle_type: 'none', auto_reset: false },
-      progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 },
       need_help: false,
       version: 1
     };

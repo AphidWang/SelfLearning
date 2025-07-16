@@ -23,6 +23,7 @@ import { BaseTaskCard, BaseTaskCardProps, useBaseTaskCard } from './BaseTaskCard
 import { CountTaskConfig } from '../../../../types/goal';
 import { supabase } from '../../../../services/supabase';
 import { useTaskStore } from '../../../../store/taskStore';
+import { getCheckInDates } from '../../../../utils/taskHelpers';
 
 interface CountTaskCardProps extends BaseTaskCardProps {
   highlight?: boolean; // 是否啟用特化模式（週挑戰風格）
@@ -58,19 +59,20 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
 
   // 監聽 task prop 變化，同步到本地狀態
   useEffect(() => {
+    console.log('🟢 CountTaskCard 拿到新的 task:', task);
     setLocalTask(task);
   }, [task]);
 
   // 解析任務配置 - 使用本地狀態
   const taskConfig = localTask.task_config as CountTaskConfig;
-  const currentCount = localTask.progress_data?.current_count || taskConfig?.current_count || 0;
-  const targetCount = localTask.progress_data?.target_count || taskConfig?.target_count || 7;
-  const checkInDates = (localTask.progress_data as any)?.check_in_dates || [];
+  const taskActions = localTask.task_actions || [];
+  const checkInDates = getCheckInDates(taskActions);
+  const currentCount = checkInDates.length;
+  const targetCount = taskConfig?.target_count || 7;
   
   console.log('📊 任務數據:', {
     taskTitle: localTask.title,
     taskConfig,
-    progressData: localTask.progress_data,
     currentCount,
     targetCount,
     checkInDates
@@ -188,6 +190,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
       if (!localTask.id || checkInDates.length === 0) return;
       
       try {
+        console.log("🔍 載入真實的打卡時間資料:", checkInDates);
         const { data: taskActions, error } = await supabase
           .from('task_actions')
           .select('action_date, action_timestamp')
@@ -273,14 +276,14 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           // 更新本地任務狀態，立即反映變化
           setLocalTask(prevTask => ({
             ...prevTask,
-            progress_data: result.task.progress_data,
             task_config: result.task.task_config,
             version: result.task.version
           }));
           
           // 顯示成功提示
           const { default: toast } = await import('react-hot-toast');
-          const checkInDates = (result.task.progress_data as any)?.check_in_dates || [];
+          const taskActions = result.task.task_actions || [];
+          const checkInDates = getCheckInDates(taskActions);
           const targetCount = (result.task.task_config as any)?.target_count || 7;
           toast.success(`今天完成了！進度 ${checkInDates.length}/${targetCount} 次 🎉`, {
             duration: 3000,
@@ -305,10 +308,18 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           await onTaskAction(localTask.id, 'check_in');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('打卡操作失敗:', error);
       const { default: toast } = await import('react-hot-toast');
-      toast.error('打卡失敗，請稍後再試');
+      const msg =
+        error?.message ||
+        error?.data?.message ||
+        error?.error_description ||
+        error?.details ||
+        error?.status ||
+        error?.code ||
+        JSON.stringify(error);
+      toast.error('打卡失敗: ' + msg);
     } finally {
       setIsCheckingIn(false);
     }
@@ -324,8 +335,18 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     try {
       await onTaskAction(localTask.id, 'reset');
       setShowResetConfirm(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('重置失敗:', error);
+      const { default: toast } = await import('react-hot-toast');
+      const msg =
+        error?.message ||
+        error?.data?.message ||
+        error?.error_description ||
+        error?.details ||
+        error?.status ||
+        error?.code ||
+        JSON.stringify(error);
+      toast.error('重置失敗: ' + msg);
     }
   };
 
@@ -349,7 +370,6 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           // 更新本地任務狀態，立即反映變化
           setLocalTask(prevTask => ({
             ...prevTask,
-            progress_data: result.task.progress_data,
             task_config: result.task.task_config,
             version: result.task.version
           }));
@@ -391,10 +411,18 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
       }
       
       setShowCancelConfirm(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('取消今日打卡失敗:', error);
       const { default: toast } = await import('react-hot-toast');
-      toast.error('取消打卡失敗');
+      const msg =
+        error?.message ||
+        error?.data?.message ||
+        error?.error_description ||
+        error?.details ||
+        error?.status ||
+        error?.code ||
+        JSON.stringify(error);
+      toast.error('取消打卡失敗: ' + msg);
       setShowCancelConfirm(false);
     }
   };

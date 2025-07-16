@@ -97,7 +97,7 @@ export const TaskWallPage = () => {
   
   // Store hooks with error handling
   const { 
-    fetchTopicsWithActions: fetchTopics, 
+    fetchTopicsWithActions, 
     topics, 
     createTopic,
     getActiveGoals,
@@ -148,7 +148,7 @@ export const TaskWallPage = () => {
       const startTime = performance.now();
       try {
         await Promise.all([
-          fetchTopics(),
+          fetchTopicsWithActions(),
           getCollaboratorCandidates()
         ]);
         
@@ -177,7 +177,7 @@ export const TaskWallPage = () => {
     };
     
     fetchData();
-  }, [fetchTopics, getCollaboratorCandidates, userLoading]);
+  }, [fetchTopicsWithActions, getCollaboratorCandidates, userLoading]);
 
   // 自動清除錯誤消息
   useEffect(() => {
@@ -351,7 +351,6 @@ export const TaskWallPage = () => {
         task_type: 'single',
         task_config: { type: 'single' },
         cycle_config: { cycle_type: 'none', auto_reset: false },
-        progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 }
       });
     } catch (error) {
       console.error('新增任務失敗:', error);
@@ -517,7 +516,6 @@ export const TaskWallPage = () => {
         task_type: 'count',
         task_config: taskConfig,
         cycle_config: cycleConfig,
-        progress_data: progressData,
         status: 'in_progress',
         priority: 'high',
         order_index: 0,
@@ -527,7 +525,7 @@ export const TaskWallPage = () => {
 
       if (newTask) {
         // 刷新頁面數據
-        await fetchTopics();
+        await fetchTopicsWithActions();
         
         toast.success('週挑戰創建成功！開始你的7天打卡之旅 🎉', {
           duration: 5000,
@@ -547,7 +545,7 @@ export const TaskWallPage = () => {
     } finally {
       setIsCreatingWeeklyTask(false);
     }
-  }, [currentUser, topics, createTopic, addGoal, addTask, fetchTopics, getWeekStart, getTaiwanDateString]);
+  }, [currentUser, topics, createTopic, addGoal, addTask, fetchTopicsWithActions, getWeekStart, getTaiwanDateString]);
 
   /**
    * 從所有主題中提取活躍的任務
@@ -902,8 +900,8 @@ export const TaskWallPage = () => {
     setShowRecordDialog(false);
     setSelectedTaskForRecord(null);
     // 重新獲取最新數據
-    await fetchTopics();
-  }, [fetchTopics]);
+    await fetchTopicsWithActions();
+  }, [fetchTopicsWithActions]);
 
   // 處理打開歷史記錄
   const handleOpenHistory = useCallback((task: TaskWithContext) => {
@@ -1217,13 +1215,13 @@ export const TaskWallPage = () => {
             console.log('選擇了模板:', templateId);
             setShowTemplateBrowser(false);
             // 刷新主題列表
-            fetchTopics();
+            fetchTopicsWithActions();
           }}
           onCreateBlankTopic={() => {
             console.log('建立空白主題');
             setShowTemplateBrowser(false);
             // 刷新主題列表
-            fetchTopics();
+            fetchTopicsWithActions();
           }}
         />
 

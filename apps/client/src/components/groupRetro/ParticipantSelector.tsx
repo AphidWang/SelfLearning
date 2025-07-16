@@ -398,35 +398,29 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
       )}
       
       {/* 參與者列表 */}
-      {!loading && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium text-gray-800">
-              可選擇的夥伴 ({filteredParticipants.length})
-            </h4>
-          </div>
-          
-          {filteredParticipants.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-sm">沒有找到符合條件的夥伴</p>
-              <p className="text-xs text-gray-400 mt-1">
-                試試調整搜尋條件
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filteredParticipants.map((participant) => (
-                <ParticipantCard
-                  key={participant.user.id}
-                  participant={participant}
-                  isSelected={isParticipantSelected(participant.user.id)}
-                  onSelect={() => handleParticipantSelect(participant)}
-                  onRemove={() => handleParticipantRemove(participant.user.id)}
-                />
-              ))}
-            </div>
-          )}
+      {(!loading && filteredParticipants.length === 0) ? (
+        <div className="text-center py-8 text-gray-500">
+          <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <p className="text-sm">沒有找到符合條件的夥伴</p>
+          <p className="text-xs text-gray-400 mt-1">
+            試試調整搜尋條件
+          </p>
+        </div>
+      ) : loading ? (
+        <div className="flex justify-center py-8">
+          <LoadingDots />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {filteredParticipants.map((participant) => (
+            <ParticipantCard
+              key={participant.user.id}
+              participant={participant}
+              isSelected={isParticipantSelected(participant.user.id)}
+              onSelect={() => handleParticipantSelect(participant)}
+              onRemove={() => handleParticipantRemove(participant.user.id)}
+            />
+          ))}
         </div>
       )}
       

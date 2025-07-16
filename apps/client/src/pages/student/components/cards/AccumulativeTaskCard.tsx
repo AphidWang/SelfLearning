@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { BaseTaskCard, BaseTaskCardProps, useBaseTaskCard } from './BaseTaskCard';
 import { AccumulativeTaskConfig } from '../../../../types/goal';
+import { getDailyAmountRecords } from '../../../../utils/taskHelpers';
 
 interface AccumulativeTaskCardProps extends BaseTaskCardProps {
   onTaskAction?: (taskId: string, action: 'add_amount' | 'reset', params?: any) => Promise<void>;
@@ -33,10 +34,11 @@ export const AccumulativeTaskCard: React.FC<AccumulativeTaskCardProps> = (props)
 
   // 解析任務配置
   const taskConfig = task.task_config as AccumulativeTaskConfig;
-  const currentAmount = task.progress_data?.current_amount || taskConfig?.current_amount || 0;
-  const targetAmount = task.progress_data?.target_amount || taskConfig?.target_amount || 100;
-  const unit = task.progress_data?.unit || taskConfig?.unit || '次';
-  const dailyRecords = (task.progress_data as any)?.daily_records || taskConfig?.daily_records || [];
+  const taskActions = task.task_actions || [];
+  const dailyRecords = getDailyAmountRecords(taskActions);
+  const currentAmount = dailyRecords.reduce((sum, r) => sum + r.amount, 0);
+  const targetAmount = taskConfig?.target_amount || 100;
+  const unit = taskConfig?.unit || '次';
   
   // 計算進度
   const progress = targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0;

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { BaseTaskCard, BaseTaskCardProps, useBaseTaskCard } from './BaseTaskCard';
 import { StreakTaskConfig } from '../../../../types/goal';
+import { getCheckInDates, getCurrentStreak, getMaxStreak } from '../../../../utils/taskHelpers';
 
 interface StreakTaskCardProps extends BaseTaskCardProps {
   onTaskAction?: (taskId: string, action: 'check_in' | 'reset') => Promise<void>;
@@ -36,10 +37,11 @@ export const StreakTaskCard: React.FC<StreakTaskCardProps> = (props) => {
 
   // 解析任務配置
   const taskConfig = task.task_config as StreakTaskConfig;
-  const currentStreak = task.progress_data?.current_streak || taskConfig?.current_streak || 0;
-  const maxStreak = task.progress_data?.max_streak || taskConfig?.max_streak || 0;
+  const taskActions = task.task_actions || [];
+  const checkInDates = getCheckInDates(taskActions);
+  const currentStreak = getCurrentStreak(checkInDates);
+  const maxStreak = getMaxStreak(checkInDates);
   const targetDays = taskConfig?.target_days || 7;
-  const checkInDates = (task.progress_data as any)?.check_in_dates || taskConfig?.check_in_dates || [];
   
   // 計算進度
   const progress = targetDays > 0 ? (currentStreak / targetDays) * 100 : 0;

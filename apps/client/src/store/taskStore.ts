@@ -151,7 +151,6 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
       const taskType = taskData.task_type || 'single';
       const taskConfig = taskData.task_config || {};
       const cycleConfig = taskData.cycle_config || {};
-      const progressData = taskData.progress_data || {};
       const taskDataWithDefaults = {
         title: taskData.title,
         description: taskData.description || '',
@@ -163,7 +162,6 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         task_type: taskType,
         task_config: taskConfig,
         cycle_config: cycleConfig,
-        progress_data: progressData,
         special_flags: taskData.special_flags || [],
       };
       const { data, error } = await supabase
