@@ -276,6 +276,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
         {/* 第一列：特殊卡片區域 */}
         {highlightCards.length > 0 && (
           <motion.div
+            key="highlight-cards-section"
             className="w-full mb-6"
             variants={containerVariants}
             initial="hidden"
@@ -349,6 +350,7 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
         {/* 第二列開始：普通卡片網格區域 */}
         {normalCards.length > 0 && (
           <motion.div
+            key="normal-cards-section"
             className={`grid gap-4 md:gap-6 ${getGridColumns()}`}
             variants={containerVariants}
             initial="hidden"
