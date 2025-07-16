@@ -177,23 +177,6 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   const highlightCards = cards.filter(card => card.highlight);
   const normalCards = cards.filter(card => !card.highlight);
 
-  // 除錯：檢查傳入的資料
-  useEffect(() => {
-    console.log('🔍 TaskWallGrid 除錯資訊:', {
-      totalCards: cards.length,
-      highlightCards: highlightCards.length,
-      normalCards: normalCards.length,
-      cardsWithEmptyId: cards.filter(card => !card.data.id || card.data.id.trim() === '').length,
-      cardsData: cards.map((card, index) => ({
-        index,
-        type: card.type,
-        id: card.data.id,
-        highlight: card.highlight,
-        title: (card.data as any).title
-      }))
-    });
-  }, [cards, highlightCards.length, normalCards.length]);
-
   // 創建一個用於追蹤唯一 ID 的 Map
   const usedKeys = new Set<string>();
 
