@@ -36,8 +36,8 @@ export const GoalItem: React.FC<GoalItemProps> = ({
           <span className="font-medium text-gray-900 dark:text-white">{goal.title}</span>
         </div>
         <span className="text-sm text-gray-500 dark:text-gray-400">
-          {goal.tasks.filter((t) => t.status === 'done').length} /{' '}
-          {goal.tasks.length} 個任務
+          {goal.tasks?.filter((t) => t.status === 'done').length} /{' '}
+          {goal.tasks?.length} 個任務
         </span>
       </button>
 
@@ -51,7 +51,7 @@ export const GoalItem: React.FC<GoalItemProps> = ({
             className="overflow-hidden"
           >
             <div className="px-4 pb-3 space-y-2">
-              {goal.tasks.map((task) => (
+              {goal.tasks?.map((task) => (
                 <TaskItem
                   key={task.id}
                   task={task}

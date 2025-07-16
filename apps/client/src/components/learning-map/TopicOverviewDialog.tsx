@@ -79,7 +79,7 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
   onClose,
   onTopicClick
 }) => {
-  const { getTopic, getActiveGoals, getCompletionRate } = useTopicStore();
+  const { getTopic, getActiveGoals } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
   }
 
   const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
-  const progress = getCompletionRate(topic.id);
+  const progress = topic.completionRate;
   const goals = getActiveGoals(topic.id);
   
   // 計算週進度統計
@@ -206,7 +206,7 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
           {/* 進度圓圈 */}
           <div className="text-center mt-6">
             <CircularProgress 
-              value={progress} 
+              value={progress ?? 0} 
               size={80} 
               strokeWidth={6}
               color={subjectStyle.accent}

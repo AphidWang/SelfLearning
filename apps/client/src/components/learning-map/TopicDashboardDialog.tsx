@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Topic } from '../../types/goal';
 import { TopicDashboardCard } from './TopicDashboardCard';
 import { useTopicStore } from '../../store/topicStore';
@@ -14,8 +14,14 @@ export const TopicDashboardDialog: React.FC<TopicDashboardDialogProps> = ({
   onTopicClick,
   onAddTopic,
 }) => {
-  const { getActiveTopics, getCompletionRate } = useTopicStore();
-  const activeTopics = getActiveTopics();
+  const { fetchTopicsWithActions } = useTopicStore();
+  const [topics, setTopics] = useState<Topic[]>([]);
+
+  useEffect(() => {
+    fetchTopicsWithActions().then((result) => {
+      if (Array.isArray(result)) setTopics(result);
+    });
+  }, [fetchTopicsWithActions]);
   
   return (
     <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[400px] max-w-[90vw] flex flex-col h-full">
@@ -33,12 +39,12 @@ export const TopicDashboardDialog: React.FC<TopicDashboardDialogProps> = ({
       </div>
       <div className="flex-1 overflow-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {activeTopics.map(topic => (
+          {topics.map(topic => (
             <TopicDashboardCard
               key={topic.id}
               title={topic.title}
               subject={topic.subject || '未分類'}
-              progress={getCompletionRate(topic.id)}
+              progress={topic.completionRate ?? 0 }
               onClick={() => {
                 onClose();
                 onTopicClick(topic.id);

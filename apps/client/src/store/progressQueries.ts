@@ -5,21 +5,9 @@ import { supabase } from '../services/supabase';
  * 計算主題完成率
  * @param topic Topic 物件
  * @returns 完成率（百分比，0~100）
+ * 沒有做 db 的查詢，只是個 helper function
  */
 export function getCompletionRate(topic: Topic): number {
-  if (!topic.goals || topic.goals.length === 0) return 0;
-  const allTasks = topic.goals.flatMap(g => g.tasks || []);
-  if (allTasks.length === 0) return 0;
-  const completedTasks = allTasks.filter(t => t.status === 'done').length;
-  return Math.round((completedTasks / allTasks.length) * 100);
-}
-
-/**
- * 計算主題進度百分比（同 getCompletionRate，語意不同可分開維護）
- * @param topic Topic 物件
- * @returns 進度百分比（0~100）
- */
-export function calculateProgress(topic: Topic): number {
   if (!topic.goals || topic.goals.length === 0) return 0;
   const allTasks = topic.goals.flatMap(g => g.tasks || []);
   if (allTasks.length === 0) return 0;

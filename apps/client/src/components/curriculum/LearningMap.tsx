@@ -421,7 +421,7 @@ const Node: React.FC<NodeProps> = React.memo(({
       </div>
     </motion.div>
     {showDialog && (
-      <CurriculumDialog goalId={node.id} onClose={() => setShowDialog(false)} />
+      <CurriculumDialog topicId={node.id} goalId={node.id} onClose={() => setShowDialog(false)} />
     )}
     </>
   );

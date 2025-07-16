@@ -13,7 +13,7 @@ export const TopicProgressDialog: React.FC<TopicProgressDialogProps> = ({
   onClose,
   onTopicClick,
 }) => {
-  const { getActiveTopics, getActiveGoals, getCompletionRate } = useTopicStore();
+  const { getActiveTopics, getActiveGoals } = useTopicStore();
   const topics = getActiveTopics();
   
   // 當前顯示的目標索引
@@ -142,7 +142,7 @@ export const TopicProgressDialog: React.FC<TopicProgressDialogProps> = ({
         <div className="flex gap-6 min-w-max px-4">
           {topics.map(topic => {
             const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
-            const progress = getCompletionRate(topic.id);
+            const progress = topic.completionRate;
             const currentGoals = getInProgressGoals(topic.id);
             const completedGoals = getRecentlyCompletedGoals(topic.id);
             const goals = getActiveGoals(topic.id);
@@ -289,7 +289,7 @@ export const TopicProgressDialog: React.FC<TopicProgressDialogProps> = ({
                 {/* 進度圓圈 - 右下角 */}
                 <div className="absolute bottom-4 right-4">
                   <CircularProgress 
-                    value={progress} 
+                    value={progress ?? 0} 
                     size={32} 
                     strokeWidth={3}
                     color={subjectStyle.accent}

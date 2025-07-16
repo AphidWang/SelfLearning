@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import PageLayout from '../../components/layout/PageLayout';
-import Calendar from '../../components/calendar/Calendar';
 import { Task } from '../../types/goal';
 import ProgressChart from '../../components/progress/ProgressChart';
 import { Check, BookOpen, Clock, FileText, Layers, Search, Plus } from 'lucide-react';
@@ -31,15 +30,26 @@ const todayEvents = [
 
 const upcomingTasks: Task[] = [
   {
-    id: '1',
-    title: '寫一篇遊記',
-    description: '選擇一個最近去過的地方，寫一篇遊記',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
-    status: 'todo',
-    category: '國語',
-    priority: 'high',
-    assignedTo: '陳老師'
-  },
+      id: '1',
+      title: '寫一篇遊記',
+      description: '選擇一個最近去過的地方，寫一篇遊記',
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
+      status: 'todo',
+      category: '國語',
+      priority: 'high',
+      assignedTo: ['陳老師'],
+      goal_id: '',
+      order_index: 0,
+      task_type: 'single',
+      task_config: { type: 'single' },
+      cycle_config: { cycle_type: 'none', auto_reset: false },
+      progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 },
+      need_help: false,
+      special_flags: [],
+      version: 1,
+      created_at: '',
+      updated_at: ''
+    },
   {
     id: '2',
     title: '水三態的科學實驗',
@@ -48,7 +58,18 @@ const upcomingTasks: Task[] = [
     status: 'todo',
     category: '自然',
     priority: 'medium',
-    assignedTo: '王老師'
+    assignedTo: ['王老師'],
+    goal_id: '',
+    order_index: 0,
+    task_type: 'single',
+    task_config: { type: 'single' },
+    cycle_config: { cycle_type: 'none', auto_reset: false },
+    progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 },
+    need_help: false,
+    special_flags: [],
+    version: 1,
+    created_at: '',
+    updated_at: '',
   },
   {
     id: '3',
@@ -58,8 +79,18 @@ const upcomingTasks: Task[] = [
     status: 'done',
     category: '自然',
     priority: 'low',
-    assignedTo: '王老師',
-    completedAt: new Date().toISOString()
+    assignedTo: ['王老師'],
+    goal_id: '',
+    order_index: 0,
+    task_type: 'single',
+    task_config: { type: 'single' },
+    cycle_config: { cycle_type: 'none', auto_reset: false },
+    progress_data: { last_updated: new Date().toISOString(), completion_percentage: 0 },
+    need_help: false,
+    special_flags: [],
+    version: 1,
+    created_at: '',
+    updated_at: ''
   }
 ];
 

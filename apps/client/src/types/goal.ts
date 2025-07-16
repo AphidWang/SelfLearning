@@ -202,6 +202,9 @@ export interface Topic {
   owner?: User; // 擁有者資訊
   template?: TopicTemplate; // 來源模板資訊
   collaborators?: User[]; // 從 topic_collaborators 轉換而來的協作者列表
+
+  // completionRate
+  completionRate?: number;
 }
 
 export interface Goal {

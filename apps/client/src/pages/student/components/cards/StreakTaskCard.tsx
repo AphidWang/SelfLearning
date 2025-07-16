@@ -87,8 +87,8 @@ export const StreakTaskCard: React.FC<StreakTaskCardProps> = (props) => {
     
     try {
       // 這裡使用 topicStore 的 cancelTodayCheckIn 方法
-      const { useTopicStore } = await import('../../../../store/topicStore');
-      const result = await useTopicStore.getState().cancelTodayCheckIn(task.id);
+      const { useTaskStore } = await import('../../../../store/taskStore');
+      const result = await useTaskStore.getState().cancelTodayCheckIn(task.id);
       
       if (result.success) {
         console.log('✅ 成功取消今日打卡');

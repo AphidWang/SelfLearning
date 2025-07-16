@@ -189,9 +189,9 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
                 {task.goalTitle}
               </p>
               
-              {task.completedAt && (
+              {task.completed_at && (
                 <p className="text-xs text-gray-500 mt-1">
-                  完成於 {new Date(task.completedAt).toLocaleDateString()}
+                  完成於 {new Date(task.completed_at).toLocaleDateString()}
                 </p>
               )}
             </div>

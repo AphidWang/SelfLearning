@@ -7,6 +7,7 @@ import {
   HelpCircle, CheckCircle, PlayCircle,
   Target, X, Pencil, Star, Sparkles, Edit3
 } from 'lucide-react';
+import { useTaskStore } from '../../store/taskStore';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { TaskRecordForm } from '../shared/TaskRecordForm';
@@ -28,7 +29,9 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   onBack,
   onHelpRequest
 }) => {
-  const { updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, getTopic } = useTopicStore();
+  const { updateTask, markTaskCompleted, markTaskInProgress } = useTaskStore();
+  const { getTopic } = useTopicStore();
+ 
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
@@ -38,9 +41,9 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
 
   const handleStatusUpdate = async (status: 'in_progress' | 'done') => {
     if (status === 'done') {
-      await markTaskCompleted(topicId, goalId, task.id);
+      await markTaskCompleted(task.id, task.version);
     } else {
-      await markTaskInProgress(topicId, goalId, task.id);
+      await markTaskInProgress(task.id, task.version);
     }
     onBack();
   };
@@ -50,7 +53,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   };
 
   const handleSaveDescription = () => {
-    updateTaskInfo(topicId, goalId, task.id, {
+    updateTask(task.id, task.version, {
       title: editedTask.title,
       description: editedTask.description,
       priority: editedTask.priority,
@@ -88,7 +91,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   const handleSave = async () => {
     if (!task || !topic) return;
     
-    await updateTaskInfo(topicId, goalId, task.id, {
+    await updateTask(task.id, task.version, {
       title: task.title,
       description: task.description,
       priority: task.priority,

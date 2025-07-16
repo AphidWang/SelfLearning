@@ -6,6 +6,7 @@ import { Pencil, Check, History, ChevronLeft, Calendar, CheckCircle2, Clock, Upl
 import { subjects } from '../../styles/tokens';
 import { useTopicStore } from '../../store/topicStore';
 import { GoalOverviewDialog } from './TopicOverviewDialog';
+import { useTaskStore } from '../../store/taskStore';
 
 interface WeeklyActivity {
   id: string;
@@ -60,7 +61,8 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   const [showReview, setShowReview] = useState(false);
   const historyScrollRef = useRef<HTMLDivElement>(null);
   const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
-  const { getActiveGoals, getCompletionRate, addTask, getFocusedGoals } = useTopicStore();
+  const { getActiveGoals, getFocusedGoals } = useTopicStore();
+  const {addTask} = useTaskStore();
 
   // 獲取主題當前專注的目標
   const getFocusedGoalsForTopic = (topicId: string) => {
@@ -134,7 +136,7 @@ export const TopicDetailsDialog: React.FC<TopicDetailsDialogProps> = ({
   const goals = getActiveGoals(topic.id);
   const totalGoals = goals.length;
   const completedGoalsCount = goals.filter(g => g?.tasks?.every(t => t.status === 'done')).length;
-  const progress = getCompletionRate(topic.id);
+  const progress = topic.completionRate ?? 0;
 
   // 當前顯示的目標索引
   const currentIndex = focusedGoals.length > 0 ? Math.min(currentGoalIndexes[topic.id] || 0, focusedGoals.length - 1) : 0;

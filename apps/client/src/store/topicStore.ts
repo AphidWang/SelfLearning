@@ -59,19 +59,25 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         set({ loading: false, topics: [], error: null });
-        return;
+        return [];
       }
       const { data, error } = await supabase.rpc('get_user_topics_with_structure', {
         p_user_id: user.id
       });
       if (error) {
         set({ loading: false, error: error.message });
-        return;
+        return [];
       }
-      // data 是 jsonb array
-      set({ topics: data || [], loading: false });
+      const { getCompletionRate } = await import('./progressQueries');
+      const topicsWithRate = (data || []).map((topic: any) => ({
+        ...topic,
+        completionRate: getCompletionRate(topic)
+      }));
+      set({ topics: topicsWithRate, loading: false });
+      return topicsWithRate;
     } catch (error: any) {
       set({ loading: false, error: error.message || '獲取主題失敗' });
+      return [];
     }
   },
 
@@ -82,8 +88,10 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       });
       if (error) throw error;
       if (!data || !Array.isArray(data) || data.length === 0) return null;
-      console.log('=== DEBUG getTopic:', data[0]);
-      return data[0];
+      const topic = data[0];
+      // 加入完成率
+      const { getCompletionRate } = await import('./progressQueries');
+      return { ...topic, completionRate: getCompletionRate(topic) };
     } catch (error: any) {
       set({ error: error.message || '獲取主題失敗' });
       return null;

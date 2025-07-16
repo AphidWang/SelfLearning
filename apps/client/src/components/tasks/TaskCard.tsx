@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { useTaskStore } from '../../store/taskStore';
 
 interface TaskCardProps {
   task: Task;
@@ -25,7 +26,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
   showDragHandle = true 
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const { performTaskAction, checkInTask, addTaskCount, addTaskAmount, resetTaskProgress } = useTopicStore();
+  const { performTaskAction, checkInTask, addTaskCount, addTaskAmount, resetTaskProgress } = useTaskStore();
 
   const handleDragStart = (e: React.DragEvent) => {
     if (weekId) {

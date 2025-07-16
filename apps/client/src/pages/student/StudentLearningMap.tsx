@@ -27,23 +27,20 @@
  */
 
 import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
-import { TopicDashboard } from '../../components/learning-map/TopicDashboard';
 import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
 import { TaskDetailDialog } from '../../components/learning-map/TaskDetailDialog';
-import { TopicDetails } from '../../components/learning-map/TopicDetails';
 import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
 import { useTopicStore } from '../../store/topicStore';
 import PageLayout from '../../components/layout/PageLayout';
-import { Topic, Task, TopicStatus, TopicType } from '../../types/goal';
+import { TopicStatus, TopicType } from '../../types/goal';
 import { SUBJECTS } from '../../constants/subjects';
 import { DailyReviewCarousel } from '../../components/learning-map/DailyReviewCarousel';
-import { TopicDashboardCard } from '../../components/learning-map/TopicDashboardCard';
 import { TopicDashboardDialog } from '../../components/learning-map/TopicDashboardDialog';
 import { TopicDetailsDialog } from '../../components/learning-map/TopicDetailsDialog';
 import { DraggableDialog } from '../../components/learning-map/DraggableDialog';
 import { TopicProgressDialog } from '../../components/learning-map/TopicProgressDialog';
 import { TopicReviewPage } from '../../components/topic-review/TopicReviewPage';
-import { AnimatePresence } from 'framer-motion';
+import { useGoalStore } from '../../store/goalStore';
 
 export const StudentLearningMap: React.FC = () => {
   // Dialog 相關狀態
@@ -60,7 +57,7 @@ export const StudentLearningMap: React.FC = () => {
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
   const [showDailyReview, setShowDailyReview] = useState(false);
 
-  const { topics, addTopic, getCompletionRate, fetchTopicsWithActions } = useTopicStore();
+  const { topics, addTopic, fetchTopicsWithActions } = useTopicStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
   const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
@@ -202,26 +199,7 @@ export const StudentLearningMap: React.FC = () => {
         topicId: topic.id
       };
     });
-
-  const activeTopic = topics.find(topic => topic.status === 'active');
-
-  const handleAddGoal = async () => {
-    if (!selectedTopic?.goals) return;
     
-    try {
-      const newGoal = await useTopicStore.getState().addGoal(selectedTopic.id, {
-        title: '新目標',
-        description: '',
-        status: 'todo',
-        tasks: [],
-        order_index: selectedTopic.goals.length,
-        priority: 'medium'
-      });
-    } catch (error) {
-      console.error('新增目標失敗:', error);
-    }
-  };
-
   return (
     <PageLayout title="學習地圖">
       {/* Progress Dialog */}

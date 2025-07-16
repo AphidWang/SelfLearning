@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useTopicStore } from '../../store/topicStore';
 import type { Task } from '../../types/goal';
+import { useTaskStore } from '../../store/taskStore';
 
 interface CurriculumDialogProps {
   topicId: string;
@@ -9,7 +10,8 @@ interface CurriculumDialogProps {
 }
 
 const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, onClose }) => {
-  const { topics, updateTaskCompat: updateTask } = useTopicStore();
+  const { topics  } = useTopicStore();
+  const { updateTask } = useTaskStore();
   const topic = topics.find(t => t.id === topicId);
   const goal = topic?.goals?.find(g => g.id === goalId);
 
@@ -39,7 +41,7 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
   const toggleTaskStatus = async (taskId: string, task: Task) => {
     try {
       const newStatus = task.status === 'done' ? 'todo' : 'done';
-      const updatedTask = await updateTask(topicId, goalId, taskId, {
+      const updatedTask = await updateTask(taskId, task.version, {
         ...task,
         status: newStatus,
         completed_at: newStatus === 'done' ? new Date().toISOString() : undefined
@@ -55,12 +57,12 @@ const CurriculumDialog: React.FC<CurriculumDialogProps> = ({ topicId, goalId, on
   const editTaskTitle = (taskId: string, task: Task) => {
     const title = window.prompt('修改任務名稱', task.title);
     if (title !== null && title !== task.title) {
-      updateTask(topicId, goalId, task.id, { ...task, title });
+      updateTask(task.id, task.version, { ...task, title });
     }
   };
 
-  const handleTaskUpdate = (topicId: string, goalId: string, taskId: string, updates: Partial<Task>) => {
-    updateTask(topicId, goalId, taskId, updates);
+  const handleTaskUpdate = (taskId: string, taskVersion: number, updates: Partial<Task>) => {
+    updateTask(taskId, taskVersion, updates);
   };
 
   return (

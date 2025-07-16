@@ -20,6 +20,7 @@ import { AccumulativeTaskCard } from './AccumulativeTaskCard';
 import type { TaskWithContext, TaskStatus } from '../../../../types/goal';
 import { useTopicStore } from '../../../../store/topicStore';
 import toast from 'react-hot-toast';
+import { useTaskStore } from '../../../../store/taskStore';
 
 export interface TaskCardFactoryProps {
   task: TaskWithContext;
@@ -44,7 +45,7 @@ export const TaskCardFactory: React.FC<TaskCardFactoryProps> = (props) => {
     addTaskCount, 
     addTaskAmount, 
     resetTaskProgress 
-  } = useTopicStore();
+  } = useTaskStore();
 
   /**
    * 統一的任務操作處理

@@ -127,8 +127,8 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
 
   // 初始化數據載入
   useEffect(() => {
-    const { fetchTopics } = useTopicStore.getState();
-    fetchTopics();
+    const { fetchTopicsWithActions } = useTopicStore.getState();
+    fetchTopicsWithActions();
   }, []);
 
   // 初始化數據

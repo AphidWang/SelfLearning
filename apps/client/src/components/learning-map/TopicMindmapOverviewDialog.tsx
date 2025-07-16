@@ -22,7 +22,7 @@ export const TopicMindmapOverviewDialog: React.FC<TopicMindmapOverviewDialogProp
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
-  const { getTopic, getCompletionRate } = useTopicStore();
+  const { getTopic } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
   
   useEffect(() => {
@@ -40,7 +40,7 @@ export const TopicMindmapOverviewDialog: React.FC<TopicMindmapOverviewDialogProp
   }
 
   const subjectColor = subjectColors[topic.subject || '未分類'];
-  const progress = getCompletionRate(topic.id);
+  const progress = topic.completionRate ?? 0;
 
   return (
     <motion.div

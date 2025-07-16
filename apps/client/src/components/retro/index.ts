@@ -5,6 +5,5 @@
  */
 
 export { PersonalRetroPanel } from './PersonalRetroPanel';
-export { WeekOverviewCard } from './WeekOverviewCard';
 export { QuestionDrawGame } from './QuestionDrawGame';
 export { AnswerInputCard } from './AnswerInputCard'; 

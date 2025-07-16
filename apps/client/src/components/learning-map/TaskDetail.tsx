@@ -8,8 +8,10 @@ import {
   Battery, BatteryMedium, BatteryLow,
   Target, Upload, PauseCircle
 } from 'lucide-react';
-import { useTopicStore, type MarkTaskResult } from '../../store/topicStore';
+import { useTopicStore } from '../../store/topicStore';
+import { type TaskActionResult } from '../../types/goal';
 import toast from 'react-hot-toast';
+import { useTaskStore } from '../../store/taskStore';
 
 interface TaskDetailProps {
   task: Task;
@@ -54,7 +56,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onBack,
   onHelpRequest
 }) => {
-  const { updateTaskInfo, markTaskCompletedCompat: markTaskCompleted, markTaskInProgressCompat: markTaskInProgress, markTaskTodoCompat: markTaskTodo } = useTopicStore();
+  const { updateTask, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTaskStore();
   const [comment, setComment] = useState('');
   const [mood, setMood] = useState<MoodLevel | null>(null);
   const [energy, setEnergy] = useState<EnergyLevel | null>(null);
@@ -74,17 +76,17 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   }, []);
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
-    let result: MarkTaskResult;
+    let result: TaskActionResult;
     
     switch (newStatus) {
       case 'done':
-        result = await markTaskCompleted(topicId, goalId, task.id);
+        result = await markTaskCompleted(task.id, task.version);
         break;
       case 'in_progress':
-        result = await markTaskInProgress(topicId, goalId, task.id);
+        result = await markTaskInProgress(task.id, task.version);
         break;
       case 'todo':
-        result = await markTaskTodo(topicId, goalId, task.id);
+        result = await markTaskTodo(task.id, task.version);
         break;
       default:
         return;
@@ -104,7 +106,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
         field === 'category' || field === 'role' || field === 'estimatedTime' || 
         field === 'notes' || field === 'challenge' || field === 'dueDate' || 
         field === 'assignedTo' || field === 'order') {
-      updateTaskInfo(topicId, goalId, task.id, { [field]: value } as any);
+      updateTask(task.id, task.version, { [field]: value } as any);
     }
   };
 

@@ -2,13 +2,12 @@ import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { motion, easeInOut } from 'framer-motion';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
-import { UserAvatar, UserAvatarGroup } from '../learning-map/UserAvatar';
-import type { User } from '@self-learning/types';
+import { UserAvatar } from '../learning-map/UserAvatar';
 import { Topic } from '../../types/goal';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,
-  Cloud, Car, TreePine, Star, Heart, Flower2, Sun, Moon, AlertTriangle,
-  Pause, Award, Trophy, FlagOff, Users, Eye, EyeOff
+  Cloud, Car, TreePine, Star, Sun, Moon, AlertTriangle,
+  Pause, Trophy, Eye, EyeOff
 } from 'lucide-react';
 import type { Goal } from '../../types/goal';
 
@@ -83,7 +82,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   onGoalClick,
   className = ""
 }) => {
-  const { getTopic, getActiveGoals, getCompletionRate } = useTopicStore();
+  const { getTopic, getActiveGoals } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
   const isInitialRender = useRef(true);
   const [shouldAnimate, setShouldAnimate] = useState(showAnimations);
@@ -301,7 +300,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
     const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
     const subjectColor = subjectStyle.accent;
-    const progress = getCompletionRate(topic.id);
+    const progress = topic.completionRate;
     const showAvatars = topic?.show_avatars ?? true;
     const goalRadius = Math.min(width, height) * 0.46;
     const taskRadius = goalRadius * 0.6;
@@ -318,7 +317,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
       goalNodeSize,
       taskNodeSize
     };
-  }, [topic, width, height, getCompletionRate]);
+  }, [topic, width, height]);
 
   // 優化點擊處理函數
   const handleGoalClick = useCallback((e: React.MouseEvent, goalId: string) => {

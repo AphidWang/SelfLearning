@@ -50,7 +50,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({ participant, index })
   
   // 能量等級對應的圖標和顏色
   const energyConfig = useMemo(() => {
-    const level = weeklyStats.averageEnergy;
+    const level = weeklyStats.averageEnergy ?? 0;
     if (level >= 5) return { icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-50' };
     if (level >= 4) return { icon: Star, color: 'text-green-500', bg: 'bg-green-50' };
     if (level >= 3) return { icon: Heart, color: 'text-blue-500', bg: 'bg-blue-50' };
@@ -62,11 +62,11 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({ participant, index })
   
   // 鼓勵性的描述
   const encouragementText = useMemo(() => {
-    if (weeklyStats.checkInCount >= 5) return '本週很規律！';
-    if (weeklyStats.checkInCount >= 3) return '保持得不錯！';
-    if (weeklyStats.checkInCount >= 1) return '開始了就很棒！';
+    if (weeklyStats.totalCheckIns >= 5) return '本週很規律！';
+    if (weeklyStats.totalCheckIns >= 3) return '保持得不錯！';
+    if (weeklyStats.totalCheckIns >= 1) return '開始了就很棒！';
     return '期待你的分享！';
-  }, [weeklyStats.checkInCount]);
+  }, [weeklyStats.totalCheckIns]);
   
   return (
     <motion.div
@@ -106,7 +106,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({ participant, index })
           </div>
           <div>
             <p className="text-sm text-gray-600">打卡次數</p>
-            <p className="font-semibold text-gray-800">{weeklyStats.checkInCount} 次</p>
+            <p className="font-semibold text-gray-800">{weeklyStats.totalCheckIns} 次</p>
           </div>
         </div>
         
@@ -169,9 +169,9 @@ export const ParticipantOverview: React.FC = () => {
   const teamStats = useMemo(() => {
     if (participants.length === 0) return null;
     
-    const totalCheckIns = participants.reduce((sum, p) => sum + p.weeklyStats.checkInCount, 0);
+    const totalCheckIns = participants.reduce((sum, p) => sum + p.weeklyStats.totalCheckIns, 0);
     const totalCompletedTasks = participants.reduce((sum, p) => sum + p.weeklyStats.completedTaskCount, 0);
-    const averageEnergy = participants.reduce((sum, p) => sum + p.weeklyStats.averageEnergy, 0) / participants.length;
+    const averageEnergy = participants.reduce((sum, p) => sum + (p.weeklyStats.averageEnergy ?? 0), 0) / participants.length;
     
     // 收集所有主題（去重）
     const allTopics = new Set<string>();

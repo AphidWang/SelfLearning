@@ -1,4 +1,4 @@
-import { TaskStatus } from '../types/task';
+import { TaskStatus } from '../types/goal';
 
 export const formatDate = (date: string) => {
   const today = new Date();
@@ -32,7 +32,7 @@ export const formatDate = (date: string) => {
 
 export const getDueDateStyle = (endDate: string, status: TaskStatus) => {
   // 如果任務已完成或待回饋，使用預設樣式（不上色）
-  if (status === 'completed' || status === 'waiting_feedback') {
+  if (status === 'done') {
     return 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400';
   }
 
