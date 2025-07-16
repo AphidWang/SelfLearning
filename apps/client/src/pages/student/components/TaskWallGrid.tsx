@@ -177,6 +177,23 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
   const highlightCards = cards.filter(card => card.highlight);
   const normalCards = cards.filter(card => !card.highlight);
 
+  // 除錯：檢查傳入的資料
+  useEffect(() => {
+    console.log('🔍 TaskWallGrid 除錯資訊:', {
+      totalCards: cards.length,
+      highlightCards: highlightCards.length,
+      normalCards: normalCards.length,
+      cardsWithEmptyId: cards.filter(card => !card.data.id || card.data.id.trim() === '').length,
+      cardsData: cards.map((card, index) => ({
+        index,
+        type: card.type,
+        id: card.data.id,
+        highlight: card.highlight,
+        title: (card.data as any).title
+      }))
+    });
+  }, [cards, highlightCards.length, normalCards.length]);
+
   // 創建一個用於追蹤唯一 ID 的 Map
   const usedKeys = new Set<string>();
 
@@ -189,6 +206,14 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
     // 如果沒有 ID 或 ID 為空字串，生成臨時 ID
     if (!baseId || baseId.trim() === '') {
       baseId = `temp-${card.type}-${index}`;
+      console.warn('⚠️ 發現空的卡片 ID，生成臨時 ID:', { 
+        originalId: card.data.id, 
+        generatedId: baseId,
+        cardType: card.type,
+        index,
+        prefix,
+        cardTitle: (card.data as any).title
+      });
     }
     
     let key = `${prefix}-${card.type}-${baseId}-${index}`;
@@ -198,9 +223,28 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
     while (usedKeys.has(key)) {
       counter++;
       key = `${prefix}-${card.type}-${baseId}-${index}-${counter}`;
+      console.warn('🔄 發現重複 key，添加計數器:', { 
+        originalKey: `${prefix}-${card.type}-${baseId}-${index}`,
+        newKey: key,
+        counter
+      });
     }
     
     usedKeys.add(key);
+    
+    // 額外檢查：確保 key 不是空字串
+    if (!key || key.trim() === '') {
+      const fallbackKey = `fallback-${Date.now()}-${Math.random()}`;
+      console.error('🚨 生成的 key 是空字串，使用後備方案:', { 
+        originalKey: key,
+        fallbackKey,
+        cardData: card.data,
+        prefix,
+        index
+      });
+      return fallbackKey;
+    }
+    
     return key;
   };
 

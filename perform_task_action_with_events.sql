@@ -73,6 +73,7 @@ BEGIN
   
   -- 2. 記錄到 user_events 表
   SELECT record_user_event(
+    p_user_id,
     'task',
     p_task_id,
     event_type,
@@ -153,6 +154,7 @@ BEGIN
   
   -- 2. 記錄到 user_events 表
   SELECT record_user_event(
+    current_user_id,
     'task',
     p_task_id,
     'record_added',

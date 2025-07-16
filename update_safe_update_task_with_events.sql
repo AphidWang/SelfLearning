@@ -85,6 +85,7 @@ BEGIN
   -- 如果狀態有變更，記錄事件到 user_events
   IF p_status IS NOT NULL AND p_status != old_status AND current_user_id IS NOT NULL THEN
     SELECT record_user_event(
+      current_user_id,
       'task',
       p_id::text,
       'status_changed',

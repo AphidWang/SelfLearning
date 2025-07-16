@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
+import { useAsyncOperation } from '../utils/errorHandler';
 import type { Task, ReferenceInfo, ReferenceAttachment, ReferenceLink, TaskActionResult, ActiveTaskResult, TaskAction, TaskRecord } from '../types/goal';
 
 interface TaskStoreState {
@@ -433,13 +434,27 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
 
   /**
    * 執行任務動作（打卡、計數等）
+   * 注意：這個方法會在內部處理錯誤，但不會顯示 toast
+   * 如需顯示統一錯誤處理，請在組件中使用 wrapAsync 包裝
    */
   performTaskAction: async (taskId, actionType, params) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未認證');
+      
       const today = new Date().toISOString().split('T')[0];
       const now = new Date();
+      
+      // 添加詳細的 console log 來幫助調試
+      console.log('🔄 TaskStore.performTaskAction 開始:', {
+        taskId,
+        actionType,
+        params,
+        userId: user.id,
+        today,
+        timestamp: now.toISOString()
+      });
+      
       const { data, error } = await supabase.rpc('perform_task_action_transaction', {
         p_task_id: taskId,
         p_action_type: actionType,
@@ -448,18 +463,36 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         p_user_id: user.id,
         p_action_data: params || {}
       });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('❌ Supabase RPC 錯誤:', error);
+        throw error;
+      }
+      
       const result = data;
+      console.log('📊 RPC 回傳結果:', result);
+      
       if (!result.success) {
+        console.warn('⚠️ 任務動作失敗:', result.message);
         return { success: false, message: result.message };
       }
+      
       if (result.task) {
         set(state => ({
           tasks: state.tasks.map(t => t.id === taskId ? result.task : t)
         }));
       }
+      
+      console.log('✅ 任務動作成功完成');
       return { success: true, task: result.task };
     } catch (error: any) {
+      console.error('❌ TaskStore.performTaskAction 錯誤:', {
+        error: error.message,
+        stack: error.stack,
+        taskId,
+        actionType,
+        params
+      });
       return { success: false, message: error.message || '執行任務動作失敗' };
     }
   },

@@ -21,6 +21,7 @@ import type { TaskWithContext, TaskStatus } from '../../../../types/goal';
 import { useTopicStore } from '../../../../store/topicStore';
 import toast from 'react-hot-toast';
 import { useTaskStore } from '../../../../store/taskStore';
+import { useAsyncOperation } from '../../../../utils/errorHandler';
 
 export interface TaskCardFactoryProps {
   task: TaskWithContext;
@@ -47,6 +48,8 @@ export const TaskCardFactory: React.FC<TaskCardFactoryProps> = (props) => {
     resetTaskProgress 
   } = useTaskStore();
 
+  const { wrapAsync } = useAsyncOperation();
+
   /**
    * 統一的任務操作處理
    */
@@ -55,29 +58,31 @@ export const TaskCardFactory: React.FC<TaskCardFactoryProps> = (props) => {
     action: 'check_in' | 'add_count' | 'add_amount' | 'reset', 
     params?: any
   ) => {
-    try {
-      let result;
-      
-      switch (action) {
-        case 'check_in':
-          result = await checkInTask(taskId);
-          break;
-        case 'add_count':
-          result = await addTaskCount(taskId, params?.count || 1);
-          break;
-        case 'add_amount':
-          result = await addTaskAmount(taskId, params?.amount || 0, params?.unit);
-          break;
-        case 'reset':
-          result = await resetTaskProgress(taskId);
-          break;
-        default:
-          throw new Error(`未知的操作類型: ${action}`);
-      }
-
-      if (result.success) {
-        toast.success(getSuccessMessage(action));
+    const operation = wrapAsync(
+      async () => {
+        let result;
         
+        switch (action) {
+          case 'check_in':
+            result = await checkInTask(taskId);
+            break;
+          case 'add_count':
+            result = await addTaskCount(taskId, params?.count || 1);
+            break;
+          case 'add_amount':
+            result = await addTaskAmount(taskId, params?.amount || 0, params?.unit);
+            break;
+          case 'reset':
+            result = await resetTaskProgress(taskId);
+            break;
+          default:
+            throw new Error(`未知的操作類型: ${action}`);
+        }
+
+        if (!result.success) {
+          throw new Error(result.message || '操作失敗');
+        }
+
         // 檢查是否為週挑戰任務的打卡操作
         // 週挑戰任務會在卡片內部自行處理狀態更新，不需要觸發全域刷新
         const isWeeklyChallenge = task.special_flags?.includes('weekly_quick_challenge');
@@ -87,12 +92,34 @@ export const TaskCardFactory: React.FC<TaskCardFactoryProps> = (props) => {
           // 非週挑戰打卡操作才觸發全域刷新
           otherProps.onRecordSuccess?.();
         }
-      } else {
-        toast.error(result.message || '操作失敗');
+
+        return result;
+      },
+      {
+        context: `執行任務${getActionDisplayName(action)}`,
+        showSuccess: true,
+        successMessage: getSuccessMessage(action),
       }
-    } catch (error) {
-      console.error('任務操作失敗:', error);
-      toast.error('操作失敗');
+    );
+
+    await operation();
+  };
+
+  /**
+   * 獲取操作顯示名稱
+   */
+  const getActionDisplayName = (action: string) => {
+    switch (action) {
+      case 'check_in':
+        return '打卡';
+      case 'add_count':
+        return '計數';
+      case 'add_amount':
+        return '累積';
+      case 'reset':
+        return '重置';
+      default:
+        return '操作';
     }
   };
 
