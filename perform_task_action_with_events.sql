@@ -17,6 +17,7 @@ DECLARE
   action_id UUID;
   event_id UUID;
   task_title TEXT;
+  event_type TEXT;
   result JSON;
 BEGIN
   -- 檢查用戶權限
@@ -30,6 +31,15 @@ BEGIN
   IF task_title IS NULL THEN
     RETURN json_build_object('success', false, 'message', 'Task not found');
   END IF;
+  
+  -- 根據動作類型設定對應的事件類型
+  CASE p_action_type
+    WHEN 'check_in' THEN event_type := 'task.check_in';
+    WHEN 'add_amount' THEN event_type := 'task.record_added';
+    WHEN 'add_count' THEN event_type := 'task.record_added';
+    WHEN 'reset' THEN event_type := 'task.status_changed';
+    ELSE event_type := 'task.status_changed';
+  END CASE;
   
   -- 檢查是否今天已經執行過相同動作（避免重複打卡）
   IF EXISTS (
@@ -65,7 +75,7 @@ BEGIN
   SELECT record_user_event(
     'task',
     p_task_id,
-    'check_in',
+    event_type,
     jsonb_build_object(
       'action_id', action_id,
       'action_type', p_action_type,

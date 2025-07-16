@@ -21,6 +21,7 @@ import { supabase } from '../services/supabase';
 import { getTodayInTimezone } from '../config/timezone';
 import { generateWeekId } from '../utils/weekUtils';
 import { journalStore } from './journalStore';
+import { useAsyncOperation } from '../utils/errorHandler';
 
 import type {
   WeeklyStats,
@@ -258,28 +259,35 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
 
   // 獲取當前週統計 - 統一調用 getWeekStatsForWeek 確保邏輯一致
   getCurrentWeekStats: async () => {
-    try {
-      // 獲取當前週期 ID
-      const today = getTodayInTimezone();
-      const weekId = generateWeekId(today);
-      
-      DEBUG_RETRO_STORE && console.log('🔍 獲取當前週統計，weekId:', weekId);
-      
-      // 直接調用 getWeekStatsForWeek 確保邏輯一致
-      const weekStats = await get().getWeekStatsForWeek(weekId);
-      
-      // 更新 store 狀態，但不覆蓋用戶選擇的週期
-      set({ 
-        currentWeekStats: weekStats
-        // 移除 selectedWeekId: weekId，避免覆蓋用戶選擇
-      });
-      
-      return weekStats;
-    } catch (error: any) {
-      console.error('獲取當前週統計失敗:', error);
-      set({ loading: false, error: error.message || '獲取當前週統計失敗' });
-      return null;
-    }
+    const { wrapAsync } = useAsyncOperation();
+    
+    const operation = wrapAsync(
+      async () => {
+        // 獲取當前週期 ID
+        const today = getTodayInTimezone();
+        const weekId = generateWeekId(today);
+        
+        DEBUG_RETRO_STORE && console.log('🔍 獲取當前週統計，weekId:', weekId);
+        
+        // 直接調用 getWeekStatsForWeek 確保邏輯一致
+        const weekStats = await get().getWeekStatsForWeek(weekId);
+        
+        // 更新 store 狀態，但不覆蓋用戶選擇的週期
+        set({ 
+          currentWeekStats: weekStats
+          // 移除 selectedWeekId: weekId，避免覆蓋用戶選擇
+        });
+        
+        return weekStats;
+      },
+      {
+        context: '載入當前週統計數據',
+        retryCount: 1,
+      }
+    );
+
+    const result = await operation();
+    return result;
   },
 
   // 問題抽取
@@ -308,40 +316,48 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
 
   // 保存回答
   saveAnswer: async (data: CreateRetroAnswerData) => {
-    try {
-      set({ loading: true, error: null });
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('用戶未認證');
-      
-      // 轉換欄位名稱以匹配資料庫表結構
-      const dbData = {
-        user_id: user.id,
-        date: getTodayInTimezone(), // 添加日期欄位
-        week_id: data.weekId,
-        question: data.question,
-        is_custom_question: data.isCustomQuestion,
-        custom_question: data.customQuestion,
-        answer: data.answer,
-        mood: data.mood,
-        emoji: data.emoji
-      };
-      
-      const { data: answer, error } = await supabase
-        .from('retro_answers')
-        .insert([dbData])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      set({ loading: false });
-      return answer;
-    } catch (error: any) {
-      console.error('保存回答失敗:', error);
-      set({ loading: false, error: error.message });
-      return null;
-    }
+    const { wrapAsync } = useAsyncOperation();
+    
+    const operation = wrapAsync(
+      async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('用戶未認證');
+        
+        // 轉換欄位名稱以匹配資料庫表結構
+        const dbData = {
+          user_id: user.id,
+          date: getTodayInTimezone(), // 添加日期欄位
+          week_id: data.weekId,
+          question: data.question,
+          is_custom_question: data.isCustomQuestion,
+          custom_question: data.customQuestion,
+          answer: data.answer,
+          mood: data.mood,
+          emoji: data.emoji
+        };
+        
+        const { data: answer, error } = await supabase
+          .from('retro_answers')
+          .insert([dbData])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        return answer;
+      },
+      {
+        context: '保存回顧回答',
+        showSuccess: true,
+        successMessage: '回答已成功保存',
+      }
+    );
+
+    set({ loading: true, error: null });
+    const result = await operation();
+    set({ loading: false });
+    
+    return result;
   },
 
   // 更新回答
@@ -369,23 +385,31 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
 
   // 刪除回答
   deleteAnswer: async (id: string) => {
-    try {
-      set({ loading: true, error: null });
-      
-      const { error } = await supabase
-        .from('retro_answers')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      set({ loading: false });
-      return true;
-    } catch (error: any) {
-      console.error('刪除回答失敗:', error);
-      set({ loading: false, error: error.message });
-      return false;
-    }
+    const { wrapAsync } = useAsyncOperation();
+    
+    const operation = wrapAsync(
+      async () => {
+        const { error } = await supabase
+          .from('retro_answers')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        return true;
+      },
+      {
+        context: '刪除回顧回答',
+        showSuccess: true,
+        successMessage: '回答已成功刪除',
+      }
+    );
+
+    set({ loading: true, error: null });
+    const result = await operation();
+    set({ loading: false });
+    
+    return result || false;
   },
 
   // 創建會話
