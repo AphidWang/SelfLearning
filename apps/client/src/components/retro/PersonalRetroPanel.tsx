@@ -40,6 +40,7 @@ interface HoverTasksProps {
       id: string;
       timestamp: string;
     }>;
+    hoverType?: 'checkIn' | 'record';
   }>;
   isVisible: boolean;
   position: { x: number; y: number };
@@ -201,7 +202,17 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
 
   // 修改 HoverTasksPanel 組件
   const HoverTasksPanel: React.FC<HoverTasksProps> = ({ tasks, isVisible, position }) => {
-    if (!isVisible || tasks.length === 0) return null;
+    console.log(`[Debug] HoverTasksPanel 渲染:`, { 
+      isVisible, 
+      tasksLength: tasks.length, 
+      position,
+      tasks: tasks.map(t => ({ title: t.title, hoverType: t.hoverType }))
+    });
+    
+    if (!isVisible || tasks.length === 0) {
+      console.log(`[Debug] HoverTasksPanel 不顯示:`, { isVisible, tasksLength: tasks.length });
+      return null;
+    }
 
     const formatTime = (timestamp: string) => {
       return new Date(timestamp).toLocaleTimeString('zh-TW', {
@@ -210,28 +221,34 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
       });
     };
 
+    // 判斷當前顯示的類型
+    const displayType = tasks[0]?.hoverType || 'checkIn';
+    const isCheckInType = displayType === 'checkIn';
+
     return (
       <div
-        className="fixed z-50 bg-white rounded-xl shadow-xl border-2 border-blue-200 p-4 max-w-xs pointer-events-none animate-fadeIn"
+        className={`fixed z-50 bg-white rounded-xl shadow-xl border-2 p-4 max-w-xs pointer-events-none animate-fadeIn ${
+          isCheckInType ? 'border-blue-200' : 'border-orange-200'
+        }`}
         style={{
           left: position.x,
           top: position.y - 16,
           transform: 'translate(-50%, -100%)'
         }}
       >
-        <div className="text-sm font-medium text-gray-800 mb-2">📋 今日任務活動</div>
+        <div className="text-sm font-medium text-gray-800 mb-2">
+          {isCheckInType ? '🔔 打卡任務' : '📔 學習記錄'}
+        </div>
         <div className="space-y-3">
           {tasks.map((task, index) => {
             const colors = getSubjectColor(task.subject);
-            const hasTaskRecords = task.taskRecords && task.taskRecords.length > 0;
-            const hasCheckIns = task.recordCount > 0 && !hasTaskRecords;
             
             return (
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2 flex-1 min-w-0">
                     <div className={`w-1.5 h-1.5 rounded-full ${colors.dot} flex-shrink-0`} />
-                    <span className="text-gray-700 truncate">{task.title}</span>
+                    <span className="text-gray-700 truncate font-medium">{task.title}</span>
                   </div>
                   <span className={`text-xs px-2 py-1 rounded-full ${colors.bg} ${colors.text}`}>
                     {task.subject}
@@ -239,21 +256,21 @@ const CompletedRetroCard: React.FC<CompletedRetroCardProps> = ({ answer, onEdit,
                 </div>
                 
                 <div className="pl-3 space-y-1">
-                  {/* 顯示任務記錄 */}
-                  {hasTaskRecords && task.taskRecords.map((record, recordIndex) => (
-                    <div key={recordIndex} className="text-xs text-gray-600 flex items-center gap-2">
-                      <span>📔</span>
-                      <span>{formatTime(record.timestamp)}</span>
-                      <span className="text-orange-600">學習記錄</span>
-                    </div>
-                  ))}
-                  
-                  {/* 顯示打卡記錄 */}
-                  {hasCheckIns && (
+                  {isCheckInType ? (
+                    /* 顯示打卡記錄 */
                     <div className="text-xs text-gray-600 flex items-center gap-2">
                       <span>🔔</span>
-                      <span className="text-blue-600">打卡記錄</span>
+                      <span className="text-blue-600">打卡 {task.recordCount} 次</span>
                     </div>
+                  ) : (
+                    /* 顯示學習記錄詳情 */
+                    task.taskRecords.map((record, recordIndex) => (
+                      <div key={recordIndex} className="text-xs text-gray-600 flex items-center gap-2">
+                        <span>📔</span>
+                        <span>{formatTime(record.timestamp)}</span>
+                        <span className="text-orange-600">學習記錄</span>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
@@ -335,6 +352,7 @@ export const PersonalRetroPanel: React.FC = () => {
         id: string;
         timestamp: string;
       }>;
+      hoverType?: 'checkIn' | 'record';
     }>;
     position: { x: number; y: number };
   }>({
@@ -539,10 +557,10 @@ export const PersonalRetroPanel: React.FC = () => {
     }));
   };
 
-  // 處理打卡hover
-  const handleCheckInHover = async (
+  // 處理打卡和記錄的 hover
+  const handleTaskHover = async (
     event: React.MouseEvent,
-    checkInTasks: Array<{
+    tasks: Array<{
       id: string;
       title: string;
       subject: string;
@@ -551,8 +569,21 @@ export const PersonalRetroPanel: React.FC = () => {
         id: string;
         timestamp: string;
       }>;
-    }>
+    }>,
+    hoverType: 'checkIn' | 'record'
   ) => {
+    console.log(`[Debug] handleTaskHover 觸發:`, {
+      hoverType,
+      tasksLength: tasks.length,
+      tasks: tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        subject: t.subject,
+        recordCount: t.recordCount,
+        taskRecordsLength: t.taskRecords?.length || 0
+      }))
+    });
+
     if (hoverTimer) {
       clearTimeout(hoverTimer);
       setHoverTimer(null);
@@ -561,28 +592,39 @@ export const PersonalRetroPanel: React.FC = () => {
     const rect = event.currentTarget.getBoundingClientRect();
 
     try {
-      // 現在任務詳情已經包含了 taskRecords，不需要額外查詢
-      const tasksWithRecords = checkInTasks
-        .filter(task => task.taskRecords && task.taskRecords.length > 0)
-        .map(task => ({
-          ...task,
-          taskRecords: task.taskRecords || []
-        }));
+      // 根據類型篩選任務
+      let filteredTasks;
+      if (hoverType === 'checkIn') {
+        // 打卡：有 recordCount 但沒有 taskRecords 的任務
+        filteredTasks = tasks.filter(task => task.recordCount > 0 && (!task.taskRecords || task.taskRecords.length === 0));
+        console.log(`[Debug] 打卡篩選結果:`, filteredTasks);
+      } else {
+        // 記錄：有 taskRecords 的任務
+        filteredTasks = tasks.filter(task => task.taskRecords && task.taskRecords.length > 0);
+        console.log(`[Debug] 記錄篩選結果:`, filteredTasks);
+      }
 
-      setHoverTasks({
+      const hoverData = {
         visible: true,
-        tasks: tasksWithRecords,
+        tasks: filteredTasks.map(task => ({
+          ...task,
+          taskRecords: task.taskRecords || [],
+          hoverType
+        })),
         position: {
           x: rect.left + rect.width / 2,
           y: rect.top
         }
-      });
+      };
+
+      console.log(`[Debug] 設置 hover 數據:`, hoverData);
+      setHoverTasks(hoverData);
     } catch (error) {
-      console.error('處理打卡記錄失敗:', error);
+      console.error('處理任務 hover 失敗:', error);
     }
   };
 
-  const handleCheckInLeave = () => {
+  const handleTaskHoverLeave = () => {
     const timer = setTimeout(() => {
       setHoverTasks(prev => ({ ...prev, visible: false }));
     }, 100);
@@ -899,16 +941,6 @@ export const PersonalRetroPanel: React.FC = () => {
                 </div>
               </div>
 
-              {/* 測試錯誤處理按鈕 - 開發階段使用 */}
-              {process.env.NODE_ENV === 'development' && (
-                <button
-                  onClick={testErrorHandling}
-                  className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                  title="測試統一錯誤處理系統"
-                >
-                  🐛 測試錯誤
-                </button>
-              )}
               
               {/* 儲存按鈕 - 只在完成2個以上回顧時顯示 */}
               {completedRetros.length >= 2 && (
@@ -1133,15 +1165,24 @@ export const PersonalRetroPanel: React.FC = () => {
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-2"
                   >
-                    {currentWeekStats.dailyCheckIns.map((day, index) => (
-                      <motion.div
-                        key={day.date}
-                        data-date={day.date}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 + index * 0.05 }}
-                        className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200 hover:shadow-md transition-all p-3"
-                      >
+                    {currentWeekStats.dailyCheckIns.map((day, index) => {
+                      // Debug: 檢查每日數據結構
+                      console.log(`[Debug] 每日數據 ${day.date}:`, {
+                        checkInCount: day.checkInCount,
+                        taskRecordCount: day.taskRecordCount,
+                        topics: day.topics,
+                        topicsLength: day.topics?.length || 0
+                      });
+                      
+                      return (
+                        <motion.div
+                          key={day.date}
+                          data-date={day.date}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.1 + index * 0.05 }}
+                          className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200 hover:shadow-md transition-all p-3"
+                        >
                         <div className="flex flex-col gap-2">
                           {/* 第一行：日期/星期 + 心情/動力/查看日記 */}
                           <div className="flex items-center justify-between">
@@ -1183,8 +1224,11 @@ export const PersonalRetroPanel: React.FC = () => {
                             {day.checkInCount > 0 && (
                               <span
                                 className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors text-xs hover-tasks-trigger"
-                                onMouseEnter={(e) => handleCheckInHover(e, day.topics.filter(t => t.recordCount > 0 && !t.taskRecords?.length))}
-                                onMouseLeave={handleCheckInLeave}
+                                onMouseEnter={(e) => {
+                                  console.log(`[Debug] 打卡 hover 觸發 - 日期: ${day.date}, topics:`, day.topics);
+                                  handleTaskHover(e, day.topics || [], 'checkIn');
+                                }}
+                                onMouseLeave={handleTaskHoverLeave}
                               >
                                 🔔 {day.checkInCount} 次打卡
                               </span>
@@ -1194,8 +1238,11 @@ export const PersonalRetroPanel: React.FC = () => {
                             {day.taskRecordCount > 0 && (
                               <span
                                 className="inline-flex items-center px-2 py-1 rounded-full bg-orange-100 text-orange-700 cursor-pointer hover:bg-orange-200 transition-colors text-xs hover-tasks-trigger"
-                                onMouseEnter={(e) => handleCheckInHover(e, day.topics.filter(t => t.taskRecords?.length > 0))}
-                                onMouseLeave={handleCheckInLeave}
+                                onMouseEnter={(e) => {
+                                  console.log(`[Debug] 記錄 hover 觸發 - 日期: ${day.date}, topics:`, day.topics);
+                                  handleTaskHover(e, day.topics || [], 'record');
+                                }}
+                                onMouseLeave={handleTaskHoverLeave}
                               >
                                 📔 {day.taskRecordCount} 個記錄
                               </span>
@@ -1218,8 +1265,9 @@ export const PersonalRetroPanel: React.FC = () => {
                               })}
                           </div>
                         </div>
-                      </motion.div>
-                    ))}
+                        </motion.div>
+                      );
+                    })}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1313,7 +1361,6 @@ export const PersonalRetroPanel: React.FC = () => {
                     {currentWeekStats.dailyCheckIns.map((day, index) => {
                       const hasEnergy = typeof day.energy === 'number' && !isNaN(day.energy);
                       // debug log
-                      console.log(`[能量圖] ${day.date} energy:`, day.energy);
                       // day.energy 1~10 => height 10%~100%
                       const height = hasEnergy
                         ? ((day.energy ?? 0) / 10) * 90

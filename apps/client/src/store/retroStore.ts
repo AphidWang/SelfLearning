@@ -946,12 +946,67 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
       const completedData = summary.completed_data || [];
       const topicsData = summary.topics_data || [];
       
+      DEBUG_RETRO_STORE && console.log('📊 週統計數據:', {
+        weekData,
+        totalRecords: weekData.total_records,
+        totalCheckIns: weekData.total_check_ins,
+        dailyDataLength: dailyData.length
+      });
+      
       // 🔄 轉換每日簽到資料（先組基本 dailyCheckIns）
       let dailyCheckIns = dailyData.map((day: any) => {
         const activeTasks = day.active_tasks || [];
         const checkInTasks = activeTasks.filter((task: any) => task.type === 'check_in');
-        const taskRecordTasks = activeTasks.filter((task: any) => task.type === 'task_record');
+        const taskRecordTasks = activeTasks.filter((task: any) => task.type === 'record' || task.type === 'task_record');
         const completedTasks = activeTasks.filter((task: any) => task.type === 'completed');
+        
+        DEBUG_RETRO_STORE && console.log(`📅 日期 ${day.date} 數據:`, {
+          總活動: activeTasks.length,
+          打卡: checkInTasks.length,
+          記錄: taskRecordTasks.length,
+          完成: completedTasks.length,
+          原始records: day.records,
+          原始checkIns: day.check_ins
+        });
+        
+        // 🔄 處理 topics 數據：將 active_tasks 轉換為 topics 格式
+        const processedTopics = activeTasks.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          subject: task.subject || '未分類',
+          recordCount: 0, // 會在下面根據 type 設置
+          taskRecords: [] as Array<{ id: string; timestamp: string }> // 會在下面填充
+        }));
+
+        // 根據 task 類型分類記錄
+        const topicsMap = new Map();
+        activeTasks.forEach((task: any) => {
+          const key = `${task.id}-${task.title}`;
+          if (!topicsMap.has(key)) {
+            topicsMap.set(key, {
+              id: task.id,
+              title: task.title,
+              subject: task.subject || '未分類',
+              recordCount: 0,
+              taskRecords: []
+            });
+          }
+          
+          const topicItem = topicsMap.get(key);
+          if (task.type === 'check_in') {
+            topicItem.recordCount += 1;
+          } else if (task.type === 'record') {
+            topicItem.taskRecords.push({
+              id: task.id,
+              timestamp: task.action_timestamp
+            });
+          }
+        });
+
+        const finalTopics = Array.from(topicsMap.values());
+
+        DEBUG_RETRO_STORE && console.log(`📅 日期 ${day.date} 處理後的 topics:`, finalTopics);
+
         return {
           id: day.id,
           title: day.title,
@@ -962,14 +1017,14 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
           type: day.type,
           date: day.date,
           dayOfWeek: day.dayOfWeek || '',
-          checkInCount: checkInTasks.length,
-          taskRecordCount: taskRecordTasks.length,
+          checkInCount: day.check_ins || checkInTasks.length,
+          taskRecordCount: day.records || taskRecordTasks.length,
           completedTasks,
-          topics: day.topics || [],
+          topics: finalTopics,
           // 先不給 mood/energy，後面 merge
           mood: undefined,
           energy: undefined,
-          totalActivities: day.totalActivities || 0
+          totalActivities: day.total_activities || activeTasks.length
         };
       });
 
