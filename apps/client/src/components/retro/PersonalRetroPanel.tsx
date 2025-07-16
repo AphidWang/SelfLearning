@@ -27,6 +27,8 @@ import { DailyJournalDialog } from '../../pages/student/components/DailyJournalD
 import { subjects } from '../../styles/tokens';
 import type { RetroQuestion } from '../../types/retro';
 import { useTopicStore } from '../../store/topicStore';
+import { WeekSelector } from '../shared/WeekSelector';
+import { useAsyncOperation } from '../../utils/errorHandler';
 
 interface HoverTasksProps {
   tasks: Array<{
@@ -288,6 +290,9 @@ export const PersonalRetroPanel: React.FC = () => {
     selectedWeekId // 新增：獲取當前選中的週期
   } = useRetroStore();
 
+  // 添加統一錯誤處理 Hook
+  const { wrapAsync } = useAsyncOperation();
+
   // 🔍 專門監聽 selectedWeekId 變化
   useEffect(() => {
     console.log('📅 selectedWeekId 變化:', {
@@ -356,6 +361,18 @@ export const PersonalRetroPanel: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const [initialRetroCount, setInitialRetroCount] = useState(0);
 
+  // 測試錯誤處理的方法
+  const testErrorHandling = wrapAsync(
+    async () => {
+      // 模擬一個錯誤
+      throw new Error('這是一個測試錯誤，用來驗證統一錯誤處理系統');
+    },
+    {
+      context: '測試錯誤處理',
+      retryCount: 0,
+    }
+  );
+
   // 幫你加一個 util，統一 session 取得
   const getSession = async () => {
     if (!selectedWeekId) throw new Error('selectedWeekId 不應為空');
@@ -382,6 +399,10 @@ export const PersonalRetroPanel: React.FC = () => {
       });
       
       setLoadingState('loading');
+      
+      // 清空舊數據，確保載入期間不顯示過期內容
+      setCompletedRetros([]);
+      
       try {
         // 根據是否有選中週期來決定載入邏輯
         let weekStatsPromise;
@@ -828,40 +849,66 @@ export const PersonalRetroPanel: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50">
-      {/* 標題區域 */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-orange-200 sticky top-0 z-10">
+      {/* Header區域 - 融合週期選擇 */}
+      <div className="bg-gradient-to-r from-orange-50 via-pink-50 to-purple-50 backdrop-blur-md border-b border-orange-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex items-center justify-between"
           >
+            {/* 左側：標題 */}
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
                 ✨ 個人回顧時光
               </h1>
             </div>
-            
-            {/* 狀態指示器 */}
+
+            {/* 中間：週期選擇器 */}
+            <div className="flex-1 flex justify-center mx-8">
+              <WeekSelector
+                selectedWeekId={selectedWeekId ?? undefined}
+                onChange={(weekId) => {
+                  useRetroStore.getState().setSelectedWeek(weekId);
+                }}
+                loading={loading}
+                title=""
+              />
+            </div>
+
+            {/* 右側：狀態指示器和儲存按鈕 */}
             <div className="flex items-center space-x-6">
               {/* 流程狀態指示器 */}
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full transition-colors ${
-                  completedRetros.length >= 1 ? 'bg-orange-400' : 'bg-gray-300'
-                }`} />
-                <div className={`w-3 h-3 rounded-full transition-colors ${
-                  completedRetros.length >= 2 ? 'bg-yellow-400' : 'bg-gray-300'
-                }`} />
-                <div className={`w-3 h-3 rounded-full transition-colors ${
-                  completedRetros.length >= 3 ? 'bg-green-400' : 'bg-gray-300'
-                }`} />
+              <div className="flex flex-col items-center space-y-2">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full transition-colors ${
+                    completedRetros.length >= 1 ? 'bg-orange-400' : 'bg-gray-300'
+                  }`} />
+                  <div className={`w-3 h-3 rounded-full transition-colors ${
+                    completedRetros.length >= 2 ? 'bg-yellow-400' : 'bg-gray-300'
+                  }`} />
+                  <div className={`w-3 h-3 rounded-full transition-colors ${
+                    completedRetros.length >= 3 ? 'bg-green-400' : 'bg-gray-300'
+                  }`} />
+                </div>
+                {/* 完成的回顧計數與提示 */}
+                <div className="text-xs text-gray-600 text-center max-w-32">
+                  {completedRetros.length === 0 && <span>寫下兩個心得完成回顧</span>}
+                  {completedRetros.length === 1 && <span>再寫一個心得就完成了</span>}
+                  {completedRetros.length >= 2 && <span>{completedRetros.length} 個心得完成！</span>}
+                </div>
               </div>
-              {/* 完成的回顧計數與提示 */}
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                {completedRetros.length === 0 && <span>寫下兩個心得完成這週的回顧喔</span>}
-                {completedRetros.length === 1 && <span>再寫一個心得回顧就完成了呢</span>}
-                {completedRetros.length >= 2 && <span>哇！你留下了 {completedRetros.length} 個心得, 真棒!</span>}
-              </div>
+
+              {/* 測試錯誤處理按鈕 - 開發階段使用 */}
+              {process.env.NODE_ENV === 'development' && (
+                <button
+                  onClick={testErrorHandling}
+                  className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                  title="測試統一錯誤處理系統"
+                >
+                  🐛 測試錯誤
+                </button>
+              )}
               
               {/* 儲存按鈕 - 只在完成2個以上回顧時顯示 */}
               {completedRetros.length >= 2 && (
@@ -921,7 +968,19 @@ export const PersonalRetroPanel: React.FC = () => {
 
       {/* 主要內容區域 - 三欄布局 */}
       <div className="max-w-7xl mx-auto px-6 py-4" key={currentWeekStats?.weekId}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* 顯示載入狀態時的佔位區域 */}
+        {(loading || loadingState === 'loading') && (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">載入週期資料中...</p>
+            </div>
+          </div>
+        )}
+        
+        {/* 主要內容 - 只在非載入狀態時顯示 */}
+        {!loading && loadingState !== 'loading' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* 左欄：任務進度 + 每日學習軌跡 */}
           <div className="space-y-4 md:col-span-1">
             {/* 任務進度 */}
@@ -1400,7 +1459,7 @@ export const PersonalRetroPanel: React.FC = () => {
             </AnimatePresence>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modal 相關 */}
       <AnimatePresence>
@@ -1429,8 +1488,10 @@ export const PersonalRetroPanel: React.FC = () => {
               />
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+                  )}
+        </AnimatePresence>
+
+
 
       {/* Hover 任務面板 */}
       {hoverTasks.visible && <HoverTasksPanel
@@ -1595,6 +1656,9 @@ export const PersonalRetroPanel: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }; 
+
+export default PersonalRetroPanel;

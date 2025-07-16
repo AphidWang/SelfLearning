@@ -173,25 +173,50 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
     }
   };
 
+  // 分離特殊卡片和普通卡片
+  const highlightCards = cards.filter(card => card.highlight);
+  const normalCards = cards.filter(card => !card.highlight);
+
+  // 創建一個用於追蹤唯一 ID 的 Map
+  const usedKeys = new Set<string>();
+
   /**
    * 生成唯一的 key，確保不會有重複或空值
    */
   const generateUniqueKey = (card: CardData, index: number, prefix: string) => {
-    const baseId = card.data.id || `temp-${card.type}-${index}`;
-    return `${prefix}-${card.type}-${baseId}-${index}`;
+    let baseId = card.data.id;
+    
+    // 如果沒有 ID 或 ID 為空字串，生成臨時 ID
+    if (!baseId || baseId.trim() === '') {
+      baseId = `temp-${card.type}-${index}`;
+    }
+    
+    let key = `${prefix}-${card.type}-${baseId}-${index}`;
+    let counter = 0;
+    
+    // 如果 key 已存在，添加計數器直到找到唯一的 key
+    while (usedKeys.has(key)) {
+      counter++;
+      key = `${prefix}-${card.type}-${baseId}-${index}-${counter}`;
+    }
+    
+    usedKeys.add(key);
+    return key;
   };
 
   /**
    * 生成唯一的 layoutId，確保動畫正常工作
    */
   const generateLayoutId = (card: CardData, index: number, prefix: string) => {
-    const baseId = card.data.id || `temp-${card.type}-${index}`;
+    let baseId = card.data.id;
+    
+    // 如果沒有 ID 或 ID 為空字串，生成臨時 ID
+    if (!baseId || baseId.trim() === '') {
+      baseId = `temp-${card.type}-${index}`;
+    }
+    
     return `${prefix}-${card.type}-${baseId}`;
   };
-
-  // 分離特殊卡片和普通卡片
-  const highlightCards = cards.filter(card => card.highlight);
-  const normalCards = cards.filter(card => !card.highlight);
 
   return (
     <motion.div

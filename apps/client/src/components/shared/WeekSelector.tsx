@@ -165,10 +165,10 @@ export const WeekSelector: React.FC<WeekSelectorProps> = ({
 
       {/* 主要週期選擇器 */}
       <motion.div 
-        className="relative bg-gradient-to-r from-orange-400 to-pink-400 p-[2px] rounded-2xl shadow-lg"
+        className="relative"
         layout
       >
-        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md rounded-2xl p-4">
+        <div className="p-4">
           <div className="flex items-center justify-between">
             {/* 前一週按鈕 */}
             <motion.button
@@ -264,15 +264,7 @@ export const WeekSelector: React.FC<WeekSelectorProps> = ({
         )}
       </AnimatePresence>
 
-      {/* 載入指示器 */}
-      {loading && (
-        <div className="mt-4 text-center">
-          <div className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-            載入週期資料中...
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }; 

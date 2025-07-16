@@ -46,15 +46,6 @@ export const StudentRetro: React.FC = () => {
   return (
     <PageLayout title="✨ 個人回顧時光">
       <div className="container mx-auto p-4">
-        {/* 週期選擇器 */}
-        <WeekSelector
-          selectedWeekId={selectedWeekId || undefined}
-          selectedWeekIds={selectedWeekIds}
-          allowMultiWeek={false}
-          onChange={handleWeekChange}
-          loading={loading}
-          title="回顧週期"
-        />
         
         {/* 個人回顧面板 */}
         <PersonalRetroPanel />
