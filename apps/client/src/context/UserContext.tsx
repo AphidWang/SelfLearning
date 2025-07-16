@@ -1,7 +1,29 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect, useMemo } from 'react';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  ReactNode,
+  useEffect,
+  useMemo
+} from 'react';
 import { authService } from '../services/auth';
 import type { User } from '@self-learning/types';
 import { trackEvent } from '../utils/analytics';
+
+// 簡單比較兩個 User 物件是否相同（只比對主要欄位）
+const isSameUser = (a: User | null, b: User | null): boolean => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.email === b.email &&
+    a.avatar === b.avatar &&
+    a.color === b.color &&
+    a.role === b.role &&
+    JSON.stringify(a.roles) === JSON.stringify(b.roles)
+  );
+};
 
 interface UserContextType {
   currentUser: User | null;
@@ -56,11 +78,15 @@ function UserProvider({ children }: { children: ReactNode }) {
     // 監聽認證狀態變化
     const { data: { subscription } } = authService.onAuthStateChange((user) => {
       if (isMounted) {
-        
-        setCurrentUser(user);
+        setCurrentUser(prev => {
+          if (isSameUser(prev, user)) {
+            return prev;
+          }
+          return user;
+        });
         setIsLoading(false); // 確保載入狀態更新
-        
-        // 儲存到 localStorage 供初始化使用
+
+        // 僅在變更時更新 localStorage
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
         } else {
