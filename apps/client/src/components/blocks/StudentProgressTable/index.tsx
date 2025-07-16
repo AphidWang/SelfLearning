@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Clock, BookOpen } from 'lucide-react';
-import { Student, StudentWeeklyPlan } from '../../../types/student';
-import { TaskStatus } from '../../../types/task';
+import { Student, StudentWeeklyPlan } from '../../../../../../packages/types/src/student';
+import { TaskStatus } from '../../../types/goal';
 import { layout, subjects, taskStyles, text } from '../../../styles/tokens';
 import { formatDate, getDueDateStyle } from '../../../utils/dateUtils';
 
@@ -28,14 +28,10 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
 
   const getStatusStyle = (status: TaskStatus) => {
     switch (status) {
-      case 'completed':
+      case 'done':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
       case 'in_progress':
         return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
-      case 'waiting_feedback':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
-      case 'overdue':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
       default: // pending
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
     }
@@ -43,14 +39,10 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
 
   const getStatusText = (status: TaskStatus) => {
     switch (status) {
-      case 'completed':
+      case 'done':
         return '已完成';
       case 'in_progress':
         return '進行中';
-      case 'waiting_feedback':
-        return '待回饋';
-      case 'overdue':
-        return '已逾期';
       default:
         return '未開始';
     }
@@ -175,7 +167,7 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
                                       </div>
 
                                       <div className="col-span-2 text-center">
-                                        <span className={getDueDateStyle(task.endDate, task.status)}>
+                                        <span className={getDueDateStyle(task.endDate, task.status as any)}>
                                           <Clock size={14} className="mr-1" />
                                           {formatDate(task.endDate)}
                                         </span>
@@ -183,7 +175,7 @@ export const StudentProgressTable: React.FC<StudentProgressTableProps> = ({
 
                                       <div className="col-span-2 text-right">
                                         <span className={taskStyles.status[task.status]}>
-                                          {getStatusText(task.status)}
+                                          {getStatusText(task.status as any)}
                                         </span>
                                       </div>
                                     </div>
