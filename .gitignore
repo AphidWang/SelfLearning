@@ -57,3 +57,6 @@ temp-token.json
 apps/server/dist/
 test_output.txt
 supabase/migrations_backup/
+
+# Supabase 資料夾不追蹤
+supabase/
