@@ -64,7 +64,12 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
 
   // 解析任務配置 - 使用本地狀態
   const taskConfig = localTask.task_config as CountTaskConfig;
-  const checkInDates = getCheckInDates(localTask);
+  
+  // 使用 useMemo 優化 checkInDates 計算，避免無限重新渲染
+  const checkInDates = useMemo(() => {
+    return getCheckInDates(localTask);
+  }, [localTask.actions]);
+  
   const currentCount = checkInDates.length;
   const targetCount = taskConfig?.target_count || 7;
   
@@ -73,7 +78,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     taskConfig,
     currentCount,
     targetCount,
-    checkInDates
+    checkInDatesLength: checkInDates.length
   });
   
   // 計算進度
@@ -95,7 +100,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     const isChecked = checkInDates.includes(today);
     
     return isChecked;
-  }, [checkInDates, localTask.title]);
+  }, [checkInDates]);
 
   // 獲取台灣時間的週一日期
   const getTaiwanMondayOfCurrentWeek = () => {
@@ -177,18 +182,17 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     }
     
     console.log('📅 週循環生成的週日期:', dates);
-    console.log('📅 打卡日期:', checkInDates);
     
     return dates;
-  }, [localTask.cycle_config, checkInDates]);
+  }, [localTask.cycle_config?.cycle_type, localTask.cycle_config?.cycle_start_date, localTask.title]);
 
-  // 載入真實的打卡時間資料
+  // 載入真實的打卡時間資料 - 優化依賴陣列
   React.useEffect(() => {
     const loadRealCheckInTimes = async () => {
       if (!localTask.id || checkInDates.length === 0) return;
       
       try {
-        console.log("🔍 載入真實的打卡時間資料:", checkInDates);
+        console.log("🔍 載入真實的打卡時間資料，數量:", checkInDates.length);
         const { data: taskActions, error } = await supabase
           .from('task_actions')
           .select('action_date, action_timestamp')
@@ -224,7 +228,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     };
 
     loadRealCheckInTimes();
-  }, [localTask.id, checkInDates]);
+  }, [localTask.id, checkInDates.length]);
 
   // 獲取詳細的打卡時間資料（使用真實時間）
   const checkInTimestamps = useMemo(() => {
@@ -244,7 +248,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     }).sort((a, b) => b.timestamp - a.timestamp); // 按時間倒序排列，最新的在前
     
     return timestamps;
-  }, [checkInDates, realCheckInTimes]);
+  }, [checkInDates.length, realCheckInTimes]);
 
   // 當記錄變化時，重置顯示索引到最新記錄
   useEffect(() => {
