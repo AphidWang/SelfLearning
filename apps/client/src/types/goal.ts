@@ -233,11 +233,10 @@ export interface Task {
   actual_minutes?: number;
   
   // 學習記錄 - 與數據庫 task_records 表對應
-  records?: TaskRecord[];
-  task_records?: TaskRecord[];     // 添加：與數據庫字段對應
+  records?: TaskRecord[]; // 添加：與數據庫字段對應
   
   // 動作記錄 - 與數據庫 task_actions 表對應
-  task_actions?: TaskAction[];     // 添加：打卡、狀態變更等動作記錄
+  actions?: TaskAction[];     // 添加：打卡、狀態變更等動作記錄
   
   // 版本控制
   version: number;

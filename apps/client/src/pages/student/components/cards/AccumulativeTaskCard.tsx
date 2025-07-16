@@ -34,8 +34,7 @@ export const AccumulativeTaskCard: React.FC<AccumulativeTaskCardProps> = (props)
 
   // 解析任務配置
   const taskConfig = task.task_config as AccumulativeTaskConfig;
-  const taskActions = task.task_actions || [];
-  const dailyRecords = getDailyAmountRecords(taskActions);
+  const dailyRecords = getDailyAmountRecords(task);
   const currentAmount = dailyRecords.reduce((sum, r) => sum + r.amount, 0);
   const targetAmount = taskConfig?.target_amount || 100;
   const unit = taskConfig?.unit || '次';

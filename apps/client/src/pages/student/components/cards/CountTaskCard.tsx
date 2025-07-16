@@ -38,7 +38,6 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
     currentUserId, 
     highlight = false, 
     onTaskAction, 
-    onMigrate,
     onTaskUpdate
   } = props;
 
@@ -65,8 +64,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
 
   // 解析任務配置 - 使用本地狀態
   const taskConfig = localTask.task_config as CountTaskConfig;
-  const taskActions = localTask.task_actions || [];
-  const checkInDates = getCheckInDates(taskActions);
+  const checkInDates = getCheckInDates(localTask);
   const currentCount = checkInDates.length;
   const targetCount = taskConfig?.target_count || 7;
   
@@ -282,8 +280,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           
           // 顯示成功提示
           const { default: toast } = await import('react-hot-toast');
-          const taskActions = result.task.task_actions || [];
-          const checkInDates = getCheckInDates(taskActions);
+          const checkInDates = getCheckInDates(result.task);
           const targetCount = (result.task.task_config as any)?.target_count || 7;
           toast.success(`今天完成了！進度 ${checkInDates.length}/${targetCount} 次 🎉`, {
             duration: 3000,

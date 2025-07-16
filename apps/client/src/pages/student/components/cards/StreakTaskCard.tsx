@@ -37,8 +37,7 @@ export const StreakTaskCard: React.FC<StreakTaskCardProps> = (props) => {
 
   // 解析任務配置
   const taskConfig = task.task_config as StreakTaskConfig;
-  const taskActions = task.task_actions || [];
-  const checkInDates = getCheckInDates(taskActions);
+  const checkInDates = getCheckInDates(task);
   const currentStreak = getCurrentStreak(checkInDates);
   const maxStreak = getMaxStreak(checkInDates);
   const targetDays = taskConfig?.target_days || 7;

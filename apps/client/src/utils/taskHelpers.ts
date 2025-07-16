@@ -1,20 +1,28 @@
 // 取得所有打卡日期（去重排序）
-import { TaskAction } from '../types/goal';
+import { TaskAction, Task} from '../types/goal';
 
-export function getCheckInDates(taskActions: TaskAction[]): string[] {
-  return Array.from(new Set(taskActions.filter(a => a.action_type === 'check_in').map(a => a.action_date))).sort();
+export function getCheckInDates(task: Task): string[] {
+  if (task.actions && task.actions.length > 0) {
+    return Array.from(new Set(task.actions.filter(a => a.action_type === 'check_in').map(a => a.action_date))).sort();
+  } else {
+    return [];
+  }
 }
 
 // 取得累積型任務的每日累積量
-export function getDailyAmountRecords(taskActions: TaskAction[]): { date: string, amount: number }[] {
-  const addAmountActions = taskActions.filter(a => a.action_type === 'add_amount');
-  const map: Record<string, number> = {};
-  addAmountActions.forEach(a => {
-    const date = a.action_date;
-    const amount = Number(a.action_data?.amount) || 0;
-    map[date] = (map[date] || 0) + amount;
-  });
-  return Object.entries(map).map(([date, amount]) => ({ date, amount }));
+export function getDailyAmountRecords(task: Task): { date: string, amount: number }[] {
+  if (task.actions && task.actions.length > 0) {
+    const addAmountActions = task.actions.filter(a => a.action_type === 'add_amount');
+    const map: Record<string, number> = {};
+    addAmountActions.forEach(a => {
+        const date = a.action_date;
+        const amount = Number(a.action_data?.amount) || 0;
+        map[date] = (map[date] || 0) + amount;
+    });
+    return Object.entries(map).map(([date, amount]) => ({ date, amount }));
+  } else {
+    return [];
+  }
 }
 
 // 算 current streak
