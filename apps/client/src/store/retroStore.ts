@@ -18,12 +18,10 @@ const DEBUG_RETRO_STORE = true;
 
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
-import { httpInterceptor } from '../services/httpInterceptor';
 import { getTodayInTimezone } from '../config/timezone';
-import { generateWeekId, parseWeekId } from '../utils/weekUtils';
-import { useTopicStore } from './topicStore';
-import { taskRecordStore } from './taskRecordStore';
+import { generateWeekId } from '../utils/weekUtils';
 import { journalStore } from './journalStore';
+
 import type {
   WeeklyStats,
   RetroQuestion,
@@ -36,8 +34,6 @@ import type {
   UpdateRetroAnswerData,
   DrawAnimationState,
   RetroAchievement,
-  RetroResponse,
-  DailyCheckIn
 } from '../types/retro';
 import { useTaskStore } from './taskStore';
 const { getUserTaskActivitiesForDateRange } = useTaskStore.getState();
@@ -488,7 +484,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
         query = query.eq('mood', filters.mood);
       }
       
-      const { data, error } = await query;
+      const { error } = await query;
       if (error) throw error;
       
       // TODO: 處理統計數據
@@ -914,36 +910,74 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
         throw new Error('RPC 函數返回空數據');
       }
       
-      DEBUG_RETRO_STORE && console.log('📊 RPC 返回數據:', retroSummary);
+      // 修正：正確處理 array 結構
+      const summary = Array.isArray(retroSummary) ? retroSummary[0] : retroSummary;
+      
+      DEBUG_RETRO_STORE && console.log('📊 RPC 返回數據:', summary);
 
       // 🔄 根據 RPC 函數返回結構處理數據
       // retroSummary 格式：{ daily_data, week_data, completed_data, topics_data }
-      const dailyData = retroSummary.daily_data || [];
-      const weekData = retroSummary.week_data || {};
-      const completedData = retroSummary.completed_data || [];
-      const topicsData = retroSummary.topics_data || [];
+      const dailyData = summary.daily_data || [];
+      const weekData = summary.week_data || {};
+      const completedData = summary.completed_data || [];
+      const topicsData = summary.topics_data || [];
       
-      // 🔄 轉換每日簽到資料
-      const dailyCheckIns = dailyData.flatMap((day: any) => {
+      // 🔄 轉換每日簽到資料（先組基本 dailyCheckIns）
+      let dailyCheckIns = dailyData.map((day: any) => {
         const activeTasks = day.active_tasks || [];
-        return activeTasks.filter((task: any) => task.type === 'check_in').map((task: any) => ({
-          id: task.id,
-          title: task.title,
-          topic: task.subject,
-          goal: task.goal_title,
-          actionTimestamp: task.action_timestamp,
-          actionData: task.action_data,
-          type: task.type,
-          date: task.action_timestamp ? task.action_timestamp.split('T')[0] : day.date,
+        const checkInTasks = activeTasks.filter((task: any) => task.type === 'check_in');
+        const taskRecordTasks = activeTasks.filter((task: any) => task.type === 'task_record');
+        const completedTasks = activeTasks.filter((task: any) => task.type === 'completed');
+        return {
+          id: day.id,
+          title: day.title,
+          topic: day.subject,
+          goal: day.goal_title,
+          actionTimestamp: day.action_timestamp,
+          actionData: day.action_data,
+          type: day.type,
+          date: day.date,
           dayOfWeek: day.dayOfWeek || '',
-        }));
+          checkInCount: checkInTasks.length,
+          taskRecordCount: taskRecordTasks.length,
+          completedTasks,
+          topics: day.topics || [],
+          // 先不給 mood/energy，後面 merge
+          mood: undefined,
+          energy: undefined,
+          totalActivities: day.totalActivities || 0
+        };
       });
-      
+
+      // === PATCH: 前端 merge journalStore 的 energy/mood ===
+      // 用 Promise.all 並行查詢 journal
+      const mergedDailyCheckIns = await Promise.all(
+        dailyCheckIns.map(async (checkIn) => {
+          try {
+            const journal = await journalStore.getJournalByDate(checkIn.date);
+            return {
+              ...checkIn,
+              mood: journal?.mood ?? checkIn.mood,
+              energy: journal?.motivation_level ?? checkIn.energy
+            };
+          } catch {
+            return checkIn;
+          }
+        })
+      );
+      dailyCheckIns = mergedDailyCheckIns;
+
       // 🧮 從 RPC 數據計算週總統計
       const totalCheckIns = weekData.total_check_ins || 0;
       const totalTaskRecords = weekData.total_records || 0;
       const totalActivities = weekData.total_activities || 0;
       const totalCompletions = weekData.total_completed || 0;
+
+      // 計算平均能量
+      const energyValues = dailyCheckIns.map(d => d.energy).filter(e => typeof e === 'number' && !isNaN(e));
+      const averageEnergy = energyValues.length > 0
+        ? energyValues.reduce((a, b) => a + b, 0) / energyValues.length
+        : null;
       
       // 🎯 轉換主要任務清單
       const mainTasks = completedData.map((task: any) => ({
@@ -954,18 +988,6 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
         completedAt: task.completed_at,
         type: 'completed' as const
       }));
-      
-      // 🎯 轉換主要主題清單
-      const mainTopics = topicsData.map((topic: any) => ({
-        id: topic.id,
-        title: topic.title,
-        subject: topic.subject,
-        progress: topic.progress,
-        totalTasks: topic.total_tasks,
-        completedTasks: topic.completed_tasks,
-        hasActivity: topic.has_activity,
-        weekActivities: topic.week_activities
-      }));
 
       // 📊 建構完整的週統計對象
       const weeklyStats: WeeklyStats = {
@@ -973,7 +995,7 @@ export const useRetroStore = create<RetroStoreState>((set, get) => ({
         weekStart: weekStartStr,
         weekEnd: weekEndStr,
         completedTaskCount: totalCompletions,
-        averageEnergy: null,
+        averageEnergy,
         totalCheckIns,
         totalTaskRecords,
         totalActivities,

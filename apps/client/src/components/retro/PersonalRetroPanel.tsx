@@ -1092,7 +1092,7 @@ export const PersonalRetroPanel: React.FC = () => {
                                 {new Date(day.date).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}
                               </div>
                               <div className="text-sm font-medium text-gray-800">
-                                {day.dayOfWeek}
+                                星期{day.dayOfWeek}
                               </div>
                             </div>
                             
@@ -1203,7 +1203,7 @@ export const PersonalRetroPanel: React.FC = () => {
                     <div className="text-xs text-gray-600">完成任務</div>
                   </div>
                   <div>
-                    <div className="text-base font-bold text-orange-600">{currentWeekStats.averageEnergy || 0}/5</div>
+                    <div className="text-base font-bold text-orange-600">{currentWeekStats.averageEnergy || 0}/10</div>
                     <div className="text-xs text-gray-600">平均能量</div>
                   </div>
                 </div>
@@ -1221,7 +1221,7 @@ export const PersonalRetroPanel: React.FC = () => {
                     <p className="text-sm text-gray-700">
                       本週學習模式：{patternDisplay.text}，共完成 {currentWeekStats.completedTaskCount} 個任務，
                       進行了 {currentWeekStats.totalCheckIns} 次打卡，記錄了 {currentWeekStats.totalTaskRecords || 0} 個學習心得。
-                      {currentWeekStats.averageEnergy && `平均能量指數為 ${currentWeekStats.averageEnergy.toFixed(1)}/5。`}
+                      {currentWeekStats.averageEnergy && `平均能量指數為 ${currentWeekStats.averageEnergy.toFixed(0)}/10。`}
                     </p>
                   </motion.div>
                 )}
@@ -1250,22 +1250,38 @@ export const PersonalRetroPanel: React.FC = () => {
                 </div>
 
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3 border border-indigo-200">
-                  <div className="flex items-end justify-between gap-1 h-16">
+                  <div className="flex justify-between gap-1 h-16">
                     {currentWeekStats.dailyCheckIns.map((day, index) => {
-                      const height = day.energy ? (day.energy / 5) * 100 : (day.totalActivities / Math.max(...currentWeekStats.dailyCheckIns.map(d => d.totalActivities))) * 100;
+                      const hasEnergy = typeof day.energy === 'number' && !isNaN(day.energy);
+                      // debug log
+                      console.log(`[能量圖] ${day.date} energy:`, day.energy);
+                      // day.energy 1~10 => height 10%~100%
+                      const height = hasEnergy
+                        ? ((day.energy ?? 0) / 10) * 90
+                        : 0;
                       return (
                         <div key={index} className="flex flex-col items-center flex-1">
-                          <motion.div
-                            className="bg-gradient-to-t from-indigo-400 to-purple-400 rounded-t-lg min-h-[4px] w-full cursor-pointer"
-                            style={{ height: `${height}%` }}
-                            initial={{ height: 0 }}
-                            animate={{ height: `${height}%` }}
-                            transition={{ delay: 0.5 + index * 0.1 }}
-                            title={`${day.date}: ${day.energy || '未記錄'}${day.energy ? '/5' : ''}`}
-                          />
-                          <div className="text-xs text-gray-500 mt-1">
-                            {day.mood ? getMoodEmoji(day.mood) : '😐'}
+                          <div className="relative w-full h-full">
+                            {hasEnergy ? (
+                              <motion.div
+                                className="bg-gradient-to-t absolute bottom-0 from-indigo-400 to-purple-400 rounded-t-lg min-h-[4px] w-full cursor-pointer"
+                                style={{ height: `${height}%` }}
+                                initial={{ height: 0 }}
+                                animate={{ height: `${height}%` }}
+                                transition={{ delay: 0.5 + index * 0.1 }}
+                                title={`${day.date}: ${day.energy}/10`}
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center w-full h-full text-2xl select-none opacity-60" title="這天沒紀錄能量喔">
+                                🦥
+                              </div>
+                            )}
                           </div>
+                          {hasEnergy && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {day.mood ? getMoodEmoji(day.mood) : ''}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
