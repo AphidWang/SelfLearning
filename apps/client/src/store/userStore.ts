@@ -149,6 +149,27 @@ const adminUserApi = {
       method: 'PUT',
       body: JSON.stringify({ password }),
     }),
+
+  // 通用 user relationship API
+  getRelation: (userId: string) => adminApiCall(`/user-relationships/${userId}`),
+
+  // 新增關係
+  addRelation: (user_id: string, related_user_id: string, relation_type: string, status: string = 'accepted') => adminApiCall('/user-relationships', {
+    method: 'POST',
+    body: JSON.stringify({ user_id, related_user_id, relation_type, status })
+  }),
+
+  // 刪除關係
+  removeRelation: (user_id: string, related_user_id: string, relation_type: string) => adminApiCall('/user-relationships', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      user_id,
+      related_user_id,
+      relation_type,
+      status: 'terminated',
+      terminated_at: new Date().toISOString(),
+    })
+  }),
 };
 
 interface UserStore {
@@ -192,6 +213,11 @@ interface UserStore {
   // 重置和清理
   clearError: () => void;
   reset: () => void;
+
+  // 通用 user relationship
+  getRelation: (userId: string) => Promise<any[]>;
+  addRelation: (user_id: string, related_user_id: string, relation_type: string, status?: string) => Promise<void>;
+  removeRelation: (user_id: string, related_user_id: string, relation_type: string) => Promise<void>;
 }
 
 export const useUserStore = create<UserStore>((set, get) => {
@@ -440,7 +466,21 @@ export const useUserStore = create<UserStore>((set, get) => {
         set({ loading: false, error: error.message || '強制刷新用戶列表失敗' });
         throw error;
       }
-    }
+    },
+
+    // 通用 user relationship
+    getRelation: async (userId: string) => {
+      const data = await adminUserApi.getRelation(userId);
+      return data.relations || [];
+    },
+
+    addRelation: async (user_id: string, related_user_id: string, relation_type: string, status: string = 'accepted') => {
+      await adminUserApi.addRelation(user_id, related_user_id, relation_type, status);
+    },
+
+    removeRelation: async (user_id: string, related_user_id: string, relation_type: string) => {
+      await adminUserApi.removeRelation(user_id, related_user_id, relation_type);
+    },
   };
 
   return store;

@@ -7,6 +7,8 @@ import {
   Edit3, Trash2, Mail, MoreVertical, 
   AlertTriangle, Key, GraduationCap, Crown, Heart, Shield, Settings, Check, X
 } from 'lucide-react';
+import ReactSelect from 'react-select';
+import ReactModal from 'react-modal';
 
 interface UserCardProps {
   user: User;
@@ -51,17 +53,89 @@ export const UserCard: React.FC<UserCardProps> = ({
   onEdit, 
   onResetPassword
 }) => {
-  const { deleteUser, updateUser, loading } = useUserStore();
+  const { deleteUser, updateUser, loading, users } = useUserStore();
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRoleEdit, setShowRoleEdit] = useState(false);
   const [updatingRoles, setUpdatingRoles] = useState(false);
+
+  // 家長管理小朋友
+  const [showManageChildren, setShowManageChildren] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<{ value: string; label: string } | null>(null);
+  const [children, setChildren] = useState<User[]>([]);
+  const [childrenLoading, setChildrenLoading] = useState(false);
+  const [childrenError, setChildrenError] = useState('');
+  const [actionStatus, setActionStatus] = useState<'idle'|'loading'|'success'|'error'>('idle');
+  const [actionError, setActionError] = useState('');
 
   // 獲取用戶的所有角色（支援新舊格式）
   const userRoles = user.roles || (user.role ? [user.role] : ['student']);
   
   // 臨時角色狀態（用於編輯時的暫存）
   const [tempRoles, setTempRoles] = useState<string[]>(userRoles);
+
+  // 只顯示 student 角色
+  const studentOptions = users.filter(u => (u.roles || [u.role]).includes('student')).map(u => ({ value: u.id, label: u.name + (u.email ? ` (${u.email})` : '') }));
+
+  // 取得已建立關係的小朋友（用 getRelation 過濾 parent-student 關係）
+  const fetchChildren = async () => {
+    setChildrenLoading(true);
+    setChildrenError('');
+    try {
+      const relations = await useUserStore.getState().getRelation(user.id);
+      // 只取 user 是 parent、relation_type=parent、status=accepted 的 student
+      const studentIds = relations
+        .filter((r: any) => r.relation_type === 'parent' && r.related_user_id === user.id && r.status === 'accepted')
+        .map((r: any) => r.user_id);
+      const allUsers = useUserStore.getState().users;
+      setChildren(allUsers.filter(u => studentIds.includes(u.id)));
+    } catch (e: any) {
+      setChildrenError(e.message || '載入失敗');
+    } finally {
+      setChildrenLoading(false);
+    }
+  };
+
+  // 新增 parent-student 關係
+  const handleAddChild = async () => {
+    if (!selectedStudent) return;
+    setActionStatus('loading');
+    setActionError('');
+    try {
+      await useUserStore.getState().addRelation((selectedStudent as any).value, user.id, 'parent', 'accepted');
+      await fetchChildren();
+      setSelectedStudent(null);
+      setActionStatus('success');
+      setTimeout(() => setActionStatus('idle'), 1000);
+    } catch (e: any) {
+      setActionStatus('error');
+      setActionError(e.message || '建立關係失敗');
+    }
+  };
+
+  // 刪除 parent-student 關係
+  const handleRemoveChild = async (studentId: string) => {
+    setActionStatus('loading');
+    setActionError('');
+    try {
+      await useUserStore.getState().removeRelation(studentId, user.id, 'parent');
+      await fetchChildren();
+      setActionStatus('success');
+      setTimeout(() => setActionStatus('idle'), 1000);
+    } catch (e: any) {
+      setActionStatus('error');
+      setActionError(e.message || '刪除關係失敗');
+    }
+  };
+
+  // 開啟 dialog 時載入
+  const openManageChildren = () => {
+    setShowManageChildren(true);
+    fetchChildren();
+  };
+
+  // 是否有 parent 角色
+  const isParent = (user.roles || [user.role]).includes('parent');
 
   const handleDelete = async () => {
     try {
@@ -150,6 +224,14 @@ export const UserCard: React.FC<UserCardProps> = ({
             >
               <Edit3 className="w-3.5 h-3.5" />
             </button>
+            {isParent && (
+              <button
+                onClick={openManageChildren}
+                className="ml-2 px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 rounded border border-orange-300"
+              >
+                管理小朋友
+              </button>
+            )}
           </div>
           {user.email && (
             <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 truncate">
@@ -363,6 +445,77 @@ export const UserCard: React.FC<UserCardProps> = ({
           </motion.div>
         </motion.div>
       )}
+
+      {/* 家長管理小朋友 Dialog */}
+      {/* @ts-ignore */}
+      <ReactModal
+        isOpen={showManageChildren}
+        onRequestClose={() => setShowManageChildren(false)}
+        ariaHideApp={false}
+        className="fixed inset-0 flex items-center justify-center z-50"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-40 z-40"
+      >
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full p-6 relative">
+          <button
+            onClick={() => setShowManageChildren(false)}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">管理小朋友</h2>
+          {/* 新增小朋友 */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">新增小朋友</label>
+            <div className="flex gap-2 items-center">
+              <div className="flex-1">
+                <ReactSelect
+                  options={studentOptions}
+                  value={selectedStudent}
+                  onChange={option => setSelectedStudent(option)}
+                  placeholder="搜尋學生..."
+                  isClearable
+                />
+              </div>
+              <button
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl shadow disabled:bg-gray-300 disabled:cursor-not-allowed"
+                onClick={handleAddChild}
+                disabled={!selectedStudent || actionStatus === 'loading'}
+              >
+                {actionStatus === 'loading' ? '新增中...' : '新增'}
+              </button>
+            </div>
+            {actionStatus === 'success' && <span className="text-green-600 font-bold ml-2">✔️ 已建立</span>}
+            {actionStatus === 'error' && <span className="text-red-600 font-bold ml-2">{actionError}</span>}
+          </div>
+          {/* 已有小朋友列表 */}
+          <div>
+            <label className="block text-sm font-medium mb-1">已建立關係的小朋友</label>
+            {childrenLoading ? (
+              <div className="text-gray-500">載入中...</div>
+            ) : childrenError ? (
+              <div className="text-red-600">{childrenError}</div>
+            ) : children.length === 0 ? (
+              <div className="text-gray-400">尚未建立任何關係</div>
+            ) : (
+              <ul className="space-y-2">
+                {children.map(child => (
+                  <li key={child.id} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <UserAvatar user={child} size="sm" />
+                    <span className="flex-1">{child.name}</span>
+                    <button
+                      className="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded border border-red-300"
+                      onClick={() => handleRemoveChild(child.id)}
+                      disabled={actionStatus === 'loading'}
+                    >
+                      移除
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </ReactModal>
 
       {/* 點擊遮罩關閉選單 */}
       {showMenu && (
