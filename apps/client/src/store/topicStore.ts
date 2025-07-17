@@ -46,6 +46,52 @@ interface TopicStore {
 
 }
 
+// TODO: 之後要把 collaborator 的資料獲取移到顯示層，這裡暫時 patch 以保證 FE 不爆
+function attachUserProfilesToCollaborators(users: any[], entity: any) {
+  if (!entity) return entity;
+  // owner
+  if (entity.owner_id) {
+    entity.owner = users.find(u => u.id === entity.owner_id) || {
+      id: entity.owner_id,
+      name: `User-${entity.owner_id?.slice?.(0, 8) || ''}`,
+      email: '',
+      avatar: undefined,
+      role: 'student',
+      roles: ['student']
+    };
+  }
+  // collaborators (id 陣列 or物件陣列)
+  if (Array.isArray(entity.collaborators)) {
+    entity.collaborators = entity.collaborators.map((collab: any) => {
+      const id = typeof collab === 'string' ? collab : collab.id;
+      const permission = collab.permission;
+      const invited_at = collab.invited_at;
+      const user = users.find(u => u.id === id) || {
+        id,
+        name: `User-${id?.slice?.(0, 8) || ''}`,
+        email: '',
+        avatar: undefined,
+        role: 'student',
+        roles: ['student']
+      };
+      return { ...user, permission, invited_at };
+    });
+  }
+  // 遞迴處理 goals
+  if (Array.isArray(entity.goals)) {
+    entity.goals = entity.goals.map(goal => attachUserProfilesToCollaborators(users, goal));
+  }
+  // 遞迴處理 tasks
+  if (Array.isArray(entity.tasks)) {
+    entity.tasks = entity.tasks.map(task => attachUserProfilesToCollaborators(users, task));
+  }
+  // goal 下的 tasks
+  if (Array.isArray(entity.tasks)) {
+    entity.tasks = entity.tasks.map(task => attachUserProfilesToCollaborators(users, task));
+  }
+  return entity;
+}
+
 export const useTopicStore = create<TopicStore>((set, get) => ({
   topics: [],
   selectedTopicId: null,
@@ -68,11 +114,13 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         set({ loading: false, error: error.message });
         return [];
       }
+      const userStore = await import('./userStore');
+      const allUsers = userStore.useUserStore.getState().users || [];
       const { getCompletionRate } = await import('./progressQueries');
-      const topicsWithRate = (data || []).map((topic: any) => ({
-        ...topic,
-        completionRate: getCompletionRate(topic)
-      }));
+      const topicsWithRate = (data || []).map((topic: any) => {
+        const patched = attachUserProfilesToCollaborators(allUsers, topic);
+        return { ...patched, completionRate: getCompletionRate(patched) };
+      });
       set({ topics: topicsWithRate, loading: false });
       return topicsWithRate;
     } catch (error: any) {
@@ -89,9 +137,11 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       if (error) throw error;
       if (!data || !Array.isArray(data) || data.length === 0) return null;
       const topic = data[0];
-      // 加入完成率
+      const userStore = await import('./userStore');
+      const allUsers = userStore.useUserStore.getState().users || [];
+      const patched = attachUserProfilesToCollaborators(allUsers, topic);
       const { getCompletionRate } = await import('./progressQueries');
-      return { ...topic, completionRate: getCompletionRate(topic) };
+      return { ...patched, completionRate: getCompletionRate(patched) };
     } catch (error: any) {
       set({ error: error.message || '獲取主題失敗' });
       return null;
