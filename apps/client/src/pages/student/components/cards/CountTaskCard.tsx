@@ -53,6 +53,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   // 新增：當前顯示的記錄索引（背面用）
   const [currentRecordIndex, setCurrentRecordIndex] = useState(0);
+  const [showCheckInEffect, setShowCheckInEffect] = useState(false);
 
   const { renderTopicTag, renderOwnerTag, renderBottomInfo } = useBaseTaskCard(localTask);
 
@@ -271,16 +272,13 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
       if (isWeeklyChallenge) {
         // 週挑戰任務：直接調用 taskStore 的 checkInTask 方法，只更新本地狀態
         const result = await taskStore.checkInTask(localTask.id);
-        
+        console.log('🟢 [CountTaskCard] checkInTask result:', result);
         if (result.success && result.task) {
           console.log('✅ 週挑戰打卡成功，更新本地狀態');
           
-          // 更新本地任務狀態，立即反映變化
-          setLocalTask(prevTask => ({
-            ...prevTask,
-            task_config: result.task.task_config,
-            version: result.task.version
-          }));
+          setLocalTask(prev => ({ ...prev, ...result.task }));
+          setShowCheckInEffect(true);
+          setTimeout(() => setShowCheckInEffect(false), 1800);
           
           // 顯示成功提示
           const { default: toast } = await import('react-hot-toast');
@@ -371,8 +369,7 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
           // 更新本地任務狀態，立即反映變化
           setLocalTask(prevTask => ({
             ...prevTask,
-            task_config: result.task.task_config,
-            version: result.task.version
+            ...result.task
           }));
           
           // 顯示成功提示
@@ -530,7 +527,11 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
                   <div className="mb-3">
                     <div className="flex items-center gap-2 text-xs text-white/80">
                       <span className="text-yellow-300">🎯</span>
-                      <span>{currentCount}/{targetCount} 次</span>
+                      <span>
+                        {/* 本週打卡次數 */}
+                        {checkInDates.filter(date => weekDates.includes(date)).length}/{targetCount} 次
+                        <span className="ml-1 text-white/60">(累積 {checkInDates.length} 次)</span>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -913,20 +914,37 @@ export const CountTaskCard: React.FC<CountTaskCardProps> = (props) => {
   };
 
   return (
-    <BaseTaskCard
-      {...props}
-      highlight={highlight}
-      className={highlight ? 'max-w-xs' : ''} // 特化模式使用較小的寬度
-      cardClassName={highlight ? '' : ''} // 特化模式由 renderContent 完全控制樣式
-      frontClassName={highlight ? '' : ''}
-      backClassName={highlight ? '' : ''}
-      style={highlight ? {} : {}} // 特化模式不需要額外的 style
-                    renderContent={(showReferenceInfo) => ({
-        frontContent: renderFrontContent(),
-        backContent: renderBackContent(),
-        statusIndicator: null, // 已在 frontContent 中處理
-        actionButtons: undefined // BaseTaskCard 已經正確處理 pointer-events
-      })}
-    />
+    <div className="relative">
+      {/* 打卡特效動畫 */}
+      {showCheckInEffect && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-50">
+          <div className="animate-bounce">
+            <span className="text-5xl select-none">🎉</span>
+          </div>
+          <div className="absolute left-1/4 top-1/4 animate-fade-in-up">
+            <span className="text-3xl select-none">✨</span>
+          </div>
+          <div className="absolute right-1/4 bottom-1/4 animate-fade-in-down">
+            <span className="text-3xl select-none">🎊</span>
+          </div>
+        </div>
+      )}
+      {/* 卡片內容 */}
+      <BaseTaskCard
+        {...props}
+        highlight={highlight}
+        className={highlight ? 'max-w-xs' : ''}
+        cardClassName={highlight ? '' : ''}
+        frontClassName={highlight ? '' : ''}
+        backClassName={highlight ? '' : ''}
+        style={highlight ? {} : {}}
+        renderContent={(showReferenceInfo) => ({
+          frontContent: renderFrontContent(),
+          backContent: renderBackContent(),
+          statusIndicator: null,
+          actionButtons: undefined
+        })}
+      />
+    </div>
   );
 }; 
