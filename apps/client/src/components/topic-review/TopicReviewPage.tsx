@@ -36,7 +36,7 @@ export const TopicReviewPage: React.FC<TopicReviewPageProps> = ({
   const stats = useTopicStats(topicId, state.topic);
 
   const [showSaveAsTemplateModal, setShowSaveAsTemplateModal] = useState(false);
-
+  
   // 記憶化主題樣式
   const subjectStyle = useMemo(() => {
     if (!state.topic) return subjects.getSubjectStyle('');

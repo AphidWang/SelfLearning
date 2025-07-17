@@ -236,6 +236,21 @@ const DEFAULT_GROUP_QUESTIONS: DefaultGroupQuestions = {
   ]
 };
 
+// === loading 狀態管理 ===
+let loadingCount = 0;
+function setLoading(isLoading: boolean) {
+  if (isLoading) {
+    loadingCount++;
+    useGroupRetroStore.setState({ loading: true });
+  } else {
+    loadingCount = Math.max(0, loadingCount - 1);
+    if (loadingCount === 0) useGroupRetroStore.setState({ loading: false });
+  }
+}
+
+// === promise cache for loadAvailableParticipants ===
+let loadAvailableParticipantsPromise: Promise<ParticipantWeeklySummary[]> | null = null;
+
 export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
   // 初始狀態
   currentSession: null,
@@ -254,7 +269,8 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
   // 會話管理
   createSession: async (data: CreateGroupRetroSessionData) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -378,22 +394,24 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
 
       set({ 
         currentSession: newSession, 
-        selectedParticipants: selectedParticipants,
-        loading: false 
+        selectedParticipants: selectedParticipants
       });
       
       return newSession;
       
     } catch (error: any) {
       console.error('創建小組討論會話失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   updateSession: async (id: string, data: UpdateGroupRetroSessionData) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { data: sessionData, error } = await supabase
         .from('group_retro_sessions')
@@ -439,23 +457,25 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       // 重新載入完整會話
       const updatedSession = await get().getSession(id);
       if (updatedSession) {
-        set({ currentSession: updatedSession, loading: false });
+        set({ currentSession: updatedSession });
         return updatedSession;
       }
 
-      set({ loading: false });
       throw new Error('更新後無法載入會話');
       
     } catch (error: any) {
       console.error('更新會話失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   deleteSession: async (id: string) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { error } = await supabase
         .from('group_retro_sessions')
@@ -464,19 +484,22 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
 
       if (error) throw error;
       
-      set({ currentSession: null, loading: false });
+      set({ currentSession: null });
       return true;
       
     } catch (error: any) {
       console.error('刪除會話失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   getSession: async (id: string) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       // 獲取會話基本資料
       const { data: sessionData, error: sessionError } = await supabase
@@ -568,18 +591,20 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         completedAt: sessionData.completed_at
       };
       
-      set({ loading: false });
       return session;
       
     } catch (error: any) {
       console.error('獲取會話失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       return null;
+    } finally {
+      setLoading(false);
     }
   },
 
   getCurrentWeekSession: async () => {
     try {
+      setLoading(true);
       const weekId = get().getWeekId();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
@@ -604,256 +629,265 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       console.error('獲取當前週會話失敗:', error);
       set({ error: error.message });
       return null;
+    } finally {
+      setLoading(false);
     }
   },
 
   // 參與者管理
   loadAvailableParticipants: async (filters?: ParticipantSelectionFilters) => {
     debugLog('🟠 [groupRetroStore] loadAvailableParticipants 開始', { filters });
-    const state = get();
-    debugLog('🟠 [groupRetroStore] 當前狀態:', { loading: state.loading, participantsCount: state.availableParticipants.length });
-    
-    // 如果已經在載入中，避免重複載入
-    if (state.loading) {
-      debugLog('🔴 [groupRetroStore] 已在載入中，返回現有參與者');
-      return state.availableParticipants;
+    // const state = get(); // 不再需要 state.loading
+
+    // 如果已經在載入中，直接 await 上一個 promise
+    if (loadAvailableParticipantsPromise) {
+      debugLog('🔴 [groupRetroStore] 已在載入中，等待現有 promise');
+      return loadAvailableParticipantsPromise;
     }
-    
-    try {
-      debugLog('🟢 [groupRetroStore] 設置載入狀態');
-      set({ loading: true, error: null });
-      
-      // 獲取用戶列表 - 使用協作者候選人 API
-      debugLog('🟢 [groupRetroStore] 調用 userStore.getCollaboratorCandidates');
-      const userStore = useUserStore.getState();
-      
-      debugLog('🟢 [groupRetroStore] 當前 userStore.users.length:', userStore.users.length);
-      
+
+    loadAvailableParticipantsPromise = (async () => {
       try {
-        // 確保用戶數據存在 - 如果沒有用戶或需要強制刷新
-        if (!userStore.users.length) {
-          debugLog('🟢 [groupRetroStore] 用戶列表為空，調用 API');
-          await userStore.getCollaboratorCandidates();
-        } else {
-          debugLog('🟢 [groupRetroStore] 用戶列表已存在，使用緩存');
+        setLoading(true);
+        console.trace('loadAvailableParticipants callstack');
+        // debugLog('🟠 [groupRetroStore] 當前狀態:', { loading: state.loading, participantsCount: state.availableParticipants.length });
+        // debugLog('🟢 [groupRetroStore] 設置載入狀態');
+        
+        // 獲取用戶列表 - 使用協作者候選人 API
+        debugLog('🟢 [groupRetroStore] 調用 userStore.getCollaboratorCandidates');
+        const userStore = useUserStore.getState();
+        
+        debugLog('🟢 [groupRetroStore] 當前 userStore.users.length:', userStore.users.length);
+        
+        try {
+          // 確保用戶數據存在 - 如果沒有用戶或需要強制刷新
+          if (!userStore.users.length) {
+            debugLog('🟢 [groupRetroStore] 用戶列表為空，調用 API');
+            await userStore.getCollaboratorCandidates();
+          } else {
+            debugLog('�� [groupRetroStore] 用戶列表已存在，使用緩存');
+          }
+          
+          const allUsers = userStore.users;
+          
+          debugLog('🟢 [groupRetroStore] 處理完成');
+          debugLog('🟢 [groupRetroStore] userStore.users:', allUsers);
+          debugLog('🟢 [groupRetroStore] 獲取到用戶數量:', allUsers.length);
+          debugLog('🟢 [groupRetroStore] userStore.error:', userStore.error);
+          debugLog('🟢 [groupRetroStore] userStore.loading:', userStore.loading);
+          
+          if (allUsers.length > 0) {
+            debugLog('🟢 [groupRetroStore] 用戶列表詳情:', allUsers.map(u => ({ id: u.id, name: u.name, email: u.email })));
+          } else {
+            debugLog('🔴 [groupRetroStore] 用戶列表為空！可能是 API 調用失敗或數據載入問題');
+          }
+        } catch (apiError) {
+          debugLog('🔴 [groupRetroStore] getCollaboratorCandidates API 調用失敗:', apiError);
+          debugLog('🔴 [groupRetroStore] userStore.error:', userStore.error);
+          
+          // 不要拋出錯誤，而是繼續處理，讓用戶至少能看到空的列表
+          console.warn('載入用戶數據失敗，但繼續處理:', apiError);
         }
         
         const allUsers = userStore.users;
         
-        debugLog('🟢 [groupRetroStore] 處理完成');
-        debugLog('🟢 [groupRetroStore] userStore.users:', allUsers);
-        debugLog('🟢 [groupRetroStore] 獲取到用戶數量:', allUsers.length);
-        debugLog('🟢 [groupRetroStore] userStore.error:', userStore.error);
-        debugLog('🟢 [groupRetroStore] userStore.loading:', userStore.loading);
-        
-        if (allUsers.length > 0) {
-          debugLog('🟢 [groupRetroStore] 用戶列表詳情:', allUsers.map(u => ({ id: u.id, name: u.name, email: u.email })));
-        } else {
-          debugLog('🔴 [groupRetroStore] 用戶列表為空！可能是 API 調用失敗或數據載入問題');
+        // 如果沒有用戶，直接設置為空數組並結束
+        if (allUsers.length === 0) {
+          debugLog('🟡 [groupRetroStore] 沒有用戶，設置空數組');
+          set({ availableParticipants: []});
+          return [];
         }
-      } catch (apiError) {
-        debugLog('🔴 [groupRetroStore] getCollaboratorCandidates API 調用失敗:', apiError);
-        debugLog('🔴 [groupRetroStore] userStore.error:', userStore.error);
         
-        // 不要拋出錯誤，而是繼續處理，讓用戶至少能看到空的列表
-        console.warn('載入用戶數據失敗，但繼續處理:', apiError);
-      }
-      
-      const allUsers = userStore.users;
-      
-      // 如果沒有用戶，直接設置為空數組並結束
-      if (allUsers.length === 0) {
-        debugLog('🟡 [groupRetroStore] 沒有用戶，設置空數組');
-        set({ availableParticipants: [], loading: false });
-        return [];
-      }
-      
-      // 獲取當前週統計數據
-      const weekId = get().getWeekId();
-      const participants: ParticipantWeeklySummary[] = [];
-      
-      // 獲取 RetroStore 實例
-      const retroStore = useRetroStore.getState();
-      
-      for (const user of allUsers) {
-        try {
-          debugLog('🟢 [groupRetroStore] 處理用戶:', user.id, user.name);
-          
-          // 初始化預設值
-          let hasCompletedPersonalRetro = false;
-          let lastRetroDate: string | undefined = undefined;
-          let detectedTopics: string[] = [];
-          
+        // 獲取當前週統計數據
+        const weekId = get().getWeekId();
+        const participants: ParticipantWeeklySummary[] = [];
+        
+        // 獲取 RetroStore 實例
+        const retroStore = useRetroStore.getState();
+        
+        for (const user of allUsers) {
           try {
-            // 檢查是否有最近的個人 Retro 會話（使用正確的個人回顧表）
-            const { data: recentSessions } = await supabase
-              .from('retro_sessions')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('status', 'completed')
-              .order('created_at', { ascending: false })
-              .limit(1);
+            debugLog('🟢 [groupRetroStore] 處理用戶:', user.id, user.name);
             
-            if (recentSessions && recentSessions.length > 0) {
-              hasCompletedPersonalRetro = true;
-              lastRetroDate = recentSessions[0].created_at;
-              
-              // 獲取該會話的答案來推斷週統計
-              const { data: answers } = await supabase
-                .from('retro_answers')
+            // 初始化預設值
+            let hasCompletedPersonalRetro = false;
+            let lastRetroDate: string | undefined = undefined;
+            let detectedTopics: string[] = [];
+            
+            try {
+              // 檢查是否有最近的個人 Retro 會話（使用正確的個人回顧表）
+              const { data: recentSessions } = await supabase
+                .from('retro_sessions')
                 .select('*')
-                .eq('session_id', recentSessions[0].id)
-                .order('created_at', { ascending: false });
+                .eq('user_id', user.id)
+                .eq('status', 'completed')
+                .order('created_at', { ascending: false })
+                .limit(1);
               
-              if (answers && answers.length > 0) {
-                // 嘗試從答案內容中提取主題資訊
-                const topicsFromAnswers = answers
-                  .map(answer => answer.answer)
-                  .join(' ')
-                  .toLowerCase();
+              if (recentSessions && recentSessions.length > 0) {
+                hasCompletedPersonalRetro = true;
+                lastRetroDate = recentSessions[0].created_at;
                 
-                // 簡單的主題識別邏輯
-                if (topicsFromAnswers.includes('數學') || topicsFromAnswers.includes('math')) {
-                  detectedTopics.push('數學學習');
+                // 獲取該會話的答案來推斷週統計
+                const { data: answers } = await supabase
+                  .from('retro_answers')
+                  .select('*')
+                  .eq('session_id', recentSessions[0].id)
+                  .order('created_at', { ascending: false });
+                
+                if (answers && answers.length > 0) {
+                  // 嘗試從答案內容中提取主題資訊
+                  const topicsFromAnswers = answers
+                    .map(answer => answer.answer)
+                    .join(' ')
+                    .toLowerCase();
+                  
+                  // 簡單的主題識別邏輯
+                  if (topicsFromAnswers.includes('數學') || topicsFromAnswers.includes('math')) {
+                    detectedTopics.push('數學學習');
+                  }
+                  if (topicsFromAnswers.includes('英文') || topicsFromAnswers.includes('english')) {
+                    detectedTopics.push('英文學習');
+                  }
+                  if (topicsFromAnswers.includes('程式') || topicsFromAnswers.includes('coding')) {
+                    detectedTopics.push('程式設計');
+                  }
+                  if (topicsFromAnswers.includes('閱讀') || topicsFromAnswers.includes('reading')) {
+                    detectedTopics.push('閱讀理解');
+                  }
                 }
-                if (topicsFromAnswers.includes('英文') || topicsFromAnswers.includes('english')) {
-                  detectedTopics.push('英文學習');
-                }
-                if (topicsFromAnswers.includes('程式') || topicsFromAnswers.includes('coding')) {
-                  detectedTopics.push('程式設計');
-                }
-                if (topicsFromAnswers.includes('閱讀') || topicsFromAnswers.includes('reading')) {
-                  detectedTopics.push('閱讀理解');
-                }
+              }
+              
+            } catch (retroError) {
+              debugLog('🔴 [groupRetroStore] 獲取用戶 Retro 資料失敗:', user.id, retroError);
+              // 繼續處理，使用預設值
+            }
+            
+            // 如果沒有檢測到特定主題，使用預設主題
+            if (detectedTopics.length === 0) {
+              if (hasCompletedPersonalRetro) {
+                detectedTopics.push('一般學習', '個人成長');
+              } else {
+                detectedTopics.push('待開始學習');
               }
             }
             
-          } catch (retroError) {
-            debugLog('🔴 [groupRetroStore] 獲取用戶 Retro 資料失敗:', user.id, retroError);
-            // 繼續處理，使用預設值
-          }
-          
-          // 如果沒有檢測到特定主題，使用預設主題
-          if (detectedTopics.length === 0) {
-            if (hasCompletedPersonalRetro) {
-              detectedTopics.push('一般學習', '個人成長');
-            } else {
-              detectedTopics.push('待開始學習');
-            }
-          }
-          
-          // 建立週統計資料
-          const weeklyStats = {
-            weekId,
-            weekStart: '2024-01-01',
-            weekEnd: '2024-01-07',
-            totalCheckIns: hasCompletedPersonalRetro ? Math.floor(Math.random() * 7) + 1 : 0,
-            totalTaskRecords: hasCompletedPersonalRetro ? Math.floor(Math.random() * 5) + 1 : 0,
-            totalActivities: hasCompletedPersonalRetro ? Math.floor(Math.random() * 12) + 2 : 0,
-            completedTaskCount: hasCompletedPersonalRetro ? Math.floor(Math.random() * 10) + 3 : 0,
-            averageEnergy: hasCompletedPersonalRetro ? Math.floor(Math.random() * 5) + 1 : 3,
-            mainTasks: [],
-            activeTasks: [],
-            inProgressTasks: [],
-            dailyCheckIns: [],
-            learningPatterns: [],
-            weekSummary: { 
-              totalLearningHours: hasCompletedPersonalRetro ? Math.floor(Math.random() * 20) + 5 : 0,
-              completedGoals: hasCompletedPersonalRetro ? Math.floor(Math.random() * 3) + 1 : 0,
-              averageEfficiency: hasCompletedPersonalRetro ? Math.random() * 0.5 + 0.5 : 0.5,
-              learningPattern: 'balanced' as const,
-              topPerformanceDay: '週三',
-              improvementAreas: []
-            }
-          };
-          
-          // 生成主要主題
-          const mainTopics = detectedTopics.slice(0, 3);
-          
-          // 生成能量描述
-          const energyDescriptions = ['需要休息', '有點累', '普通', '還不錯', '充滿活力'];
-          const energyDescription = energyDescriptions[Math.max(0, Math.min(4, weeklyStats.averageEnergy - 1))] || '普通';
-          
-          // 生成顏色主題
-          const colorThemes = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-teal-500'];
-          const colorTheme = colorThemes[Math.floor(Math.random() * colorThemes.length)];
-          
-          participants.push({
-            user,
-            weeklyStats,
-            hasCompletedPersonalRetro,
-            mainTopics,
-            energyDescription,
-            colorTheme,
-            lastRetroDate
-          });
-          
-        } catch (userError) {
-          console.warn(`獲取用戶 ${user.id} 數據失敗:`, userError);
-          
-          // 即使出錯也要加入基本資訊，確保用戶能被顯示
-          participants.push({
-            user,
-            weeklyStats: {
-              weekId: '',
-              weekStart: '',
-              weekEnd: '',
-              totalCheckIns: 0,
-              totalTaskRecords: 0,
-              totalActivities: 0,
-              completedTaskCount: 0,
-              averageEnergy: 3,
+            // 建立週統計資料
+            const weeklyStats = {
+              weekId,
+              weekStart: '2024-01-01',
+              weekEnd: '2024-01-07',
+              totalCheckIns: hasCompletedPersonalRetro ? Math.floor(Math.random() * 7) + 1 : 0,
+              totalTaskRecords: hasCompletedPersonalRetro ? Math.floor(Math.random() * 5) + 1 : 0,
+              totalActivities: hasCompletedPersonalRetro ? Math.floor(Math.random() * 12) + 2 : 0,
+              completedTaskCount: hasCompletedPersonalRetro ? Math.floor(Math.random() * 10) + 3 : 0,
+              averageEnergy: hasCompletedPersonalRetro ? Math.floor(Math.random() * 5) + 1 : 3,
               mainTasks: [],
               activeTasks: [],
-              dailyCheckIns: [],
               inProgressTasks: [],
+              dailyCheckIns: [],
               learningPatterns: [],
-              weekSummary: {
-                totalLearningHours: 0,
-                completedGoals: 0,
-                averageEfficiency: 0.5,
+              weekSummary: { 
+                totalLearningHours: hasCompletedPersonalRetro ? Math.floor(Math.random() * 20) + 5 : 0,
+                completedGoals: hasCompletedPersonalRetro ? Math.floor(Math.random() * 3) + 1 : 0,
+                averageEfficiency: hasCompletedPersonalRetro ? Math.random() * 0.5 + 0.5 : 0.5,
                 learningPattern: 'balanced' as const,
-                topPerformanceDay: '無',
+                topPerformanceDay: '週三',
                 improvementAreas: []
               }
-            },
-            hasCompletedPersonalRetro: false,
-            mainTopics: ['學習準備中'],
-            energyDescription: '普通',
-            colorTheme: 'bg-gray-500',
-            lastRetroDate: undefined
-          });
+            };
+            
+            // 生成主要主題
+            const mainTopics = detectedTopics.slice(0, 3);
+            
+            // 生成能量描述
+            const energyDescriptions = ['需要休息', '有點累', '普通', '還不錯', '充滿活力'];
+            const energyDescription = energyDescriptions[Math.max(0, Math.min(4, weeklyStats.averageEnergy - 1))] || '普通';
+            
+            // 生成顏色主題
+            const colorThemes = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-teal-500'];
+            const colorTheme = colorThemes[Math.floor(Math.random() * colorThemes.length)];
+            
+            participants.push({
+              user,
+              weeklyStats,
+              hasCompletedPersonalRetro,
+              mainTopics,
+              energyDescription,
+              colorTheme,
+              lastRetroDate
+            });
+            
+          } catch (userError) {
+            console.warn(`獲取用戶 ${user.id} 數據失敗:`, userError);
+            
+            // 即使出錯也要加入基本資訊，確保用戶能被顯示
+            participants.push({
+              user,
+              weeklyStats: {
+                weekId: '',
+                weekStart: '',
+                weekEnd: '',
+                totalCheckIns: 0,
+                totalTaskRecords: 0,
+                totalActivities: 0,
+                completedTaskCount: 0,
+                averageEnergy: 3,
+                mainTasks: [],
+                activeTasks: [],
+                dailyCheckIns: [],
+                inProgressTasks: [],
+                learningPatterns: [],
+                weekSummary: {
+                  totalLearningHours: 0,
+                  completedGoals: 0,
+                  averageEfficiency: 0.5,
+                  learningPattern: 'balanced' as const,
+                  topPerformanceDay: '無',
+                  improvementAreas: []
+                }
+              },
+              hasCompletedPersonalRetro: false,
+              mainTopics: ['學習準備中'],
+              energyDescription: '普通',
+              colorTheme: 'bg-gray-500',
+              lastRetroDate: undefined
+            });
+          }
         }
+        
+        debugLog('🟢 [groupRetroStore] 處理完成，總參與者數量:', participants.length);
+        
+        // 應用篩選條件
+        let filteredParticipants = participants;
+        
+        if (filters?.excludeUserIds?.length) {
+          filteredParticipants = filteredParticipants.filter(p => 
+            !filters.excludeUserIds!.includes(p.user.id)
+          );
+        }
+        
+        if (filters?.searchQuery) {
+          const query = filters.searchQuery.toLowerCase();
+          filteredParticipants = filteredParticipants.filter(p =>
+            p.user.name?.toLowerCase().includes(query) ||
+            p.user.email?.toLowerCase().includes(query)
+          );
+        }
+        
+        debugLog('🟢 [groupRetroStore] 篩選後參與者數量:', filteredParticipants.length);
+        set({ availableParticipants: filteredParticipants });
+        return filteredParticipants;
+        
+      } catch (error: any) {
+        console.error('載入可用參與者失敗:', error);
+        set({ error: error.message });
+        throw error;
+      } finally {
+        setLoading(false);
+        loadAvailableParticipantsPromise = null;
       }
-      
-      debugLog('🟢 [groupRetroStore] 處理完成，總參與者數量:', participants.length);
-      
-      // 應用篩選條件
-      let filteredParticipants = participants;
-      
-      if (filters?.excludeUserIds?.length) {
-        filteredParticipants = filteredParticipants.filter(p => 
-          !filters.excludeUserIds!.includes(p.user.id)
-        );
-      }
-      
-      if (filters?.searchQuery) {
-        const query = filters.searchQuery.toLowerCase();
-        filteredParticipants = filteredParticipants.filter(p =>
-          p.user.name?.toLowerCase().includes(query) ||
-          p.user.email?.toLowerCase().includes(query)
-        );
-      }
-      
-      debugLog('🟢 [groupRetroStore] 篩選後參與者數量:', filteredParticipants.length);
-      set({ availableParticipants: filteredParticipants, loading: false });
-      return filteredParticipants;
-      
-    } catch (error: any) {
-      console.error('載入可用參與者失敗:', error);
-      set({ error: error.message, loading: false });
-      throw error;
-    }
+    })();
+    return loadAvailableParticipantsPromise;
   },
 
   selectParticipant: (participant: ParticipantWeeklySummary) => {
@@ -904,7 +938,8 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
 
   addCustomQuestion: async (sessionId: string, question: Omit<GroupRetroQuestion, 'id' | 'createdAt'>) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { data: questionData, error } = await supabase
         .from('group_retro_questions')
@@ -945,19 +980,22 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         set({ currentSession: updatedSession });
       }
       
-      set({ loading: false });
+      set({});
       return newQuestion;
       
     } catch (error: any) {
       console.error('新增自訂問題失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   updateQuestion: async (questionId: string, updates: Partial<GroupRetroQuestion>) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { data: questionData, error } = await supabase
         .from('group_retro_questions')
@@ -1002,19 +1040,22 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         set({ currentSession: updatedSession });
       }
       
-      set({ loading: false });
+      set({});
       return updatedQuestion;
       
     } catch (error: any) {
       console.error('更新問題失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   deleteQuestion: async (questionId: string) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { error } = await supabase
         .from('group_retro_questions')
@@ -1038,20 +1079,23 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         set({ currentSession: updatedSession });
       }
       
-      set({ loading: false });
+      set({});
       return true;
       
     } catch (error: any) {
       console.error('刪除問題失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   // 回覆管理
   addReply: async (sessionId: string, data: CreateGroupRetroReplyData) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -1127,19 +1171,22 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         get().updateSessionProgress();
       }
       
-      set({ loading: false });
+      set({});
       return newReply;
       
     } catch (error: any) {
       console.error('新增回覆失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   updateReply: async (replyId: string, data: UpdateGroupRetroReplyData) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { data: replyData, error } = await supabase
         .from('group_retro_replies')
@@ -1177,19 +1224,22 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         set({ currentSession: updatedSession });
       }
       
-      set({ loading: false });
+      set({});
       return replyData as GroupRetroReply;
       
     } catch (error: any) {
       console.error('更新回覆失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   deleteReply: async (replyId: string) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const { error } = await supabase
         .from('group_retro_replies')
@@ -1214,13 +1264,15 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         get().updateSessionProgress();
       }
       
-      set({ loading: false });
+      set({});
       return true;
       
     } catch (error: any) {
       console.error('刪除回覆失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
@@ -1277,6 +1329,7 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
 
   getSessionStats: async (sessionId: string) => {
     try {
+      setLoading(true);
       // 這裡應該從後端獲取統計數據
       const stats: GroupRetroStats = {
         totalSessions: 1,
@@ -1304,13 +1357,16 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       console.error('獲取會話統計失敗:', error);
       set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
   // 匯出功能
   exportSession: async (sessionId: string, format: 'json' | 'csv' | 'markdown') => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       const currentSession = get().currentSession;
       if (!currentSession || currentSession.id !== sessionId) {
@@ -1366,13 +1422,15 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         URL.revokeObjectURL(url);
       }
       
-      set({ loading: false });
+      set({});
       return exportData;
       
     } catch (error: any) {
       console.error('匯出會話失敗:', error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   },
 
@@ -1412,6 +1470,7 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
   // 獲取指定週期的 session
   getSessionForWeek: async (weekId: string) => {
     try {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       
@@ -1435,13 +1494,16 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
       console.error('獲取指定週期會話失敗:', error);
       set({ error: error.message });
       return null;
+    } finally {
+      setLoading(false);
     }
   },
 
   // 載入指定週期的完整數據
   loadWeekData: async (weekId: string) => {
     try {
-      set({ loading: true, error: null });
+      setLoading(true);
+      set({ error: null });
       
       debugLog('🔄 載入週期數據:', weekId);
       
@@ -1455,13 +1517,30 @@ export const useGroupRetroStore = create<GroupRetroStoreState>((set, get) => ({
         currentSession: session
       });
       
-      set({ loading: false });
+      // 如果沒有 session，主動根據 weekId 撈 availableParticipants
+      if (!session) {
+        debugLog('🟡 沒有現存 session，主動撈 availableParticipants for week:', weekId);
+        await get().loadAvailableParticipants();
+      }
       
       debugLog('✅ 週期數據載入完成:', { weekId, hasSession: !!session });
     } catch (error: any) {
       console.error('載入週期數據失敗:', error);
-      set({ loading: false, error: error.message });
+      set({ error: error.message });
       throw error;
+    } finally {
+      setLoading(false);
     }
   }
 })); 
+
+// 直接導出 store 內部 function
+export const getWeekId = (...args: Parameters<GroupRetroStoreState['getWeekId']>) =>
+  useGroupRetroStore.getState().getWeekId(...args);
+export const setSelectedWeek = (...args: Parameters<GroupRetroStoreState['setSelectedWeek']>) =>
+  useGroupRetroStore.getState().setSelectedWeek(...args);
+export const loadWeekData = (...args: Parameters<GroupRetroStoreState['loadWeekData']>) =>
+  useGroupRetroStore.getState().loadWeekData(...args);
+export const clearError = () => useGroupRetroStore.getState().clearError();
+export const getCurrentSession = () => useGroupRetroStore.getState().currentSession;
+export const getAvailableParticipants = () => useGroupRetroStore.getState().availableParticipants; 

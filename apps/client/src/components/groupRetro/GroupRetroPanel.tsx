@@ -35,7 +35,7 @@ import type { GroupRetroSession, CreateGroupRetroSessionData } from '../../types
 import toast, { Toaster } from 'react-hot-toast';
 
 // Debug 開關
-const DEBUG_GROUP_RETRO_PANEL = false;
+const DEBUG_GROUP_RETRO_PANEL = true;
 
 const debugLog = (...args: any[]) => {
   if (DEBUG_GROUP_RETRO_PANEL) {
@@ -45,6 +45,17 @@ const debugLog = (...args: any[]) => {
 
 interface GroupRetroPanelProps {
   onClose?: () => void;
+  currentSession: GroupRetroSession | null;
+  selectedParticipants: any[];
+  sessionProgress: any;
+  error: string | null;
+  currentWeekId: string | null;
+  loading: boolean;
+  onCreateSession: (data: CreateGroupRetroSessionData) => Promise<void>;
+  onStepChange: (step: PanelStep) => void;
+  sessionTitle?: string;
+  setSessionTitle?: (title: string) => void;
+  onAddParticipant?: (participant: any) => void;
 }
 
 // 面板步驟狀態
@@ -107,111 +118,37 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, onStepChange
   );
 };
 
-export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => {
+export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({
+  onClose,
+  currentSession,
+  selectedParticipants,
+  sessionProgress,
+  error,
+  currentWeekId,
+  loading,
+  onCreateSession,
+  onStepChange,
+  sessionTitle: sessionTitleProp,
+  setSessionTitle: setSessionTitleProp,
+  onAddParticipant,
+}) => {
   debugLog('🔴 [GroupRetroPanel] 組件渲染開始');
   
-  const { currentUser } = useUser();
-  const {
-    currentSession,
-    selectedParticipants,
-    sessionProgress,
-    // loading,  // 移除：避免因 ParticipantSelector 的載入狀態導致父組件重新渲染
-    error,
-    createSession,
-    getCurrentWeekSession,
-    getWeekId,
-    clearError,
-    reset
-  } = useGroupRetroStore();
-
   // 組件狀態
-  const [currentStep, setCurrentStep] = useState<PanelStep>('setup');
-  const [sessionTitle, setSessionTitle] = useState('');
+  const initialStep: PanelStep = currentSession ? 'overview' : 'setup';
+  const [currentStep, setCurrentStep] = useState<PanelStep>(initialStep);
+  const [sessionTitle, setSessionTitle] = useState(sessionTitleProp || '');
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  debugLog('🔴 [GroupRetroPanel] 狀態:', {
-    currentStep: currentStep,
-    currentUser: currentUser?.id,
-    currentSession: currentSession?.id,
-    selectedParticipants: selectedParticipants.length,
-    // loading,  // 移除 loading 狀態記錄
-    error: !!error
-  });
-
-  // 使用 useRef 來穩定引用，避免重新渲染
-  const selectedParticipantsRef = useRef(selectedParticipants);
-  const createSessionRef = useRef(createSession);
-
-  debugLog('🔴 [GroupRetroPanel] 組件狀態初始化完成');
-
-  // 更新 ref 當值變化時
+  // 只要 currentSession 變動都回到 setup
   useEffect(() => {
-    debugLog('🔴 [GroupRetroPanel] 更新 ref useEffect 觸發');
-    selectedParticipantsRef.current = selectedParticipants;
-    createSessionRef.current = createSession;
-  }, [selectedParticipants, createSession]);
-
-  // 獲取當前週期 ID - 監聽 store 中的 selectedWeekId
-  const { selectedWeekId: currentWeekId } = useGroupRetroStore();
-
-  // 初始化時檢查是否有現存的會話
-  useEffect(() => {
-    debugLog('🔴 [GroupRetroPanel] 初始化 useEffect 觸發');
-    
-    const checkExistingSession = async () => {
-      try {
-        debugLog('🔴 [GroupRetroPanel] 檢查現存會話');
-        const existingSession = await getCurrentWeekSession();
-        if (existingSession) {
-          debugLog('🔴 [GroupRetroPanel] 找到現存會話，跳到概覽');
-          // 如果有現存會話，直接跳到概覽步驟
-          setCurrentStep('overview');
-          // 發送步驟變化事件
-          window.dispatchEvent(new CustomEvent('groupRetroStepChange', { 
-            detail: { step: 'overview' } 
-          }));
-          setSessionTitle(existingSession.title);
-        } else {
-          debugLog('🔴 [GroupRetroPanel] 沒有現存會話，設置預設標題');
-          // 生成預設標題
-          const defaultTitle = `第 ${currentWeekId} 週共學討論`;
-          setSessionTitle(defaultTitle);
-        }
-      } catch (error) {
-        console.error('🔴 [GroupRetroPanel] 檢查現存會話失敗:', error);
-      }
-    };
-
-    if (currentUser?.id) {
-      debugLog('🔴 [GroupRetroPanel] 有 currentUser，開始檢查會話');
-      checkExistingSession();
+    if (currentSession && currentSession.status === 'completed') {
+      setCurrentStep('completed');
     } else {
-      debugLog('🔴 [GroupRetroPanel] 沒有 currentUser，跳過檢查');
+      setCurrentStep('setup');
     }
-  }, [currentUser?.id, currentWeekId, getCurrentWeekSession]); // 修復：添加 getCurrentWeekSession 依賴
-
-  // 清除錯誤
-  useEffect(() => {
-    debugLog('🔴 [GroupRetroPanel] 清除錯誤 useEffect 觸發, error:', error);
-    if (error) {
-      debugLog('🔴 [GroupRetroPanel] 設置錯誤清除定時器');
-      const timer = setTimeout(() => {
-        debugLog('🔴 [GroupRetroPanel] 清除錯誤');
-        clearError();
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error, clearError]);
-
-  // 監聽週期變化，更新預設標題
-  useEffect(() => {
-    if (currentWeekId && !currentSession) {
-      // 只有在沒有現存會話時才更新標題
-      const defaultTitle = `第 ${currentWeekId} 週共學討論`;
-      setSessionTitle(defaultTitle);
-    }
-  }, [currentWeekId, currentSession]);
+  }, [currentSession]);
 
   // 監聽完成討論事件
   useEffect(() => {
@@ -230,13 +167,11 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
 
   // 創建會話
   const handleCreateSession = useCallback(async () => {
-    const currentSelectedParticipants = selectedParticipantsRef.current;
-    
+    const currentSelectedParticipants = selectedParticipants;
     if (currentSelectedParticipants.length < 2) {
       toast.error('請至少選擇 2 位夥伴參與討論');
       return;
     }
-
     setIsCreatingSession(true);
     try {
       const sessionData: CreateGroupRetroSessionData = {
@@ -250,10 +185,8 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
           allowAnonymous: false
         }
       };
-
-      await createSessionRef.current(sessionData);
+      await onCreateSession(sessionData);
       setCurrentStep('overview');
-      
       toast.success('小組討論會話創建成功！', {
         duration: 3000,
         style: {
@@ -268,72 +201,13 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
     } finally {
       setIsCreatingSession(false);
     }
-  }, [sessionTitle, currentWeekId]); // 修復：移除 selectedParticipants 和 createSession 引用
+  }, [sessionTitle, currentWeekId, selectedParticipants, onCreateSession]);
 
   // 步驟切換
   const handleStepChange = useCallback((step: PanelStep) => {
-    // 發送步驟變化事件給父組件
-    window.dispatchEvent(new CustomEvent('groupRetroStepChange', { 
-      detail: { step } 
-    }));
-    if (step === 'overview' && !currentSession) {
-      // 如果要進入概覽但沒有會話，先創建會話
-      const createSessionAndNavigate = async () => {
-        const currentSelectedParticipants = selectedParticipantsRef.current;
-        
-        if (currentSelectedParticipants.length < 2) {
-          toast.error('請至少選擇 2 位夥伴參與討論');
-          return;
-        }
-
-        setIsCreatingSession(true);
-        try {
-          const sessionData: CreateGroupRetroSessionData = {
-            title: sessionTitle || `第 ${currentWeekId} 週共學討論`,
-            weekId: currentWeekId || '',
-            participantIds: currentSelectedParticipants.map(p => p.user.id),
-            settings: {
-              autoGenerateQuestions: true,
-              maxParticipants: 8,
-              questionLimit: 5,
-              allowAnonymous: false
-            }
-          };
-
-          await createSessionRef.current(sessionData);
-          setCurrentStep('overview');
-          // 發送步驟變化事件
-          window.dispatchEvent(new CustomEvent('groupRetroStepChange', { 
-            detail: { step: 'overview' } 
-          }));
-          
-          toast.success('小組討論會話創建成功！', {
-            duration: 3000,
-            style: {
-              background: '#10B981',
-              color: 'white',
-              borderRadius: '12px'
-            }
-          });
-        } catch (error) {
-          console.error('創建會話失敗:', error);
-          toast.error('創建會話失敗，請稍後再試');
-        } finally {
-          setIsCreatingSession(false);
-        }
-      };
-      
-      createSessionAndNavigate();
-      return;
-    }
     setCurrentStep(step);
-    // 發送步驟變化事件（如果不是從父組件觸發的）
-    if (step !== 'overview') {
-      window.dispatchEvent(new CustomEvent('groupRetroStepChange', { 
-        detail: { step } 
-      }));
-    }
-  }, [currentSession, sessionTitle, currentWeekId]); // 修復：移除 selectedParticipants 和 createSession 引用
+    onStepChange(step);
+  }, [onStepChange]);
 
   // 渲染主要內容
   const renderMainContent = () => {
@@ -370,8 +244,22 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
               />
             </div>
 
+            {/* 已選夥伴列表 */}
+            {selectedParticipants && selectedParticipants.length > 0 && (
+              <div className="mb-4">
+                <div className="font-bold text-gray-700 mb-2">已選夥伴：</div>
+                <ul className="flex flex-wrap gap-2">
+                  {selectedParticipants.map((p, idx) => (
+                    <li key={p.user?.id || idx} className="px-3 py-1 bg-orange-100 rounded-full text-sm text-orange-700">
+                      {p.user?.name || '未命名'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {(() => {
-              debugLog('🔴 [GroupRetroPanel] 準備渲染 ParticipantSelector');
+              debugLog('�� [GroupRetroPanel] 準備渲染 ParticipantSelector');
               return <ParticipantSelector key="participant-selector" />;
             })()}
 
@@ -503,7 +391,6 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
             />
           </motion.div>
         );
-
       case 'completed':
         return (
           <motion.div
@@ -511,63 +398,20 @@ export const GroupRetroPanel: React.FC<GroupRetroPanelProps> = ({ onClose }) => 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="space-y-6 text-center"
+            className="space-y-6"
           >
-            <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 className="w-10 h-10 text-white" />
+            <div className="text-center text-2xl font-bold text-green-600 mb-2">
+              🎉 恭喜你完成小組回顧！每一次回顧都是成長的累積，持續反思讓學習更有力量。
             </div>
-            
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">討論完成！</h2>
-              <p className="text-gray-600">太棒了！大家的分享很精彩，記得把討論記錄保存下來喔</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-6 border-2 border-yellow-200">
-              <div className="flex items-center justify-center mb-4">
-                <Star className="w-6 h-6 text-yellow-500" />
-                <Star className="w-6 h-6 text-yellow-500" />
-                <Star className="w-6 h-6 text-yellow-500" />
-              </div>
-              <h3 className="font-bold text-gray-800 mb-2">共學收穫</h3>
-              <p className="text-sm text-gray-600">
-                透過分享和討論，大家不僅回顧了自己的學習，也學到了夥伴們的方法和經驗
-              </p>
-            </div>
-
-            <div className="flex gap-4 justify-center">
-              <motion.button
-                onClick={() => {
-                  // 匯出功能
-                  if (currentSession) {
-                    const store = useGroupRetroStore.getState();
-                    store.exportSession(currentSession.id, 'markdown');
-                  }
-                }}
-                className="px-6 py-3 bg-gradient-to-r from-blue-400 to-purple-400 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Download className="w-4 h-4" />
-                下載記錄
-              </motion.button>
-              
-              <motion.button
-                onClick={() => {
-                  reset();
-                  setCurrentStep('setup');
-                  // 發送步驟變化事件
-                  window.dispatchEvent(new CustomEvent('groupRetroStepChange', { 
-                    detail: { step: 'setup' } 
-                  }));
-                }}
-                className="px-6 py-3 bg-gradient-to-r from-gray-400 to-gray-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <RefreshCw className="w-4 h-4" />
-                開始新討論
-              </motion.button>
-            </div>
+            {/* 直接重用討論結果頁內容 */}
+            <GroupRetroResultsDashboard 
+              onSaveComplete={() => {
+                setCurrentStep('completed');
+                window.dispatchEvent(new CustomEvent('groupRetroStepChange', { 
+                  detail: { step: 'completed' } 
+                }));
+              }}
+            />
           </motion.div>
         );
 

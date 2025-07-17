@@ -37,10 +37,7 @@ const debugLog = (...args: any[]) => {
   }
 };
 
-interface ParticipantSelectorProps {
-  onSelectionChange?: (participants: ParticipantWeeklySummary[]) => void;
-}
-
+// 不需要 onSelectionChange prop
 interface ParticipantCardProps {
   participant: ParticipantWeeklySummary;
   isSelected: boolean;
@@ -183,126 +180,33 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
   );
 };
 
-export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSelectionChange }) => {
+export const ParticipantSelector: React.FC = () => {
   debugLog('🔵 [ParticipantSelector] 組件渲染開始');
   
   // 組件狀態
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // 使用 useRef 來跟蹤載入狀態，避免組件重新掛載時被重置
-  const loadingStateRef = useRef({
-    hasLoaded: false,
-    lastFilters: ''
-  });
 
   // Store 狀態
   const {
     availableParticipants,
     selectedParticipants,
-    loading,
     error,
-    loadAvailableParticipants,
     selectParticipant,
     removeParticipant
   } = useGroupRetroStore();
 
-  debugLog('🔵 [ParticipantSelector] loadingStateRef.current:', loadingStateRef.current);
   debugLog('🔵 [ParticipantSelector] 狀態:', {
     searchQuery,
     availableParticipants: availableParticipants.length,
-    selectedParticipants: selectedParticipants.length,
-    loading
+    selectedParticipants: selectedParticipants.length
   });
 
-  // 計算當前篩選條件 - 只有搜尋查詢
-  const currentFilters = useMemo(() => {
-    const filters = searchQuery;
-    debugLog('🟡 [ParticipantSelector] currentFilters 計算:', filters);
-    return filters;
-  }, [searchQuery]);
-
-  debugLog('🔵 [ParticipantSelector] currentFilters:', currentFilters);
-  debugLog('🔵 [ParticipantSelector] lastFilters:', loadingStateRef.current.lastFilters);
-  debugLog('🔵 [ParticipantSelector] 篩選條件比較:', currentFilters === loadingStateRef.current.lastFilters);
-
-  // 載入可用參與者
-  useEffect(() => {
-    debugLog('🟡 [ParticipantSelector] useEffect 觸發');
-    debugLog('🟡 [ParticipantSelector] 狀態檢查:', {
-      storeLoading: loading,
-      hasLoaded: loadingStateRef.current.hasLoaded,
-      lastFilters: loadingStateRef.current.lastFilters,
-      currentFilters: currentFilters,
-      filtersEqual: loadingStateRef.current.lastFilters === currentFilters
-    });
-    
-    // 修復：統一使用 store 的 loading 狀態
-    if (loading) {
-      debugLog('🔴 [ParticipantSelector] Store 正在載入中，跳過');
-      return;
-    }
-    
-    // 如果篩選條件沒有變化且已經載入過，也不要重複載入
-    if (loadingStateRef.current.hasLoaded && loadingStateRef.current.lastFilters === currentFilters) {
-      debugLog('🔴 [ParticipantSelector] 篩選條件未變化且已載入，跳過');
-      return;
-    }
-    
-    debugLog('🟢 [ParticipantSelector] 開始載入 - 條件滿足');
-    
-    const loadParticipants = async () => {
-      try {
-        // 立即設置本地載入狀態，避免重複觸發
-        loadingStateRef.current = {
-          hasLoaded: false,
-          lastFilters: currentFilters // 預先設置以防止重複觸發
-        };
-        
-        debugLog('🟢 [ParticipantSelector] 調用 loadAvailableParticipants');
-        await loadAvailableParticipants({
-          searchQuery: searchQuery.trim() || undefined
-        });
-        
-        debugLog('🟢 [ParticipantSelector] 載入成功，更新狀態');
-        // 載入成功後更新狀態
-        loadingStateRef.current = {
-          hasLoaded: true,
-          lastFilters: currentFilters
-        };
-        
-        debugLog('🟢 [ParticipantSelector] 載入完成，最終狀態:', loadingStateRef.current);
-      } catch (error) {
-        debugLog('🔴 [ParticipantSelector] 載入參與者失敗:', error);
-        // 載入失敗時重置狀態
-        loadingStateRef.current = {
-          hasLoaded: false,
-          lastFilters: ''
-        };
-      }
-    };
-    
-    loadParticipants();
-  }, [currentFilters]); // 修復：統一使用 currentFilters，移除 loading 避免額外觸發
-  
-  // 通知父組件選擇變化
-  useEffect(() => {
-    debugLog('🟡 [ParticipantSelector] 選擇變化通知 useEffect 觸發');
-    if (onSelectionChange) {
-      onSelectionChange(selectedParticipants);
-    }
-  }, [selectedParticipants]); // 修復：移除 onSelectionChange 依賴項，避免父組件重新渲染時觸發
+  // 移除自動載入邏輯，交由父組件處理
+  // 移除通知父組件的 useEffect
 
   // 篩選和搜尋參與者
   const filteredParticipants = useMemo(() => {
     let filtered = [...availableParticipants];
-    
-    // 排除當前用戶（如果需要）
-    // 這裡的 currentUser 需要從 context 或 store 中獲取，目前暫時移除
-    // if (currentUser) {
-    //   filtered = filtered.filter(p => p.user.id !== currentUser.id);
-    // }
-    
-    // 搜尋過濾
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(p =>
@@ -311,20 +215,17 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
         p.mainTopics.some(topic => topic.toLowerCase().includes(query))
       );
     }
-    
     return filtered;
   }, [availableParticipants, searchQuery]);
-  
+
   // 處理參與者選擇
   const handleParticipantSelect = (participant: ParticipantWeeklySummary) => {
     selectParticipant(participant);
   };
-  
   // 處理參與者移除
   const handleParticipantRemove = (userId: string) => {
     removeParticipant(userId);
   };
-  
   // 判斷參與者是否已選擇
   const isParticipantSelected = (userId: string) => {
     return selectedParticipants.some(p => p.user.id === userId);
@@ -345,7 +246,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
           />
         </div>
       </div>
-      
       {/* 已選擇的參與者 */}
       {selectedParticipants.length > 0 && (
         <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
@@ -355,7 +255,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
               已選擇的討論夥伴 ({selectedParticipants.length})
             </h4>
           </div>
-          
           <div className="flex flex-wrap gap-2">
             {selectedParticipants.map((participant) => (
               <motion.div
@@ -382,33 +281,20 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
           </div>
         </div>
       )}
-      
-      {/* 載入狀態 */}
-      {loading && (
-        <div className="flex justify-center py-8">
-          <LoadingDots />
-        </div>
-      )}
-      
       {/* 錯誤提示 */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
           <p className="text-sm">{error}</p>
         </div>
       )}
-      
       {/* 參與者列表 */}
-      {(!loading && filteredParticipants.length === 0) ? (
+      {filteredParticipants.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p className="text-sm">沒有找到符合條件的夥伴</p>
           <p className="text-xs text-gray-400 mt-1">
             試試調整搜尋條件
           </p>
-        </div>
-      ) : loading ? (
-        <div className="flex justify-center py-8">
-          <LoadingDots />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -423,7 +309,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({ onSele
           ))}
         </div>
       )}
-      
       {/* 選擇提示 */}
       {filteredParticipants.length > 0 && selectedParticipants.length === 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">

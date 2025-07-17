@@ -71,6 +71,8 @@ export const useTopicReview = (topicId: string) => {
           topic: fetchedTopic,
           editedTopic: fetchedTopic,
         }));
+
+        console.log('📥 useTopicReview - refreshTopic end ', state);
         
         return fetchedTopic;
       },
