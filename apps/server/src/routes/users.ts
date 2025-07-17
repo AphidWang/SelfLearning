@@ -424,4 +424,62 @@ router.post('/debug/fix-metadata/:id', async (req: Request, res: Response) => {
   }
 });
 
+// 通用 user-relationships API
+router.get('/user-relationships/:userId', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    // 查詢 user 為主體或關聯對象的所有關係
+    const { data, error } = await supabaseAdmin
+      .from('user_relationships')
+      .select('*')
+      .or(`user_id.eq.${userId},related_user_id.eq.${userId}`);
+    if (error) throw error;
+    res.json({ relations: data });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || '獲取關係失敗' });
+  }
+});
+
+router.post('/user-relationships', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { user_id, related_user_id, relation_type, status = 'accepted', invited_by, note } = req.body;
+    if (!user_id || !related_user_id || !relation_type) {
+      return res.status(400).json({ message: '缺少必要欄位' });
+    }
+    const { data, error } = await supabaseAdmin
+      .from('user_relationships')
+      .insert([{ user_id, related_user_id, relation_type, status, invited_by, note }])
+      .select();
+    if (error) throw error;
+    res.status(201).json({ relation: data[0] });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || '建立關係失敗' });
+  }
+});
+
+router.patch('/user-relationships', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { user_id, related_user_id, relation_type, status, note } = req.body;
+    if (!user_id || !related_user_id || !relation_type || !status) {
+      return res.status(400).json({ message: '缺少必要欄位' });
+    }
+    const update: any = { status };
+    if (status === 'terminated') {
+      update.terminated_at = new Date().toISOString();
+    }
+    if (note) update.note = note;
+    const { data, error } = await supabaseAdmin
+      .from('user_relationships')
+      .update(update)
+      .eq('user_id', user_id)
+      .eq('related_user_id', related_user_id)
+      .eq('relation_type', relation_type)
+      .select();
+    if (error) throw error;
+    res.json({ relation: data[0] });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || '更新關係失敗' });
+  }
+});
+
 export default router; 
