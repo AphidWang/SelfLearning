@@ -6,7 +6,7 @@ import type { Task, ReferenceInfo, ReferenceAttachment, ReferenceLink, TaskActio
 interface TaskStoreState {
   tasks: Task[];
   error?: string;
-  addTask: (goalId: string, task: Omit<Task, 'id' | 'goal_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Task | null>;
+  addTask: (goalId: string, task: Omit<Task, 'id' | 'goal_id' | 'version' | 'created_at' | 'updated_at' | 'creator_id'>) => Promise<Task | null>;
   updateTask: (taskId: string, expectedVersion: number, updates: Partial<Task>) => Promise<Task | null>;
   deleteTask: (taskId: string) => Promise<boolean>;
   restoreTask: (taskId: string) => Promise<boolean>;
@@ -151,6 +151,9 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
       const taskType = taskData.task_type || 'single';
       const taskConfig = taskData.task_config || {};
       const cycleConfig = taskData.cycle_config || {};
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
       const taskDataWithDefaults = {
         title: taskData.title,
         description: taskData.description || '',
@@ -159,6 +162,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         order_index: taskData.order_index || 0,
         need_help: taskData.need_help || false,
         goal_id: goalId,
+        creator_id: user.id,
         task_type: taskType,
         task_config: taskConfig,
         cycle_config: cycleConfig,
@@ -190,9 +194,13 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
       } else if (updates.status && updates.status !== 'done') {
         completedAt = undefined;
       }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
       const { data, error } = await supabase.rpc('safe_update_task', {
         p_id: taskId,
         p_expected_version: expectedVersion,
+        p_user_id: user.id,
         p_title: updates.title,
         p_description: updates.description,
         p_status: updates.status,
@@ -206,15 +214,16 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         p_completed_at: completedAt,
         p_completed_by: updates.completed_by,
         p_estimated_minutes: updates.estimated_minutes,
-        p_actual_minutes: updates.actual_minutes
+        p_actual_minutes: updates.actual_minutes,
+        p_creator_id: null
       });
       if (error) throw error;
       const result = data as any;
-      if (!result.success) {
-        if (result.message === 'Version conflict detected') {
+      if (!result || !result.success) {
+        if (result && result.message === 'Version conflict detected') {
           throw new Error('任務已被其他用戶修改，請重新載入');
         }
-        throw new Error(result.message);
+        throw new Error(result?.message || '更新任務失敗');
       }
       const { data: taskData, error: taskError } = await supabase
         .from('tasks')
@@ -380,6 +389,21 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         set(state => ({
           tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t)
         }));
+        
+        // 同時更新 topicStore 中的任務狀態
+        const { useTopicStore } = await import('./topicStore');
+        useTopicStore.setState(state => ({
+          topics: state.topics?.map(topic => ({
+            ...topic,
+            goals: topic.goals?.map(goal => ({
+              ...goal,
+              tasks: goal.tasks?.map(task => 
+                task.id === taskId ? { ...task, ...updatedTask } : task
+              )
+            }))
+          }))
+        }));
+        
         return { success: true, task: updatedTask };
       }
       return { success: false, message: '更新任務失敗' };
@@ -400,6 +424,21 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         set(state => ({
           tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t)
         }));
+        
+        // 同時更新 topicStore 中的任務狀態
+        const { useTopicStore } = await import('./topicStore');
+        useTopicStore.setState(state => ({
+          topics: state.topics?.map(topic => ({
+            ...topic,
+            goals: topic.goals?.map(goal => ({
+              ...goal,
+              tasks: goal.tasks?.map(task => 
+                task.id === taskId ? { ...task, ...updatedTask } : task
+              )
+            }))
+          }))
+        }));
+        
         return { success: true, task: updatedTask };
       }
       return { success: false, message: '更新任務失敗' };
@@ -422,6 +461,21 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         set(state => ({
           tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t)
         }));
+        
+        // 同時更新 topicStore 中的任務狀態
+        const { useTopicStore } = await import('./topicStore');
+        useTopicStore.setState(state => ({
+          topics: state.topics?.map(topic => ({
+            ...topic,
+            goals: topic.goals?.map(goal => ({
+              ...goal,
+              tasks: goal.tasks?.map(task => 
+                task.id === taskId ? { ...task, ...updatedTask } : task
+              )
+            }))
+          }))
+        }));
+        
         return { success: true, task: updatedTask };
       }
       return { success: false, message: '更新任務失敗' };

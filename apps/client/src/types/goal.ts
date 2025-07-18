@@ -135,6 +135,7 @@ export interface TaskAction {
 export interface Topic {
   id: string;
   owner_id: string;
+  creator_id: string;
   title: string;
   description?: string;
   reference_info?: ReferenceInfo;
@@ -173,6 +174,7 @@ export interface Topic {
 export interface Goal {
   id: string;
   topic_id: string;
+  creator_id: string;
   title: string;
   description?: string;
   reference_info?: ReferenceInfo;
@@ -204,6 +206,7 @@ export interface Goal {
 export interface Task {
   id: string;
   goal_id: string;
+  creator_id: string;
   title: string;
   description?: string;
   reference_info?: ReferenceInfo;

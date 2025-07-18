@@ -23,24 +23,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, X, Star, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
-import type { Task } from '../../../types/goal';
-
-/**
- * 擴展的任務介面，包含主題和目標資訊
- */
-interface TaskWithContext extends Task {
-  topicId: string;
-  topicTitle: string;
-  topicSubject: string;
-  goalId: string;
-  goalTitle: string;
-  subjectStyle: any;
-}
+import type { TaskWithContext } from '../../../types/goal';
 
 interface CompletedCardsStackProps {
   completedTasks: TaskWithContext[];
   onClearStack: () => void;
-  onRestoreTask: (taskId: string, goalId: string, topicId: string) => Promise<void>;
+  onRestoreTask: (taskId: string, goalId: string, topicId: string, taskVersion: number) => Promise<void>;
 }
 
 export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
@@ -199,7 +187,7 @@ export const CompletedCardsStack: React.FC<CompletedCardsStackProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onRestoreTask(task.id, task.goalId, task.topicId);
+                onRestoreTask(task.id, task.goalId, task.topicId, task.version ?? 0);
               }}
               className="ml-2 p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
               title="恢復到進行中"

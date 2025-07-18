@@ -57,7 +57,8 @@ interface TaskWallGridProps {
     taskId: string,
     goalId: string,
     topicId: string,
-    newStatus: TaskStatus
+    newStatus: TaskStatus,
+    taskVersion: number
   ) => void;
   onAddTaskToGoal: (
     goalId: string,
@@ -303,7 +304,8 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
                           card.data.id,
                           (card.data as TaskWithContext).goalId,
                           (card.data as TaskWithContext).topicId,
-                          newStatus
+                          newStatus,
+                          (card.data as TaskWithContext).version
                         )
                       }
                       onOpenRecord={onOpenRecord}
@@ -376,7 +378,8 @@ export const TaskWallGrid: React.FC<TaskWallGridProps> = ({
                         card.data.id,
                         (card.data as TaskWithContext).goalId,
                         (card.data as TaskWithContext).topicId,
-                        newStatus
+                        newStatus,
+                        (card.data as TaskWithContext).version
                       )
                     }
                     onOpenRecord={onOpenRecord}

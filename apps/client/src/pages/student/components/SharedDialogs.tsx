@@ -10,33 +10,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, X, RotateCcw } from 'lucide-react';
-
-/**
- * 任務上下文接口（從 TaskWallPage 移過來）
- */
-interface TaskWithContext {
-  id: string;
-  title: string;
-  description?: string;
-  status: string;
-  completed_at?: string;
-  topicId: string;
-  topicTitle: string;
-  topicSubject: string;
-  goalId: string;
-  goalTitle: string;
-  subjectStyle: any;
-  records: {
-    id: string;
-    created_at: string;
-    title: string;
-    message: string;
-    difficulty: number;
-    completion_time?: number;
-    files?: any[];
-    tags?: string[];
-  }[];
-}
+import type { TaskWithContext } from '../../../types/goal';
 
 /**
  * 星星計數器組件 - 彩色星星設計
@@ -199,7 +173,7 @@ interface CompletedTasksDialogProps {
   isOpen: boolean;
   onClose: () => void;
   completedTasks: TaskWithContext[];
-  onRestoreTask: (taskId: string, goalId: string, topicId: string) => Promise<void>;
+  onRestoreTask: (taskId: string, goalId: string, topicId: string, taskVersion: number) => Promise<void>;
   onClearStack: () => void;
 }
 
@@ -304,7 +278,7 @@ export const CompletedTasksDialog: React.FC<CompletedTasksDialogProps> = ({
                     </div>
                     
                     <button
-                      onClick={() => onRestoreTask(task.id, task.goalId, task.topicId)}
+                      onClick={() => onRestoreTask(task.id, task.goalId, task.topicId, task.version ?? 0)}
                       className="ml-4 p-3 text-blue-600 hover:bg-blue-100 rounded-xl transition-colors flex-shrink-0 group"
                       title="恢復到進行中"
                     >

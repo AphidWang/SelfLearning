@@ -57,7 +57,7 @@ export const StudentLearningMap: React.FC = () => {
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
   const [showDailyReview, setShowDailyReview] = useState(false);
 
-  const { topics, addTopic, fetchTopicsWithActions } = useTopicStore();
+  const { topics, createTopic, fetchTopicsWithActions } = useTopicStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
   const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
@@ -132,7 +132,7 @@ export const StudentLearningMap: React.FC = () => {
       is_collaborative: false,
       show_avatars: true
     };
-    const addedTopic = await addTopic(newTopic);
+    const addedTopic = await createTopic(newTopic);
     if (addedTopic) {
       setShowTemplateBrowser(false);
       setShowTopicReviewId(addedTopic.id);

@@ -17,13 +17,14 @@ export const createTopicTool: Tool<{ topic: string }, Topic> = {
       status: 'active',
       goals: [],
       owner_id: '',  // 這會由 store 處理
+      creator_id: '',  // 這會由 store 處理
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       is_collaborative: false,
       show_avatars: false,
       version: 1
     };
-    topicStore.addTopic(newTopic);
+    topicStore.createTopic(newTopic);
     return newTopic;
   }
 };
@@ -47,7 +48,8 @@ export const createGoalTool: Tool<{ goal_name: string }, Goal> = {
       priority: 'medium',
       order_index: 0,
       version: 1,
-      tasks: []
+      tasks: [],
+      creator_id: ''
     };
     await goalStore.addGoal(selectedTopicId, newGoal);
     return newGoal;
@@ -75,7 +77,8 @@ export const createTaskTool: Tool<{ task_name: string; goal_id: string }, Task> 
       task_config: { type: 'single' },
       cycle_config: { cycle_type: 'none', auto_reset: false },
       need_help: false,
-      version: 1
+      version: 1,
+      creator_id: ''
     };
     await taskStore.addTask(params.goal_id, newTask);
     return newTask;
@@ -102,7 +105,8 @@ export const useTemplateGoalsTool: Tool<void, string[]> = {
         priority: 'medium',
         order_index: 0,
         version: 1,
-        tasks: []
+        tasks: [],
+        creator_id: ''
       };
       goalStore.addGoal(selectedTopicId, goal);
       return goal;

@@ -20,29 +20,7 @@ import {
   Pause, User as UserIcon, Link, FileText, Image, 
   Video, Download, ExternalLink 
 } from 'lucide-react';
-import type { Task, TaskStatus } from '../../../../types/goal';
-
-/**
- * 擴展的任務介面，包含主題和目標資訊
- */
-export interface TaskWithContext extends Task {
-  topicId: string;
-  topicTitle: string;
-  topicSubject: string;
-  goalId: string;
-  goalTitle: string;
-  subjectStyle: any;
-  records: {
-    id: string;
-    created_at: string;
-    title: string;
-    message: string;
-    difficulty: number;
-    completion_time?: number;
-    files?: any[];
-    tags?: string[];
-  }[];
-}
+import type { TaskStatus, TaskWithContext } from '../../../../types/goal';
 
 /**
  * 基礎卡片 Props

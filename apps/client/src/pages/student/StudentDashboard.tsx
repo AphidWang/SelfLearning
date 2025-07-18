@@ -47,7 +47,7 @@ const upcomingTasks: Task[] = [
       special_flags: [],
       version: 1,
       created_at: '',
-      updated_at: ''
+      creator_id: '1',
     },
   {
     id: '2',
@@ -68,6 +68,7 @@ const upcomingTasks: Task[] = [
     version: 1,
     created_at: '',
     updated_at: '',
+    creator_id: '1',
   },
   {
     id: '3',
@@ -87,7 +88,8 @@ const upcomingTasks: Task[] = [
     special_flags: [],
     version: 1,
     created_at: '',
-    updated_at: ''
+    updated_at: '',
+    creator_id: '1',
   }
 ];
 

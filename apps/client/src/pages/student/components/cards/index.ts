@@ -6,7 +6,7 @@
 
 // 基礎卡片
 export { BaseTaskCard, useBaseTaskCard } from './BaseTaskCard';
-export type { BaseTaskCardProps, TaskWithContext, CardContent } from './BaseTaskCard';
+export type { BaseTaskCardProps, CardContent } from './BaseTaskCard';
 
 // 具體卡片類型
 export { SingleTaskCard } from './SingleTaskCard';
@@ -21,3 +21,5 @@ export type { CreateWeeklyTaskCardProps } from './CreateWeeklyTaskCard';
 // 卡片工廠
 export { TaskCardFactory } from './TaskCardFactory';
 export type { TaskCardFactoryProps } from './TaskCardFactory'; 
+
+export type { TaskWithContext } from '../../../../types/goal'; 

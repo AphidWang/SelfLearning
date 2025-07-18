@@ -5,7 +5,7 @@ import type { Goal, ReferenceInfo, ReferenceAttachment, ReferenceLink } from '..
 interface GoalStoreState {
   goals: Goal[];
   error?: string;
-  addGoal: (topicId: string, goalData: Omit<Goal, 'id' | 'topic_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Goal | null>;
+  addGoal: (topicId: string, goalData: Omit<Goal, 'id' | 'topic_id' | 'version' | 'created_at' | 'updated_at' | 'creator_id'>) => Promise<Goal | null>;
   updateGoal: (goalId: string, expectedVersion: number, updates: Partial<Goal>) => Promise<Goal | null>;
   deleteGoal: (goalId: string) => Promise<boolean>;
   restoreGoal: (goalId: string) => Promise<boolean>;
@@ -29,6 +29,9 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
    */
   addGoal: async (topicId, goalData) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
       const goalDataWithDefaults = {
         title: goalData.title,
         description: goalData.description || '',
@@ -36,7 +39,8 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
         priority: goalData.priority || 'medium',
         order_index: goalData.order_index || 0,
         need_help: goalData.need_help || false,
-        topic_id: topicId
+        topic_id: topicId,
+        creator_id: user.id
       };
 
       const { data, error } = await supabase
@@ -63,23 +67,30 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
    */
   updateGoal: async (goalId, expectedVersion, updates) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
       const { data, error } = await supabase.rpc('safe_update_goal', {
         p_id: goalId,
         p_expected_version: expectedVersion,
+        p_user_id: user.id,
         p_title: updates.title,
         p_description: updates.description,
         p_status: updates.status,
         p_priority: updates.priority,
-        p_order_index: updates.order_index
+        p_order_index: updates.order_index,
+        p_need_help: updates.need_help,
+        p_help_message: updates.help_message,
+        p_creator_id: null
       });
 
       if (error) throw error;
       const result = data as any;
-      if (!result.success) {
-        if (result.message === 'Version conflict detected') {
+      if (!result || !result.success) {
+        if (result && result.message === 'Version conflict detected') {
           throw new Error('目標已被其他用戶修改，請重新載入');
         }
-        throw new Error(result.message);
+        throw new Error(result?.message || '更新目標失敗');
       }
 
       const { data: goalData, error: goalError } = await supabase

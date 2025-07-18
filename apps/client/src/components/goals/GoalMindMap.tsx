@@ -1338,9 +1338,9 @@ export const TopicMindMap: React.FC<TopicMindMapProps> = ({ topicId, onBack }) =
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   };
-                  const { addTopic } = useTopicStore.getState();
+                  const { createTopic } = useTopicStore.getState();
                   console.log('📝 準備新增主題', { newTopic });
-                  const addedTopicPromise = addTopic(newTopic);
+                  const addedTopicPromise = createTopic(newTopic);
                   addedTopicPromise.then(addedTopic => {
                     if (!addedTopic) return;
                     console.log('✅ 主題已新增', { addedTopic });

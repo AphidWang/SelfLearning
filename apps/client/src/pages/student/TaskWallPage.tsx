@@ -22,30 +22,43 @@
  * - 星星計數器：完成任務時的動畫反饋
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Plus, Eye, Grid3X3, Columns, Users, Calendar, TrendingUp, 
+  Clipboard, CheckCircle2, Archive, Settings, Search, Filter,
+  MoreVertical, Shuffle, SortAsc, ChevronDown, ChevronRight,
+  Clock, Target, User as UserIcon, Play, BookOpen, BookMarked, Zap, Star, Gift
+} from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTopicStore } from '../../store/topicStore';
+import { useTaskStore } from '../../store/taskStore';
+import { useGoalStore } from '../../store/goalStore';
 import { useUserStore } from '../../store/userStore';
 import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
-import { ArrowLeft, Filter, Star, BookMarked, RotateCcw, Grid3x3, List, Users, Flag, Target, CheckCircle2, Clock, Play, Plus, Edit3, Trophy, Calendar, TrendingUp } from 'lucide-react';
-import PageLayout from '../../components/layout/PageLayout';
-import { TaskWallGrid } from './components/TaskWallGrid';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
-import { TaskRecordDialog } from './components/TaskRecordDialog';
 import { TopicReviewPage } from '../../components/topic-review/TopicReviewPage';
-import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
-import { TopicGrid, TopicCard, CreateTopicCard, TopicCardData } from './components/TopicCards';
-import { StarCounter, CompletedTasksDialog, CutePromptDialog } from './components/SharedDialogs';
-import { CreateWeeklyTaskCard } from './components/cards/CreateWeeklyTaskCard';
-import type { Topic, Goal, Task, TaskStatus } from '../../types/goal';
-import { SPECIAL_TASK_FLAGS, hasWeeklyQuickChallenge } from '../../types/goal';
 import { LoadingDots } from '../../components/shared/LoadingDots';
+import { TaskWallGrid } from './components/TaskWallGrid';
+import { CompletedCardsStack } from './components/CompletedCardsStack';
+import { StarCounter, CompletedTasksDialog, CutePromptDialog } from './components/SharedDialogs';
+import { useAsyncOperation } from '../../utils/errorHandler';
+import PageLayout from '../../components/layout/PageLayout';
+import type { 
+  Task, 
+  Goal, 
+  TaskStatus, 
+  GoalStatus, 
+  TaskWithContext
+} from '../../types/goal';
+import { SPECIAL_TASK_FLAGS } from '../../types/goal';
+import { CreateWeeklyTaskCard } from './components/cards/CreateWeeklyTaskCard';
+import { TaskRecordDialog } from './components/TaskRecordDialog';
 import { TaskRecordHistoryDialog } from './components/TaskRecordHistoryDialog';
-import { useTaskStore } from '../../store/taskStore';
-import { useGoalStore } from '../../store/goalStore';
-import { getCompletionRate } from '../../store/progressQueries';
+import { TopicGrid } from './components/TopicCards';
+import { TopicTemplateBrowser as TemplateBrowser } from '../../components/template/TopicTemplateBrowser';
+
 
 /**
  * 任務牆配置介面
@@ -55,28 +68,6 @@ interface TaskWallConfig {
   showCompletedStack: boolean;
   viewMode: 'tasks' | 'topics'; // 新增：視圖模式切換
   sortMode: 'task_type' | 'topic'; // 新增：排序模式
-}
-
-/**
- * 擴展的任務介面，包含主題和目標資訊
- */
-interface TaskWithContext extends Task {
-  topicId: string;
-  topicTitle: string;
-  topicSubject: string;
-  goalId: string;
-  goalTitle: string;
-  subjectStyle: any;
-  records: {
-    id: string;
-    created_at: string;
-    title: string;
-    message: string;
-    difficulty: number;
-    completion_time?: number;
-    files?: any[];
-    tags?: string[];
-  }[];
 }
 
 /**
@@ -253,15 +244,17 @@ export const TaskWallPage = () => {
     taskId: string, 
     goalId: string, 
     topicId: string, 
-    newStatus: TaskStatus
+    newStatus: TaskStatus,
+    taskVersion: number
   ) => {
+    console.log('handleTaskStatusUpdate called', taskId, goalId, topicId, newStatus, taskVersion);
     try {
       let result;
       
       // 使用專門的狀態切換函數
       switch (newStatus) {
         case 'done':
-          result = await markTaskCompleted(taskId, 0, true); // 只傳 taskId, version, requireRecord
+          result = await markTaskCompleted(taskId, taskVersion, true); // 使用正確的版本號
           
           if (!result.success) {
             if (result.requiresRecord) {
@@ -271,15 +264,16 @@ export const TaskWallPage = () => {
                 ?.goals?.find(g => g.id === goalId)
                 ?.tasks?.find(t => t.id === taskId);
               
-              if (task) {
+              const topic = topics.find(t => t.id === topicId);
+              if (task && topic) {
                 setSelectedTaskForRecord({
                   ...task,
                   topicId,
-                  topicTitle: topics.find(t => t.id === topicId)?.title || '',
-                  topicSubject: topics.find(t => t.id === topicId)?.subject || '未分類',
+                  topicTitle: topic.title,
+                  topicSubject: topic.subject || '未分類',
                   goalId,
-                  goalTitle: topics.find(t => t.id === topicId)?.goals?.find(g => g.id === goalId)?.title || '',
-                  subjectStyle: subjects.getSubjectStyle(topics.find(t => t.id === topicId)?.subject || ''),
+                  goalTitle: topic.goals?.find(g => g.id === goalId)?.title || '',
+                  subjectStyle: subjects.getSubjectStyle(topic.subject || ''),
                   records: (task.records || []).map(record => ({
                     id: record.id,
                     created_at: record.created_at || new Date().toISOString(),
@@ -306,7 +300,7 @@ export const TaskWallPage = () => {
           break;
           
         case 'in_progress':
-          result = await markTaskInProgress(taskId, 0);
+          result = await markTaskInProgress(taskId, taskVersion);
           if (!result.success) {
             toast.error(result.message);
             return;
@@ -314,7 +308,7 @@ export const TaskWallPage = () => {
           break;
           
         case 'todo':
-          result = await markTaskTodo(taskId, 0);
+          result = await markTaskTodo(taskId, taskVersion);
           if (!result.success) {
             toast.error(result.message);
             return;
@@ -330,7 +324,7 @@ export const TaskWallPage = () => {
       console.error('更新任務狀態失敗:', error);
       toast.error('系統錯誤，請稍後再試');
     }
-  }, [markTaskCompleted, markTaskInProgress, markTaskTodo, topics]);
+  }, [markTaskCompleted, markTaskInProgress, markTaskTodo]);
 
   /**
    * 處理新增任務到目標
@@ -363,11 +357,12 @@ export const TaskWallPage = () => {
   const handleRestoreTask = useCallback(async (
     taskId: string, 
     goalId: string, 
-    topicId: string
+    topicId: string,
+    taskVersion: number
   ) => {
     try {
       // 使用專門的狀態切換函數
-      await markTaskInProgress(taskId, 0);
+      await markTaskInProgress(taskId, taskVersion);
     } catch (error) {
       console.error('恢復任務失敗:', error);
     }
@@ -520,7 +515,7 @@ export const TaskWallPage = () => {
         priority: 'high',
         order_index: 0,
         need_help: false,
-        special_flags: [SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE]
+        special_flags: [SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE],
       });
 
       if (newTask) {
@@ -803,7 +798,7 @@ export const TaskWallPage = () => {
   /**
    * 處理主題數據，計算各種統計資訊
    */
-  const topicCards = useMemo((): TopicCardData[] => {
+  const topicCards = useMemo((): any[] => { // Changed return type to any[] as TopicCardData is removed
     if (!topics) return [];
 
     return topics
@@ -1208,7 +1203,7 @@ export const TaskWallPage = () => {
         />
 
         {/* 主題模板瀏覽器 */}
-        <TopicTemplateBrowser
+        <TemplateBrowser
           isOpen={showTemplateBrowser}
           onClose={() => setShowTemplateBrowser(false)}
           onTemplateSelected={(templateId) => {

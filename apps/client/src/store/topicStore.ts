@@ -16,7 +16,7 @@ interface TopicStore {
   // Topic CRUD
   fetchTopicsWithActions: () => Promise<void>;
   getTopic: (id: string) => Promise<Topic | null>;
-  createTopic: (topic: Omit<Topic, 'id' | 'owner_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Topic | null>;
+  createTopic: (topic: Omit<Topic, 'id' | 'owner_id' | 'version' | 'created_at' | 'updated_at' | 'creator_id'>) => Promise<Topic | null>;
   updateTopic: (id: string, expectedVersion: number, updates: Partial<Topic>) => Promise<Topic | null>;
   deleteTopic: (id: string) => Promise<boolean>;
   restoreTopic: (id: string) => Promise<boolean>;
@@ -28,9 +28,6 @@ interface TopicStore {
   addTopicLink: (topicId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
   removeTopicLink: (topicId: string, linkId: string) => Promise<boolean>;
   
-  // Compatibility API
-  addTopic: (topic: Omit<Topic, 'id' | 'owner_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Topic | null>;
-
   createTopicFromTemplate: (params: CreateTopicFromTemplateParams) => Promise<Topic | null>;
 
   // Utility
@@ -157,7 +154,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const status = dbTopicData.status ?? 'active';
       const { data, error } = await supabase
         .from('topics')
-        .insert([{ ...dbTopicData, owner_id: user.id, status }])
+        .insert([{ ...dbTopicData, owner_id: user.id, creator_id: user.id, status }])
         .select()
         .single();
       if (error) throw error;
@@ -172,9 +169,13 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
 
   updateTopic: async (id, expectedVersion, updates) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
       const { data, error } = await supabase.rpc('safe_update_topic', {
         p_id: id,
         p_expected_version: expectedVersion,
+        p_user_id: user.id,
         p_title: updates.title,
         p_description: updates.description,
         p_status: updates.status,
@@ -188,12 +189,12 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         p_bubbles: updates.bubbles
       });
       if (error) throw error;
-      const result = data[0];
-      if (!result.success) {
-        if (result.message === 'Version conflict detected') {
+      const result = data;
+      if (!result || !result.success) {
+        if (result && result.message === 'Version conflict detected') {
           throw new Error('主題已被其他用戶修改，請重新載入');
         }
-        throw new Error(result.message);
+        throw new Error(result?.message || '更新主題失敗');
       }
       const updatedTopic = await get().getTopic(id);
       if (updatedTopic) {
@@ -306,28 +307,6 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       links: topic.reference_info.links.filter(l => l.id !== linkId)
     };
     return await get().updateTopicReferenceInfo(topicId, updatedReferenceInfo);
-  },
-
-  // Compatibility API
-  addTopic: async (topic) => {
-    set({ loading: true, error: null });
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('用戶未認證');
-      const { goals, bubbles, progress, owner_id, version, created_at, updated_at, ...dbTopicData } = topic as any;
-      const { data, error } = await supabase
-        .from('topics')
-        .insert([{ ...dbTopicData, owner_id: user.id }])
-        .select()
-        .single();
-      if (error) throw error;
-      const newTopic = { ...data, goals: [], progress: 0 };
-      set(state => ({ topics: [newTopic, ...state.topics], loading: false }));
-      return newTopic;
-    } catch (error: any) {
-      set({ loading: false, error: error.message || '創建主題失敗' });
-      return null;
-    }
   },
   
   createTopicFromTemplate: async (params) => {
