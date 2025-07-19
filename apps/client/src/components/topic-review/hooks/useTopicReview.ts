@@ -5,6 +5,7 @@ import { useAsyncOperation, ErrorPatterns } from '../../../utils/errorHandler';
 import type { Topic, Goal, Task } from '../../../types/goal';
 import type { User } from '@self-learning/types';
 import { getCompletionRate } from '../../../store/progressQueries';
+import { refreshTopicData } from '../../../store/dataManager';
 
 interface Collaborator extends User {
   permission: 'view' | 'edit';
@@ -28,7 +29,6 @@ export interface TopicReviewState {
 
 export const useTopicReview = (topicId: string) => {
   const { 
-    getTopic,
     updateTopic,
     deleteTopic,
     enableTopicCollaboration,
@@ -61,7 +61,7 @@ export const useTopicReview = (topicId: string) => {
       async () => {
         console.log('📥 useTopicReview - refreshTopic started');
         
-        const fetchedTopic = await getTopic(topicId);
+        const fetchedTopic = await refreshTopicData(topicId);
         if (!fetchedTopic) {
           throw new Error('無法載入主題資料');
         }
@@ -82,7 +82,7 @@ export const useTopicReview = (topicId: string) => {
         retryDelay: 500,
       }
     ),
-    [topicId, getTopic, wrapAsync]
+    [topicId, refreshTopicData, wrapAsync]
   );
 
   // 當協作者更新時刷新頁面

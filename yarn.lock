@@ -6854,6 +6854,7 @@ __metadata:
     react-toastify: "npm:^11.0.5"
     react-xarrows: "npm:^2.0.2"
     reactflow: "npm:^11.11.4"
+    shallow: "npm:^1.0.0"
     tailwindcss: "npm:^3.4.1"
     ts-node: "npm:^10.9.2"
     typescript: "npm:^5.3.3"
@@ -9342,6 +9343,7 @@ __metadata:
     lru-cache: "npm:7.18.3"
     npm-run-all: "npm:^4.1.5"
     react-modal: "npm:3.16.1"
+    shallow: "npm:^1.0.0"
     supertest: "npm:^6.3.3"
     ts-node: "npm:^10.9.2"
     typescript: "npm:^5.3.3"
@@ -9451,6 +9453,13 @@ __metadata:
   version: 1.2.0
   resolution: "setprototypeof@npm:1.2.0"
   checksum: 10c0/68733173026766fa0d9ecaeb07f0483f4c2dc70ca376b3b7c40b7cda909f94b0918f6c5ad5ce27a9160bdfb475efaa9d5e705a11d8eaae18f9835d20976028bc
+  languageName: node
+  linkType: hard
+
+"shallow@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "shallow@npm:1.0.0"
+  checksum: 10c0/c5e3309716556ee2d2631a3190f8395b09eb46b38f05851df98fdd33af7a38bbad0324712991ebd3dc3de24c11513b1f8357d51f41957127e80b1901754592e1
   languageName: node
   linkType: hard
 

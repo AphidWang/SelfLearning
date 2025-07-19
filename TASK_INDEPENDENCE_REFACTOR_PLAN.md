@@ -1,8 +1,10 @@
-# Task 獨立性重構計劃
+# Task 獨立性重構計劃 (更新版)
 
 ## 🎯 重構目標
 
-讓 Task 可以被單獨建立（不需要依賴於 Topic），並且有方法可以撈到獨立的 Task。
+1. **解決 Store 架構問題**：避免 topicStore 和 taskStore 間的數據重複和同步問題
+2. **實現 Task 獨立性**：讓 Task 可以被單獨建立（不需要依賴於 Topic）
+3. **提供獨立 Task 查詢**：有方法可以撈到獨立的 Task
 
 ## 📋 目前架構分析
 
@@ -11,14 +13,115 @@
 Topic (owner_id) → Goal (owner_id, topic_id) → Task (owner_id, goal_id)
 ```
 
-### 現有問題
-1. Task 必須依賴 Goal
-2. Goal 必須依賴 Topic  
-3. 沒有 creator_id 概念，只有 owner_id
-4. 無法創建獨立的 Task
-5. 無法查詢獨立的 Task
+### ⚠️ 當前嚴重問題
+1. **數據重複**：同一個 task 存在於 taskStore 和 topicStore 中
+2. **同步複雜性**：每次 task 更新需要同時更新兩個 store
+3. **一致性風險**：容易出現數據不一致的情況（剛解決的畫面不更新問題）
+4. **維護成本**：新增功能時需要考慮多個 store 的同步
 
-## 🏗️ 階段性重構計劃
+### 其他架構問題
+5. Task 必須依賴 Goal
+6. Goal 必須依賴 Topic  
+7. 沒有 creator_id 概念，只有 owner_id
+8. 無法創建獨立的 Task
+9. 無法查詢獨立的 Task
+
+## 🏗️ 重構計劃（重新排序優先級）
+
+---
+
+## === 階段 0：立即修復 Store 架構問題 ===
+
+### 🎯 目標
+- 解決數據重複和狀態同步問題
+- 為後續重構奠定穩固基礎
+- 立即改善開發體驗
+
+### ✅ 已完成的修復
+- [x] 統一 TaskWithContext 類型定義
+- [x] 修復 SPECIAL_TASK_FLAGS 匯入錯誤
+- [x] 讓 taskStore 同時更新 topicStore 狀態（臨時解決方案）
+- [x] 確保 version 欄位在所有 TaskWithContext 實例中可用
+
+### 🔧 當前臨時解決方案問題
+```typescript
+// 問題：在 taskStore 中手動同步 topicStore
+markTaskCompleted: async (taskId, expectedVersion, requireRecord = true) => {
+  // ... 更新 taskStore
+  
+  // 臨時解決方案：手動同步 topicStore
+  const { useTopicStore } = await import('./topicStore');
+  useTopicStore.setState(state => ({
+    topics: state.topics?.map(topic => ({
+      ...topic,
+      goals: topic.goals?.map(goal => ({
+        ...goal,
+        tasks: goal.tasks?.map(task => 
+          task.id === taskId ? { ...task, ...updatedTask } : task
+        )
+      }))
+    }))
+  }));
+}
+```
+
+### 📊 推薦的最終解決方案：分離數據架構
+
+#### 方案 A：數據結構分離（強烈推薦）
+```typescript
+// topicStore 只管理結構關係
+interface Topic {
+  id: string;
+  title: string;
+  goals: Goal[];
+}
+
+interface Goal {
+  id: string;
+  title: string;
+  taskIds: string[]; // 只存 ID，不存完整 task
+}
+
+// taskStore 管理完整 task 數據
+interface TaskStore {
+  tasks: Record<string, Task>; // 以 ID 為 key 的 map
+  
+  // 組合查詢方法
+  getTasksForGoal(goalId: string): Task[];
+  getTasksForTopic(topicId: string): Task[];
+  getTaskById(taskId: string): Task | undefined;
+}
+
+// 在組件中使用
+const TaskWallPage = () => {
+  const { topics } = useTopicStore();
+  const { getTasksForTopic } = useTaskStore();
+  
+  const allTasks = useMemo(() => {
+    return topics.flatMap(topic => getTasksForTopic(topic.id));
+  }, [topics, getTasksForTopic]);
+}
+```
+
+#### 方案 B：統一 Store（備選方案）
+```typescript
+interface UnifiedStore {
+  topics: Topic[];
+  goals: Goal[];
+  tasks: Task[];
+  
+  // 組合查詢方法
+  getTasksForGoal(goalId: string): Task[];
+  getTasksForTopic(topicId: string): Task[];
+  getTopicWithTasks(topicId: string): TopicWithTasks;
+}
+```
+
+### 🚨 立即決策需求
+**需要立即決定使用哪個方案**，因為：
+1. 當前臨時解決方案會累積更多技術債務
+2. 每次新增功能都會遇到同步問題
+3. 影響開發效率和代碼質量
 
 ---
 
@@ -29,126 +132,38 @@ Topic (owner_id) → Goal (owner_id, topic_id) → Task (owner_id, goal_id)
 - 保持現有功能完全相容
 - 為第二階段的獨立 Task 奠定基礎
 
-### 📊 資料庫遷移
+### ✅ 已完成的工作
+- [x] 創建遷移腳本並測試 creator_id 功能
+- [x] 更新 TypeScript 類型定義（Topic, Goal, Task interfaces）
+- [x] 更新 topicStore.createTopic：設定 creator_id
+- [x] 更新 goalStore.addGoal：設定 creator_id  
+- [x] 更新 taskStore.addTask：設定 creator_id
+- [x] 修復版本衝突問題（TaskWallPage 等組件傳遞正確版本號）
+- [x] 完成第一階段測試：驗證現有功能正常，新建實體有正確 creator_id
 
-#### 1.1 新增 creator_id 欄位
+### 📊 已執行的資料庫遷移
+
+#### ✅ 已完成的遷移
 ```sql
--- 新增 Topic creator_id
-ALTER TABLE topics 
-ADD COLUMN creator_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- 新增 Goal creator_id  
-ALTER TABLE goals
-ADD COLUMN creator_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- 新增 Task creator_id
-ALTER TABLE tasks
-ADD COLUMN creator_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+-- ✅ 已在生產環境執行
+-- 新增 creator_id 欄位到 topics, goals, tasks
+-- 遷移現有資料：creator_id = owner_id  
+-- 建立索引：creator_id 相關的查詢優化索引
+-- 更新 RPC Functions：safe_update_topic, safe_update_goal, safe_update_task 支援 creator_id
 ```
 
-#### 1.2 資料遷移腳本
-```sql
--- 遷移現有資料：creator_id = owner_id
-UPDATE topics SET creator_id = owner_id WHERE creator_id IS NULL;
-UPDATE goals SET creator_id = (SELECT owner_id FROM topics WHERE topics.id = goals.topic_id) WHERE creator_id IS NULL;
-UPDATE tasks SET creator_id = (SELECT owner_id FROM topics WHERE topics.id = (SELECT topic_id FROM goals WHERE goals.id = tasks.goal_id)) WHERE creator_id IS NULL;
+### 🎯 TODO List 狀態檢查
 ```
-
-#### 1.3 索引優化
-```sql
--- 創建者查詢索引
-CREATE INDEX idx_topics_creator_id ON topics(creator_id);
-CREATE INDEX idx_goals_creator_id ON goals(creator_id);  
-CREATE INDEX idx_tasks_creator_id ON tasks(creator_id);
-
--- 複合索引用於獨立 Task 查詢
-CREATE INDEX idx_tasks_creator_goal ON tasks(creator_id, goal_id);
+✅ task-independence-1.1: 資料庫遷移：新增 creator_id 欄位到 topics, goals, tasks 表
+✅ task-independence-1.2: 執行資料遷移腳本：將現有 owner_id 複製到 creator_id
+✅ task-independence-1.3: 建立索引：creator_id 相關的查詢優化索引
+✅ task-independence-1.4: 更新 RPC Functions：safe_update_topic, safe_update_goal, safe_update_task 支援 creator_id
+✅ task-independence-1.5: 更新 TypeScript 類型定義：新增 creator_id 欄位到 Topic, Goal, Task interfaces
+✅ task-independence-1.6: 更新 topicStore.createTopic：設定 creator_id
+✅ task-independence-1.7: 更新 goalStore.addGoal：設定 creator_id
+✅ task-independence-1.8: 更新 taskStore.addTask：設定 creator_id
+✅ task-independence-1.9: 第一階段測試：驗證現有功能正常，新建實體有正確 creator_id
 ```
-
-### 🔧 RPC Functions 更新
-
-#### 1.4 更新現有 RPC Functions
-需要修改的 RPC Functions：
-- `safe_update_topic` - 新增 creator_id 支援
-- `safe_update_goal` - 新增 creator_id 支援  
-- `safe_update_task` - 新增 creator_id 支援
-- `get_active_tasks_for_user` - 考慮 creator_id
-- `get_topic_with_structure` - 回傳 creator_id
-
-### 💻 前端程式碼更新
-
-#### 1.5 Types 更新
-```typescript
-// apps/client/src/types/goal.ts
-export interface Topic {
-  // ... 現有欄位
-  creator_id: string;    // 新增
-}
-
-export interface Goal {
-  // ... 現有欄位  
-  creator_id: string;    // 新增
-}
-
-export interface Task {
-  // ... 現有欄位
-  creator_id: string;    // 新增
-}
-```
-
-#### 1.6 Store 更新
-
-**topicStore.ts:**
-```typescript
-createTopic: async (topicData) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('用戶未認證');
-  
-  const dbTopicData = {
-    ...topicData,
-    owner_id: user.id,
-    creator_id: user.id  // 新增
-  };
-  // ... 其餘邏輯
-}
-```
-
-**goalStore.ts:**
-```typescript
-addGoal: async (topicId, goalData) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('用戶未認證');
-
-  const goalDataWithDefaults = {
-    ...goalData,
-    topic_id: topicId,
-    creator_id: user.id  // 新增
-  };
-  // ... 其餘邏輯
-}
-```
-
-**taskStore.ts:**
-```typescript
-addTask: async (goalId, taskData) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('用戶未認證');
-
-  const taskDataWithDefaults = {
-    ...taskData,
-    goal_id: goalId,
-    creator_id: user.id  // 新增
-  };
-  // ... 其餘邏輯
-}
-```
-
-### ✅ 第一階段驗收標準
-- [ ] 所有表格都有 creator_id 欄位
-- [ ] 現有資料正確遷移
-- [ ] 新建的 Topic/Goal/Task 都有正確的 creator_id
-- [ ] 現有功能完全正常運作
-- [ ] 所有測試通過
 
 ---
 
@@ -159,7 +174,18 @@ addTask: async (goalId, taskData) => {
 - 提供獨立 Task 的查詢 API
 - 支援協作者功能
 
-### 📊 資料庫更新
+### 📋 待完成的工作
+```
+⏳ task-independence-2.1: 調整資料庫約束：讓 tasks.goal_id 可為 NULL，新增獨立任務檢查約束
+⏳ task-independence-2.2: 建立 RPC Functions：get_independent_tasks_by_creator 和 get_independent_tasks_as_collaborator
+⏳ task-independence-2.3: TaskStore 新增獨立任務功能：createIndependentTask, getMyIndependentTasks, getCollaborativeIndependentTasks
+⏳ task-independence-2.4: 創建獨立任務 UI 頁面：IndependentTasksPage.tsx
+⏳ task-independence-2.5: 更新導航和路由：新增獨立任務選項到 Sidebar
+⏳ task-independence-2.6: 實作向後相容策略：擴展 addTask 支援獨立模式
+⏳ task-independence-2.7: 第二階段測試：驗證獨立任務完整功能，確保現有功能不受影響
+```
+
+### 📊 資料庫更新計劃
 
 #### 2.1 調整表格約束
 ```sql
@@ -187,6 +213,10 @@ RETURNS TABLE (
   creator_id UUID,
   owner_id UUID,
   collaborator_ids JSONB,
+  task_type VARCHAR(50),
+  task_config JSONB,
+  cycle_config JSONB,
+  special_flags JSONB,
   created_at TIMESTAMP WITH TIME ZONE,
   updated_at TIMESTAMP WITH TIME ZONE
 ) AS $$
@@ -195,6 +225,7 @@ BEGIN
   SELECT 
     t.id, t.title, t.description, t.status, t.priority,
     t.creator_id, t.owner_id, t.collaborator_ids,
+    t.task_type, t.task_config, t.cycle_config, t.special_flags,
     t.created_at, t.updated_at
   FROM tasks t
   WHERE 
@@ -216,6 +247,10 @@ RETURNS TABLE (
   creator_id UUID,
   owner_id UUID,
   collaborator_ids JSONB,
+  task_type VARCHAR(50),
+  task_config JSONB,
+  cycle_config JSONB,
+  special_flags JSONB,
   created_at TIMESTAMP WITH TIME ZONE,
   updated_at TIMESTAMP WITH TIME ZONE
 ) AS $$
@@ -224,6 +259,7 @@ BEGIN
   SELECT 
     t.id, t.title, t.description, t.status, t.priority,
     t.creator_id, t.owner_id, t.collaborator_ids,
+    t.task_type, t.task_config, t.cycle_config, t.special_flags,
     t.created_at, t.updated_at
   FROM tasks t
   WHERE 
@@ -238,208 +274,102 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-### 💻 前端程式碼更新
+---
 
-#### 2.3 TaskStore 新增獨立 Task 功能
-```typescript
-interface TaskStoreState {
-  // ... 現有欄位
+## === 第三階段：完善和優化 ===
 
-  // 新增獨立 Task 功能
-  createIndependentTask: (task: Omit<Task, 'id' | 'goal_id' | 'creator_id' | 'version' | 'created_at' | 'updated_at'>) => Promise<Task | null>;
-  getMyIndependentTasks: () => Promise<Task[]>;
-  getCollaborativeIndependentTasks: () => Promise<Task[]>;
-  inviteTaskCollaborator: (taskId: string, userId: string) => Promise<boolean>;
-}
+### 🎯 目標
+- 完整測試和效能優化
+- 撰寫文檔和使用指南
+- 監控和效能分析
 
-// 實作
-createIndependentTask: async (taskData) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('用戶未認證');
-
-    const taskDataWithDefaults = {
-      ...taskData,
-      goal_id: null,          // 獨立 Task
-      creator_id: user.id,
-      owner_id: user.id,
-      status: taskData.status || 'todo',
-      priority: taskData.priority || 'medium',
-      need_help: taskData.need_help || false,
-      task_type: taskData.task_type || 'single',
-      task_config: taskData.task_config || { type: 'single' },
-      cycle_config: taskData.cycle_config || { cycle_type: 'none', auto_reset: false },
-    };
-
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert([taskDataWithDefaults])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    set(state => ({ tasks: [...state.tasks, data] }));
-    return data;
-  } catch (error: any) {
-    console.error('創建獨立任務失敗:', error);
-    set({ error: error.message || '創建獨立任務失敗' });
-    return null;
-  }
-},
-
-getMyIndependentTasks: async () => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('用戶未認證');
-
-    const { data, error } = await supabase.rpc('get_independent_tasks_by_creator', {
-      p_user_id: user.id
-    });
-
-    if (error) throw error;
-    return data || [];
-  } catch (error: any) {
-    console.error('獲取我的獨立任務失敗:', error);
-    return [];
-  }
-},
-
-getCollaborativeIndependentTasks: async () => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('用戶未認證');
-
-    const { data, error } = await supabase.rpc('get_independent_tasks_as_collaborator', {
-      p_user_id: user.id
-    });
-
-    if (error) throw error;
-    return data || [];
-  } catch (error: any) {
-    console.error('獲取協作獨立任務失敗:', error);
-    return [];
-  }
-}
+### 📋 待完成的工作
 ```
-
-#### 2.4 UI 組件更新
-
-**新增獨立任務頁面：**
-```typescript
-// apps/client/src/pages/student/IndependentTasksPage.tsx
-export const IndependentTasksPage: React.FC = () => {
-  const { 
-    createIndependentTask, 
-    getMyIndependentTasks,
-    getCollaborativeIndependentTasks 
-  } = useTaskStore();
-  
-  // ... 組件實作
-};
+⏳ task-independence-3.1: 撰寫完整的單元測試和整合測試
+⏳ task-independence-3.2: 效能測試：監控查詢效能和記憶體使用
+⏳ task-independence-3.3: 文檔更新：使用指南和 API 文檔
 ```
-
-**更新導航：**
-- 在 Sidebar 新增「獨立任務」選項
-- 更新路由配置
-
-### 🔄 向後相容策略
-
-#### 2.5 漸進式遷移
-```typescript
-// 擴展現有 addTask 方法支援獨立模式
-addTask: async (goalIdOrNull: string | null, taskData) => {
-  if (goalIdOrNull === null) {
-    // 創建獨立任務
-    return await get().createIndependentTask(taskData);
-  } else {
-    // 現有邏輯：創建依賴 Goal 的任務
-    // ... 現有實作
-  }
-}
-```
-
-#### 2.6 API 一致性
-- 現有 `addTask(goalId, taskData)` 保持不變
-- 新增 `createIndependentTask(taskData)` 
-- 統一的 Task 操作方法（updateTask, deleteTask 等）同時支援兩種模式
-
-### ✅ 第二階段驗收標準
-- [ ] 可以創建獨立的 Task（goal_id 為 NULL）
-- [ ] 可以查詢自己創建的獨立 Task
-- [ ] 可以查詢自己協作的獨立 Task
-- [ ] 獨立 Task 支援完整的生命週期管理
-- [ ] 現有依賴 Goal 的 Task 功能完全正常
-- [ ] 所有測試通過
 
 ---
 
-## 🚨 風險評估與注意事項
+## 🚨 立即決策需求
 
-### 資料一致性風險
-1. **遷移過程中的資料完整性**
-   - 建議在非營業時間進行遷移
-   - 完整備份資料庫
-   - 分步驟執行並驗證每個步驟
+### ❗ 高優先級（需立即處理）
+1. **決定 Store 架構方案**：方案 A（分離數據）vs 方案 B（統一 Store）
+2. **移除臨時同步代碼**：當前的手動同步會累積技術債務
 
-2. **RPC Function 更新風險**
-   - 逐一更新並測試每個 RPC
-   - 保持向後相容性
-   - 監控 Supabase 日誌
+### ⚡ 中優先級（本週內處理）
+3. **完成第二階段遷移**：獨立 Task 功能
+4. **創建獨立任務 UI**：新的頁面和導航
 
-### 效能影響
-1. **查詢效能**
-   - 新增適當的索引
-   - 監控查詢效能
-   - 考慮分頁載入
-
-2. **儲存空間**
-   - creator_id 會增加一些儲存開銷
-   - 評估是否需要定期清理歸檔資料
-
-### 用戶體驗風險
-1. **功能複雜度增加**
-   - 提供清楚的 UI 區分獨立 Task 和依賴 Task
-   - 完善的使用指南
-   - 漸進式功能推出
+### 🔄 低優先級（可延後）
+5. **效能優化和測試**：在基礎架構穩定後進行
 
 ---
 
-## 📅 實施時間軸
+## 📅 建議實施時間軸
 
-### 第一階段（預估 1-2 週）
-- **Week 1**: 資料庫遷移 + RPC 更新
-- **Week 2**: 前端 Store 更新 + 測試
+### 立即行動（今天-明天）
+- **決定 Store 架構方案**
+- **實施選定的架構方案**  
+- **移除臨時同步代碼**
 
-### 第二階段（預估 2-3 週）  
-- **Week 1**: 資料庫約束調整 + 新 RPC Functions
-- **Week 2**: TaskStore 獨立功能實作
-- **Week 3**: UI 組件開發 + 整合測試
+### 本週內
+- **完成第二階段資料庫遷移**
+- **實作獨立 Task 功能**
+- **創建基礎 UI**
+
+### 下週
+- **完善 UI 和用戶體驗**
+- **撰寫測試和文檔**
+- **效能優化**
 
 ---
 
 ## 🧪 測試策略
 
-### 單元測試
-- [ ] 資料庫遷移測試
-- [ ] RPC Function 測試  
-- [ ] Store 方法測試
+### 已完成的測試
+- [x] 第一階段功能測試：creator_id 支援和版本控制
+- [x] TaskWithContext 統一性測試
 
-### 整合測試
-- [ ] 完整的 Task 生命週期測試
+### 待完成的測試
+- [ ] Store 架構重構後的完整測試
+- [ ] 獨立 Task CRUD 操作測試
 - [ ] 獨立 Task 與依賴 Task 混合場景測試
 - [ ] 協作功能測試
-
-### 效能測試
-- [ ] 大量資料下的查詢效能
-- [ ] 併發創建 Task 的效能
-- [ ] 記憶體使用量測試
+- [ ] 效能和壓力測試
 
 ---
 
-## 📝 後續優化建議
+## 📝 相關文檔和參考
 
-1. **快取策略**：對頻繁查詢的獨立 Task 實施快取
-2. **批次操作**：支援批次創建/更新獨立 Task
-3. **進階篩選**：提供更豐富的獨立 Task 篩選和排序選項
-4. **統計分析**：獨立 Task 的使用統計和分析報告 
+### 已建立的文檔
+- `TASK_INDEPENDENCE_REFACTOR_PLAN.md` (本文檔)
+- `USER_EVENTS_SYSTEM_DEPLOYMENT_SUMMARY.md`
+- `TOPIC_STORE_MIGRATION_GUIDE.md`
+
+### 需要更新的文檔
+- API 文檔（新增獨立 Task 相關 API）
+- 用戶使用指南（獨立 Task 功能說明）
+- 開發者指南（新的 Store 架構說明）
+
+---
+
+## 💡 總結和下一步
+
+### 當前狀況
+- ✅ 第一階段（creator_id 支援）已完成
+- ⚠️ Store 架構問題需要立即解決
+- ⏳ 第二階段（獨立 Task）待開始
+
+### 立即行動計劃
+1. **今天**：決定並實施 Store 架構解決方案
+2. **明天**：移除臨時同步代碼，測試新架構
+3. **本週**：開始第二階段獨立 Task 功能開發
+
+### 成功指標
+- Store 間不再有數據重複
+- Task 狀態更新即時反映
+- 可以創建和管理獨立 Task
+- 現有功能完全正常運作
+- 開發體驗明顯改善 

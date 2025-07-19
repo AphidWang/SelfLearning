@@ -2,6 +2,7 @@ import type { Topic, Goal, Task, Bubble, GoalStatus, TaskStatus, TaskPriority, C
 import type { TopicCollaborator, User } from '@self-learning/types';
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
+import { fetchTopicsWithActions, refreshTopicData } from './dataManager';
 /**
  * Topic-only store interface after refactor.
  * Contains only Topic related methods.
@@ -13,9 +14,7 @@ interface TopicStore {
   error: string | null;
   syncing: boolean;
 
-  // Topic CRUD
-  fetchTopicsWithActions: () => Promise<void>;
-  getTopic: (id: string) => Promise<Topic | null>;
+  // Topic CRUD (fetchTopicsWithActions moved to dataManager.ts)
   createTopic: (topic: Omit<Topic, 'id' | 'owner_id' | 'version' | 'created_at' | 'updated_at' | 'creator_id'>) => Promise<Topic | null>;
   updateTopic: (id: string, expectedVersion: number, updates: Partial<Topic>) => Promise<Topic | null>;
   deleteTopic: (id: string) => Promise<boolean>;
@@ -43,52 +42,6 @@ interface TopicStore {
 
 }
 
-// TODO: 之後要把 collaborator 的資料獲取移到顯示層，這裡暫時 patch 以保證 FE 不爆
-function attachUserProfilesToCollaborators(users: any[], entity: any) {
-  if (!entity) return entity;
-  // owner
-  if (entity.owner_id) {
-    entity.owner = users.find(u => u.id === entity.owner_id) || {
-      id: entity.owner_id,
-      name: `User-${entity.owner_id?.slice?.(0, 8) || ''}`,
-      email: '',
-      avatar: undefined,
-      role: 'student',
-      roles: ['student']
-    };
-  }
-  // collaborators (id 陣列 or物件陣列)
-  if (Array.isArray(entity.collaborators)) {
-    entity.collaborators = entity.collaborators.map((collab: any) => {
-      const id = typeof collab === 'string' ? collab : collab.id;
-      const permission = collab.permission;
-      const invited_at = collab.invited_at;
-      const user = users.find(u => u.id === id) || {
-        id,
-        name: `User-${id?.slice?.(0, 8) || ''}`,
-        email: '',
-        avatar: undefined,
-        role: 'student',
-        roles: ['student']
-      };
-      return { ...user, permission, invited_at };
-    });
-  }
-  // 遞迴處理 goals
-  if (Array.isArray(entity.goals)) {
-    entity.goals = entity.goals.map(goal => attachUserProfilesToCollaborators(users, goal));
-  }
-  // 遞迴處理 tasks
-  if (Array.isArray(entity.tasks)) {
-    entity.tasks = entity.tasks.map(task => attachUserProfilesToCollaborators(users, task));
-  }
-  // goal 下的 tasks
-  if (Array.isArray(entity.tasks)) {
-    entity.tasks = entity.tasks.map(task => attachUserProfilesToCollaborators(users, task));
-  }
-  return entity;
-}
-
 export const useTopicStore = create<TopicStore>((set, get) => ({
   topics: [],
   selectedTopicId: null,
@@ -96,54 +49,6 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   error: null,
   syncing: false,
 
-  fetchTopicsWithActions: async () => {
-    set({ loading: true, error: null });
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        set({ loading: false, topics: [], error: null });
-        return [];
-      }
-      const { data, error } = await supabase.rpc('get_user_topics_with_structure', {
-        p_user_id: user.id
-      });
-      if (error) {
-        set({ loading: false, error: error.message });
-        return [];
-      }
-      const userStore = await import('./userStore');
-      const allUsers = userStore.useUserStore.getState().users || [];
-      const { getCompletionRate } = await import('./progressQueries');
-      const topicsWithRate = (data || []).map((topic: any) => {
-        const patched = attachUserProfilesToCollaborators(allUsers, topic);
-        return { ...patched, completionRate: getCompletionRate(patched) };
-      });
-      set({ topics: topicsWithRate, loading: false });
-      return topicsWithRate;
-    } catch (error: any) {
-      set({ loading: false, error: error.message || '獲取主題失敗' });
-      return [];
-    }
-  },
-
-  getTopic: async (id: string) => {
-    try {
-      const { data, error } = await supabase.rpc('get_topics_full_structure', {
-        topic_ids: [id]
-      });
-      if (error) throw error;
-      if (!data || !Array.isArray(data) || data.length === 0) return null;
-      const topic = data[0];
-      const userStore = await import('./userStore');
-      const allUsers = userStore.useUserStore.getState().users || [];
-      const patched = attachUserProfilesToCollaborators(allUsers, topic);
-      const { getCompletionRate } = await import('./progressQueries');
-      return { ...patched, completionRate: getCompletionRate(patched) };
-    } catch (error: any) {
-      set({ error: error.message || '獲取主題失敗' });
-      return null;
-    }
-  },
 
   createTopic: async (topicData) => {
     set({ loading: true, error: null });
@@ -196,7 +101,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         }
         throw new Error(result?.message || '更新主題失敗');
       }
-      const updatedTopic = await get().getTopic(id);
+      const updatedTopic = await refreshTopicData(id);
       if (updatedTopic) {
         set(state => ({ topics: state.topics.map(t => t.id === id ? updatedTopic : t) }));
         return updatedTopic;
@@ -230,8 +135,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         .update({ status: 'active' })
         .eq('id', id);
       if (error) throw error;
-      // 重新載入主題列表以顯示還原的主題
-      await get().fetchTopicsWithActions();
+
+      await fetchTopicsWithActions()
       return true;
     } catch (error: any) {
       set({ error: error.message || '還原主題失敗' });
@@ -348,34 +253,38 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     }
   },
 
-  // Utility
+  // Utility methods - will be replaced by external composition
   getActiveGoals: (topicId) => {
     const topic = get().topics.find(t => t.id === topicId);
-    if (!topic || !Array.isArray(topic.goals)) return [];
-    return topic.goals
-      .filter(goal => goal.status !== 'archived')
-      .map(goal => ({ ...goal, tasks: goal.tasks || [] }));
+    if (!topic) return [];
+    
+    // Use new structure with goalIds
+    if (topic.goalIds && topic.goalIds.length > 0) {
+      // Return placeholder objects, real data should be fetched from goalStore
+      return topic.goalIds.map(goalId => ({ id: goalId, topic_id: topicId, status: 'active' } as any));
+    }
+    
+    return [];
   },
   getFocusedGoals: (topicId) => {
     const topic = get().topics.find(t => t.id === topicId);
-    if (!topic || !Array.isArray(topic.goals)) return [];
-    return topic.goals
-      .filter(goal => goal.status === 'focus')
-      .map(goal => ({ ...goal, tasks: goal.tasks || [] }));
+    if (!topic) return [];
+    
+    // Use new structure with goalIds (filtered for focus goals should be done externally)
+    if (topic.goalIds && topic.goalIds.length > 0) {
+      // Return placeholder objects, real filtering should be done using goalStore
+      return topic.goalIds.map(goalId => ({ id: goalId, topic_id: topicId, status: 'focus' } as any));
+    }
+    
+    return [];
   },
   getActiveTopics: () => {
     return get().topics.filter(topic => {
       if (topic.status === 'active' || topic.status === 'in-progress') {
         return true;
       }
-      if (Array.isArray(topic.goals) && topic.goals.length > 0) {
-        const hasActiveTasks = topic.goals.some(goal =>
-          Array.isArray(goal.tasks) && goal.tasks.some(task =>
-            task.status === 'todo' || task.status === 'in_progress'
-          )
-        );
-        return hasActiveTasks;
-      }
+      // Note: 需要結合 taskStore 來判斷是否有活躍任務
+      // 暫時只根據 status 判斷，之後組件層會處理
       return false;
     });
   },
@@ -386,7 +295,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('找不到主題');
       const updated = await get().updateTopic(topicId, topic.version, { is_collaborative: true });
-      await get().fetchTopicsWithActions();
+      
+      await fetchTopicsWithActions()
       return updated;
     } catch (error: any) {
       set({ error: error.message || '啟用協作模式失敗' });
@@ -398,7 +308,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
       const topic = get().topics.find(t => t.id === topicId);
       if (!topic) throw new Error('找不到主題');
       const updated = await get().updateTopic(topicId, topic.version, { is_collaborative: false });
-      await get().fetchTopicsWithActions();
+      
+      await fetchTopicsWithActions()
       return updated;
     } catch (error: any) {
       set({ error: error.message || '停用協作模式失敗' });
@@ -413,7 +324,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         .from('topic_collaborators')
         .insert([{ topic_id: topicId, user_id: userId, permission, invited_by: user.id }]);
       if (error) throw error;
-      await get().fetchTopicsWithActions();
+      
+      await fetchTopicsWithActions()
       return true;
     } catch (error: any) {
       set({ error: error.message || '邀請協作者失敗' });
@@ -428,7 +340,8 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
         .eq('topic_id', topicId)
         .eq('user_id', userId);
       if (error) throw error;
-      await get().fetchTopicsWithActions();
+      
+      await fetchTopicsWithActions()
       return true;
     } catch (error: any) {
       set({ error: error.message || '移除協作者失敗' });
@@ -442,7 +355,7 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
   setSyncing: (syncing) => set({ syncing }),
   reset: () => set({ topics: [], selectedTopicId: null, loading: false, error: null, syncing: false }),
   refreshTopic: async (id) => {
-    const topic = await get().getTopic(id);
+    const topic = await refreshTopicData(id);
     if (topic) {
       set(state => ({ topics: state.topics.map(t => t.id === id ? topic : t) }));
     }

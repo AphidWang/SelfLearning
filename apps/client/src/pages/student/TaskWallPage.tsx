@@ -35,6 +35,28 @@ import { useTopicStore } from '../../store/topicStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useGoalStore } from '../../store/goalStore';
 import { useUserStore } from '../../store/userStore';
+import { 
+  getGoalsForTopic, 
+  getTasksForGoal, 
+  getTopicProgress,
+  getTaskById,
+  getGoalById,
+  getAllTasksForTopic,
+  getActiveGoalsForTopic,
+  getActiveTasksForGoal
+} from '../../store/helpers';
+import {
+  useGoalsForTopic,
+  useActiveGoalsForTopic,
+  useTasksForGoal,
+  useActiveTasksForGoal,
+  useTopicStats,
+  useGoalStats,
+  useAllTasksForTopic,
+  useActiveTasksForTopic,
+  useTaskWallTaskIds,
+  useTasksByIds
+} from '../../store/selectors';
 import { useUser } from '../../context/UserContext';
 import { subjects } from '../../styles/tokens';
 import { DailyJournalDialog } from './components/DailyJournalDialog';
@@ -58,7 +80,7 @@ import { TaskRecordDialog } from './components/TaskRecordDialog';
 import { TaskRecordHistoryDialog } from './components/TaskRecordHistoryDialog';
 import { TopicGrid } from './components/TopicCards';
 import { TopicTemplateBrowser as TemplateBrowser } from '../../components/template/TopicTemplateBrowser';
-
+import { fetchTopicsWithActions } from '../../store/dataManager';
 
 /**
  * 任務牆配置介面
@@ -87,8 +109,7 @@ export const TaskWallPage = () => {
   const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
   
   // Store hooks with error handling
-  const { 
-    fetchTopicsWithActions, 
+  const {  
     topics, 
     createTopic,
     getActiveGoals,
@@ -168,7 +189,7 @@ export const TaskWallPage = () => {
     };
     
     fetchData();
-  }, [fetchTopicsWithActions, getCollaboratorCandidates, userLoading]);
+  }, [userLoading]); // 移除 getCollaboratorCandidates 依賴，因為它是穩定的函數
 
   // 自動清除錯誤消息
   useEffect(() => {
@@ -182,44 +203,52 @@ export const TaskWallPage = () => {
     }
   }, [error]);
 
-  // 從資料庫載入已完成任務到完成收藏
+  /**
+   * 使用響應式 selector 獲取 TaskWallPage 關注的任務 ID 列表
+   */
+  const { activeTaskIds, completedTaskIds } = useTaskWallTaskIds();
+
+  /**
+   * 使用響應式 selector 根據 ID 列表獲取完整的任務資料
+   */
+  const allActiveTasks = useTasksByIds(activeTaskIds);
+
+  // 使用響應式 selector 獲取已完成任務
+  const completedTasksData = useTasksByIds(completedTaskIds);
+  
+  // 從響應式數據構建已完成任務列表
   useEffect(() => {
-    if (!topics) return;
+    if (!topics || !completedTasksData) return;
 
     const completedTasksFromDB: TaskWithContext[] = [];
     
-    topics.forEach(topic => {
-      if (topic.status === 'archived') return;
+    completedTasksData.forEach(task => {
+      const goal = getGoalById(task.goal_id);
+      if (!goal) return;
+      
+      const topic = topics.find(t => t.id === goal.topic_id);
+      if (!topic || topic.status === 'archived') return;
       
       const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
       
-      topic.goals?.forEach(goal => {
-        if (goal.status === 'archived') return;
-        
-        goal.tasks?.forEach(task => {
-          // 載入已完成的任務
-          if (task.status === 'done') {
-            completedTasksFromDB.push({
-              ...task,
-              topicId: topic.id,
-              topicTitle: topic.title,
-              topicSubject: topic.subject || '未分類',
-              goalId: goal.id,
-              goalTitle: goal.title,
-              subjectStyle,
-              records: (task.records || []).map(record => ({
-                id: record.id,
-                created_at: record.created_at || new Date().toISOString(),
-                title: task.title,
-                message: record.message || '',
-                difficulty: record.difficulty || 3,
-                completion_time: record.completion_time,
-                files: record.files || [],
-                tags: record.tags || []
-              }))
-            });
-          }
-        });
+      completedTasksFromDB.push({
+        ...task,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        topicSubject: topic.subject || '未分類',
+        goalId: goal.id,
+        goalTitle: goal.title,
+        subjectStyle,
+        records: (task.records || []).map(record => ({
+          id: record.id,
+          created_at: record.created_at || new Date().toISOString(),
+          title: task.title,
+          message: record.message || '',
+          difficulty: record.difficulty || 3,
+          completion_time: record.completion_time,
+          files: record.files || [],
+          tags: record.tags || []
+        }))
       });
     });
 
@@ -234,7 +263,7 @@ export const TaskWallPage = () => {
     const recentCompletedTasks = completedTasksFromDB.slice(0, 10);
     setCompletedTasks(recentCompletedTasks);
     setCompletedCount(completedTasksFromDB.length);
-  }, [topics]);
+  }, [completedTasksData, topics]); // getGoalById 是穩定的函數引用
 
   /**
    * 處理任務狀態更新
@@ -259,20 +288,19 @@ export const TaskWallPage = () => {
           if (!result.success) {
             if (result.requiresRecord) {
               // 需要學習記錄，顯示溫馨提示
-              const task = topics
-                .find(t => t.id === topicId)
-                ?.goals?.find(g => g.id === goalId)
-                ?.tasks?.find(t => t.id === taskId);
+              const task = getTaskById(taskId);
+              const currentTopics = useTopicStore.getState().topics;
+              const topic = currentTopics.find(t => t.id === topicId);
+              const goal = getGoalById(goalId);
               
-              const topic = topics.find(t => t.id === topicId);
-              if (task && topic) {
+              if (task && topic && goal) {
                 setSelectedTaskForRecord({
                   ...task,
                   topicId,
                   topicTitle: topic.title,
                   topicSubject: topic.subject || '未分類',
                   goalId,
-                  goalTitle: topic.goals?.find(g => g.id === goalId)?.title || '',
+                  goalTitle: goal.title,
                   subjectStyle: subjects.getSubjectStyle(topic.subject || ''),
                   records: (task.records || []).map(record => ({
                     id: record.id,
@@ -324,7 +352,7 @@ export const TaskWallPage = () => {
       console.error('更新任務狀態失敗:', error);
       toast.error('系統錯誤，請稍後再試');
     }
-  }, [markTaskCompleted, markTaskInProgress, markTaskTodo]);
+  }, [markTaskCompleted, markTaskInProgress, markTaskTodo]); // getTaskById 和 getGoalById 是穩定的函數引用
 
   /**
    * 處理新增任務到目標
@@ -349,7 +377,7 @@ export const TaskWallPage = () => {
     } catch (error) {
       console.error('新增任務失敗:', error);
     }
-  }, [addTask]);
+  }, [addTask]); // addTask 是穩定的函數引用
 
   /**
    * 處理任務恢復到進行中
@@ -366,7 +394,7 @@ export const TaskWallPage = () => {
     } catch (error) {
       console.error('恢復任務失敗:', error);
     }
-  }, [markTaskInProgress]);
+  }, [markTaskInProgress]); // markTaskInProgress 是穩定的函數引用
 
   /**
    * 處理切換完成堆疊顯示
@@ -439,7 +467,8 @@ export const TaskWallPage = () => {
     
     try {
       // 找到或創建"個人習慣"主題
-      let habitTopic = topics?.find(topic => topic.title === '個人習慣' && topic.subject === '生活');
+      const currentTopics = useTopicStore.getState().topics;
+      let habitTopic = currentTopics?.find(topic => topic.title === '個人習慣' && topic.subject === '生活');
       
       if (!habitTopic) {
         // 創建個人習慣主題（隱藏主題，不在主題牆顯示）
@@ -460,7 +489,8 @@ export const TaskWallPage = () => {
       }
 
       // 找到或創建"每週挑戰"目標
-      let challengeGoal = habitTopic.goals?.find(goal => goal.title === '每週挑戰');
+      const goals = getGoalsForTopic(habitTopic.id);
+      let challengeGoal = goals.find(goal => goal.title === '每週挑戰');
       
       if (!challengeGoal) {
         const newGoal = await addGoal(habitTopic.id, {
@@ -540,57 +570,45 @@ export const TaskWallPage = () => {
     } finally {
       setIsCreatingWeeklyTask(false);
     }
-  }, [currentUser, topics, createTopic, addGoal, addTask, fetchTopicsWithActions, getWeekStart, getTaiwanDateString]);
+  }, [currentUser, createTopic, addGoal, addTask, getWeekStart, getTaiwanDateString]); // fetchTopicsWithActions 是穩定的函數引用
+
 
   /**
-   * 從所有主題中提取活躍的任務
-   * 過濾條件：未完成、未歸檔的任務
-   * 排除：隱藏主題中的週挑戰任務（因為有專門的 WeeklyQuickCard 顯示）
+   * 過濾和構建活躍任務列表
    */
   const activeTasks = useMemo((): TaskWithContext[] => {
-    if (!topics) return [];
+    if (!topics || !allActiveTasks) return [];
 
     const tasks: TaskWithContext[] = [];
     
-    topics.forEach(topic => {
-      // 只處理活躍的主題
-      if (topic.status === 'archived') return;
+    allActiveTasks.forEach(task => {
+      // 獲取相關的 topic 和 goal 資訊
+      const goal = getGoalById(task.goal_id);
+      if (!goal) return;
+      
+      const topic = topics.find(t => t.id === goal.topic_id);
+      if (!topic || topic.status === 'archived') return;
       
       const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
       
-      topic.goals?.forEach(goal => {
-        // 只處理活躍的目標
-        if (goal.status === 'archived') return;
-        
-        goal.tasks?.forEach(task => {
-          // 只顯示待完成和進行中的任務，排除已歸檔的任務
-          if (task.status === 'todo' || task.status === 'in_progress') {
-            // 排除所有週挑戰任務，避免與 WeeklyQuickCard 重複
-            const isWeeklyChallenge = task.special_flags?.includes(SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE);
-            
-            if (!isWeeklyChallenge) {
-              tasks.push({
-                ...task,
-                topicId: topic.id,
-                topicTitle: topic.title,
-                topicSubject: topic.subject || '未分類',
-                goalId: goal.id,
-                goalTitle: goal.title,
-                subjectStyle,
-                records: (task.records || []).map(record => ({
-                  id: record.id,
-                  created_at: record.created_at || new Date().toISOString(),
-                  title: task.title,
-                  message: record.message || '',
-                  difficulty: record.difficulty || 3,
-                  completion_time: record.completion_time,
-                  files: record.files || [],
-                  tags: record.tags || []
-                }))
-              });
-            }
-          }
-        });
+      tasks.push({
+        ...task,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        topicSubject: topic.subject || '未分類',
+        goalId: goal.id,
+        goalTitle: goal.title,
+        subjectStyle,
+        records: (task.records || []).map(record => ({
+          id: record.id,
+          created_at: record.created_at || new Date().toISOString(),
+          title: task.title,
+          message: record.message || '',
+          difficulty: record.difficulty || 3,
+          completion_time: record.completion_time,
+          files: record.files || [],
+          tags: record.tags || []
+        }))
       });
     });
 
@@ -673,7 +691,9 @@ export const TaskWallPage = () => {
         return b.id.localeCompare(a.id);
       }
     });
-  }, [topics, config.sortMode]);
+  }, [allActiveTasks, topics, config.sortMode]); // getGoalById 是穩定的函數引用
+
+
 
   /**
    * 從所有主題中提取需要建立任務的目標
@@ -688,12 +708,13 @@ export const TaskWallPage = () => {
       if (topic.status === 'archived') return;
       
       const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+      const topicGoals = getGoalsForTopic(topic.id);
       
-      topic.goals?.forEach(goal => {
+      topicGoals.forEach(goal => {
         if (goal.status === 'archived') return;
         
         // 檢查目標是否需要更多任務
-        const activeTasks = goal.tasks?.filter(t => t.status !== 'archived') || [];
+        const activeTasks = getActiveTasksForGoal(goal.id);
         const incompleteTasks = activeTasks.filter(t => t.status !== 'done');
         
         // 如果沒有未完成的任務，這個目標需要新任務
@@ -710,7 +731,7 @@ export const TaskWallPage = () => {
     });
 
     return goals;
-  }, [topics]);
+  }, [topics]); // getGoalsForTopic 和 getActiveTasksForGoal 是穩定的函數引用
 
   /**
    * 根據配置過濾任務
@@ -733,11 +754,13 @@ export const TaskWallPage = () => {
       if (topic.status === 'archived') return;
       
       const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
+      const goals = getGoalsForTopic(topic.id);
       
-      topic.goals?.forEach(goal => {
+      goals.forEach(goal => {
         if (goal.status === 'archived') return;
         
-        goal.tasks?.forEach(task => {
+        const tasks = getTasksForGoal(goal.id);
+        tasks.forEach(task => {
           if ((task.status === 'todo' || task.status === 'in_progress') &&
               task.special_flags?.includes(SPECIAL_TASK_FLAGS.WEEKLY_QUICK_CHALLENGE)) {
             challengeTask = {
@@ -768,7 +791,7 @@ export const TaskWallPage = () => {
       hasChallenge: !!challengeTask,
       challengeTask
     };
-  }, [topics]);
+  }, [topics]); // getGoalsForTopic 和 getTasksForGoal 是穩定的函數引用
 
   /**
    * 整合所有卡片（包括週挑戰任務）
@@ -807,10 +830,10 @@ export const TaskWallPage = () => {
         const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
         
         // 計算目標統計
-        const activeGoals = (topic.goals || []).filter(goal => goal.status !== 'archived');
+        const activeGoals = getActiveGoalsForTopic(topic.id);
         const totalGoals = activeGoals.length;
         const completedGoals = activeGoals.filter(goal => {
-          const goalTasks = (goal.tasks || []).filter(task => task.status !== 'archived');
+          const goalTasks = getActiveTasksForGoal(goal.id);
           return goalTasks.length > 0 && goalTasks.every(task => task.status === 'done');
         }).length;
 
@@ -821,7 +844,7 @@ export const TaskWallPage = () => {
         let needHelpCount = 0;
 
         activeGoals.forEach(goal => {
-          const goalTasks = (goal.tasks || []).filter(task => task.status !== 'archived');
+          const goalTasks = getActiveTasksForGoal(goal.id);
           totalTasks += goalTasks.length;
           
           goalTasks.forEach(task => {
@@ -866,7 +889,7 @@ export const TaskWallPage = () => {
         }
         return b.topic.id.localeCompare(a.topic.id); // 新的在前
       });
-  }, [topics]);
+  }, [topics]); // getActiveGoalsForTopic 和 getActiveTasksForGoal 是穩定的函數引用
 
   /**
    * 處理主題點擊 - 開啟 TopicReviewPage
@@ -879,16 +902,16 @@ export const TaskWallPage = () => {
     setTimeout(() => {
       setLoadingTopicId(null);
     }, 500);
-  }, []);
+  }, []); // 沒有依賴，函數內部只設置狀態
 
   // 修改切換視圖模式的處理函數
-  const handleViewModeChange = async (mode: 'tasks' | 'topics') => {
+  const handleViewModeChange = useCallback(async (mode: 'tasks' | 'topics') => {
     setIsViewModeChanging(true);
     setConfig(prev => ({ ...prev, viewMode: mode }));
     // 模擬載入延遲
     await new Promise(resolve => setTimeout(resolve, 500));
     setIsViewModeChanging(false);
-  };
+  }, []);
 
   // 在 TaskWallPage 組件中添加刷新函數
   const handleRecordSuccess = useCallback(async () => {
@@ -896,7 +919,7 @@ export const TaskWallPage = () => {
     setSelectedTaskForRecord(null);
     // 重新獲取最新數據
     await fetchTopicsWithActions();
-  }, [fetchTopicsWithActions]);
+  }, []); // fetchTopicsWithActions 是穩定的函數引用，不需要依賴
 
   // 處理打開歷史記錄
   const handleOpenHistory = useCallback((task: TaskWithContext) => {

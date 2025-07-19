@@ -11,6 +11,7 @@ import { subjects } from '../../styles/tokens';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import toast from 'react-hot-toast';
 import { useTaskStore } from '../../store/taskStore';
+import { refreshTopicData } from '../../store/dataManager';
 
 interface TopicDetailsProps {
   topic: Topic;
@@ -48,7 +49,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
     topic_type: topic.topic_type || '學習目標',
     subject: topic.subject || SUBJECTS.CUSTOM
   });
-  const { deleteTopic, updateTopic, getActiveGoals, getTopic } = useTopicStore();
+  const { deleteTopic, updateTopic, getActiveGoals } = useTopicStore();
   const { addTask, deleteTask, updateTask, markTaskCompleted, markTaskInProgress, reorderTasks } = useTaskStore();
   const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [showGoalsOverview, setShowGoalsOverview] = useState(false);
@@ -57,7 +58,7 @@ export const TopicDetails: React.FC<TopicDetailsProps> = ({
 
   useEffect(() => {
     const fetchTopicData = async () => {
-      const topicData = await getTopic(topic.id);
+      const topicData = await refreshTopicData(topic.id);
       if (topicData) {
         const goals = getActiveGoals(topic.id);
         setActiveGoals(goals);

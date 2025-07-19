@@ -7,6 +7,7 @@ import { TopicRadialMap, useTopicRadialMapStats } from '../topic-review/TopicRad
 import { 
   X, Brain, TrendingUp, Calendar, CheckCircle2
 } from 'lucide-react';
+import { refreshTopicData } from '../../store/dataManager';
 
 interface TopicMindmapOverviewDialogProps {
   open: boolean;
@@ -22,16 +23,15 @@ export const TopicMindmapOverviewDialog: React.FC<TopicMindmapOverviewDialogProp
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
-  const { getTopic } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
   
   useEffect(() => {
     const fetchTopic = async () => {
-      const fetchedTopic = await getTopic(topicId);
+      const fetchedTopic = await refreshTopicData(topicId);
       setTopic(fetchedTopic);
     };
     fetchTopic();
-  }, [topicId, getTopic]);
+  }, [topicId]);
   
   const weeklyStats = useTopicRadialMapStats(topicId);
   

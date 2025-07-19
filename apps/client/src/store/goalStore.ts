@@ -3,26 +3,68 @@ import { supabase } from '../services/supabase';
 import type { Goal, ReferenceInfo, ReferenceAttachment, ReferenceLink } from '../types/goal';
 
 interface GoalStoreState {
-  goals: Goal[];
+  goals: Record<string, Goal>;
   error?: string;
+  
+  // 組合查詢方法
+  getGoalsForTopic: (topicId: string) => Goal[];
+  getGoalById: (goalId: string) => Goal | undefined;
+  getAllGoals: () => Goal[];
+  
+  // Goal CRUD 操作
   addGoal: (topicId: string, goalData: Omit<Goal, 'id' | 'topic_id' | 'version' | 'created_at' | 'updated_at' | 'creator_id'>) => Promise<Goal | null>;
   updateGoal: (goalId: string, expectedVersion: number, updates: Partial<Goal>) => Promise<Goal | null>;
   deleteGoal: (goalId: string) => Promise<boolean>;
   restoreGoal: (goalId: string) => Promise<boolean>;
-  updateGoalHelp: (topicId: string, goalId: string, needHelp: boolean, helpMessage?: string) => Promise<boolean>;
+  updateGoalHelp: (goalId: string, needHelp: boolean, helpMessage?: string) => Promise<boolean>;
   updateGoalReferenceInfo: (goalId: string, referenceInfo: ReferenceInfo) => Promise<boolean>;
   addGoalAttachment: (goalId: string, attachment: Omit<ReferenceAttachment, 'id' | 'created_at'>) => Promise<boolean>;
   removeGoalAttachment: (goalId: string, attachmentId: string) => Promise<boolean>;
   addGoalLink: (goalId: string, link: Omit<ReferenceLink, 'id' | 'created_at'>) => Promise<boolean>;
   removeGoalLink: (goalId: string, linkId: string) => Promise<boolean>;
-  setGoalOwner: (topicId: string, goalId: string, userId: string) => Promise<Goal | null>;
-  addGoalCollaborator: (topicId: string, goalId: string, userId: string) => Promise<boolean>;
-  removeGoalCollaborator: (topicId: string, goalId: string, userId: string) => Promise<boolean>;
+  setGoalOwner: (goalId: string, userId: string) => Promise<Goal | null>;
+  addGoalCollaborator: (goalId: string, userId: string) => Promise<boolean>;
+  removeGoalCollaborator: (goalId: string, userId: string) => Promise<boolean>;
+  
+  // Batch operations for performance
+  setGoals: (goals: Goal[]) => void;
+  clearGoals: () => void;
 }
 
 export const useGoalStore = create<GoalStoreState>((set, get) => ({
-  goals: [],
+  goals: {},
   error: undefined,
+
+  // 組合查詢方法
+  getGoalsForTopic: (topicId: string) => {
+    const state = get();
+    return Object.values(state.goals).filter(goal => goal.topic_id === topicId);
+  },
+  
+  getGoalById: (goalId: string) => {
+    const state = get();
+    return state.goals[goalId];
+  },
+  
+  getAllGoals: () => {
+    const state = get();
+    return Object.values(state.goals);
+  },
+
+  // Batch operations
+  setGoals: (goals: Goal[]) => {
+    set(state => {
+      const goalsMap = { ...state.goals };
+      goals.forEach(goal => {
+        goalsMap[goal.id] = goal;
+      });
+      return { goals: goalsMap };
+    });
+  },
+
+  clearGoals: () => {
+    set({ goals: {} });
+  },
 
   /**
    * 添加目標
@@ -51,10 +93,10 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
 
       if (error) throw error;
 
-      const newGoal = { ...data, tasks: [] };
-
-      set(state => ({ goals: [...state.goals, newGoal] }));
-      return newGoal;
+      set(state => ({
+        goals: { ...state.goals, [data.id]: data }
+      }));
+      return data;
     } catch (error: any) {
       console.error('添加目標失敗:', error);
       set({ error: error.message || '添加目標失敗' });
@@ -99,11 +141,11 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
         .eq('id', goalId)
         .single();
       if (goalError) throw goalError;
-      const goalWithTasks = { ...goalData, tasks: [] };
+      
       set(state => ({
-        goals: state.goals.map(goal => goal.id === goalId ? { ...goal, ...goalWithTasks } : goal)
+        goals: { ...state.goals, [goalId]: goalData }
       }));
-      return goalWithTasks;
+      return goalData;
     } catch (error: any) {
       console.error('更新目標失敗:', error);
       set({ error: error.message || '更新目標失敗' });
@@ -121,7 +163,11 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
         .update({ status: 'archived' })
         .eq('id', goalId);
       if (error) throw error;
-      set(state => ({ goals: state.goals.filter(goal => goal.id !== goalId) }));
+      
+      set(state => {
+        const { [goalId]: deleted, ...remainingGoals } = state.goals;
+        return { goals: remainingGoals };
+      });
       console.log(`📍 deleteGoal - 成功歸檔目標 ${goalId}`);
       return true;
     } catch (error: any) {
@@ -143,15 +189,15 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
 
       if (error) throw error;
 
-      // 這裡理論上要 refreshTopic(goal.topic_id)，但 goalStore 沒有 topic 狀態，先略過或 TODO
-      // if (!goalError && goal) {
-      //   await get().refreshTopic(goal.topic_id);
-      // }
-
-      // 直接把該 goal 狀態設回 goals
-      set(state => ({
-        goals: state.goals.map(g => g.id === goalId ? { ...g, status: 'todo' } : g)
-      }));
+      set(state => {
+        const existingGoal = state.goals[goalId];
+        if (existingGoal) {
+          return {
+            goals: { ...state.goals, [goalId]: { ...existingGoal, status: 'todo' } }
+          };
+        }
+        return state;
+      });
 
       console.log(`📍 restoreGoal - 成功還原目標 ${goalId}`);
       return true;
@@ -165,8 +211,11 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
   /**
    * 更新目標求助訊息
    */
-  updateGoalHelp: async (_topicId: string, goalId: string, needHelp: boolean, helpMessage?: string) => {
+  updateGoalHelp: async (goalId: string, needHelp: boolean, helpMessage?: string) => {
     try {
+      const existingGoal = get().goals[goalId];
+      if (!existingGoal) return false;
+
       const updateData: Partial<Goal> = {
         need_help: needHelp
       };
@@ -175,11 +224,8 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
       } else if (!needHelp) {
         updateData.help_message = undefined;
       }
-      // goalStore 沒有 topicId，直接用 updateGoal
-      // updateGoal: (goalId: string, expectedVersion: number, updates: Partial<Goal>)
-      // 這裡假設 version 由前端自己管理，這裡先用 0 當 placeholder
-      // 實際應用時要傳正確 version
-      const result = await get().updateGoal(goalId, 0, updateData);
+      
+      const result = await get().updateGoal(goalId, existingGoal.version, updateData);
       return !!result;
     } catch (error: any) {
       console.error('更新目標求助訊息失敗:', error);
@@ -197,9 +243,16 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
         .update({ reference_info: referenceInfo })
         .eq('id', goalId);
       if (error) throw error;
-      set(state => ({
-        goals: state.goals.map(goal => goal.id === goalId ? { ...goal, reference_info: referenceInfo } : goal)
-      }));
+      
+      set(state => {
+        const existingGoal = state.goals[goalId];
+        if (existingGoal) {
+          return {
+            goals: { ...state.goals, [goalId]: { ...existingGoal, reference_info: referenceInfo } }
+          };
+        }
+        return state;
+      });
       return true;
     } catch (error: any) {
       console.error('更新 Goal 參考資訊失敗:', error);
@@ -213,7 +266,7 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
    */
   addGoalAttachment: async (goalId, attachment) => {
     const state = get();
-    const targetGoal = state.goals.find(g => g.id === goalId);
+    const targetGoal = state.goals[goalId];
     if (!targetGoal) return false;
     const newAttachment: ReferenceAttachment = {
       ...attachment,
@@ -233,7 +286,7 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
    */
   removeGoalAttachment: async (goalId, attachmentId) => {
     const state = get();
-    const targetGoal = state.goals.find(g => g.id === goalId);
+    const targetGoal = state.goals[goalId];
     if (!targetGoal || !targetGoal.reference_info) return false;
     const updatedReferenceInfo = {
       ...targetGoal.reference_info,
@@ -247,7 +300,7 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
    */
   addGoalLink: async (goalId, link) => {
     const state = get();
-    const targetGoal = state.goals.find(g => g.id === goalId);
+    const targetGoal = state.goals[goalId];
     if (!targetGoal) return false;
     const newLink: ReferenceLink = {
       ...link,
@@ -267,7 +320,7 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
    */
   removeGoalLink: async (goalId, linkId) => {
     const state = get();
-    const targetGoal = state.goals.find(g => g.id === goalId);
+    const targetGoal = state.goals[goalId];
     if (!targetGoal || !targetGoal.reference_info) return false;
     const updatedReferenceInfo = {
       ...targetGoal.reference_info,
@@ -279,7 +332,7 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
   /**
    * 設定目標負責人
    */
-  setGoalOwner: async (_topicId, goalId, userId) => {
+  setGoalOwner: async (goalId, userId) => {
     try {
       const { data: updatedGoal, error } = await supabase
         .from('goals')
@@ -291,10 +344,16 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
         console.error('設置目標負責人失敗:', error);
         return null;
       }
-      // 只更新 goals 狀態，不處理 owner 欄位（如需顯示 owner 請自行 fetch user）
-      set(state => ({
-        goals: state.goals.map(g => g.id === goalId ? { ...g, owner_id: userId } : g)
-      }));
+      
+      set(state => {
+        const existingGoal = state.goals[goalId];
+        if (existingGoal) {
+          return {
+            goals: { ...state.goals, [goalId]: { ...existingGoal, owner_id: userId } }
+          };
+        }
+        return state;
+      });
       console.log(`📍 setGoalOwner - 成功設置目標 ${goalId} 負責人為 ${userId}`);
       return updatedGoal as Goal;
     } catch (error: any) {
@@ -306,7 +365,7 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
   /**
    * 添加目標協作者
    */
-  addGoalCollaborator: async (_topicId, goalId, userId) => {
+  addGoalCollaborator: async (goalId, userId) => {
     try {
       const { data: currentGoal, error: getError } = await supabase
         .from('goals')
@@ -331,10 +390,16 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
         console.error('更新目標協作者失敗:', updateError);
         return false;
       }
-      // TODO: refreshTopic(_topicId) 如需同步 topic 狀態
-      set(state => ({
-        goals: state.goals.map(g => g.id === goalId ? { ...g, collaborator_ids: updatedCollaborators } : g)
-      }));
+      
+      set(state => {
+        const existingGoal = state.goals[goalId];
+        if (existingGoal) {
+          return {
+            goals: { ...state.goals, [goalId]: { ...existingGoal, collaborator_ids: updatedCollaborators } }
+          };
+        }
+        return state;
+      });
       console.log(`📍 addGoalCollaborator - 成功添加協作者 ${userId} 到目標 ${goalId}`);
       return true;
     } catch (error: any) {
@@ -346,7 +411,7 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
   /**
    * 移除目標協作者
    */
-  removeGoalCollaborator: async (_topicId, goalId, userId) => {
+  removeGoalCollaborator: async (goalId, userId) => {
     try {
       // 先查現有協作者
       const { data: currentGoal, error: getError } = await supabase
@@ -372,10 +437,16 @@ export const useGoalStore = create<GoalStoreState>((set, get) => ({
         console.error('更新目標協作者失敗:', updateError);
         return false;
       }
-      // TODO: refreshTopic(_topicId) 如需同步 topic 狀態
-      set(state => ({
-        goals: state.goals.map(g => g.id === goalId ? { ...g, collaborator_ids: updatedCollaborators } : g)
-      }));
+      
+      set(state => {
+        const existingGoal = state.goals[goalId];
+        if (existingGoal) {
+          return {
+            goals: { ...state.goals, [goalId]: { ...existingGoal, collaborator_ids: updatedCollaborators } }
+          };
+        }
+        return state;
+      });
       console.log(`📍 removeGoalCollaborator - 成功移除協作者 ${userId} 從目標 ${goalId}`);
       return true;
     } catch (error: any) {

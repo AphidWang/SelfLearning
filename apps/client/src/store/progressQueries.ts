@@ -1,5 +1,6 @@
 import type { Topic, Goal, Task } from '../types/goal';
 import { supabase } from '../services/supabase';
+import { getTopicProgress } from './helpers';
 
 /**
  * 計算主題完成率
@@ -8,11 +9,7 @@ import { supabase } from '../services/supabase';
  * 沒有做 db 的查詢，只是個 helper function
  */
 export function getCompletionRate(topic: Topic): number {
-  if (!topic.goals || topic.goals.length === 0) return 0;
-  const allTasks = topic.goals.flatMap(g => g.tasks || []);
-  if (allTasks.length === 0) return 0;
-  const completedTasks = allTasks.filter(t => t.status === 'done').length;
-  return Math.round((completedTasks / allTasks.length) * 100);
+  return Math.round(getTopicProgress(topic.id).completionRate);
 }
 
 /**

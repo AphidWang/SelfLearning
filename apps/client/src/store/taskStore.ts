@@ -4,8 +4,32 @@ import { useAsyncOperation } from '../utils/errorHandler';
 import type { Task, ReferenceInfo, ReferenceAttachment, ReferenceLink, TaskActionResult, ActiveTaskResult, TaskAction, TaskRecord } from '../types/goal';
 
 interface TaskStoreState {
-  tasks: Task[];
+  tasks: Record<string, Task>;
   error?: string;
+  
+  // Cache 機制
+  lastFetchTime: number;
+  cacheExpiry: number; // 快取過期時間（毫秒）
+  
+  // 組合查詢方法
+  getTasksForGoal: (goalId: string) => Task[];
+  getTasksForTopic: (topicId: string) => Task[];
+  getTaskById: (taskId: string) => Task | undefined;
+  getAllTasks: () => Task[];
+  
+  // Cache 管理
+  isCacheValid: () => boolean;
+  invalidateCache: () => void;
+  
+  // Batch operations for performance
+  setTasks: (tasks: Task[]) => void;
+  clearTasks: () => void;
+  
+  // 獨立任務功能
+  createIndependentTask: (task: Omit<Task, 'id' | 'goal_id' | 'version' | 'created_at' | 'updated_at' | 'creator_id'>) => Promise<Task | null>;
+  getMyIndependentTasks: () => Promise<Task[]>;
+  getCollaborativeIndependentTasks: () => Promise<Task[]>;
+  
   addTask: (goalId: string, task: Omit<Task, 'id' | 'goal_id' | 'version' | 'created_at' | 'updated_at' | 'creator_id'>) => Promise<Task | null>;
   updateTask: (taskId: string, expectedVersion: number, updates: Partial<Task>) => Promise<Task | null>;
   deleteTask: (taskId: string) => Promise<boolean>;
@@ -139,8 +163,163 @@ interface TaskStoreState {
 }
 
 export const useTaskStore = create<TaskStoreState>((set, get) => ({
-  tasks: [],
+  tasks: {},
   error: undefined,
+  lastFetchTime: 0,
+  cacheExpiry: 5 * 60 * 1000, // 5分鐘過期
+
+  // Cache 管理
+  isCacheValid: () => {
+    const state = get();
+    return Date.now() - state.lastFetchTime < state.cacheExpiry;
+  },
+
+  invalidateCache: () => {
+    set({ lastFetchTime: 0 });
+  },
+
+  // 組合查詢方法
+  getTasksForGoal: (goalId: string) => {
+    const state = get();
+    return Object.values(state.tasks).filter(task => task.goal_id === goalId);
+  },
+  
+  getTasksForTopic: (topicId: string) => {
+    const state = get();
+    return Object.values(state.tasks).filter(task => {
+      // TODO: 需要通過 goalStore 來查找 goal.topic_id
+      // 暫時返回空陣列，之後實作
+      return false;
+    });
+  },
+  
+  getTaskById: (taskId: string) => {
+    const state = get();
+    return state.tasks[taskId];
+  },
+  
+  getAllTasks: () => {
+    const state = get();
+    return Object.values(state.tasks);
+  },
+
+  // Batch operations for performance
+  setTasks: (tasks: Task[]) => {
+    set(state => {
+      const tasksMap = { ...state.tasks };
+      tasks.forEach(task => {
+        tasksMap[task.id] = task;
+      });
+      return { 
+        tasks: tasksMap,
+        lastFetchTime: Date.now() // 更新快取時間
+      };
+    });
+  },
+
+  clearTasks: () => {
+    set({ tasks: {}, lastFetchTime: 0 });
+  },
+
+  // 獨立任務功能
+  createIndependentTask: async (taskData) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      const taskType = taskData.task_type || 'single';
+      const taskConfig = taskData.task_config || {};
+      const cycleConfig = taskData.cycle_config || {};
+
+      const independentTaskData = {
+        title: taskData.title,
+        description: taskData.description || '',
+        status: taskData.status || 'todo',
+        priority: taskData.priority || 'medium',
+        order_index: taskData.order_index || 0,
+        need_help: taskData.need_help || false,
+        goal_id: null, // 獨立任務不屬於任何 goal
+        creator_id: user.id,
+        owner_id: user.id, // 創建者即為擁有者
+        task_type: taskType,
+        task_config: taskConfig,
+        cycle_config: cycleConfig,
+        special_flags: taskData.special_flags || [],
+      };
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert([independentTaskData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      set(state => ({ tasks: { ...state.tasks, [data.id]: data } }));
+      console.log('✅ 成功創建獨立任務:', data.id);
+      return data;
+    } catch (error: any) {
+      console.error('創建獨立任務失敗:', error);
+      set({ error: error.message || '創建獨立任務失敗' });
+      return null;
+    }
+  },
+
+  getMyIndependentTasks: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      const { data, error } = await supabase.rpc('get_independent_tasks_by_creator', {
+        p_user_id: user.id
+      });
+
+      if (error) throw error;
+
+      const tasks = data || [];
+      // 更新本地 store
+      set(state => {
+        const updatedTasks = { ...state.tasks };
+        tasks.forEach(task => {
+          updatedTasks[task.id] = task;
+        });
+        return { tasks: updatedTasks };
+      });
+
+      return tasks;
+    } catch (error: any) {
+      console.error('獲取我的獨立任務失敗:', error);
+      return [];
+    }
+  },
+
+  getCollaborativeIndependentTasks: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('用戶未認證');
+
+      const { data, error } = await supabase.rpc('get_independent_tasks_as_collaborator', {
+        p_user_id: user.id
+      });
+
+      if (error) throw error;
+
+      const tasks = data || [];
+      // 更新本地 store
+      set(state => {
+        const updatedTasks = { ...state.tasks };
+        tasks.forEach(task => {
+          updatedTasks[task.id] = task;
+        });
+        return { tasks: updatedTasks };
+      });
+
+      return tasks;
+    } catch (error: any) {
+      console.error('獲取協作獨立任務失敗:', error);
+      return [];
+    }
+  },
 
   /**
    * 新增任務
@@ -174,7 +353,10 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .select()
         .single();
       if (error) throw error;
-      set(state => ({ tasks: [...state.tasks, data] }));
+      set(state => ({ 
+        tasks: { ...state.tasks, [data.id]: data },
+        lastFetchTime: Date.now()
+      }));
       return data;
     } catch (error: any) {
       console.error('添加任務失敗:', error);
@@ -232,7 +414,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .single();
       if (taskError) throw taskError;
       set(state => ({
-        tasks: state.tasks.map(task => task.id === taskId ? { ...task, ...taskData } : task)
+        tasks: { ...state.tasks, [taskId]: taskData }
       }));
       return taskData;
     } catch (error: any) {
@@ -252,7 +434,10 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .update({ status: 'archived' })
         .eq('id', taskId);
       if (error) throw error;
-      set(state => ({ tasks: state.tasks.filter(task => task.id !== taskId) }));
+      set(state => {
+        const { [taskId]: deleted, ...remainingTasks } = state.tasks;
+        return { tasks: remainingTasks };
+      });
       console.log(`📍 deleteTask - 成功歸檔任務 ${taskId}`);
       return true;
     } catch (error: any) {
@@ -272,9 +457,15 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .update({ status: 'todo' })
         .eq('id', taskId);
       if (error) throw error;
-      set(state => ({
-        tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'todo' } : t)
-      }));
+      set(state => {
+        const existingTask = state.tasks[taskId];
+        if (existingTask) {
+          return {
+            tasks: { ...state.tasks, [taskId]: { ...existingTask, status: 'todo' } }
+          };
+        }
+        return state;
+      });
       console.log(`📍 restoreTask - 成功還原任務 ${taskId}`);
       return true;
     } catch (error: any) {
@@ -294,9 +485,15 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .update({ reference_info: referenceInfo })
         .eq('id', taskId);
       if (error) throw error;
-      set(state => ({
-        tasks: state.tasks.map(task => task.id === taskId ? { ...task, reference_info: referenceInfo } : task)
-      }));
+      set(state => {
+        const existingTask = state.tasks[taskId];
+        if (existingTask) {
+          return {
+            tasks: { ...state.tasks, [taskId]: { ...existingTask, reference_info: referenceInfo } }
+          };
+        }
+        return state;
+      });
       return true;
     } catch (error: any) {
       console.error('更新 Task 參考資訊失敗:', error);
@@ -310,7 +507,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
    */
   addTaskAttachment: async (taskId, attachment) => {
     const state = get();
-    const targetTask = state.tasks.find(t => t.id === taskId);
+    const targetTask = state.tasks[taskId];
     if (!targetTask) return false;
     const newAttachment: ReferenceAttachment = {
       ...attachment,
@@ -330,7 +527,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
    */
   removeTaskAttachment: async (taskId, attachmentId) => {
     const state = get();
-    const targetTask = state.tasks.find(t => t.id === taskId);
+    const targetTask = state.tasks[taskId];
     if (!targetTask || !targetTask.reference_info) return false;
     const updatedReferenceInfo = {
       ...targetTask.reference_info,
@@ -344,7 +541,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
    */
   addTaskLink: async (taskId, link) => {
     const state = get();
-    const targetTask = state.tasks.find(t => t.id === taskId);
+    const targetTask = state.tasks[taskId];
     if (!targetTask) return false;
     const newLink: ReferenceLink = {
       ...link,
@@ -364,7 +561,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
    */
   removeTaskLink: async (taskId, linkId) => {
     const state = get();
-    const targetTask = state.tasks.find(t => t.id === taskId);
+    const targetTask = state.tasks[taskId];
     if (!targetTask || !targetTask.reference_info) return false;
     const updatedReferenceInfo = {
       ...targetTask.reference_info,
@@ -386,24 +583,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         completed_by: user.id
       });
       if (updatedTask) {
-        set(state => ({
-          tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t)
-        }));
-        
-        // 同時更新 topicStore 中的任務狀態
-        const { useTopicStore } = await import('./topicStore');
-        useTopicStore.setState(state => ({
-          topics: state.topics?.map(topic => ({
-            ...topic,
-            goals: topic.goals?.map(goal => ({
-              ...goal,
-              tasks: goal.tasks?.map(task => 
-                task.id === taskId ? { ...task, ...updatedTask } : task
-              )
-            }))
-          }))
-        }));
-        
+        // taskStore 已在 updateTask 中更新，不需要重複
         return { success: true, task: updatedTask };
       }
       return { success: false, message: '更新任務失敗' };
@@ -421,24 +601,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         status: 'in_progress'
       });
       if (updatedTask) {
-        set(state => ({
-          tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t)
-        }));
-        
-        // 同時更新 topicStore 中的任務狀態
-        const { useTopicStore } = await import('./topicStore');
-        useTopicStore.setState(state => ({
-          topics: state.topics?.map(topic => ({
-            ...topic,
-            goals: topic.goals?.map(goal => ({
-              ...goal,
-              tasks: goal.tasks?.map(task => 
-                task.id === taskId ? { ...task, ...updatedTask } : task
-              )
-            }))
-          }))
-        }));
-        
+        // taskStore 已在 updateTask 中更新，不需要重複
         return { success: true, task: updatedTask };
       }
       return { success: false, message: '更新任務失敗' };
@@ -458,24 +621,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         completed_at: undefined
       });
       if (updatedTask) {
-        set(state => ({
-          tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t)
-        }));
-        
-        // 同時更新 topicStore 中的任務狀態
-        const { useTopicStore } = await import('./topicStore');
-        useTopicStore.setState(state => ({
-          topics: state.topics?.map(topic => ({
-            ...topic,
-            goals: topic.goals?.map(goal => ({
-              ...goal,
-              tasks: goal.tasks?.map(task => 
-                task.id === taskId ? { ...task, ...updatedTask } : task
-              )
-            }))
-          }))
-        }));
-        
+        // taskStore 已在 updateTask 中更新，不需要重複
         return { success: true, task: updatedTask };
       }
       return { success: false, message: '更新任務失敗' };
@@ -531,7 +677,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
       
       if (result.task) {
         set(state => ({
-          tasks: state.tasks.map(t => t.id === taskId ? result.task : t)
+          tasks: { ...state.tasks, [taskId]: result.task }
         }));
       }
       
@@ -582,7 +728,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
       }
       if (result.task) {
         set(state => ({
-          tasks: state.tasks.map(t => t.id === taskId ? result.task : t)
+          tasks: { ...state.tasks, [taskId]: result.task }
         }));
       }
       return { success: true, task: result.task };
@@ -839,9 +985,15 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .select()
         .single();
       if (error) return null;
-      set(state => ({
-        tasks: state.tasks.map(t => t.id === taskId ? { ...t, owner_id: userId } : t)
-      }));
+      set(state => {
+        const existingTask = state.tasks[taskId];
+        if (existingTask) {
+          return {
+            tasks: { ...state.tasks, [taskId]: { ...existingTask, owner_id: userId } }
+          };
+        }
+        return state;
+      });
       return updatedTask as Task;
     } catch (error: any) {
       return null;
@@ -867,9 +1019,15 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .update({ collaborator_ids: updatedCollaborators })
         .eq('id', taskId);
       if (updateError) return false;
-      set(state => ({
-        tasks: state.tasks.map(t => t.id === taskId ? { ...t, collaborator_ids: updatedCollaborators } : t)
-      }));
+      set(state => {
+        const existingTask = state.tasks[taskId];
+        if (existingTask) {
+          return {
+            tasks: { ...state.tasks, [taskId]: { ...existingTask, collaborator_ids: updatedCollaborators } }
+          };
+        }
+        return state;
+      });
       return true;
     } catch (error: any) {
       return false;
@@ -895,9 +1053,15 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         .update({ collaborator_ids: updatedCollaborators })
         .eq('id', taskId);
       if (updateError) return false;
-      set(state => ({
-        tasks: state.tasks.map(t => t.id === taskId ? { ...t, collaborator_ids: updatedCollaborators } : t)
-      }));
+      set(state => {
+        const existingTask = state.tasks[taskId];
+        if (existingTask) {
+          return {
+            tasks: { ...state.tasks, [taskId]: { ...existingTask, collaborator_ids: updatedCollaborators } }
+          };
+        }
+        return state;
+      });
       return true;
     } catch (error: any) {
       return false;

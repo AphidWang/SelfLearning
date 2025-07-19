@@ -10,6 +10,7 @@ import {
   Pause, Trophy, Eye, EyeOff
 } from 'lucide-react';
 import type { Goal } from '../../types/goal';
+import { refreshTopicData } from '../../store/dataManager';
 
 interface TopicRadialMapProps {
   topicId: string;
@@ -82,7 +83,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   onGoalClick,
   className = ""
 }) => {
-  const { getTopic, getActiveGoals } = useTopicStore();
+  const { getActiveGoals } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
   const isInitialRender = useRef(true);
   const [shouldAnimate, setShouldAnimate] = useState(showAnimations);
@@ -265,7 +266,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
   // 獲取主題數據 - 優先使用外部傳入的 goals
   useEffect(() => {
     const fetchData = async () => {
-      const fetchedTopic = await getTopic(topicId);
+      const fetchedTopic = await refreshTopicData(topicId);
       if (fetchedTopic) {
         setTopic(fetchedTopic);
       }
@@ -278,7 +279,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
       // 如果有傳入 goals，只獲取 topic 基本信息
       fetchData();
     }
-  }, [topicId, getTopic, goals]);
+  }, [topicId, goals]);
   
   // 調試信息
   useEffect(() => {

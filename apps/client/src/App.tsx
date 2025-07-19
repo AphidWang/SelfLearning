@@ -22,6 +22,7 @@ import StudentPlanning from './pages/student/StudentPlanning';
 import GoalMindMapPage from './pages/student/GoalMindMapPage';
 import TopicMindMapPage from './pages/student/TopicMindMapPage.tsx';
 import TaskWallPage from './pages/student/TaskWallPage';
+import IndependentTasksPage from './pages/student/IndependentTasksPage';
 
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
@@ -232,6 +233,11 @@ function App() {
                     <Route path="/student/learning-map" element={
                       <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
                         <StudentLearningMap />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/independent-tasks" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <IndependentTasksPage />
                       </RoleProtectedRoute>
                     } />
                     <Route path="/student/subject/:subjectId" element={

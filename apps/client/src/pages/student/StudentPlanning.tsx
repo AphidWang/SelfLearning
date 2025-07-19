@@ -19,9 +19,12 @@ import { useAssistant } from '../../hooks/useAssistant';
 import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 import type { TaskActionResult } from '../../types/goal';
+import { fetchTopicsWithActions } from '../../store/dataManager';
+import { getTopicProgress, getGoalsForTopic } from '../../store/helpers';
+import { getGoalById, getTaskById } from '../../store/helpers';
 
 const StudentPlanning: React.FC = () => {
-  const { topics, updateTopic, fetchTopicsWithActions: fetchTopics, createTopic } = useTopicStore();
+  const { topics, updateTopic, createTopic } = useTopicStore();
   const { updateTask, markTaskCompleted, markTaskInProgress, markTaskTodo } = useTaskStore();
   const { addGoal } = useGoalStore();
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
@@ -65,7 +68,7 @@ const StudentPlanning: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await useTopicStore.getState().fetchTopicsWithActions();
+      await fetchTopicsWithActions();
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入主題時發生錯誤');
     } finally {
@@ -104,12 +107,11 @@ const StudentPlanning: React.FC = () => {
   };
 
   const handleAddToSchedule = (topicId: string, goalId: string, taskId: string) => {
-    const topic = useTopicStore.getState().topics.find(t => t.id === topicId);
-    if (!topic?.goals) return;
-    const goal = topic.goals.find(g => g.id === goalId);
-    if (!goal?.tasks) return;
-    const task = goal.tasks.find(t => t.id === taskId);
-    if (!task) return;
+    // 使用 helper functions
+    
+    const goal = getGoalById(goalId);
+    const task = getTaskById(taskId);
+    if (!goal || !task) return;
 
     updateTask(task.id, task.version ?? 0, {
       title: task.title,
@@ -135,13 +137,9 @@ const StudentPlanning: React.FC = () => {
   };
 
   const getCompletionRate = (topic: Topic) => {
-    if (!topic?.goals) return 0;
-    const totalTasks = topic.goals.reduce((acc, goal) => acc + (goal.tasks?.length || 0), 0);
-    const completedTasks = topic.goals.reduce(
-      (acc, goal) => acc + (goal.tasks?.filter(task => task.status === 'done').length || 0),
-      0
-    );
-    return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+    // 使用 helper functions 替代直接訪問 topic.goals
+    const progress = getTopicProgress(topic.id);
+    return Math.round(progress.completionRate);
   };
 
   const handleTaskStatusChange = async (topicId: string, goalId: string, task: Task) => {
@@ -256,15 +254,15 @@ const StudentPlanning: React.FC = () => {
   };
 
   const handleAddGoal = async () => {
-    if (!selectedTopic?.goals) return;
+    if (!selectedTopic?.goalIds) return;
     
     try {
       const newGoal = await useGoalStore.getState().addGoal(selectedTopic.id, {
         title: '新目標',
         description: '',
         status: 'todo',
-        tasks: [],
-        order_index: selectedTopic.goals.length,
+        taskIds: [],
+        order_index: selectedTopic.goalIds?.length || 0,
         priority: 'medium'
       });
 
@@ -647,17 +645,13 @@ const StudentPlanning: React.FC = () => {
                   <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">已完成項目</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {selectedTopic?.goals?.reduce((acc, goal) => 
-                        acc + (goal.tasks?.filter(task => task.status === 'done').length || 0), 0
-                      ) || 0}
+                      {selectedTopic ? getTopicProgress(selectedTopic.id).completedTasks : 0}
                     </p>
                   </div>
                   <div className="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400">待辦項目</p>
                     <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                      {selectedTopic?.goals?.reduce((acc, goal) => 
-                        acc + (goal.tasks?.filter(task => task.status === 'todo').length || 0), 0
-                      ) || 0}
+                      {selectedTopic ? getTopicProgress(selectedTopic.id).todoTasks : 0}
                     </p>
                   </div>
                 </div>
@@ -678,7 +672,7 @@ const StudentPlanning: React.FC = () => {
                   </div>
 
                   <div className="space-y-3">
-                    {selectedTopic?.goals?.map(goal => (
+                    {selectedTopic ? getGoalsForTopic(selectedTopic.id).map(goal => (
                       <GoalItem
                         key={goal.id}
                         goal={goal}
@@ -688,7 +682,7 @@ const StudentPlanning: React.FC = () => {
                         onTaskEdit={(task) => handleTaskEdit(selectedTopic.id, goal.id, task)}
                         onAddTask={() => {/* 添加任務的邏輯 */}}
                       />
-                    ))}
+                    )) : []}
                   </div>
                 </div>
               </div>
@@ -752,7 +746,7 @@ const StudentPlanning: React.FC = () => {
                         subject: SUBJECTS.CUSTOM,
                         category: 'learning',
                         status: 'active',
-                        goals: [],
+                        goalIds: [],
                         bubbles: [],
                         progress: 0,
                         is_collaborative: false,

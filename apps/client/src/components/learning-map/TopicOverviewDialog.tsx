@@ -8,6 +8,7 @@ import {
   X, Target, Calendar, CheckCircle2, Clock, 
   Play, Flag, TrendingUp, BookOpen, ArrowRight
 } from 'lucide-react';
+import { refreshTopicData } from '../../store/dataManager';
 
 interface TopicOverviewDialogProps {
   topicId: string;
@@ -79,16 +80,16 @@ export const TopicOverviewDialog: React.FC<TopicOverviewDialogProps> = ({
   onClose,
   onTopicClick
 }) => {
-  const { getTopic, getActiveGoals } = useTopicStore();
+  const { getActiveGoals } = useTopicStore();
   const [topic, setTopic] = useState<Topic | null>(null);
 
   useEffect(() => {
     const fetchTopic = async () => {
-      const fetchedTopic = await getTopic(topicId);
+      const fetchedTopic = await refreshTopicData(topicId);
       setTopic(fetchedTopic);
     };
     fetchTopic();
-  }, [topicId, getTopic]);
+  }, [topicId]);
 
   if (!topic) {
     return null;

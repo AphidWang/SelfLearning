@@ -11,6 +11,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { TaskRecordForm } from '../shared/TaskRecordForm';
+import { refreshTopicData } from '../../store/dataManager';
 
 interface TaskDetailDialogProps {
   task: Task;
@@ -30,7 +31,6 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
   onHelpRequest
 }) => {
   const { updateTask, markTaskCompleted, markTaskInProgress } = useTaskStore();
-  const { getTopic } = useTopicStore();
  
   const [isFlipped, setIsFlipped] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
@@ -75,7 +75,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
 
   useEffect(() => {
     const fetchTopic = async () => {
-      const fetchedTopic = await getTopic(topicId);
+      const fetchedTopic = await refreshTopicData(topicId);
       if (fetchedTopic) {
         setTopic(fetchedTopic);
         const goal = fetchedTopic.goals?.find(g => g.id === goalId);
@@ -86,7 +86,7 @@ export const TaskDetailDialog: React.FC<TaskDetailDialogProps> = ({
       }
     };
     fetchTopic();
-  }, [topicId, goalId, task.id, getTopic]);
+  }, [topicId, goalId, task.id]);
 
   const handleSave = async () => {
     if (!task || !topic) return;

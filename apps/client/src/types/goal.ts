@@ -157,8 +157,8 @@ export interface Topic {
   created_at?: string;
   updated_at?: string;
   
-  // 關聯數據（從其他表 JOIN 來的）
-  goals?: Goal[];
+  // 關聯數據：只存 ID 引用，不存完整對象
+  goalIds?: string[]; // ✅ 只存 Goal ID 列表
   topic_collaborators?: any[];
   progress?: number; // 計算得出的進度
   
@@ -192,8 +192,8 @@ export interface Goal {
   created_at?: string;
   updated_at?: string;
   
-  // 關聯數據
-  tasks?: Task[];
+  // 關聯數據：只存 ID 引用，不存完整對象
+  taskIds?: string[]; // ✅ 只存 Task ID 列表
   
   // 協作相關字段 - 只存儲 ID
   collaborator_ids?: string[]; // 協作人 ID 列表
