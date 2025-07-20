@@ -14,7 +14,7 @@ interface Collaborator extends User {
 export interface TopicReviewState {
   topic: Topic | null;
   owner?: User;
-  collaborators: Collaborator[];
+  collaborators: User[]; // 改為 User[] 以匹配 DetailsPanel 的期望
   availableUsers: User[];
   selectedGoalId: string | null;
   selectedTaskId: string | null;
@@ -65,6 +65,16 @@ export const useTopicReview = (topicId: string) => {
         if (!fetchedTopic) {
           throw new Error('無法載入主題資料');
         }
+
+        console.log('📥 useTopicReview - fetchedTopic from refreshTopicData:', {
+          topicId: fetchedTopic.id,
+          topicTitle: fetchedTopic.title,
+          hasCollaborators: !!fetchedTopic.collaborators,
+          collaboratorsLength: fetchedTopic.collaborators?.length,
+          firstCollaborator: fetchedTopic.collaborators?.[0],
+          hasTopicCollaborators: !!fetchedTopic.topic_collaborators,
+          topicCollaboratorsLength: fetchedTopic.topic_collaborators?.length
+        });
 
         setState(prev => ({
           ...prev,
@@ -129,11 +139,36 @@ export const useTopicReview = (topicId: string) => {
     if (!topic) return { owner: undefined, collaborators: [], availableUsers: [], totalUsers: 0 };
 
     const owner = topic.owner;
-    // 處理協作者數據 - topic.collaborators 是從 getTopic 返回的完整用戶信息
-    const collaborators = (topic.collaborators || []).map(c => ({
-      ...c,
-      permission: 'edit'
-    })) as Collaborator[];
+    
+    // 處理協作者數據 - refreshTopicData 應該已經處理過了
+    let collaborators: User[] = [];
+    
+    // 檢查 topic.collaborators（經過 storeUtils 處理後的數據）
+    if (Array.isArray(topic.collaborators)) {
+      if (topic.collaborators.length > 0 && (topic.collaborators[0] as any)?.user) {
+        // 已經處理過，直接提取 user
+        collaborators = topic.collaborators.map((c: any) => c.user);
+      } else if (topic.collaborators.length > 0 && topic.collaborators[0]?.id) {
+        // 如果還是原始數據，說明 storeUtils 沒有被正確調用
+        console.warn('🔍 useTopicReview - storeUtils 可能沒有被正確調用，手動處理協作者數據');
+        collaborators = topic.collaborators.map((collab: any) => {
+          const id = collab.id;
+          const user = users.find(u => u.id === id);
+          if (!user) {
+            console.warn(`🔍 useTopicReview - 找不到用戶 ${id}，使用預設名稱`);
+            return {
+              id,
+              name: `User-${id?.slice?.(0, 8) || ''}`,
+              email: '',
+              avatar: undefined,
+              role: 'student',
+              roles: ['student']
+            };
+          }
+          return user;
+        });
+      }
+    }
     
     const availableUsers = users.length ? users.filter(u => 
       u.id !== owner?.id && !collaborators.some(c => c.id === u.id)
@@ -143,7 +178,13 @@ export const useTopicReview = (topicId: string) => {
       owner: owner?.name, 
       collaborators: collaborators.map(c => c.name), 
       availableUsers: availableUsers.map(u => u.name),
-      totalUsers: users.length
+      totalUsers: users.length,
+      topicCollaboratorsRaw: topic.collaborators,
+      topicCollaboratorsType: typeof topic.collaborators,
+      topicCollaboratorsIsArray: Array.isArray(topic.collaborators),
+      topicCollaboratorsLength: topic.collaborators?.length,
+      firstCollaborator: topic.collaborators?.[0],
+      firstCollaboratorType: typeof topic.collaborators?.[0]
     });
 
     return { owner, collaborators, availableUsers, totalUsers: users.length };

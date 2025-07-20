@@ -4,6 +4,7 @@ import { useTopicStore } from '../../store/topicStore';
 import { subjects } from '../../styles/tokens';
 import { UserAvatar } from '../learning-map/UserAvatar';
 import { Topic } from '../../types/goal';
+import { getGoalsForTopic, getTasksForGoal } from '../../store/helpers';
 import { 
   Target, CheckCircle2, Clock, Play, Flag, Sparkles, ZoomIn, ZoomOut, RotateCcw,
   Cloud, Car, TreePine, Star, Sun, Moon, AlertTriangle,
@@ -140,8 +141,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
     let inProgressTasks = 0;
     
     goals.forEach(goal => {
-      if (!goal.tasks) return;
-      goal.tasks.forEach(task => {
+      const goalTasks = getTasksForGoal(goal.id);
+      goalTasks.forEach(task => {
         totalTasks++;
         if (task.status === 'done') {
           completedTasks++;
@@ -511,8 +512,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
           />
           
                   {/* 背景放射線 */}
-        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((_, index) => {
-          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+        {(goals && goals.length > 0 ? goals : getGoalsForTopic(topicId)).map((_, index) => {
+          const currentGoals = goals && goals.length > 0 ? goals : getGoalsForTopic(topicId);
           const { x, y } = getRadialPosition(index, currentGoals.length, goalRadius, centerX, centerY);
           return (
             <motion.line
@@ -532,8 +533,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         })}
 
         {/* 目標和任務的連接線 - 在背景之後，節點之前 */}
-        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
-          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+        {(goals && goals.length > 0 ? goals : getGoalsForTopic(topicId)).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : getGoalsForTopic(topicId);
           const goalPos = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
           
           return (
@@ -552,8 +553,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               />
               
               {/* 目標到任務的連接線 */}
-              {goal.tasks?.map((task, taskIndex) => {
-                const taskPos = getTaskPosition(taskIndex, goal.tasks?.length || 0, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
+              {getTasksForGoal(goal.id).map((task, taskIndex) => {
+                const taskPos = getTaskPosition(taskIndex, getTasksForGoal(goal.id).length, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
                 const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completed_at);
                 
                 // 檢查是否在主延伸線上（topic-goal 的延長線）
@@ -709,11 +710,12 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         </motion.g>
 
         {/* 目標節點 */}
-        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
-          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+        {(goals && goals.length > 0 ? goals : getGoalsForTopic(topicId)).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : getGoalsForTopic(topicId);
           const { x, y } = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
-          const goalCompletedTasks = goal.tasks?.filter(t => t.status === 'done').length || 0;
-          const goalProgress = (goal.tasks?.length || 0) > 0 ? (goalCompletedTasks / (goal.tasks?.length || 1)) * 100 : 0;
+          const goalTasks = getTasksForGoal(goal.id);
+          const goalCompletedTasks = goalTasks.filter(t => t.status === 'done').length;
+          const goalProgress = goalTasks.length > 0 ? (goalCompletedTasks / goalTasks.length) * 100 : 0;
           const isSelected = selectedGoalId === goal.id && !selectedTaskId; // 只有在沒有選中任務時才顯示目標選中
           
           // 根據目標狀態決定圖標、顏色和樣式
@@ -894,12 +896,13 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         })}
 
         {/* 任務節點 */}
-        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
-          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+        {(goals && goals.length > 0 ? goals : getGoalsForTopic(topicId)).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : getGoalsForTopic(topicId);
           const goalPos = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
           
-          return goal.tasks?.map((task, taskIndex) => {
-            const { x, y } = getTaskPosition(taskIndex, goal.tasks?.length || 0, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
+          const goalTasks = getTasksForGoal(goal.id);
+          return goalTasks.map((task, taskIndex) => {
+            const { x, y } = getTaskPosition(taskIndex, goalTasks.length, goalPos.x, goalPos.y, taskRadius, goalPos.angle, centerX, centerY);
             const isNewlyCompleted = task.status === 'done' && isThisWeek(task.completed_at);
             const isSelected = selectedTaskId === task.id;
             
@@ -1064,8 +1067,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
         })}
 
         {/* 所有協作頭像 - 放在最上層 */}
-        {(goals && goals.length > 0 ? goals : topic?.goals || []).map((goal, goalIndex) => {
-          const currentGoals = goals && goals.length > 0 ? goals : topic?.goals || [];
+        {(goals && goals.length > 0 ? goals : getGoalsForTopic(topicId)).map((goal, goalIndex) => {
+          const currentGoals = goals && goals.length > 0 ? goals : getGoalsForTopic(topicId);
           const goalPos = getRadialPosition(goalIndex, currentGoals.length, goalRadius, centerX, centerY);
           const { x, y } = goalPos;
           
@@ -1127,8 +1130,8 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
               )}
 
               {/* 任務協作頭像 */}
-              {goal.tasks?.map((task, taskIndex) => {
-                const taskPos = getTaskPosition(taskIndex, goal.tasks?.length || 0, x, y, taskRadius, goalPos.angle, centerX, centerY);
+              {getTasksForGoal(goal.id).map((task, taskIndex) => {
+                const taskPos = getTaskPosition(taskIndex, getTasksForGoal(goal.id).length, x, y, taskRadius, goalPos.angle, centerX, centerY);
                 return (
                   topic.is_collaborative && topic.show_avatars && task.owner && (
                     <foreignObject
@@ -1182,8 +1185,7 @@ export const TopicRadialMap: React.FC<TopicRadialMapProps> = ({
 
 // 也導出統計計算的 hook，讓其他組件可以使用
 export const useTopicRadialMapStats = (topicId: string) => {
-  const { getActiveGoals } = useTopicStore();
-  const goals = getActiveGoals(topicId);
+  const goals = getGoalsForTopic(topicId);
   
   return useMemo(() => {
     let newlyCompleted = 0;
@@ -1192,8 +1194,8 @@ export const useTopicRadialMapStats = (topicId: string) => {
     let inProgressTasks = 0;
     
     goals.forEach(goal => {
-      if (!goal.tasks) return;
-      goal.tasks.forEach(task => {
+      const goalTasks = getTasksForGoal(goal.id);
+      goalTasks.forEach(task => {
         totalTasks++;
         if (task.status === 'done') {
           completedTasks++;

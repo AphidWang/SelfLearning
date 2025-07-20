@@ -41,6 +41,7 @@ import {
   getTopicProgress,
   getTaskById,
   getGoalById,
+  getTopicById,
   getAllTasksForTopic,
   getActiveGoalsForTopic,
   getActiveTasksForGoal
@@ -226,7 +227,7 @@ export const TaskWallPage = () => {
       const goal = getGoalById(task.goal_id);
       if (!goal) return;
       
-      const topic = topics.find(t => t.id === goal.topic_id);
+      const topic = getTopicById(goal.topic_id);
       if (!topic || topic.status === 'archived') return;
       
       const subjectStyle = subjects.getSubjectStyle(topic.subject || '');
@@ -289,8 +290,7 @@ export const TaskWallPage = () => {
             if (result.requiresRecord) {
               // 需要學習記錄，顯示溫馨提示
               const task = getTaskById(taskId);
-              const currentTopics = useTopicStore.getState().topics;
-              const topic = currentTopics.find(t => t.id === topicId);
+              const topic = getTopicById(topicId);
               const goal = getGoalById(goalId);
               
               if (task && topic && goal) {
@@ -586,7 +586,7 @@ export const TaskWallPage = () => {
       const goal = getGoalById(task.goal_id);
       if (!goal) return;
       
-      const topic = topics.find(t => t.id === goal.topic_id);
+      const topic = getTopicById(goal.topic_id);
       if (!topic || topic.status === 'archived') return;
       
       const subjectStyle = subjects.getSubjectStyle(topic.subject || '');

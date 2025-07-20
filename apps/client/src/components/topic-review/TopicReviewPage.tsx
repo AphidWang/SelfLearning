@@ -6,6 +6,7 @@ import { useTopicTemplateStore } from '../../store/topicTemplateStore';
 import { useAuth } from '../../context/AuthContext';
 import { subjects } from '../../styles/tokens';
 import { SUBJECTS } from '../../constants/subjects';
+import { getGoalsForTopic } from '../../store/helpers';
 import { TopicRadialMap } from './TopicRadialMap';
 import { TopicHeader } from './components/TopicHeader';
 import { StatsPanel } from './components/StatsPanel';
@@ -382,8 +383,8 @@ const SaveAsTemplateModal: React.FC<SaveAsTemplateModalProps> = ({
       category: formData.category,
       template_type: topic.type || 'learning',
       source_id: topic.id,
-      goals: formData.includeType === 'goals_and_tasks' ? topic.goals : 
-             topic.goals?.map(goal => ({ ...goal, tasks: [] })) || [],
+      goals: formData.includeType === 'goals_and_tasks' ? getGoalsForTopic(topic.id) : 
+             getGoalsForTopic(topic.id).map(goal => ({ ...goal, tasks: [] })),
       bubbles: topic.bubbles || [],
       is_public: true,
       is_collaborative: false

@@ -111,15 +111,22 @@ export const TopicCard: React.FC<TopicCardProps> = ({ data, onClick, isLoading }
                 {topic.is_collaborative && collaborators.length > 0 && (
                   <div className="flex items-center gap-1">
                     <div className="flex -space-x-2">
-                      {collaborators.slice(0, 3).map((collaborator, index) => (
-                        <div
-                          key={collaborator.id}
-                          className="w-5 h-5 rounded-full border-2 border-white bg-gradient-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-[10px] font-bold"
-                          style={{ zIndex: 10 - index }}
-                        >
-                          {collaborator.name?.charAt(0) || '?'}
-                        </div>
-                      ))}
+                      {collaborators.slice(0, 3).map((collaborator, index) => {
+                        // 檢查協作者數據結構：可能是 {user, permission, invited_at} 或直接的 User 對象
+                        const user = (collaborator as any)?.user || collaborator;
+                        const userId = user?.id || `collaborator-${index}`;
+                        const userName = user?.name || '?';
+                        
+                        return (
+                          <div
+                            key={userId}
+                            className="w-5 h-5 rounded-full border-2 border-white bg-gradient-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white text-[10px] font-bold"
+                            style={{ zIndex: 10 - index }}
+                          >
+                            {userName.charAt(0)}
+                          </div>
+                        );
+                      })}
                       {collaborators.length > 3 && (
                         <div className="w-5 h-5 rounded-full border-2 border-white bg-gray-400 flex items-center justify-center text-white text-[10px] font-bold">
                           +{collaborators.length - 3}

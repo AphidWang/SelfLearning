@@ -38,10 +38,14 @@ function attachUserProfileToEntity(users: User[], entity: any): any {
     };
   }
 
-  // 處理 collaborators（Topic 的 topic_collaborators）
-  if (Array.isArray(entity.topic_collaborators)) {
-    entity.collaborators = entity.topic_collaborators.map((collab: any) => {
-      const id = typeof collab === 'string' ? collab : collab.user_id;
+  // 處理 collaborators（Topic 的協作者數據）
+  // 檢查 topic_collaborators 或 collaborators
+  const collaboratorData = entity.topic_collaborators || entity.collaborators;
+  
+  if (Array.isArray(collaboratorData)) {
+    entity.collaborators = collaboratorData.map((collab: any) => {
+      // 根據實際數據結構調整：collab.id 是 user_id
+      const id = typeof collab === 'string' ? collab : collab.id;
       const permission = collab.permission;
       const invited_at = collab.invited_at;
       const user = users.find(u => u.id === id) || {
@@ -52,7 +56,9 @@ function attachUserProfileToEntity(users: User[], entity: any): any {
         role: 'student',
         roles: ['student']
       };
-      return { ...user, permission, invited_at };
+      
+      // 返回符合 TopicCollaborationManager 期望的結構
+      return { user, permission, invited_at };
     });
   }
 

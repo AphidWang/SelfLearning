@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTopicRadialMapStats } from '../TopicRadialMap';
 import { useTopicStore } from '../../../store/topicStore';
+import { getGoalsForTopic, getTasksForGoal } from '../../../store/helpers';
 import type { Topic } from '../../../types/goal';
 
 export const useTopicStats = (topicId: string, topic: Topic | null) => {
@@ -12,8 +13,11 @@ export const useTopicStats = (topicId: string, topic: Topic | null) => {
     if (!topic) return 0;
     let count = 0;
     
-    topic.goals?.forEach(goal => {
-      goal.tasks?.forEach(task => {
+    // 使用重構後的架構：從 goalStore 和 taskStore 獲取數據
+    const goals = getGoalsForTopic(topic.id);
+    goals.forEach(goal => {
+      const tasks = getTasksForGoal(goal.id);
+      tasks.forEach(task => {
         if (task.need_help) {
           count++;
         }
@@ -25,19 +29,21 @@ export const useTopicStats = (topicId: string, topic: Topic | null) => {
 
   // 記憶化 goals 以避免不必要的重新渲染
   const memoizedGoals = useMemo(() => {
-    if (!topic?.goals) return [];
-    return topic.goals;
-  }, [topic?.goals]);
+    if (!topic) return [];
+    return getGoalsForTopic(topic.id);
+  }, [topic]);
 
-  const totalGoals = topic?.goals?.length || 0;
+  const totalGoals = memoizedGoals.length;
   const completedGoals = useMemo(() => {
-    if (!topic?.goals) return 0;
-    return topic.goals.filter(goal => {
-      const totalTasks = goal.tasks?.length || 0;
-      const completedTasks = goal.tasks?.filter(task => task.status === 'done').length || 0;
+    if (!topic) return 0;
+    const goals = getGoalsForTopic(topic.id);
+    return goals.filter(goal => {
+      const tasks = getTasksForGoal(goal.id);
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(task => task.status === 'done').length;
       return totalTasks > 0 && completedTasks === totalTasks;
     }).length;
-  }, [topic?.goals]);
+  }, [topic]);
 
   return {
     weeklyStats,

@@ -27,20 +27,20 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 }) => {
   const sizeClass = sizeClasses[size];
   
-  const avatarContent = user.avatar || user.name.charAt(0).toUpperCase();
-  const backgroundColor = user.color || generateColorFromName(user.name);
+  const avatarContent = user.avatar || (user.name ? user.name.charAt(0).toUpperCase() : '?');
+  const backgroundColor = user.color || generateColorFromName(user.name || 'Unknown');
   
   return (
     <div
       className={`${sizeClass} rounded-full flex items-center justify-center font-medium cursor-pointer transition-all hover:scale-110 shadow-sm border-2 border-white ${className}`}
       style={{ backgroundColor, ...style }}
       onClick={onClick}
-      title={showTooltip ? user.name : undefined}
+      title={showTooltip ? (user.name || 'Unknown User') : undefined}
     >
       {user.avatar && user.avatar.startsWith('http') ? (
         <img 
           src={user.avatar} 
-          alt={user.name}
+          alt={user.name || 'User avatar'}
           className="w-full h-full rounded-full object-cover"
         />
       ) : (

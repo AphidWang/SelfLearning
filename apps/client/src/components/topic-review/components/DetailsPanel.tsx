@@ -70,6 +70,7 @@ import type { User as UserType } from '@self-learning/types';
 import { useTopicStore } from '../../../store/topicStore';
 import { useTaskStore } from '../../../store/taskStore';
 import { useGoalStore } from '../../../store/goalStore';
+import { getGoalById, getTasksForGoal, getGoalsForTopic } from '../../../store/helpers';
 import { UserAvatar } from '../../learning-map/UserAvatar';
 import { CollaborationManager } from '../../learning-map/CollaborationManager';
 import { TaskRecordInterface } from './TaskRecordInterface';
@@ -78,815 +79,6 @@ import { GoalStatusManager } from './GoalStatusManager';
 import { TaskStatusManager } from './TaskStatusManager';
 import { ReferenceInfoPanel } from './ReferenceInfoPanel';
 import toast from 'react-hot-toast';
-
-interface DetailsPanelProps {
-  topic: Topic;
-  selectedGoalId: string | null;
-  selectedTaskId: string | null;
-  subjectStyle: any;
-  onUpdateNotify: () => Promise<void>; // 統一的更新通知機制
-  availableUsers: UserType[]; // 可用的協作者候選人
-  collaborators: UserType[]; // Topic 層級的協作者
-  onTaskSelect?: (taskId: string, goalId: string) => void; // 任務選擇回調
-}
-
-export const DetailsPanel: React.FC<DetailsPanelProps> = ({
-  topic,
-  selectedGoalId,
-  selectedTaskId,
-  subjectStyle,
-  onUpdateNotify,
-  availableUsers,
-  collaborators,
-  onTaskSelect
-}) => {
-  const { 
-    enableTopicCollaboration, disableTopicCollaboration, inviteTopicCollaborator,
-    removeTopicCollaborator,
-    updateTopicReferenceInfo, addTopicAttachment, removeTopicAttachment, addTopicLink, removeTopicLink
-  } = useTopicStore();
-  const {
-    setGoalOwner, addGoalCollaborator, removeGoalCollaborator,
-    addGoal, updateGoalReferenceInfo, addGoalAttachment, removeGoalAttachment, addGoalLink, removeGoalLink
-  } = useGoalStore();
-  const { addTask, deleteTask, markTaskCompleted, markTaskInProgress, markTaskTodo, updateTask, updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink } = useTaskStore();
-
-  // 編輯狀態
-  const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [showCollaboratorManager, setShowCollaboratorManager] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [newGoalTitle, setNewGoalTitle] = useState('');
-  const [showAddGoal, setShowAddGoal] = useState(false);
-
-  // 計算當前選中的目標和任務
-  const { selectedGoal, selectedTask } = useMemo(() => {
-    if (!topic || !selectedGoalId) return { selectedGoal: null, selectedTask: null };
-    
-    const goal = topic.goals?.find(g => g.id === selectedGoalId);
-    const task = selectedTaskId && goal && goal.tasks ? goal.tasks.find(t => t.id === selectedTaskId) : null;
-    
-    return { selectedGoal: goal || null, selectedTask: task };
-  }, [topic, selectedGoalId, selectedTaskId]);
-
-  // 通用更新處理函數
-  const handleUpdate = useCallback(async (updateFn: () => Promise<any>, skipCollaboratorRefresh = false) => {
-    setIsUpdating(true);
-    try {
-      await updateFn();
-      // 只在需要時觸發完整的更新通知
-      if (!skipCollaboratorRefresh) {
-        await onUpdateNotify();
-      }
-    } catch (error) {
-      console.error('更新失敗:', error);
-      alert('操作失敗，請稍後再試');
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [onUpdateNotify]);
-
-  // 目標狀態更新  
-  const handleGoalStatusUpdate = useCallback(async (status: GoalStatus) => {
-    if (!selectedGoal) return;
-    
-    await handleUpdate(async () => {
-      // 換成 goalStore 的 updateGoal
-      // 需傳 goalId, version, updates
-      await useGoalStore.getState().updateGoal(selectedGoal.id, selectedGoal.version, { status });
-    });
-  }, [selectedGoal, handleUpdate]);
-
-  // 編輯保存處理
-  const handleSaveEdit = useCallback(async () => {
-    if (!editTitle.trim() || !selectedGoal || !selectedTask) return;
-    
-    // 只允許更新任務資訊，不允許更新狀態
-    const taskInfo: Pick<Task, 'title' | 'description'> = {
-      title: editTitle,
-      description: editDescription
-    };
-    
-    await handleUpdate(async () => {
-      await updateTask(selectedTask.id, selectedTask.version ?? 0, taskInfo);
-    });
-    setIsEditing(false);
-  }, [editTitle, editDescription, selectedTask, selectedGoal, topic.id, updateTask, handleUpdate]);
-
-  // 開始編輯
-  const handleStartEdit = useCallback(() => {
-    if (selectedTask) {
-      setEditTitle(selectedTask.title);
-      setEditDescription(selectedTask.description || '');
-    } else if (selectedGoal) {
-      setEditTitle(selectedGoal.title);
-      setEditDescription(selectedGoal.description || '');
-    }
-    setIsEditing(true);
-  }, [selectedTask, selectedGoal]);
-
-  // 新增任務
-  const handleAddTask = useCallback(async () => {
-    if (!newTaskTitle.trim() || !selectedGoal) return;
-    
-    await handleUpdate(async () => {
-      await addTask(selectedGoal.id, {
-        title: newTaskTitle,
-        status: 'todo',
-        description: '',
-        priority: 'medium',
-        order_index: (selectedGoal.tasks?.length || 0) + 1,
-        need_help: false,
-        task_type: 'single',
-        task_config: { type: 'single' },
-        cycle_config: { cycle_type: 'none', auto_reset: false },
-      });
-    });
-    setNewTaskTitle('');
-    setShowAddTask(false);
-  }, [newTaskTitle, selectedGoal, addTask, handleUpdate]);
-
-  // 新增目標
-  const handleAddGoal = useCallback(async () => {
-    if (!newGoalTitle.trim()) return;
-    
-    await handleUpdate(async () => {
-      await addGoal(topic.id, {
-        title: newGoalTitle,
-        status: 'todo',
-        description: '',
-        priority: 'medium',
-        order_index: (topic.goals?.length || 0) + 1
-      });
-    });
-    setNewGoalTitle('');
-    setShowAddGoal(false);
-  }, [newGoalTitle, topic.id, addGoal, handleUpdate]);
-
-  // 設置負責人
-  const handleSetOwner = useCallback(async (user: UserType) => {
-    if (selectedTask && selectedGoal) {
-      await handleUpdate(async () => {
-        await setGoalOwner(topic.id, selectedGoal.id, user.id);
-      });
-    } else if (selectedGoal) {
-      await handleUpdate(async () => {
-        await setGoalOwner(topic.id, selectedGoal.id, user.id);
-      });
-    }
-  }, [selectedTask, selectedGoal, setGoalOwner, handleUpdate]);
-
-  // 新增協作者
-  const handleAddCollaborator = useCallback(async (user: UserType) => {
-    if (selectedTask && selectedGoal) {
-      await handleUpdate(async () => {
-        await addGoalCollaborator(topic.id, selectedGoal.id, user.id);
-      });
-    } else if (selectedGoal) {
-      await handleUpdate(async () => {
-        await addGoalCollaborator(topic.id, selectedGoal.id, user.id);
-      });
-    }
-  }, [selectedTask, selectedGoal, addGoalCollaborator, handleUpdate]);
-
-  // 移除協作者
-  const handleRemoveCollaborator = useCallback(async (userId: string) => {
-    if (selectedTask && selectedGoal) {
-      await handleUpdate(async () => {
-        await removeGoalCollaborator(topic.id, selectedGoal.id, userId);
-      });
-    } else if (selectedGoal) {
-      await handleUpdate(async () => {
-        await removeGoalCollaborator(topic.id, selectedGoal.id, userId);
-      });
-    }
-  }, [selectedTask, selectedGoal, removeGoalCollaborator, handleUpdate]);
-
-
-
-  // 渲染協作者管理 - 使用 CollaborationManager 組件
-  const renderCollaboratorManager = () => {
-    const currentOwner = selectedTask?.owner || (selectedGoal as any)?.owner;
-    const currentCollaborators = selectedTask?.collaborators || (selectedGoal as any)?.collaborators || [];
-    
-    // 可選擇的用戶：Topic 協作者 + 擁有者（如果存在）
-    const selectableUsers = [...collaborators];
-    if (topic.owner && !selectableUsers.find(u => u.id === topic.owner!.id)) {
-      selectableUsers.unshift(topic.owner);
-    }
-
-    return (
-      <CollaborationManager
-        title={selectedTask ? "任務協作" : "目標協作"}
-        owner={currentOwner}
-        collaborators={currentCollaborators}
-        availableUsers={selectableUsers}
-        onSetOwner={handleSetOwner}
-        onAddCollaborator={handleAddCollaborator}
-        onRemoveCollaborator={handleRemoveCollaborator}
-        className="mb-3"
-      />
-    );
-  };
-
-  // 如果選中任務，顯示任務詳情
-  if (selectedTask && selectedGoal) {
-    return <TaskDetailPanel 
-      key={`task-${selectedTask.id}`}
-      task={selectedTask}
-      goal={selectedGoal}
-      topic={topic}
-      subjectStyle={subjectStyle}
-      availableUsers={availableUsers}
-      collaborators={collaborators}
-      onUpdateNotify={onUpdateNotify}
-      onTaskSelect={onTaskSelect}
-    />;
-  }
-
-  // 如果選中目標，顯示目標詳情
-  if (selectedGoal) {
-    const completedTasks = (selectedGoal.tasks || []).filter(t => t.status === 'done').length;
-    const totalTasks = selectedGoal.tasks?.length || 0;
-    const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-
-    return (
-      <motion.div
-        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full p-4 overflow-y-auto"
-        style={{ borderColor: `${subjectStyle.accent}50` }}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        <div className="space-y-4">
-          {/* 目標標題 Header */}
-          <div className="border-b border-gray-200 dark:border-gray-600 pb-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5" style={{ color: subjectStyle.accent }} />
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">目標詳情</span>
-              <div className="flex-1" />
-              <button
-                onClick={handleStartEdit}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <Edit className="w-4 h-4" />
-              </button>
-            </div>
-            
-            {isEditing ? (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full font-bold text-lg bg-transparent border-b-2 border-blue-500 focus:outline-none"
-                  autoFocus
-                />
-                <textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  className="w-full text-sm bg-transparent resize-none border border-gray-300 rounded p-2"
-                  rows={3}
-                  placeholder="目標描述..."
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveEdit}
-                    className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-sm"
-                  >
-                    <Save className="w-3 h-3" />
-                    保存
-                  </button>
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="flex items-center gap-1 px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm"
-                  >
-                    <X className="w-3 h-3" />
-                    取消
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <h3 className="font-bold text-lg text-gray-800 dark:text-white leading-tight">
-                  {selectedGoal.title}
-                </h3>
-                {selectedGoal.description && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                    {selectedGoal.description}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* 目標進度 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">完成進度</h4>
-              <span className="text-sm font-medium" style={{ color: subjectStyle.accent }}>
-                {Math.round(progress)}%
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="h-2 rounded-full transition-all duration-300"
-                style={{ 
-                  width: `${progress}%`,
-                  backgroundColor: subjectStyle.accent 
-                }}
-              />
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {completedTasks} / {totalTasks} 任務已完成
-            </p>
-          </div>
-
-          {/* 目標狀態控制 */}
-          <GoalStatusManager
-            currentStatus={selectedGoal.status}
-            onStatusChange={handleGoalStatusUpdate}
-            isUpdating={isUpdating}
-            totalTasks={totalTasks}
-            completedTasks={completedTasks}
-          />
-
-          {/* 協作者管理 */}
-          {renderCollaboratorManager()}
-
-          {/* 目標參考資訊 */}
-          <ReferenceInfoPanel
-            title="目標參考資訊"
-            referenceInfo={selectedGoal.reference_info}
-            onUpdateReferenceInfo={async (info) => {
-              await handleUpdate(async () => {
-                await updateGoalReferenceInfo(selectedGoal.id, info);
-              });
-            }}
-            onAddAttachment={async (attachment) => {
-              await handleUpdate(async () => {
-                await addGoalAttachment(selectedGoal.id, attachment);
-              });
-            }}
-            onRemoveAttachment={async (attachmentId) => {
-              await handleUpdate(async () => {
-                await removeGoalAttachment(selectedGoal.id, attachmentId);
-              });
-            }}
-            onAddLink={async (link) => {
-              await handleUpdate(async () => {
-                await addGoalLink(selectedGoal.id, link);
-              });
-            }}
-            onRemoveLink={async (linkId) => {
-              await handleUpdate(async () => {
-                await removeGoalLink(selectedGoal.id, linkId);
-              });
-            }}
-            isUpdating={isUpdating}
-          />
-
-          {/* 任務列表與管理 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                任務列表 ({selectedGoal.tasks?.length || 0})
-              </h4>
-              <button
-                onClick={() => setShowAddTask(!showAddTask)}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* 新增任務輸入 */}
-            {showAddTask && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-4 overflow-hidden"
-              >
-                <div className="p-4 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-900/20 dark:to-blue-800/10 backdrop-blur-sm">
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        placeholder="輸入新任務標題..."
-                        className="w-full px-4 py-3 text-sm font-medium bg-white/80 dark:bg-gray-800/80 border-0 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 backdrop-blur-sm transition-all"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && newTaskTitle.trim()) {
-                            handleAddTask();
-                          }
-                          if (e.key === 'Escape') {
-                            setShowAddTask(false);
-                            setNewTaskTitle('');
-                          }
-                        }}
-                        autoFocus
-                      />
-                      <div className="absolute inset-0 rounded-lg ring-1 ring-blue-200/50 dark:ring-blue-700/50 pointer-events-none" />
-                    </div>
-                    
-                    <div className="flex items-center justify-end">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setShowAddTask(false);
-                            setNewTaskTitle('');
-                          }}
-                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md transition-all"
-                        >
-                          取消
-                        </button>
-                        <button
-                          onClick={handleAddTask}
-                          disabled={isUpdating || !newTaskTitle.trim()}
-                          className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                        >
-                          {isUpdating ? (
-                            <>
-                              <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                              新增中
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-3 h-3" />
-                              新增任務
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* 任務列表 */}
-            <div className="space-y-2">
-              {(selectedGoal.tasks || []).map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                  onClick={() => onTaskSelect?.(task.id, selectedGoal.id)}
-                >
-                  <div className={`w-3 h-3 rounded-full ${
-                    task.status === 'done' ? 'bg-green-500' :
-                    task.status === 'in_progress' ? 'bg-blue-500' :
-                    'bg-gray-400'
-                  }`} />
-                  <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                    {task.title}
-                  </span>
-                  {task.need_help && (
-                    <Flag className="w-3 h-3 text-orange-500" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 需要幫助標記 */}
-          {selectedGoal.need_help && (
-            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-              <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
-                <Flag className="w-4 h-4" />
-                <span className="text-sm font-medium">需要協助</span>
-              </div>
-              <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
-                此目標標記為需要幫助
-              </p>
-            </div>
-          )}
-        </div>
-      </motion.div>
-    );
-  }
-
-  // 如果選中主題中心，顯示主題概覽
-  if (selectedGoalId === 'TOPIC') {
-    const totalGoals = topic.goals?.length || 0;
-    const completedGoals = topic.goals?.filter(g => g.status === 'complete').length || 0;
-    const totalTasks = topic.goals?.reduce((sum, g) => sum + (g.tasks?.length || 0), 0) || 0;
-    const completedTasks = topic.goals?.reduce((sum, g) => sum + (g.tasks?.filter(t => t.status === 'done').length || 0), 0) || 0;
-
-    return (
-      <motion.div
-        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full p-4 overflow-y-auto"
-        style={{ borderColor: `${subjectStyle.accent}50` }}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        <div className="space-y-4">
-          {/* 主題標題 Header */}
-          <div className="border-b border-gray-200 dark:border-gray-600 pb-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-5 h-5 rounded-full" style={{ backgroundColor: subjectStyle.accent }} />
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">主題概覽</span>
-            </div>
-            <h3 className="font-bold text-lg text-gray-800 dark:text-white leading-tight">
-              {topic.title}
-            </h3>
-            {topic.description && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {topic.description}
-              </p>
-            )}
-          </div>
-
-          {/* 整體統計 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <div className="text-2xl font-bold" style={{ color: subjectStyle.accent }}>
-                {totalGoals}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">總目標數</div>
-            </div>
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <div className="text-2xl font-bold" style={{ color: subjectStyle.accent }}>
-                {totalTasks}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">總任務數</div>
-            </div>
-          </div>
-
-          {/* 協作管理 */}
-          <TopicCollaborationManager
-            topic={{
-              id: topic.id,
-              is_collaborative: topic.is_collaborative ?? false,
-              owner: topic.owner
-            }}
-            availableUsers={availableUsers}
-            collaborators={collaborators.map(c => ({ user: c, permission: 'edit' as const }))}
-            onInviteCollaborator={async (userId, permission) => {
-              await handleUpdate(async () => {
-                return await inviteTopicCollaborator(topic.id, userId, permission);
-              });
-              return true;
-            }}
-            onRemoveCollaborator={async (userId) => {
-              await handleUpdate(async () => {
-                return await removeTopicCollaborator(topic.id, userId);
-              });
-              return true;
-            }}
-            onToggleCollaborative={async () => {
-              await handleUpdate(async () => {
-                if (topic.is_collaborative) {
-                  return await disableTopicCollaboration(topic.id);
-                } else {
-                  return await enableTopicCollaboration(topic.id);
-                }
-              });
-              return true;
-            }}
-            isUpdating={isUpdating}
-          />
-
-          {/* 目標網格視圖 */}
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">目標進度</h4>
-              <button
-                onClick={() => setShowAddGoal(!showAddGoal)}
-                className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
-                title="新增目標"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* 新增目標輸入 */}
-            {showAddGoal && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-4 overflow-hidden"
-              >
-                <div className="p-4 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-900/20 dark:to-blue-800/10 backdrop-blur-sm">
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={newGoalTitle}
-                        onChange={(e) => setNewGoalTitle(e.target.value)}
-                        placeholder="輸入新目標標題..."
-                        className="w-full px-4 py-3 text-sm font-medium bg-white/80 dark:bg-gray-800/80 border-0 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 backdrop-blur-sm transition-all"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && newGoalTitle.trim()) {
-                            handleAddGoal();
-                          }
-                          if (e.key === 'Escape') {
-                            setShowAddGoal(false);
-                            setNewGoalTitle('');
-                          }
-                        }}
-                        autoFocus
-                      />
-                      <div className="absolute inset-0 rounded-lg ring-1 ring-blue-200/50 dark:ring-blue-700/50 pointer-events-none" />
-                    </div>
-                    
-                    <div className="flex items-center justify-end">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setShowAddGoal(false);
-                            setNewGoalTitle('');
-                          }}
-                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md transition-all"
-                        >
-                          取消
-                        </button>
-                        <button
-                          onClick={handleAddGoal}
-                          disabled={isUpdating || !newGoalTitle.trim()}
-                          className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                        >
-                          {isUpdating ? (
-                            <>
-                              <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                              新增中
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-3 h-3" />
-                              新增目標
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            <div className="grid grid-cols-1 gap-2">
-              {topic.goals && topic.goals.length > 0 ? topic.goals.map((goal, index) => {
-                const totalTasks = goal.tasks?.length || 0;
-                const completedTasks = (goal.tasks || []).filter(t => t.status === 'done').length;
-                const inProgressTasks = (goal.tasks || []).filter(t => t.status === 'in_progress').length;
-                const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
-
-                // 決定目標狀態顏色
-                let goalStatusColor = '';
-                let goalStatusBg = '';
-                let goalStatusText = '';
-                
-                if (progress === 100) {
-                  goalStatusColor = '#22c55e';
-                  goalStatusBg = 'bg-green-50 dark:bg-green-900/20';
-                  goalStatusText = 'text-green-700 dark:text-green-300';
-                } else if (inProgressTasks > 0) {
-                  goalStatusColor = '#8b5cf6';
-                  goalStatusBg = 'bg-purple-50 dark:bg-purple-900/20';
-                  goalStatusText = 'text-purple-700 dark:text-purple-300';
-                } else if (completedTasks > 0) {
-                  goalStatusColor = '#3b82f6';
-                  goalStatusBg = 'bg-blue-50 dark:bg-blue-900/20';
-                  goalStatusText = 'text-blue-700 dark:text-blue-300';
-                } else {
-                  goalStatusColor = '#6b7280';
-                  goalStatusBg = 'bg-gray-50 dark:bg-gray-800';
-                  goalStatusText = 'text-gray-600 dark:text-gray-400';
-                }
-
-                return (
-                  <div
-                    key={goal.id}
-                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${goalStatusBg} hover:brightness-95 dark:hover:brightness-110`}
-                    onClick={() => onTaskSelect?.((goal.tasks && goal.tasks.length > 0) ? goal.tasks[0].id : '', goal.id)}
-                  >
-                    {/* 編號和標題 */}
-                    <div className="flex items-center gap-2 flex-1">
-                      <span
-                        className="w-5 h-5 flex items-center justify-center rounded-full text-xs text-white flex-shrink-0"
-                        style={{ backgroundColor: goalStatusColor }}
-                      >
-                        {index + 1}
-                      </span>
-                      <span className={`text-sm ${goalStatusText} line-clamp-1`}>
-                        {goal.title}
-                      </span>
-                    </div>
-
-                    {/* 進度條和百分比 */}
-                    <div className="flex items-center gap-2 min-w-[100px]">
-                      <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{ 
-                            width: `${progress}%`,
-                            backgroundColor: goalStatusColor
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs min-w-[32px] text-right" style={{ color: goalStatusColor }}>
-                        {progress}%
-                      </span>
-                    </div>
-                  </div>
-                );
-              }) : (
-                <div className="text-center py-8">
-                  <Target className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                    尚未建立任何目標
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    點擊上方 + 新增第一個目標
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-
-
-          {/* 主題參考資訊 */}
-          <ReferenceInfoPanel
-            title="主題參考資訊"
-            referenceInfo={topic.reference_info}
-            onUpdateReferenceInfo={async (info) => {
-              await handleUpdate(async () => {
-                await updateTopicReferenceInfo(topic.id, info);
-              });
-            }}
-            onAddAttachment={async (attachment) => {
-              await handleUpdate(async () => {
-                await addTopicAttachment(topic.id, attachment);
-              });
-            }}
-            onRemoveAttachment={async (attachmentId) => {
-              await handleUpdate(async () => {
-                await removeTopicAttachment(topic.id, attachmentId);
-              });
-            }}
-            onAddLink={async (link) => {
-              await handleUpdate(async () => {
-                await addTopicLink(topic.id, link);
-              });
-            }}
-            onRemoveLink={async (linkId) => {
-              await handleUpdate(async () => {
-                await removeTopicLink(topic.id, linkId);
-              });
-            }}
-            isUpdating={isUpdating}
-          />
-
-          {/* 學科資訊 */}
-          {topic.subject && (
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">學科</h4>
-              <div className="inline-block px-3 py-1 rounded-full text-sm font-medium"
-                   style={{ 
-                     backgroundColor: `${subjectStyle.accent}20`,
-                     color: subjectStyle.accent 
-                   }}>
-                {topic.subject}
-              </div>
-            </div>
-          )}
-        </div>
-      </motion.div>
-    );
-  }
-
-  // 默認狀態 - 無選中項目
-  return (
-    <motion.div
-      className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col items-center justify-center p-6"
-      style={{ borderColor: `${subjectStyle.accent}50` }}
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.1, duration: 0.3 }}
-    >
-      <div className="text-center">
-        <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
-        </svg>
-        <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">探索學習路徑</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          點擊中央主題查看整體規劃
-          <br />
-          點擊目標或任務查看詳細資訊
-        </p>
-      </div>
-    </motion.div>
-  );
-};
 
 // TaskDetailPanel 組件 - 任務詳情面板，包含學習記錄功能
 interface TaskDetailPanelProps {
@@ -1397,5 +589,900 @@ const CutePromptDialog: React.FC<CutePromptDialogProps> = ({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+};
+
+interface DetailsPanelProps {
+  topic: Topic;
+  selectedGoalId: string | null;
+  selectedTaskId: string | null;
+  subjectStyle: any;
+  onUpdateNotify: () => Promise<void>; // 統一的更新通知機制
+  availableUsers: UserType[]; // 可用的協作者候選人
+  collaborators: UserType[]; // Topic 層級的協作者
+  onTaskSelect?: (taskId: string, goalId: string) => void; // 任務選擇回調
+}
+
+export const DetailsPanel: React.FC<DetailsPanelProps> = ({
+  topic,
+  selectedGoalId,
+  selectedTaskId,
+  subjectStyle,
+  onUpdateNotify,
+  availableUsers,
+  collaborators,
+  onTaskSelect
+}) => {
+  const { 
+    enableTopicCollaboration, disableTopicCollaboration, inviteTopicCollaborator,
+    removeTopicCollaborator,
+    updateTopicReferenceInfo, addTopicAttachment, removeTopicAttachment, addTopicLink, removeTopicLink
+  } = useTopicStore();
+  const {
+    setGoalOwner, addGoalCollaborator, removeGoalCollaborator,
+    addGoal, updateGoalReferenceInfo, addGoalAttachment, removeGoalAttachment, addGoalLink, removeGoalLink
+  } = useGoalStore();
+  const { addTask, deleteTask, markTaskCompleted, markTaskInProgress, markTaskTodo, updateTask, updateTaskReferenceInfo, addTaskAttachment, removeTaskAttachment, addTaskLink, removeTaskLink } = useTaskStore();
+  const { deleteGoal } = useGoalStore();
+
+  // 編輯狀態
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [showCollaboratorManager, setShowCollaboratorManager] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [showAddGoal, setShowAddGoal] = useState(false);
+  const [showDeleteGoalConfirm, setShowDeleteGoalConfirm] = useState(false);
+
+  // 計算當前選中的目標和任務
+  const { selectedGoal, selectedTask } = useMemo(() => {
+    if (!topic || !selectedGoalId) return { selectedGoal: null, selectedTask: null };
+    
+    const goal = getGoalById(selectedGoalId);
+    const task = selectedTaskId && goal ? getTasksForGoal(goal.id).find(t => t.id === selectedTaskId) : null;
+    
+    return { selectedGoal: goal || null, selectedTask: task };
+  }, [topic, selectedGoalId, selectedTaskId]);
+
+  // 通用更新處理函數
+  const handleUpdate = useCallback(async (updateFn: () => Promise<any>, skipCollaboratorRefresh = false) => {
+    setIsUpdating(true);
+    try {
+      await updateFn();
+      // 只在需要時觸發完整的更新通知
+      if (!skipCollaboratorRefresh) {
+        await onUpdateNotify();
+      }
+    } catch (error) {
+      console.error('更新失敗:', error);
+      alert('操作失敗，請稍後再試');
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [onUpdateNotify]);
+
+  // 目標狀態更新  
+  const handleGoalStatusUpdate = useCallback(async (status: GoalStatus) => {
+    if (!selectedGoal) return;
+    
+    await handleUpdate(async () => {
+      // 換成 goalStore 的 updateGoal
+      // 需傳 goalId, version, updates
+      await useGoalStore.getState().updateGoal(selectedGoal.id, selectedGoal.version, { status });
+    });
+  }, [selectedGoal, handleUpdate]);
+
+  // 編輯保存處理
+  const handleSaveEdit = useCallback(async () => {
+    if (!editTitle.trim() || !selectedGoal || !selectedTask) return;
+    
+    // 只允許更新任務資訊，不允許更新狀態
+    const taskInfo: Pick<Task, 'title' | 'description'> = {
+      title: editTitle,
+      description: editDescription
+    };
+    
+    await handleUpdate(async () => {
+      await updateTask(selectedTask.id, selectedTask.version ?? 0, taskInfo);
+    });
+    setIsEditing(false);
+  }, [editTitle, editDescription, selectedTask, selectedGoal, topic.id, updateTask, handleUpdate]);
+
+  // 開始編輯
+  const handleStartEdit = useCallback(() => {
+    if (selectedTask) {
+      setEditTitle(selectedTask.title);
+      setEditDescription(selectedTask.description || '');
+    } else if (selectedGoal) {
+      setEditTitle(selectedGoal.title);
+      setEditDescription(selectedGoal.description || '');
+    }
+    setIsEditing(true);
+  }, [selectedTask, selectedGoal]);
+
+  // 新增任務
+  const handleAddTask = useCallback(async () => {
+    if (!newTaskTitle.trim() || !selectedGoal) return;
+    
+    await handleUpdate(async () => {
+      await addTask(selectedGoal.id, {
+        title: newTaskTitle,
+        status: 'todo',
+        description: '',
+        priority: 'medium',
+        order_index: getTasksForGoal(selectedGoal.id).length + 1,
+        need_help: false,
+        task_type: 'single',
+        task_config: { type: 'single' },
+        cycle_config: { cycle_type: 'none', auto_reset: false },
+      });
+    });
+    setNewTaskTitle('');
+    setShowAddTask(false);
+  }, [newTaskTitle, selectedGoal, addTask, handleUpdate]);
+
+  // 新增目標
+  const handleAddGoal = useCallback(async () => {
+    if (!newGoalTitle.trim()) return;
+    
+    await handleUpdate(async () => {
+      await addGoal(topic.id, {
+        title: newGoalTitle,
+        status: 'todo',
+        description: '',
+        priority: 'medium',
+        order_index: getGoalsForTopic(topic.id).length + 1
+      });
+    });
+    setNewGoalTitle('');
+    setShowAddGoal(false);
+  }, [newGoalTitle, topic.id, addGoal, handleUpdate]);
+
+  // 刪除目標
+  const handleDeleteGoal = useCallback(async () => {
+    if (!selectedGoal) return;
+    
+    await handleUpdate(async () => {
+      await deleteGoal(selectedGoal.id);
+    });
+    setShowDeleteGoalConfirm(false);
+  }, [selectedGoal, deleteGoal, handleUpdate]);
+
+  // 設置負責人
+  const handleSetOwner = useCallback(async (user: UserType) => {
+    if (selectedTask && selectedGoal) {
+      await handleUpdate(async () => {
+        await setGoalOwner(selectedGoal.id, user.id);
+      });
+    } else if (selectedGoal) {
+      await handleUpdate(async () => {
+        await setGoalOwner(selectedGoal.id, user.id);
+      });
+    }
+  }, [selectedTask, selectedGoal, setGoalOwner, handleUpdate]);
+
+  // 新增協作者
+  const handleAddCollaborator = useCallback(async (user: UserType) => {
+    if (selectedTask && selectedGoal) {
+      await handleUpdate(async () => {
+        await addGoalCollaborator(selectedGoal.id, user.id);
+      });
+    } else if (selectedGoal) {
+      await handleUpdate(async () => {
+        await addGoalCollaborator(selectedGoal.id, user.id);
+      });
+    }
+  }, [selectedTask, selectedGoal, addGoalCollaborator, handleUpdate]);
+
+  // 移除協作者
+  const handleRemoveCollaborator = useCallback(async (userId: string) => {
+    if (selectedTask && selectedGoal) {
+      await handleUpdate(async () => {
+        await removeGoalCollaborator(selectedGoal.id, userId);
+      });
+    } else if (selectedGoal) {
+      await handleUpdate(async () => {
+        await removeGoalCollaborator(selectedGoal.id, userId);
+      });
+    }
+  }, [selectedTask, selectedGoal, removeGoalCollaborator, handleUpdate]);
+
+
+
+  // 渲染協作者管理 - 使用 CollaborationManager 組件
+  const renderCollaboratorManager = () => {
+    const currentOwner = selectedTask?.owner || (selectedGoal as any)?.owner;
+    const currentCollaborators = selectedTask?.collaborators || (selectedGoal as any)?.collaborators || [];
+    
+    // 可選擇的用戶：Topic 協作者 + 擁有者（如果存在）
+    const selectableUsers = [...collaborators];
+    if (topic.owner && !selectableUsers.find(u => u.id === topic.owner!.id)) {
+      selectableUsers.unshift(topic.owner);
+    }
+
+    return (
+      <CollaborationManager
+        title={selectedTask ? "任務協作" : "目標協作"}
+        owner={currentOwner}
+        collaborators={currentCollaborators}
+        availableUsers={selectableUsers}
+        onSetOwner={handleSetOwner}
+        onAddCollaborator={handleAddCollaborator}
+        onRemoveCollaborator={handleRemoveCollaborator}
+        className="mb-3"
+      />
+    );
+  };
+
+  // 如果選中任務，顯示任務詳情
+  if (selectedTask && selectedGoal) {
+    return <TaskDetailPanel 
+      key={`task-${selectedTask.id}`}
+      task={selectedTask}
+      goal={selectedGoal}
+      topic={topic}
+      subjectStyle={subjectStyle}
+      availableUsers={availableUsers}
+      collaborators={collaborators}
+      onUpdateNotify={onUpdateNotify}
+      onTaskSelect={onTaskSelect}
+    />;
+  }
+
+  // 如果選中目標，顯示目標詳情
+  if (selectedGoal) {
+    const tasks = getTasksForGoal(selectedGoal.id);
+    const completedTasks = tasks.filter(t => t.status === 'done').length;
+    const totalTasks = tasks.length;
+    const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    return (
+      <motion.div
+        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full p-4 overflow-y-auto"
+        style={{ borderColor: `${subjectStyle.accent}50` }}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
+      >
+        <div className="space-y-4">
+          {/* 目標標題 Header */}
+          <div className="border-b border-gray-200 dark:border-gray-600 pb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-5 h-5" style={{ color: subjectStyle.accent }} />
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">目標詳情</span>
+              <div className="flex-1" />
+              <button
+                onClick={handleStartEdit}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {isEditing ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full font-bold text-lg bg-transparent border-b-2 border-blue-500 focus:outline-none"
+                  autoFocus
+                />
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="w-full text-sm bg-transparent resize-none border border-gray-300 rounded p-2"
+                  rows={3}
+                  placeholder="目標描述..."
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveEdit}
+                    className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                  >
+                    <Save className="w-3 h-3" />
+                    保存
+                  </button>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="flex items-center gap-1 px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm"
+                  >
+                    <X className="w-3 h-3" />
+                    取消
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3 className="font-bold text-lg text-gray-800 dark:text-white leading-tight">
+                  {selectedGoal.title}
+                </h3>
+                {selectedGoal.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    {selectedGoal.description}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* 目標進度 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">完成進度</h4>
+              <span className="text-sm font-medium" style={{ color: subjectStyle.accent }}>
+                {Math.round(progress)}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className="h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${progress}%`,
+                  backgroundColor: subjectStyle.accent 
+                }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {completedTasks} / {totalTasks} 任務已完成
+            </p>
+          </div>
+
+          {/* 目標狀態控制 */}
+          <GoalStatusManager
+            currentStatus={selectedGoal.status}
+            onStatusChange={handleGoalStatusUpdate}
+            isUpdating={isUpdating}
+            totalTasks={totalTasks}
+            completedTasks={completedTasks}
+          />
+
+          {/* 協作者管理 */}
+          {renderCollaboratorManager()}
+
+          {/* 目標參考資訊 */}
+          <ReferenceInfoPanel
+            title="目標參考資訊"
+            referenceInfo={selectedGoal.reference_info}
+            onUpdateReferenceInfo={async (info) => {
+              await handleUpdate(async () => {
+                await updateGoalReferenceInfo(selectedGoal.id, info);
+              });
+            }}
+            onAddAttachment={async (attachment) => {
+              await handleUpdate(async () => {
+                await addGoalAttachment(selectedGoal.id, attachment);
+              });
+            }}
+            onRemoveAttachment={async (attachmentId) => {
+              await handleUpdate(async () => {
+                await removeGoalAttachment(selectedGoal.id, attachmentId);
+              });
+            }}
+            onAddLink={async (link) => {
+              await handleUpdate(async () => {
+                await addGoalLink(selectedGoal.id, link);
+              });
+            }}
+            onRemoveLink={async (linkId) => {
+              await handleUpdate(async () => {
+                await removeGoalLink(selectedGoal.id, linkId);
+              });
+            }}
+            isUpdating={isUpdating}
+          />
+
+          {/* 任務列表與管理 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                任務列表 ({getTasksForGoal(selectedGoal.id).length})
+              </h4>
+              <button
+                onClick={() => setShowAddTask(!showAddTask)}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 新增任務輸入 */}
+            {showAddTask && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="p-4 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-900/20 dark:to-blue-800/10 backdrop-blur-sm">
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        placeholder="輸入新任務標題..."
+                        className="w-full px-4 py-3 text-sm font-medium bg-white/80 dark:bg-gray-800/80 border-0 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 backdrop-blur-sm transition-all"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && newTaskTitle.trim()) {
+                            handleAddTask();
+                          }
+                          if (e.key === 'Escape') {
+                            setShowAddTask(false);
+                            setNewTaskTitle('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <div className="absolute inset-0 rounded-lg ring-1 ring-blue-200/50 dark:ring-blue-700/50 pointer-events-none" />
+                    </div>
+                    
+                    <div className="flex items-center justify-end">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setShowAddTask(false);
+                            setNewTaskTitle('');
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md transition-all"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleAddTask}
+                          disabled={isUpdating || !newTaskTitle.trim()}
+                          className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                        >
+                          {isUpdating ? (
+                            <>
+                              <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                              新增中
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3 h-3" />
+                              新增任務
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* 任務列表 */}
+            <div className="space-y-2">
+              {getTasksForGoal(selectedGoal.id).map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  onClick={() => onTaskSelect?.(task.id, selectedGoal.id)}
+                >
+                  <div className={`w-3 h-3 rounded-full ${
+                    task.status === 'done' ? 'bg-green-500' :
+                    task.status === 'in_progress' ? 'bg-blue-500' :
+                    'bg-gray-400'
+                  }`} />
+                  <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                    {task.title}
+                  </span>
+                  {task.need_help && (
+                    <Flag className="w-3 h-3 text-orange-500" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 需要幫助標記 */}
+          {selectedGoal.need_help && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
+                <Flag className="w-4 h-4" />
+                <span className="text-sm font-medium">需要協助</span>
+              </div>
+              <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
+                此目標標記為需要幫助
+              </p>
+            </div>
+          )}
+
+          {/* 刪除目標按鈕 */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+            <button
+              onClick={() => setShowDeleteGoalConfirm(true)}
+              disabled={isUpdating}
+              className="w-full py-2 bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              title="刪除目標"
+            >
+              <Trash2 className="w-4 h-4" />
+              刪除目標
+            </button>
+          </div>
+
+          {/* 刪除目標確認對話框 */}
+          {showDeleteGoalConfirm && (
+            <motion.div
+              className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center p-4 z-50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <motion.div
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 w-full max-w-sm shadow-xl"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-800 dark:text-white">確認刪除目標</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      此操作無法復原
+                    </p>
+                  </div>
+                </div>
+                
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  您確定要刪除目標 <strong>{selectedGoal?.title}</strong> 嗎？
+                  <br />
+                  <span className="text-sm text-gray-500">
+                    此操作將同時刪除目標下的所有任務
+                  </span>
+                </p>
+                
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowDeleteGoalConfirm(false)}
+                    className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleDeleteGoal}
+                    disabled={isUpdating}
+                    className="px-3 py-1 text-sm bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {isUpdating ? '刪除中...' : '確認刪除'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
+  // 如果選中主題中心，顯示主題概覽
+  if (selectedGoalId === 'TOPIC') {
+    const goals = getGoalsForTopic(topic.id);
+    const totalGoals = goals.length;
+    const completedGoals = goals.filter(g => g.status === 'complete').length;
+    const totalTasks = goals.reduce((sum, g) => sum + getTasksForGoal(g.id).length, 0);
+    const completedTasks = goals.reduce((sum, g) => sum + getTasksForGoal(g.id).filter(t => t.status === 'done').length, 0);
+
+    return (
+      <motion.div
+        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full p-4 overflow-y-auto"
+        style={{ borderColor: `${subjectStyle.accent}50` }}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
+      >
+        <div className="space-y-4">
+          {/* 主題標題 Header */}
+          <div className="border-b border-gray-200 dark:border-gray-600 pb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-5 h-5 rounded-full" style={{ backgroundColor: subjectStyle.accent }} />
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">主題概覽</span>
+            </div>
+            <h3 className="font-bold text-lg text-gray-800 dark:text-white leading-tight">
+              {topic.title}
+            </h3>
+            {topic.description && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {topic.description}
+              </p>
+            )}
+          </div>
+
+          {/* 整體統計 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div className="text-2xl font-bold" style={{ color: subjectStyle.accent }}>
+                {totalGoals}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">總目標數</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div className="text-2xl font-bold" style={{ color: subjectStyle.accent }}>
+                {totalTasks}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">總任務數</div>
+            </div>
+          </div>
+
+          {/* 協作管理 */}
+          <TopicCollaborationManager
+            topic={{
+              id: topic.id,
+              is_collaborative: topic.is_collaborative ?? false,
+              owner: topic.owner
+            }}
+            availableUsers={availableUsers}
+            collaborators={collaborators.map(c => ({ user: c, permission: 'edit' as const }))}
+            onInviteCollaborator={async (userId, permission) => {
+              await handleUpdate(async () => {
+                return await inviteTopicCollaborator(topic.id, userId, permission);
+              });
+              return true;
+            }}
+            onRemoveCollaborator={async (userId) => {
+              await handleUpdate(async () => {
+                return await removeTopicCollaborator(topic.id, userId);
+              });
+              return true;
+            }}
+            onToggleCollaborative={async () => {
+              await handleUpdate(async () => {
+                if (topic.is_collaborative) {
+                  return await disableTopicCollaboration(topic.id);
+                } else {
+                  return await enableTopicCollaboration(topic.id);
+                }
+              });
+              return true;
+            }}
+            isUpdating={isUpdating}
+          />
+
+          {/* 目標網格視圖 */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">目標進度</h4>
+              <button
+                onClick={() => setShowAddGoal(!showAddGoal)}
+                className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
+                title="新增目標"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 新增目標輸入 */}
+            {showAddGoal && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="p-4 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-900/20 dark:to-blue-800/10 backdrop-blur-sm">
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={newGoalTitle}
+                        onChange={(e) => setNewGoalTitle(e.target.value)}
+                        placeholder="輸入新目標標題..."
+                        className="w-full px-4 py-3 text-sm font-medium bg-white/80 dark:bg-gray-800/80 border-0 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 backdrop-blur-sm transition-all"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && newGoalTitle.trim()) {
+                            handleAddGoal();
+                          }
+                          if (e.key === 'Escape') {
+                            setShowAddGoal(false);
+                            setNewGoalTitle('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <div className="absolute inset-0 rounded-lg ring-1 ring-blue-200/50 dark:ring-blue-700/50 pointer-events-none" />
+                    </div>
+                    
+                    <div className="flex items-center justify-end">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setShowAddGoal(false);
+                            setNewGoalTitle('');
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md transition-all"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleAddGoal}
+                          disabled={isUpdating || !newGoalTitle.trim()}
+                          className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                        >
+                          {isUpdating ? (
+                            <>
+                              <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                              新增中
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3 h-3" />
+                              新增目標
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            <div className="grid grid-cols-1 gap-2">
+              {(() => {
+                const goals = getGoalsForTopic(topic.id);
+                if (goals.length === 0) {
+                  return (
+                    <div className="text-center py-8">
+                      <Target className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                        尚未建立任何目標
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        點擊上方 + 新增第一個目標
+                      </p>
+                    </div>
+                  );
+                }
+                
+                return goals.map((goal, index) => {
+                  const tasks = getTasksForGoal(goal.id);
+                  const totalTasks = tasks.length;
+                  const completedTasks = tasks.filter(t => t.status === 'done').length;
+                  const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+                  const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
+                  // 決定目標狀態顏色
+                  let goalStatusColor = '';
+                  let goalStatusBg = '';
+                  let goalStatusText = '';
+                  
+                  if (progress === 100) {
+                    goalStatusColor = '#22c55e';
+                    goalStatusBg = 'bg-green-50 dark:bg-green-900/20';
+                    goalStatusText = 'text-green-700 dark:text-green-300';
+                  } else if (inProgressTasks > 0) {
+                    goalStatusColor = '#8b5cf6';
+                    goalStatusBg = 'bg-purple-50 dark:bg-purple-900/20';
+                    goalStatusText = 'text-purple-700 dark:text-purple-300';
+                  } else if (completedTasks > 0) {
+                    goalStatusColor = '#3b82f6';
+                    goalStatusBg = 'bg-blue-50 dark:bg-blue-900/20';
+                    goalStatusText = 'text-blue-700 dark:text-blue-300';
+                  } else {
+                    goalStatusColor = '#6b7280';
+                    goalStatusBg = 'bg-gray-50 dark:bg-gray-800';
+                    goalStatusText = 'text-gray-600 dark:text-gray-400';
+                  }
+
+                  return (
+                    <div
+                      key={goal.id}
+                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${goalStatusBg} hover:brightness-95 dark:hover:brightness-110`}
+                      onClick={() => onTaskSelect?.((tasks.length > 0) ? tasks[0].id : '', goal.id)}
+                    >
+                      {/* 編號和標題 */}
+                      <div className="flex items-center gap-2 flex-1">
+                        <span
+                          className="w-5 h-5 flex items-center justify-center rounded-full text-xs text-white flex-shrink-0"
+                          style={{ backgroundColor: goalStatusColor }}
+                        >
+                          {index + 1}
+                        </span>
+                        <span className={`text-sm ${goalStatusText} line-clamp-1`}>
+                          {goal.title}
+                        </span>
+                      </div>
+
+                      {/* 進度條和百分比 */}
+                      <div className="flex items-center gap-2 min-w-[100px]">
+                        <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{ 
+                              width: `${progress}%`,
+                              backgroundColor: goalStatusColor
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs min-w-[32px] text-right" style={{ color: goalStatusColor }}>
+                          {progress}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+
+
+
+          {/* 主題參考資訊 */}
+          <ReferenceInfoPanel
+            title="主題參考資訊"
+            referenceInfo={topic.reference_info}
+            onUpdateReferenceInfo={async (info) => {
+              await handleUpdate(async () => {
+                await updateTopicReferenceInfo(topic.id, info);
+              });
+            }}
+            onAddAttachment={async (attachment) => {
+              await handleUpdate(async () => {
+                await addTopicAttachment(topic.id, attachment);
+              });
+            }}
+            onRemoveAttachment={async (attachmentId) => {
+              await handleUpdate(async () => {
+                await removeTopicAttachment(topic.id, attachmentId);
+              });
+            }}
+            onAddLink={async (link) => {
+              await handleUpdate(async () => {
+                await addTopicLink(topic.id, link);
+              });
+            }}
+            onRemoveLink={async (linkId) => {
+              await handleUpdate(async () => {
+                await removeTopicLink(topic.id, linkId);
+              });
+            }}
+            isUpdating={isUpdating}
+          />
+
+          {/* 學科資訊 */}
+          {topic.subject && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">學科</h4>
+              <div className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                   style={{ 
+                     backgroundColor: `${subjectStyle.accent}20`,
+                     color: subjectStyle.accent 
+                   }}>
+                {topic.subject}
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
+  // 默認狀態 - 無選中項目
+  return (
+    <motion.div
+      className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col items-center justify-center p-6"
+      style={{ borderColor: `${subjectStyle.accent}50` }}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.1, duration: 0.3 }}
+    >
+      <div className="text-center">
+        <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
+        </svg>
+        <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">探索學習路徑</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          點擊中央主題查看整體規劃
+          <br />
+          點擊目標或任務查看詳細資訊
+        </p>
+      </div>
+    </motion.div>
   );
 };

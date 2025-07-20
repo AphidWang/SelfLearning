@@ -31,6 +31,9 @@ import { InteractiveMap } from '../../components/learning-map/InteractiveMap';
 import { TaskDetailDialog } from '../../components/learning-map/TaskDetailDialog';
 import { TopicTemplateBrowser } from '../../components/template/TopicTemplateBrowser';
 import { useTopicStore } from '../../store/topicStore';
+import { useGoalStore } from '../../store/goalStore';
+import { useTaskStore } from '../../store/taskStore';
+import { getGoalById, getTopicById, getGoalsForTopic, getTasksForGoal } from '../../store/helpers';
 import PageLayout from '../../components/layout/PageLayout';
 import { TopicStatus, TopicType } from '../../types/goal';
 import { SUBJECTS } from '../../constants/subjects';
@@ -40,7 +43,7 @@ import { TopicDetailsDialog } from '../../components/learning-map/TopicDetailsDi
 import { DraggableDialog } from '../../components/learning-map/DraggableDialog';
 import { TopicProgressDialog } from '../../components/learning-map/TopicProgressDialog';
 import { TopicReviewPage } from '../../components/topic-review/TopicReviewPage';
-import { useGoalStore } from '../../store/goalStore';
+import {fetchTopicsWithActions} from '../../store/dataManager';
 
 export const StudentLearningMap: React.FC = () => {
   // Dialog 相關狀態
@@ -57,11 +60,13 @@ export const StudentLearningMap: React.FC = () => {
   const [showTopicReviewId, setShowTopicReviewId] = useState<string | null>(null);
   const [showDailyReview, setShowDailyReview] = useState(false);
 
-  const { topics, createTopic, fetchTopicsWithActions } = useTopicStore();
+  const { topics, createTopic } = useTopicStore();
+  const { getTaskById } = useTaskStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapRect, setMapRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
   const [dialogPosition, setDialogPosition] = useState<{x: number, y: number}>({ x: -420, y: 20 });
 
+  
   useLayoutEffect(() => {
     if ((showDailyReview || showTopicCards || selectedTopicId || showProgress || showTopicReviewId) && mapRef.current) {
       const rect = mapRef.current.getBoundingClientRect();
@@ -71,24 +76,25 @@ export const StudentLearningMap: React.FC = () => {
 
   useEffect(() => {
     // 初始化載入主題數據
-    const { fetchTopicsWithActions } = useTopicStore.getState();
     fetchTopicsWithActions();
   }, []);
 
   const selectedTopic = topics.find(t => t.id === selectedTopicId);
-  // 當有 selectedTaskId 時，從所有主題中尋找該任務
+  // 當有 selectedTaskId 時，使用重構後的 store 架構查找任務
   const taskInfo = selectedTaskId ? (() => {
-    for (const topic of topics) {
-      if (!topic.goals) continue;
-      for (const goal of topic.goals) {
-        if (!goal.tasks) continue;
-        const task = goal.tasks.find(t => t.id === selectedTaskId);
-        if (task) {
-          return { task, goal, topic };
-        }
-      }
-    }
-    return null;
+    // 1. 從 taskStore 直接獲取任務
+    const task = getTaskById(selectedTaskId);
+    if (!task) return null;
+    
+    // 2. 從 goalStore 獲取目標
+    const goal = getGoalById(task.goal_id);
+    if (!goal) return null;
+    
+    // 3. 從 topicStore 獲取主題
+    const topic = getTopicById(goal.topic_id);
+    if (!topic) return null;
+    
+    return { task, goal, topic };
   })() : null;
   
   const selectedTask = taskInfo?.task;
@@ -182,19 +188,31 @@ export const StudentLearningMap: React.FC = () => {
 
   // 過濾出有任務的目標，並轉換為地圖點
   const tasks = topics
-    .filter(topic => topic.goals?.some(goal => (goal.tasks?.length ?? 0) > 0))
+    .filter(topic => {
+      // 使用重構後的架構：檢查主題是否有活躍目標
+      const topicGoals = getGoalsForTopic(topic.id);
+      return topicGoals.some(goal => {
+        const goalTasks = getTasksForGoal(goal.id);
+        return goalTasks.length > 0;
+      });
+    })
     .map((topic, index, filteredTopics) => {
       const totalTopics = filteredTopics.length;
       const x = (index / totalTopics) * 80 + 10;
       const y = 50;
       
+      // 使用重構後的架構計算完成狀態
+      const topicGoals = getGoalsForTopic(topic.id);
+      const completed = topicGoals.every(goal => {
+        const goalTasks = getTasksForGoal(goal.id);
+        return goalTasks.length > 0 && goalTasks.every(task => task.status === 'done');
+      });
+      
       return {
         id: topic.id,
         label: topic.title,
         subject: topic.subject || '未分類',
-        completed: topic.goals?.every(goal => 
-          goal.tasks?.every(task => task.status === 'done')
-        ) ?? false,
+        completed,
         position: { x, y },
         topicId: topic.id
       };
