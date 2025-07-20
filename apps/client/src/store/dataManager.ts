@@ -10,6 +10,7 @@ import { useTopicStore } from './topicStore';
 import { useGoalStore } from './goalStore';
 import { useTaskStore } from './taskStore';
 import * as storeUtils from './storeUtils';
+import { Topic } from '../types/goal';
 
 /**
  * 處理主題數據的通用函數
@@ -102,7 +103,7 @@ async function processTopicData(topicDataArray: any[], updateMode: 'full' | 'par
  * 獲取用戶的所有主題及其結構數據
  * 解構巢狀結構，分別存入各個 store
  */
-export async function fetchTopicsWithActions(): Promise<any[]> {
+export async function fetchTopicsWithActions(): Promise<Topic[]> {
   // 設置 loading 狀態
   useTopicStore.getState().loading = true;
   useTopicStore.getState().error = null;
@@ -146,7 +147,7 @@ export async function fetchTopicsWithActions(): Promise<any[]> {
 /**
  * 重新載入特定 Topic 的完整數據
  */
-export async function refreshTopicData(topicId: string): Promise<any> {
+export async function refreshTopicData(topicId: string): Promise<Topic | null> {
   try {
     // 確保用戶資料已載入
     const userStore = await import('./userStore');
@@ -160,7 +161,7 @@ export async function refreshTopicData(topicId: string): Promise<any> {
     });
     
     if (error) throw error;
-    if (!data || !Array.isArray(data) || data.length === 0) return;
+    if (!data || !Array.isArray(data) || data.length === 0) return null;
     
     // 使用通用處理函數
     const { topicsWithRate } = await processTopicData(data);
@@ -176,6 +177,7 @@ export async function refreshTopicData(topicId: string): Promise<any> {
   } catch (error: any) {
     console.error('重新載入主題數據失敗:', error);
     useTopicStore.setState({ error: error.message || '重新載入主題失敗' });
+    return null;
   }
 }
 

@@ -214,41 +214,128 @@ export const useTopicStore = create<TopicStore>((set, get) => ({
     return await get().updateTopicReferenceInfo(topicId, updatedReferenceInfo);
   },
   
-  createTopicFromTemplate: async (params) => {
+  createTopicFromTemplate: async (params: CreateTopicFromTemplateParams) => {
     set({ loading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('用戶未認證');
-      // 這裡 params 型別不完整，直接用 as any workaround
-      const p = params as any;
-      const { data, error } = await supabase
+
+      // 1. 獲取模板數據
+      const { data: templateData, error: templateError } = await supabase
+        .from('topic_templates')
+        .select('*')
+        .eq('id', params.template_id)
+        .single();
+      
+      if (templateError) throw templateError;
+      if (!templateData) throw new Error('模板不存在');
+
+      // 2. 創建主題
+      const topicData = {
+        template_id: params.template_id,
+        title: params.title || templateData.title,
+        description: params.description || templateData.description,
+        status: 'active' as const,
+        subject: templateData.subject,
+        category: templateData.category,
+        topic_type: templateData.template_type || '學習目標',
+        is_collaborative: params.is_collaborative || templateData.is_collaborative,
+        show_avatars: true,
+        due_date: null,
+        focus_element: null,
+        bubbles: templateData.bubbles || [],
+        owner_id: user.id,
+        creator_id: user.id,
+        version: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data: topic, error: topicError } = await supabase
         .from('topics')
-        .insert([{
-          topic_template_id: p.topic_template_id,
-          title: p.title,
-          description: p.description,
-          status: p.status,
-          subject: p.subject,
-          category: p.category,
-          topic_type: p.topic_type,
-          is_collaborative: p.is_collaborative,
-          show_avatars: p.show_avatars,
-          due_date: p.due_date,
-          focus_element: p.focus_element,
-          bubbles: p.bubbles,
-          owner_id: user.id,
-          version: 1,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
+        .insert([topicData])
         .select()
         .single();
-      if (error) throw error;
-      const newTopic = { ...data, goals: [], progress: 0 };
-      set(state => ({ topics: [newTopic, ...state.topics], loading: false }));
-      return newTopic;
+      
+      if (topicError) throw topicError;
+
+      // 3. 創建 Goals（從模板的巢狀結構轉換為獨立結構）
+      if (templateData.goals && templateData.goals.length > 0) {
+        for (const templateGoal of templateData.goals) {
+          const goalData = {
+            topic_id: topic.id,
+            creator_id: user.id,
+            owner_id: user.id,
+            title: templateGoal.title,
+            description: templateGoal.description,
+            reference_info: templateGoal.reference_info,
+            status: templateGoal.status || 'todo',
+            priority: templateGoal.priority || 'medium',
+            order_index: templateGoal.order_index || 0,
+            need_help: false,
+            version: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          const { data: goal, error: goalError } = await supabase
+            .from('goals')
+            .insert([goalData])
+            .select()
+            .single();
+          
+          if (goalError) throw goalError;
+
+          // 4. 創建 Tasks（從模板的巢狀結構轉換為獨立結構）
+          if (templateGoal.tasks && templateGoal.tasks.length > 0) {
+            for (const templateTask of templateGoal.tasks) {
+              const taskData = {
+                goal_id: goal.id,
+                creator_id: user.id,
+                owner_id: user.id,
+                title: templateTask.title,
+                description: templateTask.description,
+                reference_info: templateTask.reference_info,
+                status: templateTask.status || 'todo',
+                priority: templateTask.priority || 'medium',
+                order_index: templateTask.order_index || 0,
+                task_type: 'single',
+                task_config: { type: 'single' },
+                cycle_config: { cycle_type: 'none', auto_reset: false },
+                need_help: false,
+                version: 1,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+
+              const { data: task, error: taskError } = await supabase
+                .from('tasks')
+                .insert([taskData])
+                .select()
+                .single();
+              
+              if (taskError) throw taskError;
+            }
+          }
+
+          // 5. 注意：goals 表沒有 taskIds 欄位，所以跳過這個更新
+          // 任務和目標的關聯通過 tasks.goal_id 外鍵維護
+        }
+      }
+
+      // 6. 注意：topics 表沒有 goalIds 欄位，所以跳過這個更新
+      // 目標和主題的關聯通過 goals.topic_id 外鍵維護
+      const finalTopic = {
+        ...topic,
+        progress: 0
+      };
+
+      set(state => ({ topics: [finalTopic, ...state.topics], loading: false }));
+      return finalTopic;
     } catch (error: any) {
-      set({ loading: false, error: error.message || '從模板創建主題失敗' });
+      console.error('從模板創建主題失敗:', error);
+      const errorMessage = error.message || '從模板創建主題失敗';
+      set({ loading: false, error: errorMessage });
       return null;
     }
   },
