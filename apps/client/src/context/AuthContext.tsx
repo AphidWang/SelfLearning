@@ -225,7 +225,7 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  fallback = <div>請先登入...</div> 
+  fallback = <Navigate to="/login" replace /> 
 }) => {
   const { isAuthenticated, isLoading, tokenStatus } = useAuth();
 
