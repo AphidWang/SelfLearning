@@ -4,7 +4,7 @@ import {
   CalendarDays, BookOpen, CheckSquare, 
   LineChart, Users, BookMarked, 
   Menu, X, LogOut, Map, ChevronLeft, ChevronRight, Target, Grid3X3, 
-  PenTool, Zap, SplitSquareHorizontal, Sun, Moon, AlertTriangle, RotateCcw
+  PenTool, Zap, SplitSquareHorizontal, Sun, Moon, AlertTriangle, RotateCcw, BarChart3
 } from 'lucide-react';
 import { useUser, UserRole } from '../../context/UserContext';
 import { UserProfileDialog } from '../user-manager';
@@ -59,6 +59,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
         { name: '日誌', path: '/student/journal', icon: <PenTool size={16} /> },
         { name: '個人回顧', path: '/student/retro', icon: <RotateCcw size={16} /> },
         { name: '小組討論', path: '/student/group-retro', icon: <Users size={16} /> },
+        { name: '週進度報表', path: '/student/weekly-progress', icon: <BarChart3 size={16} /> },
+        { name: '課堂格子表', path: '/student/class-grid', icon: <Grid3X3 size={16} /> },
       ];
       
       // 如果有導師身份，加入導師視圖
