@@ -12,7 +12,7 @@ import reportRouter from './routes/report';
 import path from 'path';
 
 export const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || (process.env.NODE_ENV === 'production' ? 3000 : 5174);
 
 // CORS 設置必須在其他 middleware 之前
 app.use(cors({
