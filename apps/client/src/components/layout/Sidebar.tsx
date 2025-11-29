@@ -60,6 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isCollapsed, setIs
         { name: '個人回顧', path: '/student/retro', icon: <RotateCcw size={16} /> },
         { name: '小組討論', path: '/student/group-retro', icon: <Users size={16} /> },
         { name: '週進度報表', path: '/student/weekly-progress', icon: <BarChart3 size={16} /> },
+        { name: '週計劃表', path: '/student/weekly-plan', icon: <CalendarDays size={16} /> },
         { name: '課堂格子表', path: '/student/class-grid', icon: <Grid3X3 size={16} /> },
       ];
       

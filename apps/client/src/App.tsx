@@ -24,6 +24,7 @@ import TopicMindMapPage from './pages/student/TopicMindMapPage.tsx';
 import TaskWallPage from './pages/student/TaskWallPage';
 import IndependentTasksPage from './pages/student/IndependentTasksPage';
 import WeeklyProgressReport from './pages/student/WeeklyProgressReport';
+import WeeklyPlan from './pages/student/WeeklyPlan';
 import ClassGrid from './pages/student/ClassGrid';
 
 import LottiePreview from './pages/preview/LottiePreview';
@@ -230,6 +231,11 @@ function App() {
                     <Route path="/student/weekly-progress" element={
                       <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
                         <WeeklyProgressReport />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/student/weekly-plan" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <WeeklyPlan />
                       </RoleProtectedRoute>
                     } />
                     <Route path="/student/class-grid" element={
