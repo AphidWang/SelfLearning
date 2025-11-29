@@ -39,7 +39,7 @@ const SLOTS = [
   { key: 'morning', label: '上午', width: 'w-36' },
   { key: 'afternoon', label: '下午', width: 'w-36' },
   { key: 'clubAfter', label: '社團活動', width: 'w-20' },
-  { key: 'noteAfter', label: '小紀錄 / 心情', width: 'w-20', isNote: true }
+  { key: 'noteAfter', label: '每日小紀錄 / 心情顏色', width: 'w-20', isNote: true }
 ] as const;
 
 
