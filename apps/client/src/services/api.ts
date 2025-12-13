@@ -2,9 +2,9 @@ import axios from 'axios';
 import { supabase } from './supabase';
 
 export const api = axios.create({
-  // 使用相對路徑讓 Vite proxy 生效（開發環境）
-  // 或使用環境變數指定的完整 URL（生產環境）
-  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:5200'),
+  // 使用相對路徑（同 domain 時最安全）
+  // 或使用環境變數指定的完整 URL（跨 domain 時）
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : '/api'),
   headers: {
     'Content-Type': 'application/json'
   },

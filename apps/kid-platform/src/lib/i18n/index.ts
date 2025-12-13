@@ -7,7 +7,7 @@ import { zhTW, type LocaleStrings } from './locales/zh-TW';
 
 type Locale = 'zh-TW' | 'en-US';
 
-const locales: Record<Locale, LocaleStrings> = {
+const locales: Partial<Record<Locale, LocaleStrings>> = {
   'zh-TW': zhTW,
   // 'en-US': enUS, // 未來擴充
 };
@@ -16,7 +16,7 @@ const locales: Record<Locale, LocaleStrings> = {
  * 取得當前語言的字串
  */
 function getStrings(locale: Locale = 'zh-TW'): LocaleStrings {
-  return locales[locale] || locales['zh-TW'];
+  return locales[locale] || locales['zh-TW'] || zhTW;
 }
 
 /**

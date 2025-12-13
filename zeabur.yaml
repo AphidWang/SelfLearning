@@ -1,6 +1,14 @@
+# Zeabur 部署配置
+# 此服務同時提供：
+# - Port 5200: API + Legacy Client
+# - Port 5174: New Platform
 app:
-  name: selflearning
+  name: selflearning-server
   build:
-    command: yarn build
+    command: cd apps/server && yarn install && yarn build
   start:
-    command: yarn start
+    command: cd apps/server && yarn start
+  env:
+    - PORT=5200
+    - NEW_PLATFORM_PORT=5174
+    - NODE_ENV=production

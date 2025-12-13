@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd apps/kid-platform && yarn install && yarn build",
+  "outputDirectory": "apps/kid-platform/dist",
+  "installCommand": "yarn install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

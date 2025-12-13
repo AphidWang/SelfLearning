@@ -343,6 +343,8 @@ cd apps/kid-platform && yarn test
 
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** – 技術架構說明
 - **[DESIGN.md](./DESIGN.md)** – 設計系統規範（Legacy）
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** – 部署指南（Monorepo 部署注意事項）
+- **[SECURITY.md](./SECURITY.md)** – 安全性指南（環境變數安全性）
 - **[apps/kid-platform/README.md](./apps/kid-platform/README.md)** – 新平台詳細說明
 - **[apps/kid-platform/EXAMPLES.md](./apps/kid-platform/EXAMPLES.md)** – 使用範例
 
@@ -372,7 +374,7 @@ cd apps/kid-platform && yarn test
 - [ ] Tech Stack 最終確認
 - [ ] 資料庫 Schema 設計
 - [ ] API 端點規劃
-- [ ] 部署流程
+- [x] 部署流程（見 [DEPLOYMENT.md](./DEPLOYMENT.md)）
 
 ---
 

@@ -1,0 +1,12 @@
+# Netlify 部署配置 - 新平台 (kid-platform)
+# 注意：此配置只部署 apps/kid-platform，不包含其他 app
+
+[build]
+  command = "cd apps/kid-platform && yarn install && yarn build"
+  publish = "apps/kid-platform/dist"
+  base = "."
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

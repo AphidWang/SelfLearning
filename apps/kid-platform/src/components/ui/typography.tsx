@@ -11,7 +11,7 @@ type TypographyVariant = 'title' | 'subtitle' | 'heading' | 'subheading' | 'capt
 type TypographySize = 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
 type TypographyWeight = 'normal' | 'medium' | 'semibold' | 'bold';
 
-interface TypographyProps {
+export interface TypographyProps {
   tag?: TypographyTag;
   variant?: TypographyVariant;
   size?: TypographySize;
