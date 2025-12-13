@@ -38,3 +38,4 @@ const { t } = useI18n();
 - `components/ui/` - shadcn/ui 基礎元件
 - `components/kid-friendly/` - 針對小朋友優化的元件變體
 - `components/shared/` - 跨功能共用元件
+
