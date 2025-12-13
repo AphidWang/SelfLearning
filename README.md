@@ -110,24 +110,42 @@ cp .env.example .env
 ### 開發指令
 
 ```bash
-# 開發新平台（kid-platform）
+# 開發新平台（kid-platform）- Port 5174
 yarn dev:kid-platform
 # 或
 cd apps/kid-platform && yarn dev
 # 開啟 http://localhost:5174
 
-# 開發後端（server）
+# 開發 Legacy Client - Port 5173
+yarn dev:client
+# 或
+cd apps/client && yarn dev
+# 開啟 http://localhost:5173
+
+# 開發後端（server）- Port 5200
 yarn dev:server
 # 或
 cd apps/server && yarn dev
 # API 在 http://localhost:5200
 
-# 同時啟動前端和後端
+# 同時啟動新平台和後端（預設）
 yarn dev
+# 新平台: http://localhost:5174
+# Server: http://localhost:5200
+
+# 同時啟動 Legacy Client 和後端
+yarn dev:legacy
+# Legacy Client: http://localhost:5173
+# Server: http://localhost:5200
 
 # 建置所有專案
 yarn build
 ```
+
+**Port 分配**：
+- **5173** - Legacy Client (`apps/client`)
+- **5174** - 新平台 (`apps/kid-platform`)
+- **5200** - 後端 Server (`apps/server`)
 
 ---
 
