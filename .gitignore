@@ -15,6 +15,7 @@ node_modules
 /build
 /dist
 apps/*/dist
+apps/*/build
 
 # Environment files
 .env
@@ -22,6 +23,8 @@ apps/*/dist
 .env.development.local
 .env.test.local
 .env.production.local
+.env.bak
+*.bak
 
 # Debug logs
 npm-debug.log*
@@ -60,3 +63,20 @@ supabase/migrations_backup/
 
 # Supabase 資料夾不追蹤
 supabase/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 認證檔案（包含敏感資訊）
+aphid-*.json
+*.credentials.json
