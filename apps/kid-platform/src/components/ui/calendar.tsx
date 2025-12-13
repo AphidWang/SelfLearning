@@ -4,14 +4,13 @@
  */
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DayPicker, type DayPickerProps } from 'react-day-picker';
 import { cn } from '@/lib/utils/cn';
 
 export type CalendarProps = DayPickerProps;
 
 const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
-  ({ className, classNames, showOutsideDays = true, ...props }, ref) => {
+  ({ className, classNames, showOutsideDays = true, ...props }) => {
     return (
       <DayPicker
         showOutsideDays={showOutsideDays}
@@ -51,10 +50,6 @@ const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
           day_range_middle: 'aria-selected:bg-accent aria-selected:text-accent-foreground',
           day_hidden: 'invisible',
           ...classNames,
-        }}
-        components={{
-          IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-          IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
         }}
         {...props}
       />

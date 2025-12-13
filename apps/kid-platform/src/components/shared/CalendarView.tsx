@@ -6,13 +6,12 @@
 import React, { useState, useCallback } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, startOfDay, isToday } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { Calendar, type CalendarProps } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Typography } from '@/components/ui/typography';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils/cn';
-import type { CalendarView, CalendarEvent, CalendarEventConfig } from '@/types/calendar';
+import type { CalendarView as CalendarViewType, CalendarEvent, CalendarEventConfig } from '@/types/calendar';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 export interface CalendarViewProps {
@@ -21,7 +20,7 @@ export interface CalendarViewProps {
   onDateClick?: (date: Date) => void;
   onEventAdd?: (date: Date) => void;
   eventConfig?: CalendarEventConfig;
-  defaultView?: CalendarView;
+  defaultView?: CalendarViewType;
   className?: string;
 }
 
@@ -36,7 +35,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 }) => {
   const { t } = useI18n();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [view, setView] = useState<CalendarView>(defaultView);
+  const [view, setView] = useState<CalendarViewType>(defaultView);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   // 預設事件配置
@@ -142,7 +141,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
           {/* 日期格子 */}
           <div className="grid grid-cols-7 gap-1">
-          {days.map((day, dayIdx) => {
+            {days.map((day, dayIdx) => {
             const dayEvents = getEventsForDate(day);
             const isCurrentMonth = day >= monthStart && day <= monthEnd;
             const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -214,7 +213,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
               </div>
             );
-          })}
+            })}
+          </div>
         </div>
       </div>
     );
@@ -455,7 +455,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </Typography>
         </div>
 
-        <Select value={view} onValueChange={(value) => setView(value as CalendarView)}>
+        <Select value={view} onValueChange={(value) => setView(value as CalendarViewType)}>
           <SelectTrigger className="w-[120px] sm:w-[140px] h-8 sm:h-10 text-xs sm:text-sm">
             <SelectValue />
           </SelectTrigger>
