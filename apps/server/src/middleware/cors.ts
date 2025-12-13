@@ -57,3 +57,4 @@ export const corsOptions: cors.CorsOptions = {
  * CORS Middleware
  */
 export const corsMiddleware = cors(corsOptions);
+
