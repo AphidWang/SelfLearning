@@ -71,10 +71,13 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`🚀 API + Legacy Client Server running on port ${apiPort}`);
   });
 
-  // New Platform Server (Port 5174)
-  newPlatformApp.listen(newPlatformPort, () => {
-    console.log(`🚀 New Platform Server running on port ${newPlatformPort}`);
-  });
+  // New Platform Server (Port 5174) - 只在 production 環境啟動
+  // 開發環境時，kid-platform 使用 Vite dev server，不需要這裡的 Express server
+  if (process.env.NODE_ENV === 'production') {
+    newPlatformApp.listen(newPlatformPort, () => {
+      console.log(`🚀 New Platform Server running on port ${newPlatformPort}`);
+    });
+  }
 }
 
 
