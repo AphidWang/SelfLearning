@@ -5,8 +5,10 @@
     "build": "yarn workspaces foreach --all run build",
     "start": "cd apps/server && yarn start",
     "dev:client": "cd apps/client && yarn dev",
+    "dev:kid-platform": "cd apps/kid-platform && yarn dev",
     "dev:server": "cd apps/server && yarn dev",
-    "dev": "npm-run-all --parallel dev:client dev:server",
+    "dev": "npm-run-all --parallel dev:kid-platform dev:server",
+    "dev:legacy": "npm-run-all --parallel dev:client dev:server",
     "test": "vitest run"
   },
   "workspaces": [

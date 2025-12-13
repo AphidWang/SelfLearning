@@ -1,0 +1,359 @@
+---
+description: Code Review Guidelines for Kid Platform - 系統化檢查流程
+globs: ["apps/kid-platform/**"]
+alwaysApply: true
+---
+
+# Code Review 檢查指南
+
+## 🎯 檢查流程
+
+對於每個 commit 或 PR，需要**逐項檢查**以下規則，使用具體的 grep/搜尋指令。
+
+---
+
+## 📋 檢查清單
+
+### 1. Use Shadcn UI Components (#1)
+
+**已引入的組件**（在 `components/ui/` 資料夾）：
+- `Button`, `Input`, `Label`, `Card`, `Dialog`, `Select`, `Tabs`, `Toast`, `Alert`, `Badge`, `Avatar`, `Form`, `Checkbox`, `Radio Group`, `Switch`, `Slider`, `Progress`, `Skeleton`, `Separator`, `Sheet`, `Popover`, `Tooltip`, `Command`, `Calendar`, `Date Picker`
+
+**檢查指令：**
+
+```bash
+# 檢查是否有使用 Shadcn UI 組件
+grep -E "<Button|<Card|<Avatar|<Input|<Label|<Form|<Dialog|<Select" <file>
+
+# 檢查這些組件是否從 @/components/ui 正確導入
+grep "from '@/components/ui/" <file>
+
+# 檢查是否有自定義的 UI 組件（違規：應該要用 Shadcn UI 的組件）
+grep -E "function.*Button|const.*Button|export.*Button" <file> | grep -v "from '@/components/ui"
+grep -E "function.*Card|const.*Card|export.*Card" <file> | grep -v "from '@/components/ui"
+grep -E "function.*Input|const.*Input|export.*Input" <file> | grep -v "from '@/components/ui"
+grep -E "function.*Dialog|function.*Modal|const.*Dialog|const.*Modal" <file> | grep -v "from '@/components/ui"
+grep -E "function.*Dropdown|function.*Select|const.*Dropdown|const.*Select" <file> | grep -v "from '@/components/ui"
+
+# 檢查是否有使用原生 HTML 標籤作為 UI 組件（應該要用 Shadcn UI）
+grep -E "<button[^>]*className" <file>  # 應該要用 <Button> 而不是 <button>
+grep -E "<input[^>]*className" <file>  # 應該要用 <Input> 而不是 <input>
+grep -E "<label[^>]*className" <file>  # 應該要用 <Label> 而不是 <label>
+```
+
+**判斷原則**：
+- 如果程式碼中有自定義的 UI 組件，應該先檢查是否可以用 Shadcn UI 組件替代
+- 如果需要的組件 Shadcn UI 有，應該先引入再使用，而不是自己實作
+
+---
+
+### 2. Use Typography Component (#2)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有直接使用 HTML 文字標籤（應該要用 Typography 組件）
+grep -E "<p[^>]*>|<h[1-6][^>]*>" <file>  # <p> 和 <h1>-<h6> 應該要用 Typography
+grep -E "<span[^>]*>[^<]*[A-Za-z]" <file>  # <span> 用於文字顯示時應該要用 Typography
+
+# 檢查是否有使用 Typography 組件
+grep -E "<Typography" <file>
+```
+
+**判斷原則**：
+- `<p>`, `<h1>`, `<h2>`, `<h3>`, `<h4>`, `<h5>`, `<h6>` → 應該用 `<Typography tag="p">` 等
+- `<span>` 用於文字顯示時 → 應該用 `<Typography tag="span">`
+- `<div>` 作為容器/布局 → 不需要用 Typography（這是容器，不是文字）
+- `<label>` → 應該用 Shadcn UI 的 `<Label>` 組件（不是 Typography）
+- Button/Input 等組件內的文字 → 不需要用 Typography（組件自己處理樣式）
+
+---
+
+### 3. Use i18n Strings (#3)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有硬編碼的中文字串（違規）
+grep -E "['\"][\u4e00-\u9fa5]+['\"]" <file>  # 檢查中文字串
+
+# 檢查是否有使用 useI18n hook
+grep -E "useI18n|from '@/lib/i18n'" <file>
+
+# 檢查是否有使用 t() 函數
+grep -E "t\(['\"]" <file>
+```
+
+**判斷原則**：
+- **違規**：直接在元件中寫中文字串
+  - `'開始學習'` → 應該用 `t('student.welcome.startButton')`
+  - `'歡迎回來！'` → 應該用 `t('student.welcome.title')`
+- **可接受**：在 `lib/i18n/strings/` 檔案中定義字串（這是正確的）
+- **可接受**：在註解中的中文（註解不影響使用者）
+
+---
+
+### 4. No Inline Styles (#4)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有 style={{}} 屬性
+grep -E "style=\{" <file>
+```
+
+**判斷原則**：
+- **違規**：靜態樣式用 inline style
+  - `style={{ padding: '16px' }}` → 應該用 `className="p-4"`
+  - `style={{ backgroundColor: '#ff0000' }}` → 應該用 `className="bg-red-500"`
+  - `style={{ width: '240px' }}` → 應該用 `className="w-60"`
+- **可接受**：動態值用 inline style
+  - `style={{ width: `${dynamicWidth}px` }}` → 可接受（動態值）
+  - `style={{ top: `${scrollPosition}px` }}` → 可接受（動態值）
+
+---
+
+### 5. Use Standard Tailwind Classes (#5)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有任意值語法 [value]（應該要使用標準 Tailwind classes）
+grep -E "\[[0-9]+px\]|\[[0-9]+\%\]" <file>
+
+# 檢查是否有硬編碼的顏色值（應該要使用品牌色彩或標準 Tailwind 顏色）
+grep -E "text-\[#[0-9a-fA-F]|bg-\[#[0-9a-fA-F]|border-\[#[0-9a-fA-F]" <file>
+```
+
+**判斷原則**：
+- **違規**：使用任意值 `w-[240px]` → 應該用 `w-60`
+- **違規**：使用任意值 `p-[16px]` → 應該用 `p-4`
+- **可接受**：如果值不在標準 Tailwind 中，使用最接近的標準值
+- **可接受**：品牌色彩定義在 `globals.css` 中，使用 `text-brand-*`, `bg-brand-*`
+
+---
+
+### 6. Use Brand Colors (#6)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有硬編碼的顏色值（應該要使用品牌色彩）
+grep -E "#[0-9a-fA-F]{3,6}" <file>  # 檢查 hex 顏色
+
+# 檢查是否使用品牌色彩類別
+grep -E "text-brand-|bg-brand-|border-brand-" <file>
+```
+
+**判斷原則**：
+- 如果顏色是品牌色或專案色（會重複使用），應該定義在 `globals.css` 的 Brand colors 區塊
+- 如果顏色已經在品牌調色板中，應該使用對應的 Tailwind class
+- 只有真正的一次性顏色（不會重複使用）才可以用任意值 `bg-[#xxx]`
+
+---
+
+### 7. Feature-Specific Components (#7)
+
+**檢查指令：**
+
+```bash
+# 檢查組件是否放在正確位置
+# 如果組件只在特定 route 使用，應該在該 route 下的 _components/ 或 _widgets/
+ls -la <route-directory>/_components/ <route-directory>/_widgets/
+
+# 檢查 import 路徑
+grep -E "from.*components/shared" <route-page-file>  # 如果組件只在一個 route 使用，不應該在 shared
+```
+
+**判斷原則**：
+- 如果組件只用在一個 route（如 `app/(teacher)/`），應該放在 `app/(teacher)/_components/`
+- 如果組件跨功能使用，應該放在 `components/shared/`
+- 如果組件是 UI 基礎元件，應該放在 `components/ui/`（shadcn/ui）
+
+---
+
+### 8. Store Usage (#8)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有使用 store
+grep -E "use.*Store|from.*store/" <file>
+
+# 檢查 store 是否放在正確位置
+# Feature-specific store 應該在 app/(feature)/_store/
+# Shared store 應該在 store/
+
+# 檢查是否有直接操作全域狀態（應該透過 store actions）
+grep -E "\.user\s*=|\.loading\s*=" <file>  # 不應該直接修改 store 狀態
+```
+
+**判斷原則**：
+- Feature-specific store → `app/(feature)/_store/`
+- Shared store → `store/`
+- 必須透過 store actions 修改狀態，不可直接修改
+- 如果要新增 Global Store，必須先討論（見 kid-platform.mdc）
+
+---
+
+### 9. Form Validation (#9)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有使用 React Hook Form
+grep -E "useForm|from 'react-hook-form'" <file>
+
+# 檢查是否有使用 yup 驗證
+grep -E "yupResolver|from.*validations" <file>
+
+# 檢查是否有使用 Shadcn UI 的 Form 組件
+grep -E "<Form|<FormField|<FormItem" <file>
+```
+
+**判斷原則**：
+- **違規**：不使用 React Hook Form 處理表單
+- **違規**：不使用 yup 做驗證
+- **違規**：不使用 Shadcn UI 的 Form 組件
+- Schema 應該定義在 `lib/validations/` 目錄下
+
+---
+
+### 10. Component Size & Structure (#10)
+
+**檢查指令：**
+
+```bash
+# 檢查元件行數（應該 < 200 行）
+wc -l <file>
+
+# 檢查 useState 數量（應該 < 5 個）
+grep -c "useState" <file>
+
+# 檢查 useEffect 數量（應該 < 3 個）
+grep -c "useEffect" <file>
+```
+
+**判斷原則**：
+- 單一元件 < 200 行
+- 最多 5 個 useState per component
+- 最多 3 個 useEffect per component
+- 超過時應該拆分成子元件或提取到 hooks
+
+---
+
+### 11. TypeScript Types (#11)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有使用 any（違規）
+grep -E ": any|any\[|any\||any\&" <file>
+
+# 檢查是否有適當的類型定義
+grep -E "interface|type" <file>
+```
+
+**判斷原則**：
+- **違規**：使用 `any` 類型
+- 應該使用適當的 TypeScript 類型
+- 類型定義應該放在 `types/` 目錄下
+
+---
+
+### 12. No Console.log (#12)
+
+**檢查指令：**
+
+```bash
+# 檢查是否有 console.log（應該移除或改用適當的 logging）
+grep -E "console\.log|console\.warn|console\.error" <file>
+```
+
+**判斷原則**：
+- 生產環境不應該有 console.log
+- 可以使用適當的 logging 工具（如 Sentry）
+- 開發時可以保留，但應該標註 `// TODO: remove before production`
+
+---
+
+## 🔄 系統化檢查步驟
+
+對於每個 commit 或 PR，**必須執行以下步驟**：
+
+### Step 1: 列出所有改動的檔案
+
+```bash
+# 對於 commit
+git show <commit> --name-only
+
+# 對於 PR
+git diff --name-only main...feature-branch
+```
+
+### Step 2: 對每個檔案，逐項檢查 12 個規則
+
+使用上面的 grep 指令，記錄發現的問題：
+
+1. ✅ Rule #1: Shadcn UI Components
+2. ✅ Rule #2: Typography Component
+3. ✅ Rule #3: i18n Strings
+4. ✅ Rule #4: No Inline Styles
+5. ✅ Rule #5: Standard Tailwind Classes
+6. ✅ Rule #6: Brand Colors
+7. ✅ Rule #7: Feature-Specific Components
+8. ✅ Rule #8: Store Usage
+9. ✅ Rule #9: Form Validation
+10. ✅ Rule #10: Component Size & Structure
+11. ✅ Rule #11: TypeScript Types
+12. ✅ Rule #12: No Console.log
+
+### Step 3: 記錄問題
+
+建立檢查報告，列出：
+- 發現的問題
+- 違規的檔案和行數
+- 建議的修正方式
+
+### Step 4: 修正後再次檢查
+
+修正問題後，**再次執行所有 grep 檢查確認**。
+
+---
+
+## 📝 Code Review 範例
+
+```bash
+# 範例：檢查一個檔案
+FILE="apps/kid-platform/src/app/(student)/WelcomePage.tsx"
+
+# 1. 檢查 Shadcn UI
+grep "from '@/components/ui/" "$FILE" || echo "❌ 沒有使用 Shadcn UI 組件"
+
+# 2. 檢查 Typography
+grep -E "<p[^>]*>|<h[1-6][^>]*>" "$FILE" && echo "❌ 應該使用 Typography 組件"
+
+# 3. 檢查 i18n
+grep -E "['\"][\u4e00-\u9fa5]+['\"]" "$FILE" && echo "❌ 有硬編碼的中文字串"
+
+# 4. 檢查 inline styles
+grep -E "style=\{" "$FILE" && echo "⚠️ 有 inline styles，確認是否為動態值"
+
+# ... 繼續檢查其他規則
+```
+
+---
+
+## ⚠️ 重要提醒
+
+1. **逐項檢查**：不要跳過任何規則
+2. **使用具體指令**：使用 grep 指令，不要只靠視覺檢查
+3. **檢查所有檔案**：不要只檢查主要檔案
+4. **修正後再檢查**：修正問題後，再次執行所有檢查確認
+
+---
+
+## 🔗 相關文件
+
+- [Kid Platform Coding Rules](./kid-platform.mdc) - 完整的開發規範
+- [README](../../README.md) - 專案概述和架構說明

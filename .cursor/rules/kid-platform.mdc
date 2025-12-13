@@ -1,0 +1,499 @@
+---
+description: Coding rules and architecture guidelines for Kid Platform (課程紀錄/溝通平台)
+globs: ["apps/kid-platform/**"]
+alwaysApply: true
+---
+
+# Kid Platform - Coding Rules
+
+## 🎯 專案目標
+
+建立給老師/教練/小朋友使用的課程紀錄與溝通平台，強調：
+- 適合小朋友使用的友善介面（大按鈕、鮮豔顏色、簡單操作）
+- 統一的設計系統和元件規範
+- 可維護的字串管理系統（方便專家修改和 i18n）
+
+---
+
+## 📁 資料夾架構
+
+```
+apps/kid-platform/
+├── src/
+│   ├── app/                    # 路由頁面（Next.js style，但用 React Router）
+│   │   ├── (teacher)/         # 老師功能
+│   │   │   ├── _components/   # 僅此功能使用的元件
+│   │   │   ├── _widgets/      # 僅此功能使用的 widgets
+│   │   │   ├── _store/        # 僅此功能使用的 store
+│   │   │   └── _utils/        # 僅此功能使用的 utils
+│   │   ├── (coach)/           # 教練功能
+│   │   │   └── _components/
+│   │   └── (student)/         # 小朋友功能
+│   │       └── _components/
+│   ├── components/
+│   │   ├── ui/                # shadcn/ui 基礎元件（Button, Input, Card 等）
+│   │   ├── kid-friendly/       # 針對小朋友優化的元件變體
+│   │   │   ├── BigButton.tsx
+│   │   │   ├── ColorfulCard.tsx
+│   │   │   └── SimpleInput.tsx
+│   │   └── shared/            # 跨功能共用元件
+│   ├── lib/
+│   │   ├── i18n/              # 國際化系統
+│   │   │   ├── index.ts       # i18n 設定和 hooks
+│   │   │   ├── locales/       # 語言檔案
+│   │   │   │   ├── zh-TW.ts   # 繁體中文
+│   │   │   │   └── en-US.ts  # 英文（未來擴充）
+│   │   │   └── strings/       # 字串定義（方便專家修改）
+│   │   │       ├── common.ts      # 通用字串
+│   │   │       ├── teacher.ts      # 老師相關字串
+│   │   │       ├── coach.ts        # 教練相關字串
+│   │   │       └── student.ts      # 小朋友相關字串
+│   │   ├── utils/             # 工具函數
+│   │   │   └── cn.ts          # className 合併工具
+│   │   └── validations/       # yup schemas
+│   │       ├── common.ts      # 通用驗證
+│   │       └── forms.ts      # 表單驗證
+│   ├── hooks/                 # 自訂 hooks
+│   ├── store/                 # Zustand stores（跨功能共用）
+│   ├── services/              # API 服務
+│   └── types/                 # TypeScript 類型定義
+```
+
+### 元件放置規則
+
+1. **Feature-specific 元件**（只用在一個功能）：
+   - 放在 `app/(feature)/_components/` 或 `_widgets/`
+   - 例如：`app/(teacher)/_components/ClassList.tsx`
+
+2. **Shared 元件**（跨功能使用）：
+   - 放在 `components/shared/`
+   - 例如：`components/shared/UserAvatar.tsx`
+
+3. **UI 基礎元件**（shadcn/ui）：
+   - 放在 `components/ui/`
+   - 例如：`components/ui/button.tsx`
+
+4. **Kid-friendly 變體**：
+   - 放在 `components/kid-friendly/`
+   - 例如：`components/kid-friendly/BigButton.tsx`
+
+---
+
+## 🎨 UI 元件規範
+
+### 1. 優先使用 Shadcn UI
+
+**規則**：
+- **Always** 先檢查 [Shadcn UI Components](https://ui.shadcn.com/docs/components) 是否有現成元件
+- **Always** 使用 `components/ui/` 中的元件（Button, Input, Card, Dialog 等）
+- **Do NOT** 建立自訂元件來重複 Shadcn UI 的功能
+- **Do NOT** 使用原生 HTML 元素（`<button>`, `<input>`）當 Shadcn UI 有對應元件時
+
+**安裝新元件**：
+```bash
+cd apps/kid-platform
+npx shadcn@latest add <component-name>
+```
+
+**可用元件**：
+- `Button`, `Input`, `Label`, `Card`, `Dialog`, `Select`, `Tabs`, `Toast`, `Alert`, `Badge`, `Avatar`, `Form`, `Checkbox`, `Radio Group`, `Switch`, `Slider`, `Progress`, `Skeleton`, `Separator`, `Sheet`, `Popover`, `Tooltip`, `Command`, `Calendar`, `Date Picker`
+
+### 2. Typography 元件
+
+**規則**：
+- **Always** 使用 `<Typography>` 元件取代原生 HTML 文字標籤
+- **Do NOT** 使用 `<p>`, `<h1>`, `<h2>`, `<h3>`, `<h4>`, `<h5>`, `<h6>`, `<span>`（用於文字顯示時）
+
+**使用方式**：
+```tsx
+// ❌ 錯誤
+<p className="text-lg">標題</p>
+<h1 className="text-2xl font-bold">歡迎</h1>
+
+// ✅ 正確
+<Typography tag="p" variant="subtitle" size="lg">標題</Typography>
+<Typography tag="h1" variant="title" size="2xl" weight="bold">歡迎</Typography>
+```
+
+**Typography Props**：
+- `tag`: `'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' | 'span'`
+- `variant`: `'title' | 'subtitle' | 'heading' | 'subheading' | 'caption' | 'link' | 'inherit'`
+- `size`: `'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl'`
+- `weight`: `'normal' | 'medium' | 'semibold' | 'bold'`
+- `colorful`: `boolean` - 是否使用鮮豔顏色（小朋友專用）
+
+### 3. Kid-Friendly 元件變體
+
+**規則**：
+- 針對小朋友的頁面，使用 `components/kid-friendly/` 中的變體
+- 這些元件有更大的觸控區域、更鮮豔的顏色、更簡單的操作
+
+**可用元件**：
+- `BigButton` - 最小 48x48px 觸控區域，鮮豔顏色
+- `ColorfulCard` - 鮮豔背景、大圓角、柔和陰影
+- `SimpleInput` - 大尺寸輸入框、明顯焦點狀態
+- `KidTypography` - 特別大的字體、高對比度
+
+---
+
+## 🌐 字串管理系統（i18n）
+
+### 規則
+
+1. **Never** 在元件中硬編碼字串
+2. **Always** 使用 `useI18n()` hook 取得字串
+3. **Always** 將新字串定義在 `lib/i18n/strings/` 對應檔案中
+
+### 使用方式
+
+```tsx
+// ❌ 錯誤
+<Button>開始學習</Button>
+<Typography>歡迎回來！</Typography>
+
+// ✅ 正確
+import { useI18n } from '@/lib/i18n';
+
+const { t } = useI18n();
+<Button>{t('student.welcome.startButton')}</Button>
+<Typography>{t('student.welcome.title')}</Typography>
+```
+
+### 字串檔案結構
+
+```typescript
+// lib/i18n/strings/student.ts
+export const studentStrings = {
+  welcome: {
+    title: '歡迎回來！',
+    startButton: '開始學習',
+    // ...
+  },
+  // ...
+};
+```
+
+### 專家修改字串
+
+- 所有字串都在 `lib/i18n/strings/` 目錄下
+- 按功能分類（common, teacher, coach, student）
+- 方便專家直接修改，不需要改程式碼
+
+---
+
+## 📝 表單規範
+
+### 規則
+
+1. **Always** 使用 `React Hook Form` 處理表單
+2. **Always** 使用 `yup` 做驗證
+3. **Always** 使用 Shadcn UI 的 `Form` 相關元件
+
+### Schema 定義
+
+```typescript
+// lib/validations/forms.ts
+import * as yup from 'yup';
+
+export const studentNameSchema = yup.object({
+  name: yup
+    .string()
+    .trim()
+    .min(2, '名字至少要 2 個字喔！')
+    .max(20, '名字不能超過 20 個字')
+    .required('請告訴我你的名字～')
+    .default(''),
+});
+```
+
+### Form 使用
+
+```tsx
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { studentNameSchema } from '@/lib/validations/forms';
+
+const form = useForm({
+  mode: 'onSubmit',
+  resolver: yupResolver(studentNameSchema),
+  defaultValues: studentNameSchema.getDefault(),
+});
+
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)}>
+    <FormField
+      control={form.control}
+      name="name"
+      render={({ field }) => (
+        <FormItem>
+          <FormControl>
+            <Input placeholder="你的名字" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  </form>
+</Form>
+```
+
+---
+
+## 🎨 樣式規範
+
+### Tailwind CSS
+
+1. **Always** 使用標準 Tailwind 類別
+2. **Do NOT** 使用 inline styles（除非是動態值）
+3. **Always** 使用 `cn()` 工具合併 className
+
+```tsx
+// ❌ 錯誤
+<div style={{ padding: '16px', backgroundColor: '#ff0000' }}>Content</div>
+<div className="p-4 bg-[#ff0000]">Content</div>
+
+// ✅ 正確
+<div className="p-4 bg-red-500">Content</div>
+<div className={cn("p-4", isActive && "bg-red-500")}>Content</div>
+
+// ✅ 可接受：動態值
+<div style={{ width: `${dynamicWidth}px` }}>Content</div>
+```
+
+### 品牌色彩
+
+- 檢查 `globals.css` 中的品牌色彩定義
+- 使用 Tailwind 類別：`text-brand-*`, `bg-brand-*`, `border-brand-*`
+- 小朋友專用：使用鮮豔、高對比度的顏色
+
+### 間距規範
+
+- 基本單位：0.25rem (4px)
+- 小朋友專用：使用更大的間距（至少 16px padding）
+
+---
+
+## 🎯 程式碼品質規範
+
+### 元件大小
+
+- **單一元件 < 200 行**
+- 超過 200 行時，拆分成子元件或 widgets
+- 參考：`app/(home)/feed/page.tsx` (77 lines) 是目標風格
+
+### 狀態管理
+
+#### 元件層級狀態
+
+- **最多 5 個 useState** per component
+- 超過 5 個時，使用 `useImmerReducer` 或自訂 hook
+- 複雜狀態邏輯提取到 `hooks/` 目錄
+
+#### Store 使用規範
+
+**目前使用 Zustand 作為狀態管理方案**
+
+1. **Feature-specific Store**（只用在一個功能）：
+   - 放在 `app/(feature)/_store/`
+   - 例如：`app/(teacher)/_store/classStore.ts`
+
+2. **Shared Store**（跨功能共用）：
+   - 放在 `store/` 目錄
+   - 例如：`store/userStore.ts`, `store/authStore.ts`
+
+3. **Store 命名規範**：
+   - 檔案名稱：`{name}Store.ts`
+   - Hook 名稱：`use{Name}Store`
+   - 例如：`userStore.ts` → `useUserStore()`
+
+4. **Store 結構規範**：
+   ```typescript
+   // store/userStore.ts
+   interface UserStoreState {
+     // 狀態
+     user: User | null;
+     loading: boolean;
+     error: string | null;
+     
+     // Actions
+     setUser: (user: User | null) => void;
+     fetchUser: () => Promise<void>;
+     clearUser: () => void;
+   }
+   
+   export const useUserStore = create<UserStoreState>((set, get) => ({
+     // 初始狀態
+     user: null,
+     loading: false,
+     error: null,
+     
+     // Actions
+     setUser: (user) => set({ user }),
+     fetchUser: async () => {
+       set({ loading: true, error: null });
+       try {
+         // fetch logic
+       } catch (error) {
+         set({ error: error.message });
+       } finally {
+         set({ loading: false });
+       }
+     },
+     clearUser: () => set({ user: null }),
+   }));
+   ```
+
+#### Global Store 與全域架構改動
+
+⚠️ **重要：全域架構改動需要討論**
+
+以下情況**必須**先討論再實作：
+
+1. **新增 Global Store**：
+   - 影響多個功能的全域狀態
+   - 例如：`globalAppStore`, `globalConfigStore`
+   - **必須**在 PR 或 issue 中說明：
+     - 為什麼需要 global store？
+     - 會影響哪些功能？
+     - 是否有替代方案？
+
+2. **改變狀態管理方案**：
+   - 從 Zustand 改為其他方案（Redux, Jotai, Recoil 等）
+   - **必須**團隊討論並更新此規範
+
+3. **改變 Store 架構**：
+   - 改變 store 的組織方式
+   - 改變 store 的命名規範
+   - **必須**更新此規範文件
+
+4. **新增全域 Context/Provider**：
+   - 影響整個應用的 Context
+   - **必須**說明為什麼不用 store 而用 Context
+
+**討論流程**：
+1. 在 GitHub Issue 或 PR 中提出
+2. 說明改動原因和影響範圍
+3. 獲得團隊同意後再實作
+4. 更新相關規範文件
+
+### React Hooks
+
+#### useEffect
+
+- **最多 3 個 useEffect** per component
+- 超過 3 個時，提取到 custom hooks
+- **Do NOT** 用 `useEffect` 做 data fetching（用 API hooks 代替）
+
+#### useCallback / useMemo
+
+- **Only** 在以下情況使用：
+  - 函數/值計算昂貴
+  - 會導致子元件不必要的 re-render
+- **Do NOT** 過度使用
+
+### 邏輯分離
+
+- 資料轉換邏輯 → `lib/utils/`
+- 可重用邏輯 → `hooks/`
+- 常數（magic numbers/strings）→ constants 檔案
+- **Do NOT** 在元件中寫複雜邏輯
+
+---
+
+## 📦 套件管理
+
+- **Always** 使用 `yarn`（不是 pnpm）
+- 這是 monorepo 專案，從根目錄執行命令
+
+---
+
+## 🚫 Git 操作限制
+
+- **NEVER** 使用 force push
+- **NEVER** 直接操作 remote branches
+- **NEVER** 使用 `--no-verify` 跳過 hooks
+- **Always** 使用 `git mv` 移動檔案以保留 git history
+
+---
+
+## 📖 術語定義
+
+1. **Widget**: 有業務邏輯、資料獲取、複雜狀態管理、多個元件
+2. **Component**: 純展示型，接受 props，最小/無狀態
+3. **Kid-Friendly**: 針對小朋友優化的元件變體（大尺寸、鮮豔顏色、簡單操作）
+4. **Store**: Zustand store，用於狀態管理
+5. **Feature-specific Store**: 只用在單一功能的 store
+6. **Shared Store**: 跨功能共用的 store
+7. **Global Store**: 影響整個應用的全域 store（需要討論）
+
+---
+
+## ✅ 寫程式前檢查清單
+
+1. ✅ 檢查 `components/ui/` 是否有現成元件
+2. ✅ 檢查 `lib/i18n/strings/` 是否有現成字串
+3. ✅ 檢查 `lib/validations/` 是否有現成驗證
+4. ✅ 檢查 `store/` 是否有現成 store
+5. ✅ 決定元件放置位置（feature-specific vs shared）
+6. ✅ 決定 store 放置位置（feature-specific vs shared）
+7. ✅ 計劃元件結構（< 200 行，< 5 useState，< 3 useEffect）
+8. ⚠️ **如果要新增 Global Store 或改變全域架構，先討論！**
+
+---
+
+## 🎨 小朋友專用設計規範
+
+### 觸控區域
+
+- **最小 48x48px** 觸控區域
+- 按鈕使用 `BigButton` 元件
+
+### 字體大小
+
+- **至少 16px** 內文
+- **至少 18-20px** 重要文字
+- 使用 `KidTypography` 元件
+
+### 顏色
+
+- **高對比度**、**鮮豔顏色**
+- 避免灰色系（除非是次要元素）
+- 使用 `colorful` prop 啟用鮮豔模式
+
+### 間距
+
+- **至少 16px** padding
+- 更大的 spacing 讓介面更寬鬆
+
+### 圖示
+
+- **優先使用圖示**，減少文字
+- 使用 `lucide-react` 圖示庫
+- 圖示大小至少 20px
+
+---
+
+## 📋 Code Review
+
+所有程式碼變更都需要通過 Code Review 檢查。
+
+詳見 **[Code Review Guidelines](./code-review.mdc)** - 完整的檢查清單、grep 指令和系統化檢查流程。
+
+**重點檢查項目**：
+1. ✅ 使用 Shadcn UI 組件
+2. ✅ 使用 Typography 組件
+3. ✅ 使用 i18n 字串（不硬編碼）
+4. ✅ 不使用 inline styles
+5. ✅ 使用標準 Tailwind classes
+6. ✅ Store 使用正確
+7. ✅ 表單使用 React Hook Form + yup
+8. ✅ 元件大小符合規範
+
+---
+
+## 🔗 相關文件
+
+- [Code Review Guidelines](./code-review.mdc) - Code Review 檢查指南
+- [README](../../README.md) - 專案概述和架構說明
