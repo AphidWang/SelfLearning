@@ -31,3 +31,4 @@ export interface CalendarEventConfig {
   };
   defaultOrder?: number;
 }
+
