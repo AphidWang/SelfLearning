@@ -8,9 +8,10 @@ export interface CalendarEvent {
   id: string;
   title: string;
   description?: string;
+  subject?: string; // 科目（例如：'國語', '數學'）
   startTime: Date;
   endTime: Date;
-  color?: string;
+  color?: string; // 顏色（如果沒有指定，會根據 subject 自動設定）
   displayFields?: {
     title?: boolean;
     time?: boolean;

@@ -2,20 +2,22 @@ import React, { useState } from 'react';
 import { Typography } from './components/ui/typography';
 import { BigButton } from './components/kid-friendly/BigButton';
 import { CalendarView } from './components/shared/CalendarView';
+import { EventDialog } from './components/shared/EventDialog';
 import { useI18n } from './lib/i18n';
 import type { CalendarEvent } from './types/calendar';
+import { SUBJECTS } from './constants/subjects';
 import { BookOpen } from 'lucide-react';
 
 const App: React.FC = () => {
   const { t } = useI18n();
-  const [events] = useState<CalendarEvent[]>([
+  const [events, setEvents] = useState<CalendarEvent[]>([
     {
       id: '1',
       title: '數學課',
       description: '學習加減法',
+      subject: SUBJECTS.MATH,
       startTime: new Date(2024, 11, 15, 10, 0),
       endTime: new Date(2024, 11, 15, 11, 0),
-      color: '#3b82f6',
       order: 1,
       displayFields: {
         title: true,
@@ -27,9 +29,9 @@ const App: React.FC = () => {
       id: '2',
       title: '英文課',
       description: '學習單字',
+      subject: SUBJECTS.ENGLISH,
       startTime: new Date(2024, 11, 15, 14, 0),
       endTime: new Date(2024, 11, 15, 15, 30),
-      color: '#10b981',
       order: 2,
       displayFields: {
         title: true,
@@ -40,23 +42,55 @@ const App: React.FC = () => {
     {
       id: '3',
       title: '體育課',
+      subject: SUBJECTS.PE,
       startTime: new Date(2024, 11, 16, 9, 0),
       endTime: new Date(2024, 11, 16, 10, 0),
-      color: '#f59e0b',
       order: 1,
     },
   ]);
 
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
   const handleEventClick = (event: CalendarEvent) => {
-    console.log('Event clicked:', event);
+    setSelectedEvent(event);
+    setSelectedDate(event.startTime);
+    setEventDialogOpen(true);
   };
 
   const handleDateClick = (date: Date) => {
-    console.log('Date clicked:', date);
+    setSelectedDate(date);
+    setSelectedEvent(null);
+    setEventDialogOpen(true);
   };
 
   const handleEventAdd = (date: Date) => {
-    console.log('Add event on date:', date);
+    setSelectedDate(date);
+    setSelectedEvent(null);
+    setEventDialogOpen(true);
+  };
+
+  const handleEventSave = (eventData: Omit<CalendarEvent, 'id'>) => {
+    if (selectedEvent) {
+      // 編輯現有事件
+      setEvents(events.map((e) => (e.id === selectedEvent.id ? { ...selectedEvent, ...eventData } : e)));
+    } else {
+      // 新增事件
+      const newEvent: CalendarEvent = {
+        id: Date.now().toString(),
+        ...eventData,
+      };
+      setEvents([...events, newEvent]);
+    }
+    setSelectedEvent(null);
+    setSelectedDate(null);
+  };
+
+  const handleEventDelete = (eventId: string) => {
+    setEvents(events.filter((e) => e.id !== eventId));
+    setSelectedEvent(null);
+    setSelectedDate(null);
   };
 
   return (
@@ -97,6 +131,15 @@ const App: React.FC = () => {
           />
         </div>
       </div>
+
+      <EventDialog
+        open={eventDialogOpen}
+        onOpenChange={setEventDialogOpen}
+        date={selectedDate}
+        event={selectedEvent}
+        onSave={handleEventSave}
+        onDelete={handleEventDelete}
+      />
     </div>
   );
 };

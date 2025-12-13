@@ -12,6 +12,7 @@ import { Typography } from '@/components/ui/typography';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils/cn';
 import type { CalendarView as CalendarViewType, CalendarEvent, CalendarEventConfig } from '@/types/calendar';
+import { getSubjectColor } from '@/constants/subjects';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 export interface CalendarViewProps {
@@ -167,7 +168,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 <div className="space-y-0.5 sm:space-y-1">
                   {dayEvents.slice(0, 2).map((event) => {
                     const displayFields = event.displayFields ?? config.displayFields;
-                    const eventColor = event.color ?? config.defaultColor;
+                    const eventColor = event.color ?? (event.subject ? getSubjectColor(event.subject) : config.defaultColor);
 
                     return (
                       <div
@@ -286,7 +287,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       >
                         {hourEvents.map((event) => {
                           const displayFields = event.displayFields ?? config.displayFields;
-                          const eventColor = event.color ?? config.defaultColor;
+                          const eventColor = event.color ?? (event.subject ? getSubjectColor(event.subject) : config.defaultColor);
                           const eventStartMinutes = event.startTime.getHours() * 60 + event.startTime.getMinutes();
                           const eventEndMinutes = event.endTime.getHours() * 60 + event.endTime.getMinutes();
                           const hourStartMinutes = hour * 60;
@@ -380,7 +381,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 >
                   {hourEvents.map((event) => {
                     const displayFields = event.displayFields ?? config.displayFields;
-                    const eventColor = event.color ?? config.defaultColor;
+                    const eventColor = event.color ?? (event.subject ? getSubjectColor(event.subject) : config.defaultColor);
                     const eventStartMinutes = event.startTime.getHours() * 60 + event.startTime.getMinutes();
                     const eventEndMinutes = event.endTime.getHours() * 60 + event.endTime.getMinutes();
                     const hourStartMinutes = hour * 60;

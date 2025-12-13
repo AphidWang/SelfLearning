@@ -8,6 +8,51 @@
     --color-brand-primary: #FF6B6B;
     --color-brand-secondary: #4ECDC4;
     --color-brand-accent: #FFE66D;
+
+    /* Shadcn UI 設計系統變數 - 保持 UI 一致性 */
+    /* 背景色 */
+    --background: 0 0% 100%; /* 白色 */
+    --foreground: 222.2 84% 4.9%; /* 深灰文字 */
+    
+    /* 卡片和容器 */
+    --card: 0 0% 100%; /* 白色 */
+    --card-foreground: 222.2 84% 4.9%;
+    
+    /* Popover (下拉選單、彈出視窗) */
+    --popover: 0 0% 100%; /* 白色 */
+    --popover-foreground: 222.2 84% 4.9%;
+    
+    /* Dialog (對話框) */
+    --dialog: 0 0% 100%; /* 白色 */
+    --dialog-foreground: 222.2 84% 4.9%;
+    
+    /* 主要顏色 */
+    --primary: 221.2 83.2% 53.3%; /* 藍色 */
+    --primary-foreground: 210 40% 98%;
+    
+    /* 次要顏色 */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    
+    /* 強調色 (hover 狀態) */
+    --accent: 210 40% 96.1%; /* 淺灰 */
+    --accent-foreground: 222.2 47.4% 11.2%;
+    
+    /* 破壞性操作 (刪除等) */
+    --destructive: 0 84.2% 60.2%; /* 紅色 */
+    --destructive-foreground: 210 40% 98%;
+    
+    /* 邊框 */
+    --border: 214.3 31.8% 91.4%; /* 淺灰 */
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%; /* 藍色 (focus ring) */
+    
+    /* 次要文字 */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    
+    /* 圓角 */
+    --radius: 0.5rem;
   }
 }
 
@@ -23,4 +68,5 @@ button, a {
   min-height: 44px;
   min-width: 44px;
 }
+
 
