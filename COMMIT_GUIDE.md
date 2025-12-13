@@ -173,3 +173,4 @@ grep -r "API_KEY\|SECRET\|PASSWORD" --include="*.ts" --include="*.tsx" --include
 # 檢查檔案大小（避免提交大檔案）
 find apps/ -type f -size +1M
 ```
+

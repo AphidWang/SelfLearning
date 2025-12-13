@@ -357,3 +357,4 @@ grep -E "style=\{" "$FILE" && echo "⚠️ 有 inline styles，確認是否為�
 
 - [Kid Platform Coding Rules](./kid-platform.mdc) - 完整的開發規範
 - [README](../../README.md) - 專案概述和架構說明
+
