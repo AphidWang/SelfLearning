@@ -45,3 +45,4 @@ export const studentStrings = {
     save: '儲存資料',
   },
 };
+

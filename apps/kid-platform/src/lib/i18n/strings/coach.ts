@@ -41,3 +41,4 @@ export const coachStrings = {
     messageList: '訊息列表',
   },
 };
+

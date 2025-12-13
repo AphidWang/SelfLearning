@@ -75,3 +75,4 @@ export function useI18n(locale: Locale = 'zh-TW') {
 export function t(path: StringPath, locale: Locale = 'zh-TW'): string {
   return getString(path, locale);
 }
+
