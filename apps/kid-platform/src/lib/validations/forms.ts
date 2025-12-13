@@ -66,3 +66,4 @@ export const messageSchema = yup.object({
     .required('請輸入訊息內容')
     .default(''),
 });
+
