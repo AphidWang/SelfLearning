@@ -39,3 +39,4 @@ export const KidTypography: React.FC<KidTypographyProps> = ({
     />
   );
 };
+
