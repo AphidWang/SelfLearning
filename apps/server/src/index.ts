@@ -9,6 +9,8 @@ import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
 import usersRouter from './routes/users';
 import reportRouter from './routes/report';
+import courseSchedulerRouter from './routes/courseScheduler';
+import taiwaneseRouter from './routes/taiwanese';
 import path from 'path';
 
 export const app = express();
@@ -40,6 +42,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/users', usersRouter);
 app.use('/api', reportRouter);
+app.use('/api/course-scheduler', courseSchedulerRouter);
+app.use('/api/taiwanese', taiwaneseRouter);
 
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 

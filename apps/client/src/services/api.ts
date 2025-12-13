@@ -2,12 +2,14 @@ import axios from 'axios';
 import { supabase } from './supabase';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5200',
+  // 使用相對路徑讓 Vite proxy 生效（開發環境）
+  // 或使用環境變數指定的完整 URL（生產環境）
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:5200'),
   headers: {
     'Content-Type': 'application/json'
   },
   withCredentials: true,
-  timeout: 15000 // 15 秒 timeout
+  timeout: 60000 // 60 秒 timeout（TTS 需要較長時間）
 });
 
 // 防止重複刷新 token 的標誌

@@ -16,6 +16,7 @@ import NotFound from './pages/NotFound';
 import MentorCurriculum from './pages/mentor/MentorCurriculum';
 import MentorTaskPlanner from './pages/mentor/MentorTaskPlanner.tsx';
 import CourseBluePrint from './pages/mentor/CourseBluePrint';
+import CourseScheduler from './pages/mentor/CourseScheduler';
 import { CurriculumProvider } from './context/CurriculumContext';
 import { ErrorProvider } from './context/ErrorContext';
 import StudentPlanning from './pages/student/StudentPlanning';
@@ -26,6 +27,7 @@ import IndependentTasksPage from './pages/student/IndependentTasksPage';
 import WeeklyProgressReport from './pages/student/WeeklyProgressReport';
 import WeeklyPlan from './pages/student/WeeklyPlan';
 import ClassGrid from './pages/student/ClassGrid';
+import LearnTaiwanese from './pages/student/LearnTaiwanese';
 
 import LottiePreview from './pages/preview/LottiePreview';
 import { StudentLearningMap } from './pages/student/StudentLearningMap';
@@ -263,6 +265,11 @@ function App() {
                         <SubjectPage />
                       </RoleProtectedRoute>
                     } />
+                    <Route path="/student/learn-taiwanese" element={
+                      <RoleProtectedRoute requiredRoles={['student', 'parent', 'admin', 'mentor']}>
+                        <LearnTaiwanese />
+                      </RoleProtectedRoute>
+                    } />
                     
                     {/* Mentor Routes */}
                     <Route path="/mentor" element={
@@ -293,6 +300,11 @@ function App() {
                     <Route path="/mentor/course-blueprint" element={
                       <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
                         <CourseBluePrint />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/mentor/course-scheduler" element={
+                      <RoleProtectedRoute requiredRoles={['mentor', 'admin']}>
+                        <CourseScheduler />
                       </RoleProtectedRoute>
                     } />
                     

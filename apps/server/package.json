@@ -8,20 +8,25 @@
     "dev": "nodemon",
     "build": "tsc",
     "start": "node dist/index.js",
-    "migrate": "ts-node src/scripts/apply-migrations-cli.ts"
+    "migrate": "ts-node src/scripts/apply-migrations-cli.ts",
+    "install-tts-deps": "python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt || (python3 -m venv venv && venv/bin/pip install -r requirements.txt)"
   },
   "dependencies": {
     "@self-learning/types": "*",
     "@supabase/supabase-js": "^2.50.0",
     "@types/pg": "^8.15.4",
     "axios": "1.8.2",
+    "cheerio": "^1.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
+    "google-auth-library": "^10.5.0",
+    "googleapis": "^168.0.0",
     "jsonwebtoken": "^9.0.0",
     "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@types/cheerio": "^1.0.0",
     "@types/cors": "^2.8.13",
     "@types/express": "^4.17.17",
     "@types/jsonwebtoken": "^9.0.1",
